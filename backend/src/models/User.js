@@ -1,104 +1,174 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
-const UserSchema = new mongoose.Schema(
-  {
-    email: { 
-      type: String, 
-      required: true, 
-      unique: true,
-      lowercase: true,
-      trim: true
-    },
-    password: { 
-      type: String, 
-      required: true 
-    },
-    role: { 
-      type: String, 
-      enum: ['employer', 'jobseeker', 'admin'], 
-      default: 'jobseeker' 
-    },
-    profile: {
-      firstName: { type: String, required: true },
-      lastName: { type: String, required: true },
-      phone: String,
-      avatar: String,
-      bio: String,
-      location: {
-        city: String,
-        district: String,
-        country: { type: String, default: 'VN' }
-      }
-    },
-    // Cho jobseeker
-    jobseeker: {
-      education: [{
-        school: String,
-        degree: String,
-        field: String,
-        startDate: Date,
-        endDate: Date,
-        gpa: Number
-      }],
-      experience: [{
-        company: String,
-        position: String,
-        description: String,
-        startDate: Date,
-        endDate: Date,
-        isCurrent: { type: Boolean, default: false }
-      }],
-      skills: [{ type: String }],
-      resume: String, // URL to resume file
-      expectedSalary: {
-        min: Number,
-        max: Number,
-        currency: { type: String, default: 'VND' }
-      },
-      preferredLocations: [{ type: String }],
-      preferredJobTypes: [{ type: String }] // intern, fulltime, parttime
-    },
-    // Cho employer
-    employer: {
-      companyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Company' },
-      position: String, // HR Manager, Recruiter, etc.
-      department: String
-    },
-    isVerified: { type: Boolean, default: false },
-    isActive: { type: Boolean, default: true },
-    lastLogin: Date,
-    preferences: {
-      emailNotifications: { type: Boolean, default: true },
-      pushNotifications: { type: Boolean, default: true },
-      language: { type: String, default: 'vi' }
-    }
+const UserSchema = new mongoose.Schema({
+  email: {
+    type: String,
+    required: [true, 'Please add an email'],
+    unique: true,
+    match: [
+      /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
+      'Please add a valid email'
+    ]
   },
-  { timestamps: true }
-);
-
-// Hash password before saving
-UserSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  
-  try {
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-    next();
-  } catch (error) {
-    next(error);
+  password: {
+    type: String,
+    required: [true, 'Please add a password'],
+    minlength: 6,
+    select: false
+  },
+  firstName: {
+    type: String,
+    required: [true, 'Please add a first name'],
+    trim: true,
+    maxlength: [50, 'First name cannot be more than 50 characters']
+  },
+  lastName: {
+    type: String,
+    required: [true, 'Please add a last name'],
+    trim: true,
+    maxlength: [50, 'Last name cannot be more than 50 characters']
+  },
+  role: {
+    type: String,
+    enum: ['student', 'employer', 'admin'],
+    default: 'student'
+  },
+  avatar: {
+    type: String,
+    default: ''
+  },
+  phone: {
+    type: String,
+    match: [/^[\+]?[1-9][\d]{0,15}$/, 'Please add a valid phone number']
+  },
+  dateOfBirth: {
+    type: Date
+  },
+  gender: {
+    type: String,
+    enum: ['male', 'female', 'other']
+  },
+  address: {
+    street: String,
+    city: String,
+    state: String,
+    zipCode: String,
+    country: String
+  },
+  education: {
+    school: String,
+    degree: String,
+    fieldOfStudy: String,
+    graduationYear: Number,
+    gpa: Number
+  },
+  skills: [{
+    name: String,
+    level: {
+      type: String,
+      enum: ['beginner', 'intermediate', 'advanced'],
+      default: 'beginner'
+    },
+    yearsOfExperience: Number
+  }],
+  experience: [{
+    title: String,
+    company: String,
+    location: String,
+    from: Date,
+    to: Date,
+    current: {
+      type: Boolean,
+      default: false
+    },
+    description: String
+  }],
+  resume: {
+    url: String,
+    filename: String,
+    uploadedAt: Date
+  },
+  isEmailVerified: {
+    type: Boolean,
+    default: false
+  },
+  emailVerificationToken: String,
+  emailVerificationExpire: Date,
+  resetPasswordToken: String,
+  resetPasswordExpire: Date,
+  lastLogin: Date,
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  preferences: {
+    jobAlerts: {
+      type: Boolean,
+      default: true
+    },
+    emailNotifications: {
+      type: Boolean,
+      default: true
+    },
+    pushNotifications: {
+      type: Boolean,
+      default: true
+    },
+    privacySettings: {
+      profileVisibility: {
+        type: String,
+        enum: ['public', 'private', 'connections'],
+        default: 'public'
+      }
+    }
   }
+}, {
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 });
 
-// Compare password method
-UserSchema.methods.comparePassword = async function(candidatePassword) {
-  return bcrypt.compare(candidatePassword, this.password);
+// Virtual for full name
+UserSchema.virtual('fullName').get(function() {
+  return `${this.firstName} ${this.lastName}`;
+});
+
+// Create text index for search
+UserSchema.index({
+  firstName: 'text',
+  lastName: 'text',
+  email: 'text',
+  'education.school': 'text',
+  'education.fieldOfStudy': 'text',
+  'skills.name': 'text',
+  'experience.title': 'text',
+  'experience.company': 'text'
+});
+
+// Encrypt password using bcrypt
+UserSchema.pre('save', async function(next) {
+  if (!this.isModified('password')) {
+    next();
+  }
+
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+});
+
+// Sign JWT and return
+UserSchema.methods.getSignedJwtToken = function() {
+  return jwt.sign(
+    { id: this._id, role: this.role },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRE }
+  );
 };
 
-// Indexes
-UserSchema.index({ email: 1 });
-UserSchema.index({ role: 1 });
-UserSchema.index({ 'profile.location.city': 1 });
-UserSchema.index({ 'jobseeker.skills': 1 });
+// Match user entered password to hashed password in database
+UserSchema.methods.matchPassword = async function(enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
 
 module.exports = mongoose.model('User', UserSchema);
