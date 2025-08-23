@@ -3,6 +3,11 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Force dark mode for testing */
+html.dark {
+  color-scheme: dark;
+}
+
 :root {
   /* Updated color palette for modern, professional TopCV design */
   --background: oklch(1 0 0); /* Pure white background */
@@ -23,7 +28,9 @@
   --destructive-foreground: oklch(1 0 0); /* White text on destructive */
   --border: oklch(0.92 0 0); /* Light border color */
   --input: oklch(1 0 0); /* White input background */
-  --ring: oklch(0.55 0.18 195 / 0.3); /* Primary color with transparency for focus rings */
+  --ring: oklch(
+    0.55 0.18 195 / 0.3
+  ); /* Primary color with transparency for focus rings */
   --chart-1: oklch(0.55 0.18 195); /* Primary cyan-blue */
   --chart-2: oklch(0.65 0.15 45); /* Coral accent */
   --chart-3: oklch(0.35 0 0); /* Dark gray */
@@ -73,6 +80,12 @@
   --sidebar-accent-foreground: oklch(0.145 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.65 0.18 195 / 0.3);
+}
+
+/* Force dark mode styles for testing */
+html.dark body {
+  background-color: var(--background);
+  color: var(--foreground);
 }
 
 @theme inline {
@@ -133,7 +146,11 @@
   }
 
   .gradient-hero {
-    background: linear-gradient(135deg, var(--color-primary) 0%, oklch(0.45 0.2 210) 100%);
+    background: linear-gradient(
+      135deg,
+      var(--color-primary) 0%,
+      oklch(0.45 0.2 210) 100%
+    );
   }
 
   .card-hover {
