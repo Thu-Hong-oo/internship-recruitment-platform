@@ -270,10 +270,10 @@ server.listen(PORT, () => {
   logger.info(`🏥 Health Check: http://localhost:${PORT}/health`);
   
   if (!redisConnected) {
-    logger.warn('⚠️  Redis not connected - some features may be limited');
+    logger.warn('Redis not connected - some features may be limited');
   }
   
-  logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
 // Export for testing

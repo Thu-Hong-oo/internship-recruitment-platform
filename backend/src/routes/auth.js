@@ -1,4 +1,5 @@
 const express = require('express');
+const asyncHandler = require('express-async-handler');
 const {
   register,
   verifyEmail,
@@ -14,6 +15,8 @@ const {
 } = require('../controllers/authController');
 
 const { protect } = require('../middleware/auth');
+const User = require('../models/User');
+const { logger } = require('../utils/logger');
 
 const router = express.Router();
 
@@ -344,6 +347,239 @@ router.post('/logout', protect, logout);
  *                   $ref: '#/components/schemas/User'
  */
 router.put('/updatedetails', protect, updateDetails);
+
+/**
+ * @swagger
+ * /api/auth/profile:
+ *   put:
+ *     summary: Update user profile
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               firstName:
+ *                 type: string
+ *               lastName:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               dateOfBirth:
+ *                 type: string
+ *                 format: date
+ *               gender:
+ *                 type: string
+ *                 enum: [male, female, other]
+ *               address:
+ *                 type: object
+ *               education:
+ *                 type: object
+ *               skills:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     name:
+ *                       type: string
+ *                     level:
+ *                       type: string
+ *                       enum: [beginner, intermediate, advanced]
+ *                     yearsOfExperience:
+ *                       type: number
+ *               experience:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     title:
+ *                       type: string
+ *                     company:
+ *                       type: string
+ *                     location:
+ *                       type: string
+ *                     from:
+ *                       type: string
+ *                       format: date
+ *                     to:
+ *                       type: string
+ *                       format: date
+ *                     current:
+ *                       type: boolean
+ *                     description:
+ *                       type: string
+ *     responses:
+ *       200:
+ *         description: User profile updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ */
+router.put('/profile', protect, updateDetails);
+
+/**
+ * @swagger
+ * /api/auth/upload-avatar:
+ *   post:
+ *     summary: Upload user avatar
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               avatar:
+ *                 type: string
+ *                 format: binary
+ *                 description: User avatar image file
+ *     responses:
+ *       200:
+ *         description: Avatar uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 avatar:
+ *                   type: string
+ *                   description: URL of uploaded avatar
+ */
+router.post('/upload-avatar', protect, (req, res) => {
+  // TODO: Implement file upload functionality
+  res.status(501).json({
+    success: false,
+    error: 'File upload functionality not implemented yet'
+  });
+});
+
+/**
+ * @swagger
+ * /api/auth/upload-resume:
+ *   post:
+ *     summary: Upload user resume
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               resume:
+ *                 type: string
+ *                 format: binary
+ *                 description: User resume file (PDF, DOC, DOCX)
+ *     responses:
+ *       200:
+ *         description: Resume uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 resume:
+ *                   type: object
+ *                   properties:
+ *                     url:
+ *                       type: string
+ *                     filename:
+ *                       type: string
+ */
+router.post('/upload-resume', protect, (req, res) => {
+  // TODO: Implement file upload functionality
+  res.status(501).json({
+    success: false,
+    error: 'File upload functionality not implemented yet'
+  });
+});
+
+/**
+ * @swagger
+ * /api/auth/update-preferences:
+ *   put:
+ *     summary: Update user preferences
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               jobAlerts:
+ *                 type: boolean
+ *               emailNotifications:
+ *                 type: boolean
+ *               pushNotifications:
+ *                 type: boolean
+ *               privacySettings:
+ *                 type: object
+ *                 properties:
+ *                   profileVisibility:
+ *                     type: string
+ *                     enum: [public, private, connections]
+ *     responses:
+ *       200:
+ *         description: Preferences updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ */
+router.put('/update-preferences', protect, asyncHandler(async (req, res) => {
+  const { jobAlerts, emailNotifications, pushNotifications, privacySettings } = req.body;
+  
+  const preferencesToUpdate = {};
+  if (jobAlerts !== undefined) preferencesToUpdate['preferences.jobAlerts'] = jobAlerts;
+  if (emailNotifications !== undefined) preferencesToUpdate['preferences.emailNotifications'] = emailNotifications;
+  if (pushNotifications !== undefined) preferencesToUpdate['preferences.pushNotifications'] = pushNotifications;
+  if (privacySettings) {
+    if (privacySettings.profileVisibility) {
+      preferencesToUpdate['preferences.privacySettings.profileVisibility'] = privacySettings.profileVisibility;
+    }
+  }
+
+  const user = await User.findByIdAndUpdate(req.user.id, preferencesToUpdate, {
+    new: true,
+    runValidators: true
+  });
+
+  logger.info(`User preferences updated: ${user.email}`, { userId: user._id });
+
+  res.status(200).json({
+    success: true,
+    user
+  });
+}));
 
 /**
  * @swagger
