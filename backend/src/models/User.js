@@ -32,7 +32,7 @@ const UserSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['student', 'employer', 'admin'],
+    enum: ['student', 'company', 'admin'],
     default: 'student'
   },
   avatar: {
@@ -94,8 +94,8 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  emailVerificationToken: String,
-  emailVerificationExpire: Date,
+  otp: String,
+  otpExpiry: Date,
   resetPasswordToken: String,
   resetPasswordExpire: Date,
   lastLogin: Date,

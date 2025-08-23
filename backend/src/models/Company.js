@@ -3,6 +3,9 @@ const mongoose = require('mongoose');
 const CompanySchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    info: { type: String, required: true },
+    owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     slug: { type: String, unique: true, sparse: true },
     description: String,
     industry: [{ type: String }],

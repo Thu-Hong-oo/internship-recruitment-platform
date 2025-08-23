@@ -1,6 +1,9 @@
 const express = require('express');
 const {
   register,
+  verifyEmail,
+  verifyEmailWithToken,
+  resendOTP,
   login,
   getMe,
   logout,
@@ -44,9 +47,15 @@ const router = express.Router();
  *           description: User's last name
  *         role:
  *           type: string
- *           enum: [student, employer, admin]
+ *           enum: [student, company, admin]
  *           default: student
  *           description: User's role
+ *         companyName:
+ *           type: string
+ *           description: Company name (required for company registration)
+ *         companyInfo:
+ *           type: string
+ *           description: Company information (required for company registration)
  *     LoginRequest:
  *       type: object
  *       required:
@@ -115,6 +124,96 @@ const router = express.Router();
  *                   type: string
  */
 router.post('/register', register);
+
+/**
+ * @swagger
+ * /api/auth/verify-email:
+ *   post:
+ *     summary: Verify email with OTP
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - otp
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               otp:
+ *                 type: string
+ *                 description: 6-digit verification code
+ *     responses:
+ *       200:
+ *         description: Email verified successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthResponse'
+ *       400:
+ *         description: Invalid OTP or email already verified
+ */
+router.post('/verify-email', verifyEmail);
+
+/**
+ * @swagger
+ * /api/auth/verify-email/{token}:
+ *   get:
+ *     summary: Verify email with URL token
+ *     tags: [Authentication]
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Email verification token
+ *     responses:
+ *       302:
+ *         description: Redirects to frontend with success/error status
+ *       400:
+ *         description: Invalid token or verification failed
+ */
+router.get('/verify-email/:token', verifyEmailWithToken);
+
+/**
+ * @swagger
+ * /api/auth/resend-otp:
+ *   post:
+ *     summary: Resend OTP for email verification
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: OTP resent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *       404:
+ *         description: User not found
+ */
+router.post('/resend-otp', resendOTP);
 
 /**
  * @swagger
