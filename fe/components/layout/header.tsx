@@ -54,6 +54,70 @@ export default function Header() {
   const jobsDropdown = useDropdown(150);
   const cvDropdown = useDropdown(150);
 
+  // Mock data cho các vị trí việc làm (sẽ thay bằng API call sau)
+  const jobPositions = [
+    { id: 1, name: "Nhân viên kinh doanh" },
+    { id: 2, name: "Lao động phổ thông" },
+    { id: 3, name: "Kế toán" },
+    { id: 4, name: "Marketing" },
+    { id: 5, name: "Hành chính nhân sự" },
+    { id: 6, name: "Chăm sóc khách hàng" },
+    { id: 7, name: "Ngân hàng" },
+    { id: 8, name: "IT" },
+    { id: 9, name: "Senior" },
+    { id: 10, name: "Kỹ sư xây dựng" },
+    { id: 11, name: "Thiết kế đồ họa" },
+    { id: 12, name: "Bất động sản" },
+    { id: 13, name: "Giáo dục" },
+    { id: 14, name: "Telesales" },
+  ];
+
+  // Mock data cho các mẫu CV
+  const cvTemplates = [
+    { id: 1, name: "Mẫu CV Đơn giản", style: "Simple" },
+    { id: 2, name: "Mẫu CV Ấn tượng", style: "Impressive" },
+    { id: 3, name: "Mẫu CV Chuyên nghiệp", style: "Professional" },
+    { id: 4, name: "Mẫu CV Hiện đại", style: "Modern" },
+  ];
+
+  // Mock data cho CV theo vị trí
+  const cvByPosition = [
+    { id: 1, name: "Nhân viên kinh doanh" },
+    { id: 2, name: "Lập trình viên" },
+    { id: 3, name: "Nhân viên kế toán" },
+    { id: 4, name: "Chuyên viên marketing" },
+  ];
+
+  // Mock data cho các tính năng CV
+  const cvFeatures = [
+    { id: 1, name: "Quản lý CV" },
+    { id: 2, name: "Tải CV lên" },
+    { id: 3, name: "Hướng dẫn viết CV" },
+    { id: 4, name: "Quản lý Cover Letter" },
+    { id: 5, name: "Mẫu Cover Letter" },
+  ];
+
+  // Click handlers (sẽ thay bằng navigation sau)
+  const handleJobPositionClick = (position: (typeof jobPositions)[0]) => {
+    console.log(`Clicked on job position: ${position.name}`);
+    // TODO: Navigate to job search with filter
+  };
+
+  const handleCVTemplateClick = (template: (typeof cvTemplates)[0]) => {
+    console.log(`Clicked on CV template: ${template.name} (${template.style})`);
+    // TODO: Navigate to CV template page
+  };
+
+  const handleCVByPositionClick = (position: (typeof cvByPosition)[0]) => {
+    console.log(`Clicked on CV by position: ${position.name}`);
+    // TODO: Navigate to CV by position page
+  };
+
+  const handleCVFeatureClick = (feature: (typeof cvFeatures)[0]) => {
+    console.log(`Clicked on CV feature: ${feature.name}`);
+    // TODO: Navigate to feature page
+  };
+
   return (
     <header className="bg-card border-b border-border shadow-sm">
       {/* hơi bóng nhẹ */}
@@ -81,14 +145,17 @@ export default function Header() {
               >
                 Việc làm
                 <ChevronDown className="w-4 h-4 ml-1" />
+                {/* chevron down: mũi tên xuống ^ */}
               </button>
               {jobsDropdown.isOpen && (
                 <div
-                  className="absolute top-full left-0 mt-2 w-96 bg-card border border-border rounded-lg shadow-xl z-50"
+                  className="absolute top-full left-0 mt-2 w-150 bg-card border border-border rounded-lg shadow-xl z-50"
+                  // rounded-lg: bo tròn, border-border: viền màu xám, shadow-xl: bóng mờ ở dưới của dropdown
                   onMouseEnter={jobsDropdown.openDropdown}
                   onMouseLeave={jobsDropdown.closeDropdown}
                 >
                   <div className="p-6">
+                    {/* p-6 là padding 6px */}
                     <div className="grid grid-cols-2 gap-8">
                       <div>
                         <h3 className="font-semibold text-gray-800 mb-4">
@@ -97,32 +164,44 @@ export default function Header() {
                         <div className="space-y-3">
                           <Link
                             href="/search"
-                            className="flex items-center text-gray-600 hover:text-green-600 cursor-pointer"
+                            className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
                           >
-                            {/* tailwind items-center: căn giữa theo chiều dọc= align-center, align-items-center */}
+                            {/* tailwind items-center: căn giữa theo chiều dọc= align-center, align-items-center, biến mũi tên thành bàn tay */}
                             <Search className="w-4 h-4 mr-3" />
                             Tìm việc làm
+                            <span className="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                              →
+                            </span>
                           </Link>
                           <Link
                             href="/saved-jobs"
-                            className="flex items-center text-gray-600 hover:text-green-600 cursor-pointer"
+                            className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
                           >
                             <Bookmark className="w-4 h-4 mr-3" />
                             Việc làm đã lưu
+                            <span className="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                              →
+                            </span>
                           </Link>
                           <Link
                             href="/applied-jobs"
-                            className="flex items-center text-gray-600 hover:text-green-600 cursor-pointer"
+                            className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
                           >
                             <Eye className="w-4 h-4 mr-3" />
                             Việc làm đã ứng tuyển
+                            <span className="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                              →
+                            </span>
                           </Link>
                           <Link
                             href="/recommended-jobs"
-                            className="flex items-center text-gray-600 hover:text-green-600 cursor-pointer"
+                            className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
                           >
                             <Heart className="w-4 h-4 mr-3" />
                             Việc làm phù hợp
+                            <span className="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                              →
+                            </span>
                           </Link>
                         </div>
                         <div className="mt-6">
@@ -130,13 +209,19 @@ export default function Header() {
                             CÔNG TY
                           </h3>
                           <div className="space-y-3">
-                            <div className="flex items-center text-gray-600 hover:text-green-600 cursor-pointer">
+                            <div className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200">
                               <Building2 className="w-4 h-4 mr-3" />
                               Danh sách công ty
+                              <span className="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                                →
+                              </span>
                             </div>
-                            <div className="flex items-center text-gray-600 hover:text-green-600 cursor-pointer">
+                            <div className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200">
                               <Building2 className="w-4 h-4 mr-3" />
                               Top công ty
+                              <span className="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                                →
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -146,48 +231,18 @@ export default function Header() {
                           VIỆC LÀM THEO VỊ TRÍ
                         </h3>
                         <div className="space-y-2">
-                          <div className="text-gray-600 hover:text-green-600 cursor-pointer">
-                            Việc làm Nhân viên kinh doanh
-                          </div>
-                          <div className="text-gray-600 hover:text-green-600 cursor-pointer">
-                            Việc làm Lao động phổ thông
-                          </div>
-                          <div className="text-gray-600 hover:text-green-600 cursor-pointer">
-                            Việc làm Kế toán
-                          </div>
-                          <div className="text-gray-600 hover:text-green-600 cursor-pointer">
-                            Việc làm Marketing
-                          </div>
-                          <div className="text-gray-600 hover:text-green-600 cursor-pointer">
-                            Việc làm Hành chính nhân sự
-                          </div>
-                          <div className="text-gray-600 hover:text-green-600 cursor-pointer">
-                            Việc làm Chăm sóc khách hàng
-                          </div>
-                          <div className="text-gray-600 hover:text-green-600 cursor-pointer">
-                            Việc làm Ngân hàng
-                          </div>
-                          <div className="text-gray-600 hover:text-green-600 cursor-pointer">
-                            Việc làm IT
-                          </div>
-                          <div className="text-gray-600 hover:text-green-600 cursor-pointer">
-                            Việc làm Senior
-                          </div>
-                          <div className="text-gray-600 hover:text-green-600 cursor-pointer">
-                            Việc làm Kỹ sư xây dựng
-                          </div>
-                          <div className="text-gray-600 hover:text-green-600 cursor-pointer">
-                            Việc làm Thiết kế đồ họa
-                          </div>
-                          <div className="text-gray-600 hover:text-green-600 cursor-pointer">
-                            Việc làm Bất động sản
-                          </div>
-                          <div className="text-gray-600 hover:text-green-600 cursor-pointer">
-                            Việc làm Giáo dục
-                          </div>
-                          <div className="text-gray-600 hover:text-green-600 cursor-pointer">
-                            Việc làm telesales
-                          </div>
+                          {jobPositions.map((position) => (
+                            <div
+                              key={position.id}
+                              className="text-gray-600 hover:text-primary cursor-pointer flex items-center group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
+                              onClick={() => handleJobPositionClick(position)}
+                            >
+                              <span>Việc làm {position.name}</span>
+                              <span className="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                                →
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
@@ -207,7 +262,7 @@ export default function Header() {
               </button>
               {cvDropdown.isOpen && (
                 <div
-                  className="absolute top-full left-0 mt-2 w-80 bg-card border border-border rounded-lg shadow-xl z-50"
+                  className="absolute top-full left-0 mt-2 w-150 bg-card border border-border rounded-lg shadow-xl z-50"
                   onMouseEnter={cvDropdown.openDropdown}
                   onMouseLeave={cvDropdown.closeDropdown}
                 >
@@ -216,83 +271,62 @@ export default function Header() {
                     <div className="grid grid-cols-2 gap-6">
                       {/* chia 2 cột, grid bố cục hàng cột */}
                       <div>
-                        <div className="text-green-600 font-semibold mb-3 flex items-center">
+                        <div className="text-primary font-semibold mb-3 flex items-center">
                           Mẫu CV theo style →
                         </div>
                         <div className="space-y-3">
-                          <div className="flex items-center text-gray-600 hover:text-green-600 cursor-pointer">
-                            <div className="w-4 h-4 mr-3 bg-gray-300 rounded"></div>
-                            Mẫu CV Đơn giản
-                          </div>
-                          <div className="flex items-center text-gray-600 hover:text-green-600 cursor-pointer">
-                            <div className="w-4 h-4 mr-3 bg-gray-300 rounded"></div>
-                            Mẫu CV Ấn tượng
-                          </div>
-                          <div className="flex items-center text-gray-600 hover:text-green-600 cursor-pointer">
-                            <div className="w-4 h-4 mr-3 bg-gray-300 rounded"></div>
-                            Mẫu CV Chuyên nghiệp
-                          </div>
-                          <div className="flex items-center text-gray-600 hover:text-green-600 cursor-pointer">
-                            <div className="w-4 h-4 mr-3 bg-gray-300 rounded"></div>
-                            Mẫu CV Hiện đại
-                          </div>
+                          {cvTemplates.map((template) => (
+                            <div
+                              key={template.id}
+                              className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
+                              onClick={() => handleCVTemplateClick(template)}
+                            >
+                              <div className="w-4 h-4 mr-3 bg-gray-300 rounded group-hover:bg-primary transition-colors duration-200"></div>
+                              <span>{template.name}</span>
+                              <span className="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                                →
+                              </span>
+                            </div>
+                          ))}
                         </div>
                         <div className="mt-6">
-                          <div className="text-green-600 font-semibold mb-3 flex items-center">
+                          <div className="text-primary font-semibold mb-3 flex items-center">
                             Mẫu CV theo vị trí ứng tuyển →
                           </div>
                           <div className="space-y-3">
-                            <div className="flex items-center text-gray-600 hover:text-green-600 cursor-pointer">
-                              <div className="w-4 h-4 mr-3 bg-gray-300 rounded"></div>
-                              Nhân viên kinh doanh
-                            </div>
-                            <div className="flex items-center text-gray-600 hover:text-green-600 cursor-pointer">
-                              <div className="w-4 h-4 mr-3 bg-gray-300 rounded"></div>
-                              Lập trình viên
-                            </div>
-                            <div className="flex items-center text-gray-600 hover:text-green-600 cursor-pointer">
-                              <div className="w-4 h-4 mr-3 bg-gray-300 rounded"></div>
-                              Nhân viên kế toán
-                            </div>
-                            <div className="flex items-center text-gray-600 hover:text-green-600 cursor-pointer">
-                              <div className="w-4 h-4 mr-3 bg-gray-300 rounded"></div>
-                              Chuyên viên marketing
-                            </div>
+                            {cvByPosition.map((position) => (
+                              <div
+                                key={position.id}
+                                className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
+                                onClick={() =>
+                                  handleCVByPositionClick(position)
+                                }
+                              >
+                                <div className="w-4 h-4 mr-3 bg-gray-300 rounded group-hover:bg-primary transition-colors duration-200"></div>
+                                <span>{position.name}</span>
+                                <span className="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                                  →
+                                </span>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       </div>
                       <div>
                         <div className="space-y-4">
-                          <div className="flex items-center text-gray-600 hover:text-green-600 cursor-pointer">
-                            <div className="w-6 h-6 mr-3 bg-green-100 rounded flex items-center justify-center">
-                              <div className="w-3 h-3 bg-green-600 rounded"></div>
+                          {cvFeatures.map((feature) => (
+                            <div
+                              key={feature.id}
+                              className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
+                              onClick={() => handleCVFeatureClick(feature)}
+                            >
+                              <div className="w-6 h-6 mr-3 bg-gray-300 rounded flex items-center justify-center group-hover:bg-primary transition-colors duration-200"></div>
+                              <span>{feature.name}</span>
+                              <span className="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                                →
+                              </span>
                             </div>
-                            Quản lý CV
-                          </div>
-                          <div className="flex items-center text-gray-600 hover:text-green-600 cursor-pointer">
-                            <div className="w-6 h-6 mr-3 bg-green-100 rounded flex items-center justify-center">
-                              <div className="w-3 h-3 bg-green-600 rounded"></div>
-                            </div>
-                            Tải CV lên
-                          </div>
-                          <div className="flex items-center text-gray-600 hover:text-green-600 cursor-pointer">
-                            <div className="w-6 h-6 mr-3 bg-green-100 rounded flex items-center justify-center">
-                              <div className="w-3 h-3 bg-green-600 rounded"></div>
-                            </div>
-                            Hướng dẫn viết CV
-                          </div>
-                          <div className="flex items-center text-gray-600 hover:text-green-600 cursor-pointer">
-                            <div className="w-6 h-6 mr-3 bg-green-100 rounded flex items-center justify-center">
-                              <div className="w-3 h-3 bg-green-600 rounded"></div>
-                            </div>
-                            Quản lý Cover Letter
-                          </div>
-                          <div className="flex items-center text-gray-600 hover:text-green-600 cursor-pointer">
-                            <div className="w-6 h-6 mr-3 bg-green-100 rounded flex items-center justify-center">
-                              <div className="w-3 h-3 bg-green-600 rounded"></div>
-                            </div>
-                            Mẫu Cover Letter
-                          </div>
+                          ))}
                         </div>
                       </div>
                     </div>
