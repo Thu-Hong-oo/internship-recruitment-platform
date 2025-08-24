@@ -128,7 +128,8 @@ export default function Header() {
           <div className="flex items-center">
             <Link
               href="/"
-              className="text-2xl font-bold text-primary hover:text-primary/80 transition-colors duration-200 cursor-pointer"
+              className="text-2xl font-bold text-primary hover:text-primary/50 transition-colors duration-200 cursor-pointer"
+              // transition-colors duration-200: khi hover thì màu chữ thành 50% màu gốc nhưng phải có transition-colors vì nếu không có thì màu chữ sẽ thay đổi ngay lập tức không mượt
             >
               InternBridge
             </Link>
@@ -158,6 +159,7 @@ export default function Header() {
                     {/* p-6 là padding 6px */}
                     <div className="grid grid-cols-2 gap-8">
                       <div>
+                        {/* 800 là màu xám đậm ,mức màu từ 0 đến 900*/}
                         <h3 className="font-semibold text-gray-800 mb-4">
                           VIỆC LÀM
                         </h3>
@@ -169,7 +171,8 @@ export default function Header() {
                             {/* tailwind items-center: căn giữa theo chiều dọc= align-center, align-items-center, biến mũi tên thành bàn tay */}
                             <Search className="w-4 h-4 mr-3" />
                             Tìm việc làm
-                            <span className="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                            {/* ml-auto: margin-left: auto, opacity-0: mờ đi, group-hover:opacity-100: khi hover thì mờ đi, group-hover:translate-x-1: khi hover thì dịch qua phải 1px */}
+                            <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
                               →
                             </span>
                           </Link>
@@ -179,17 +182,18 @@ export default function Header() {
                           >
                             <Bookmark className="w-4 h-4 mr-3" />
                             Việc làm đã lưu
-                            <span className="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                            <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
                               →
                             </span>
                           </Link>
                           <Link
                             href="/applied-jobs"
+
                             className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
                           >
                             <Eye className="w-4 h-4 mr-3" />
                             Việc làm đã ứng tuyển
-                            <span className="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                            <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
                               →
                             </span>
                           </Link>
@@ -199,7 +203,7 @@ export default function Header() {
                           >
                             <Heart className="w-4 h-4 mr-3" />
                             Việc làm phù hợp
-                            <span className="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                            <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
                               →
                             </span>
                           </Link>
@@ -212,14 +216,14 @@ export default function Header() {
                             <div className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200">
                               <Building2 className="w-4 h-4 mr-3" />
                               Danh sách công ty
-                              <span className="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                              <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
                                 →
                               </span>
                             </div>
                             <div className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200">
                               <Building2 className="w-4 h-4 mr-3" />
                               Top công ty
-                              <span className="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                              <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
                                 →
                               </span>
                             </div>
@@ -238,7 +242,7 @@ export default function Header() {
                               onClick={() => handleJobPositionClick(position)}
                             >
                               <span>Việc làm {position.name}</span>
-                              <span className="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                              <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
                                 →
                               </span>
                             </div>
@@ -272,7 +276,7 @@ export default function Header() {
                       {/* chia 2 cột, grid bố cục hàng cột */}
                       <div>
                         <div className="text-primary font-semibold mb-3 flex items-center">
-                          Mẫu CV theo style →
+                          Mẫu CV theo style
                         </div>
                         <div className="space-y-3">
                           {cvTemplates.map((template) => (
@@ -283,7 +287,7 @@ export default function Header() {
                             >
                               <div className="w-4 h-4 mr-3 bg-gray-300 rounded group-hover:bg-primary transition-colors duration-200"></div>
                               <span>{template.name}</span>
-                              <span className="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                              <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
                                 →
                               </span>
                             </div>
@@ -291,7 +295,7 @@ export default function Header() {
                         </div>
                         <div className="mt-6">
                           <div className="text-primary font-semibold mb-3 flex items-center">
-                            Mẫu CV theo vị trí ứng tuyển →
+                            Mẫu CV theo vị trí ứng tuyển
                           </div>
                           <div className="space-y-3">
                             {cvByPosition.map((position) => (
@@ -304,7 +308,7 @@ export default function Header() {
                               >
                                 <div className="w-4 h-4 mr-3 bg-gray-300 rounded group-hover:bg-primary transition-colors duration-200"></div>
                                 <span>{position.name}</span>
-                                <span className="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                                <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
                                   →
                                 </span>
                               </div>
@@ -322,8 +326,8 @@ export default function Header() {
                             >
                               <div className="w-6 h-6 mr-3 bg-gray-300 rounded flex items-center justify-center group-hover:bg-primary transition-colors duration-200"></div>
                               <span>{feature.name}</span>
-                              <span className="ml-auto opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
-                                →
+                              <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                                  →
                               </span>
                             </div>
                           ))}
