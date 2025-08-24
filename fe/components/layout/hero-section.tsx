@@ -36,11 +36,11 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-bold mb-4">
-              Tìm việc làm nhanh 24h, việc làm mới nhất trên toàn quốc
+              Công cụ tìm việc làm riêng cho intern
             </h1>
             <p className="text-xl opacity-90">
-              Tiếp cận <strong>40,000+</strong> tin tuyển dụng việc làm mỗi ngày
-              từ hàng nghìn doanh nghiệp uy tín tại Việt Nam
+              Dễ dàng tìm chỗ thực tập, gợi ý định hướng việc làm cho sinh viên
+              và nguồn nhân lực mới, dữ liệu phân tích realtime
             </p>
           </div>
 
@@ -50,7 +50,8 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
               <div className="flex flex-col lg:flex-row gap-4">
                 {/* Main search input - takes most space */}
                 <div className="flex-[3] relative group">
-                  <Search className="w-6 h-6 absolute left-5 top-1/2 transform -translate-y-1/2 text-primary/60 group-focus-within:text-primary transition-colors duration-300" />
+                  {/* cách cạnh trên 50% */}
+                  <Search className="w-6 h-6 absolute left-5 top-1/2 transform -translate-y-1/2 text-primary" />
                   <Input
                     placeholder="Nhập vị trí tuyển dụng, tên công ty..."
                     value={searchKeyword}
@@ -62,7 +63,7 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
                 {/* Job category dropdown */}
                 <Button
                   onClick={() => setShowJobCategoryModal(true)}
-                  className="dropdown-button flex-1 min-w-[200px] justify-start text-foreground font-medium"
+                  className="dropdown-button flex-1 min-w-[200px] justify-start font-medium"
                 >
                   <div className="w-3 h-3 bg-primary rounded-full mr-3"></div>
                   Danh mục nghề
@@ -72,7 +73,7 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
                 {/* Location dropdown */}
                 <Button
                   onClick={() => setShowLocationModal(true)}
-                  className="dropdown-button flex-1 min-w-[180px] justify-start text-foreground font-medium"
+                  className="dropdown-button flex-1 min-w-[180px] justify-start font-medium"
                 >
                   <MapPin className="w-4 h-4 mr-3 text-primary" />
                   {selectedLocation}
