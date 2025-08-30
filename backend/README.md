@@ -27,6 +27,9 @@ InternBridge là nền tảng kết nối thực tập sinh thông minh với c�
 - ✅ Theo dõi trạng thái ứng tuyển
 - ✅ Nhận thông báo và phản hồi từ nhà tuyển dụng
 
+- ✅ Xác thực email để bảo mật tài khoản
+
+
 ### 🤖 AI Features
 - ✅ **Smart Job Filtering**: Tự động lọc công việc intern
 - ✅ **Intelligent Matching**: Gợi ý công việc phù hợp
@@ -39,7 +42,10 @@ InternBridge là nền tảng kết nối thực tập sinh thông minh với c�
 - **Runtime**: Node.js
 - **Framework**: Express.js
 - **Database**: MongoDB với Mongoose
-- **Authentication**: JWT + bcrypt
+
+- **Authentication**: JWT + bcrypt + Google OAuth
+- **Email Service**: Nodemailer với SMTP
+
 - **File Upload**: Multer
 - **Web Crawling**: Puppeteer, Cheerio
 - **AI/ML**: Natural.js, TensorFlow.js
