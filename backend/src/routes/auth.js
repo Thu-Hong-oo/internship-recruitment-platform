@@ -10,7 +10,9 @@ const {
   resetPassword,
   googleAuth,
   linkGoogleAccount,
-  unlinkGoogleAccount
+  unlinkGoogleAccount,
+  verifyEmail,
+  resendEmailVerification
 } = require('../controllers/authController');
 
 const { protect } = require('../middleware/auth');
@@ -438,5 +440,94 @@ router.post('/link-google', protect, linkGoogleAccount);
  *         description: Google account unlinked successfully
  */
 router.delete('/unlink-google', protect, unlinkGoogleAccount);
+
+/**
+ * @swagger
+ * /api/auth/verify-email/{verificationtoken}:
+ *   get:
+ *     summary: Verify email with token
+ *     tags: [Authentication]
+ *     parameters:
+ *       - in: path
+ *         name: verificationtoken
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Email verification token
+ *     responses:
+ *       200:
+ *         description: Email verified successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *       400:
+ *         description: Invalid or expired token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ */
+router.get('/verify-email/:verificationtoken', verifyEmail);
+
+/**
+ * @swagger
+ * /api/auth/resend-verification:
+ *   post:
+ *     summary: Resend email verification
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Verification email sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Email already verified
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *       500:
+ *         description: Failed to send email
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ */
+router.post('/resend-verification', protect, resendEmailVerification);
 
 module.exports = router;

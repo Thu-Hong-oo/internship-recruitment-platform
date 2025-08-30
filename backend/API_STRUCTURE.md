@@ -19,8 +19,10 @@ Documentation: http://localhost:3000/api-docs
 | `GET` | `/me` | Lấy thông tin user hiện tại | ✅ |
 | `PUT` | `/profile` | Cập nhật profile | ✅ |
 | `PUT` | `/password` | Đổi mật khẩu | ✅ |
-| `POST` | `/forgot-password` | Quên mật khẩu | ❌ |
-| `PUT` | `/reset-password` | Reset mật khẩu | ❌ |
+| `POST` | `/forgotpassword` | Quên mật khẩu | ❌ |
+| `PUT` | `/resetpassword/:resettoken` | Reset mật khẩu | ❌ |
+| `GET` | `/verify-email/:verificationtoken` | Xác thực email | ❌ |
+| `POST` | `/resend-verification` | Gửi lại email xác thực | ✅ |
 | `POST` | `/logout` | Đăng xuất | ✅ |
 
 ## 🤖 AI Services

@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { logger } = require('../utils/logger');
 const googleAuthService = require('../services/googleAuth');
+const { sendEmailVerification, sendPasswordResetEmail } = require('../services/emailService');
 
 // @desc    Register user
 // @route   POST /api/auth/register
@@ -35,8 +36,26 @@ const register = asyncHandler(async (req, res) => {
     firstName,
     lastName,
     role: role || 'student',
-    authMethod: 'local'
+    authMethod: 'local',
+    isEmailVerified: false
   });
+
+  // Generate email verification token
+  const verificationToken = crypto.randomBytes(20).toString('hex');
+  user.emailVerificationToken = crypto
+    .createHash('sha256')
+    .update(verificationToken)
+    .digest('hex');
+  user.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+  await user.save({ validateBeforeSave: false });
+
+  // Send verification email
+  try {
+    await sendEmailVerification(user, verificationToken);
+  } catch (error) {
+    logger.error('Failed to send verification email', { error: error.message, userId: user._id });
+    // Don't fail registration if email fails, just log it
+  }
 
   // Create token
   const token = user.getSignedJwtToken();
@@ -53,8 +72,10 @@ const register = asyncHandler(async (req, res) => {
       lastName: user.lastName,
       role: user.role,
       fullName: user.fullName,
-      authMethod: user.authMethod
-    }
+      authMethod: user.authMethod,
+      isEmailVerified: user.isEmailVerified
+    },
+    message: 'Registration successful. Please check your email to verify your account.'
   });
 });
 
@@ -245,16 +266,24 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
   await user.save({ validateBeforeSave: false });
 
-  // Create reset url
-  const resetUrl = `${req.protocol}://${req.get('host')}/api/auth/resetpassword/${resetToken}`;
+  // Send password reset email
+  try {
+    await sendPasswordResetEmail(user, resetToken);
+    
+    logger.info(`Password reset email sent to: ${user.email}`, { userId: user._id });
 
-  logger.info(`Password reset requested for: ${user.email}`, { userId: user._id });
-
-  res.status(200).json({
-    success: true,
-    message: 'Email sent',
-    resetUrl
-  });
+    res.status(200).json({
+      success: true,
+      message: 'Password reset email sent successfully'
+    });
+  } catch (error) {
+    logger.error('Failed to send password reset email', { error: error.message, userId: user._id });
+    
+    res.status(500).json({
+      success: false,
+      error: 'Failed to send password reset email'
+    });
+  }
 });
 
 // @desc    Reset password
@@ -475,6 +504,100 @@ const unlinkGoogleAccount = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Verify email
+// @route   GET /api/auth/verify-email/:verificationtoken
+// @access  Public
+const verifyEmail = asyncHandler(async (req, res) => {
+  // Get hashed token
+  const emailVerificationToken = crypto
+    .createHash('sha256')
+    .update(req.params.verificationtoken)
+    .digest('hex');
+
+  const user = await User.findOne({
+    emailVerificationToken,
+    emailVerificationExpire: { $gt: Date.now() }
+  });
+
+  if (!user) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid or expired verification token'
+    });
+  }
+
+  // Set email as verified
+  user.isEmailVerified = true;
+  user.emailVerificationToken = undefined;
+  user.emailVerificationExpire = undefined;
+  await user.save();
+
+  logger.info(`Email verified for user: ${user.email}`, { userId: user._id });
+
+  res.status(200).json({
+    success: true,
+    message: 'Email verified successfully',
+    user: {
+      id: user._id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      fullName: user.fullName,
+      isEmailVerified: user.isEmailVerified
+    }
+  });
+});
+
+// @desc    Resend email verification
+// @route   POST /api/auth/resend-verification
+// @access  Private
+const resendEmailVerification = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user.id);
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      error: 'User not found'
+    });
+  }
+
+  if (user.isEmailVerified) {
+    return res.status(400).json({
+      success: false,
+      error: 'Email is already verified'
+    });
+  }
+
+  // Generate new verification token
+  const verificationToken = crypto.randomBytes(20).toString('hex');
+  user.emailVerificationToken = crypto
+    .createHash('sha256')
+    .update(verificationToken)
+    .digest('hex');
+  user.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+  await user.save({ validateBeforeSave: false });
+
+  // Send verification email
+  try {
+    await sendEmailVerification(user, verificationToken);
+    
+    logger.info(`Email verification resent to: ${user.email}`, { userId: user._id });
+
+    res.status(200).json({
+      success: true,
+      message: 'Verification email sent successfully'
+    });
+  } catch (error) {
+    logger.error('Failed to resend verification email', { error: error.message, userId: user._id });
+    
+    res.status(500).json({
+      success: false,
+      error: 'Failed to send verification email'
+    });
+  }
+});
+
 module.exports = {
   register,
   login,
@@ -486,5 +609,7 @@ module.exports = {
   resetPassword,
   googleAuth,
   linkGoogleAccount,
-  unlinkGoogleAccount
+  unlinkGoogleAccount,
+  verifyEmail,
+  resendEmailVerification
 };
