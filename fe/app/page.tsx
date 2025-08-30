@@ -13,8 +13,6 @@ import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { PageLayout } from "@/components/layout";
 import HeroSection from "@/components/layout/hero-section";
-import ThemeTest from "@/components/theme-test";
-
 interface HomePageProps {
   onSearch?: (keyword: string) => void;
 }
@@ -32,7 +30,6 @@ export default function HomePage({ onSearch }: HomePageProps) {
   };
   return (
     <PageLayout>
-      <ThemeTest />
       <HeroSection onSearch={handleSearch} />
 
       {/* Main Content */}
