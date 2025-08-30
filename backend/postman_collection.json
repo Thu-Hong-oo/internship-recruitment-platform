@@ -88,7 +88,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"student@example.com\",\n  \"password\": \"123456\",\n  \"firstName\": \"Nguyen Van\",\n  \"lastName\": \"A\",\n  \"role\": \"student\"\n}"
+              "raw": "{\n  \"email\": \"523.hongnguyen@gmail.com\",\n  \"password\": \"123456\",\n  \"firstName\": \"Nguyen Van\",\n  \"lastName\": \"A\",\n  \"role\": \"student\"\n}"
             },
             "url": {
               "raw": "{{api_url}}/auth/register",
@@ -136,7 +136,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"student@example.com\",\n  \"password\": \"123456\"\n}"
+              "raw": "{\n  \"email\": \"523.hongnguyen@gmailcom\",\n  \"password\": \"123456\"\n}"
             },
             "url": {
               "raw": "{{api_url}}/auth/login",
@@ -174,13 +174,49 @@
           ],
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
             "url": {
-              "raw": "{{api_url}}/auth/me",
+              "raw": "{{api_url}}/users/me",
               "host": ["{{api_url}}"],
-              "path": ["auth", "me"]
+              "path": ["users", "me"]
             },
             "description": "Get current user profile information including email verification status"
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Avatar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "avatar",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{api_url}}/users/upload-avatar",
+              "host": ["{{api_url}}"],
+              "path": ["users", "upload-avatar"]
+            },
+            "description": "Upload user avatar image. Requires authentication token. Supported formats: jpg, jpeg, png, gif. Max size: 5MB."
           },
           "response": []
         },
@@ -192,6 +228,11 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
               }
             ],
             "body": {
@@ -199,9 +240,9 @@
               "raw": "{\n  \"firstName\": \"Nguyen Van\",\n  \"lastName\": \"A\",\n  \"phone\": \"0123456789\",\n  \"dateOfBirth\": \"2000-01-01\",\n  \"gender\": \"male\",\n  \"address\": {\n    \"street\": \"123 Main St\",\n    \"city\": \"Ho Chi Minh\",\n    \"state\": \"HCM\",\n    \"country\": \"Vietnam\"\n  },\n  \"education\": {\n    \"institution\": \"University of Technology\",\n    \"degree\": \"Bachelor\",\n    \"fieldOfStudy\": \"Computer Science\",\n    \"graduationYear\": 2024,\n    \"gpa\": 3.5\n  },\n  \"skills\": [\n    {\n      \"name\": \"JavaScript\",\n      \"level\": \"intermediate\",\n      \"yearsOfExperience\": 2\n    },\n    {\n      \"name\": \"React\",\n      \"level\": \"beginner\",\n      \"yearsOfExperience\": 1\n    }\n  ]\n}"
             },
             "url": {
-              "raw": "{{api_url}}/auth/updatedetails",
+              "raw": "{{api_url}}/users/profile",
               "host": ["{{api_url}}"],
-              "path": ["auth", "updatedetails"]
+              "path": ["users", "profile"]
             },
             "description": "Update user profile information"
           },
@@ -215,6 +256,11 @@
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
               }
             ],
             "body": {
@@ -222,9 +268,9 @@
               "raw": "{\n  \"currentPassword\": \"123456\",\n  \"newPassword\": \"newpassword123\"\n}"
             },
             "url": {
-              "raw": "{{api_url}}/auth/updatepassword",
+              "raw": "{{api_url}}/users/password",
               "host": ["{{api_url}}"],
-              "path": ["auth", "updatepassword"]
+              "path": ["users", "password"]
             },
             "description": "Change user password"
           },
@@ -416,9 +462,9 @@
               "raw": "{\n  \"idToken\": \"{{google_id_token}}\"\n}"
             },
             "url": {
-              "raw": "{{api_url}}/auth/link-google",
+              "raw": "{{api_url}}/users/link-google",
               "host": ["{{api_url}}"],
-              "path": ["auth", "link-google"]
+              "path": ["users", "link-google"]
             },
             "description": "Link existing account with Google OAuth. Requires authentication token. Set 'google_id_token' in environment variables."
           },
@@ -435,9 +481,9 @@
               }
             ],
             "url": {
-              "raw": "{{api_url}}/auth/unlink-google",
+              "raw": "{{api_url}}/users/unlink-google",
               "host": ["{{api_url}}"],
-              "path": ["auth", "unlink-google"]
+              "path": ["users", "unlink-google"]
             },
             "description": "Unlink Google account from existing account. Requires authentication token."
           },

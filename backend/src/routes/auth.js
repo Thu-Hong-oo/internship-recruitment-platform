@@ -2,15 +2,10 @@ const express = require('express');
 const {
   register,
   login,
-  getMe,
   logout,
-  updateDetails,
-  updatePassword,
   forgotPassword,
   resetPassword,
   googleAuth,
-  linkGoogleAccount,
-  unlinkGoogleAccount,
   verifyEmail,
   resendEmailVerification
 } = require('../controllers/authController');
@@ -194,30 +189,7 @@ router.post('/register', register);
  */
 router.post('/login', login);
 
-/**
- * @swagger
- * /api/auth/me:
- *   get:
- *     summary: Get current user profile
- *     tags: [Authentication]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: User profile retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 user:
- *                   $ref: '#/components/schemas/User'
- *       401:
- *         description: Not authorized
- */
-router.get('/me', protect, getMe);
+
 
 /**
  * @swagger
@@ -242,91 +214,11 @@ router.get('/me', protect, getMe);
  */
 router.post('/logout', protect, logout);
 
-/**
- * @swagger
- * /api/auth/updatedetails:
- *   put:
- *     summary: Update user details
- *     tags: [Authentication]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               firstName:
- *                 type: string
- *               lastName:
- *                 type: string
- *               email:
- *                 type: string
- *               phone:
- *                 type: string
- *               dateOfBirth:
- *                 type: string
- *                 format: date
- *               gender:
- *                 type: string
- *                 enum: [male, female, other]
- *               address:
- *                 type: object
- *               education:
- *                 type: object
- *     responses:
- *       200:
- *         description: User details updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 user:
- *                   $ref: '#/components/schemas/User'
- */
-router.put('/updatedetails', protect, updateDetails);
 
-/**
- * @swagger
- * /api/auth/updatepassword:
- *   put:
- *     summary: Update user password
- *     tags: [Authentication]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - currentPassword
- *               - newPassword
- *             properties:
- *               currentPassword:
- *                 type: string
- *               newPassword:
- *                 type: string
- *                 minLength: 6
- *     responses:
- *       200:
- *         description: Password updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 token:
- *                   type: string
- */
-router.put('/updatepassword', protect, updatePassword);
+
+
+
+
 
 /**
  * @swagger
@@ -449,45 +341,7 @@ router.post('/resetpassword', resetPassword);
  */
 router.post('/google', googleAuth);
 
-/**
- * @swagger
- * /api/auth/link-google:
- *   post:
- *     summary: Link Google account to existing user
- *     tags: [Authentication]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - idToken
- *             properties:
- *               idToken:
- *                 type: string
- *                 description: Google ID token
- *     responses:
- *       200:
- *         description: Google account linked successfully
- */
-router.post('/link-google', protect, linkGoogleAccount);
 
-/**
- * @swagger
- * /api/auth/unlink-google:
- *   delete:
- *     summary: Unlink Google account from user
- *     tags: [Authentication]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Google account unlinked successfully
- */
-router.delete('/unlink-google', protect, unlinkGoogleAccount);
 
 /**
  * @swagger

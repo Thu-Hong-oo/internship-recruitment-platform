@@ -16,14 +16,12 @@ Documentation: http://localhost:3000/api-docs
 |--------|----------|-------------|---------------|
 | `POST` | `/register` | Đăng ký user mới | ❌ |
 | `POST` | `/login` | Đăng nhập (phân biệt rõ các loại lỗi) | ❌ |
-| `GET` | `/me` | Lấy thông tin user hiện tại | ✅ |
-| `PUT` | `/profile` | Cập nhật profile | ✅ |
-| `PUT` | `/password` | Đổi mật khẩu | ✅ |
 | `POST` | `/forgotpassword` | Quên mật khẩu | ❌ |
 | `POST` | `/resetpassword` | Reset mật khẩu bằng OTP (email + otp + password) | ❌ |
 | `POST` | `/verify-email` | Xác thực email bằng OTP | ❌ |
 | `POST` | `/resend-verification` | Gửi lại email xác thực | ✅ |
 | `POST` | `/logout` | Đăng xuất | ✅ |
+| `POST` | `/google` | Đăng nhập bằng Google | ❌ |
 
 ## 🤖 AI Services
 
@@ -73,6 +71,12 @@ Documentation: http://localhost:3000/api-docs
 | `POST` | `/` | Tạo user mới | ✅ | admin |
 | `PUT` | `/:id` | Cập nhật user | ✅ | admin |
 | `DELETE` | `/:id` | Xóa user | ✅ | admin |
+| `GET` | `/me` | Lấy thông tin user hiện tại | ✅ | - |
+| `PUT` | `/profile` | Cập nhật profile | ✅ | - |
+| `PUT` | `/password` | Đổi mật khẩu | ✅ | - |
+| `POST` | `/upload-avatar` | Upload avatar cho user (Cloudinary) | ✅ | - |
+| `POST` | `/link-google` | Liên kết tài khoản Google | ✅ | - |
+| `DELETE` | `/unlink-google` | Hủy liên kết Google | ✅ | - |
 
 ## 📊 Analytics
 

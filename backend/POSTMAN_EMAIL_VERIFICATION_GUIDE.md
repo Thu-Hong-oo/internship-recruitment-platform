@@ -359,6 +359,82 @@ Response sẽ hiển thị trạng thái email verification:
 2. Đảm bảo response format đúng
 3. Refresh environment trong Postman
 
+## 📸 Upload Avatar
+
+### Cách sử dụng trong Postman:
+
+1. **Chọn request "Upload Avatar"**
+2. **Headers**: Đảm bảo có `Authorization: Bearer {{token}}`
+3. **Body**: Chọn `form-data`
+4. **Key**: `avatar` (type: File)
+5. **Value**: Chọn file hình ảnh từ máy tính
+
+### Lưu ý quan trọng:
+- **Định dạng hỗ trợ**: jpg, jpeg, png, gif, webp
+- **Kích thước tối đa**: 10MB
+- **Yêu cầu**: Đăng nhập thành công (có token hợp lệ)
+- **Lưu trữ**: File được upload lên Cloudinary
+- **Database**: Cloudinary URL được cập nhật vào trường `avatar` của user
+- **Tính năng**: Tự động resize 300x300px, optimize chất lượng
+
+### Response thành công:
+```json
+{
+  "success": true,
+  "message": "Upload avatar thành công",
+  "avatar": "/uploads/avatars/avatar-1234567890-123456789.jpg",
+  "user": {
+    "id": "507f1f77bcf86cd799439011",
+    "email": "test@example.com",
+    "firstName": "Test",
+    "lastName": "User",
+    "role": "student",
+    "fullName": "Test User",
+    "avatar": "https://res.cloudinary.com/your-cloud/image/upload/v123/internship-avatars/avatar.jpg",
+    "isEmailVerified": true,
+    "authMethod": "local"
+  }
+}
+```
+
+### Kiểm tra avatar đã upload:
+- Gọi `GET /api/users/me` để xem thông tin user hiện tại
+- Trường `avatar` sẽ hiển thị đường dẫn mới
+- Có thể truy cập trực tiếp Cloudinary URL để xem hình ảnh
+
+## 👤 User Management
+
+### Các API đã được chuyển từ Authentication sang Users:
+
+#### 1. **Get Current User** (`GET /api/users/me`)
+- **Mô tả**: Lấy thông tin profile của user hiện tại
+- **Headers**: `Authorization: Bearer {{token}}`
+- **Response**: Thông tin đầy đủ của user
+
+#### 2. **Update Profile** (`PUT /api/users/profile`)
+- **Mô tả**: Cập nhật thông tin cá nhân
+- **Headers**: `Authorization: Bearer {{token}}`, `Content-Type: application/json`
+- **Body**: Thông tin cần cập nhật (firstName, lastName, phone, dateOfBirth, gender, address, education)
+
+#### 3. **Change Password** (`PUT /api/users/password`)
+- **Mô tả**: Đổi mật khẩu
+- **Headers**: `Authorization: Bearer {{token}}`, `Content-Type: application/json`
+- **Body**: `{"currentPassword": "123456", "newPassword": "newpassword123"}`
+
+#### 4. **Link Google Account** (`POST /api/users/link-google`)
+- **Mô tả**: Liên kết tài khoản Google với tài khoản hiện tại
+- **Headers**: `Authorization: Bearer {{token}}`, `Content-Type: application/json`
+- **Body**: `{"idToken": "{{google_id_token}}"}`
+
+#### 5. **Unlink Google Account** (`DELETE /api/users/unlink-google`)
+- **Mô tả**: Hủy liên kết tài khoản Google
+- **Headers**: `Authorization: Bearer {{token}}`
+
+### Lưu ý quan trọng:
+- **Tất cả API user management đều yêu cầu authentication**
+- **Token phải được gửi trong header `Authorization: Bearer {{token}}`**
+- **Các API này thuộc về quản lý profile và tài khoản, không phải xác thực ban đầu**
+
 ## 📚 Tài liệu tham khảo
 
 - [EMAIL_SETUP_GUIDE.md](./EMAIL_SETUP_GUIDE.md) - Cấu hình email service

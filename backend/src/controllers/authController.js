@@ -182,17 +182,7 @@ const login = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Get current logged in user
-// @route   GET /api/auth/me
-// @access  Private
-const getMe = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user.id);
 
-  res.status(200).json({
-    success: true,
-    user
-  });
-});
 
 // @desc    Log user out / clear cookie
 // @route   POST /api/auth/logout
@@ -206,65 +196,11 @@ const logout = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Update user details
-// @route   PUT /api/auth/updatedetails
-// @access  Private
-const updateDetails = asyncHandler(async (req, res) => {
-  const fieldsToUpdate = {
-    firstName: req.body.firstName,
-    lastName: req.body.lastName,
-    email: req.body.email,
-    phone: req.body.phone,
-    dateOfBirth: req.body.dateOfBirth,
-    gender: req.body.gender,
-    address: req.body.address,
-    education: req.body.education
-  };
 
-  // Remove undefined fields
-  Object.keys(fieldsToUpdate).forEach(key => 
-    fieldsToUpdate[key] === undefined && delete fieldsToUpdate[key]
-  );
 
-  const user = await User.findByIdAndUpdate(req.user.id, fieldsToUpdate, {
-    new: true,
-    runValidators: true
-  });
 
-  logger.info(`User details updated: ${user.email}`, { userId: user._id });
 
-  res.status(200).json({
-    success: true,
-    user
-  });
-});
 
-// @desc    Update password
-// @route   PUT /api/auth/updatepassword
-// @access  Private
-const updatePassword = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user.id).select('+password');
-
-  // Check current password
-  if (!(await user.matchPassword(req.body.currentPassword))) {
-    return res.status(401).json({
-      success: false,
-      error: 'Mật khẩu hiện tại không chính xác'
-    });
-  }
-
-  user.password = req.body.newPassword;
-  await user.save();
-
-  logger.info(`Password updated for user: ${user.email}`, { userId: user._id });
-
-  const token = user.getSignedJwtToken();
-
-  res.status(200).json({
-    success: true,
-    token
-  });
-});
 
 // @desc    Forgot password
 // @route   POST /api/auth/forgotpassword
@@ -403,153 +339,9 @@ const googleAuth = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Link Google account to existing account
-// @route   POST /api/auth/link-google
-// @access  Private
-const linkGoogleAccount = asyncHandler(async (req, res) => {
-  const { idToken } = req.body;
-  const userId = req.user.id;
 
-  if (!idToken) {
-    return res.status(400).json({
-      success: false,
-      error: 'Google ID token là bắt buộc'
-    });
-  }
 
-  try {
-    const user = await User.findById(userId);
-    
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'Không tìm thấy người dùng'
-      });
-    }
 
-    if (user.authMethod === 'google') {
-      return res.status(400).json({
-        success: false,
-        error: 'Tài khoản đã được liên kết với Google'
-      });
-    }
-
-    // Verify Google ID token
-    const googleUser = await googleAuthService.verifyIdToken(idToken);
-
-    // Check if Google account is already linked to another user
-    const existingGoogleUser = await User.findOne({ googleId: googleUser.googleId });
-    if (existingGoogleUser) {
-      return res.status(400).json({
-        success: false,
-        error: 'Tài khoản Google này đã được liên kết với người dùng khác'
-      });
-    }
-
-    // Link Google account
-    user.googleId = googleUser.googleId;
-    user.googleEmail = googleUser.email;
-    user.googleProfile = {
-      picture: googleUser.picture,
-      locale: googleUser.locale,
-      verified_email: googleUser.verified_email
-    };
-    user.authMethod = 'hybrid'; // User can now use both methods
-    user.isEmailVerified = true;
-
-    await user.save();
-
-    logger.info(`Google account linked to user: ${user.email}`, { userId: user._id });
-
-    res.status(200).json({
-      success: true,
-      message: 'Liên kết tài khoản Google thành công',
-      user: {
-        id: user._id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        fullName: user.fullName,
-        avatar: user.avatar || user.googleProfile?.picture,
-        isEmailVerified: user.isEmailVerified,
-        authMethod: user.authMethod
-      }
-    });
-  } catch (error) {
-    logger.error('Failed to link Google account', { error: error.message, userId });
-    
-    res.status(400).json({
-      success: false,
-      error: error.message || 'Không thể liên kết tài khoản Google'
-    });
-  }
-});
-
-// @desc    Unlink Google account
-// @route   DELETE /api/auth/unlink-google
-// @access  Private
-const unlinkGoogleAccount = asyncHandler(async (req, res) => {
-  const userId = req.user.id;
-
-  try {
-    const user = await User.findById(userId);
-    
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'Không tìm thấy người dùng'
-      });
-    }
-
-    if (user.authMethod === 'google') {
-      return res.status(400).json({
-        success: false,
-        error: 'Không thể hủy liên kết Google nếu đó là phương thức xác thực duy nhất'
-      });
-    }
-
-    if (!user.googleId) {
-      return res.status(400).json({
-        success: false,
-        error: 'Không có tài khoản Google nào được liên kết'
-      });
-    }
-
-    // Unlink Google account
-    user.googleId = undefined;
-    user.googleEmail = undefined;
-    user.googleProfile = undefined;
-    user.authMethod = 'local';
-
-    await user.save();
-
-    logger.info(`Google account unlinked from user: ${user.email}`, { userId: user._id });
-
-    res.status(200).json({
-      success: true,
-      message: 'Hủy liên kết tài khoản Google thành công',
-      user: {
-        id: user._id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        fullName: user.fullName,
-        avatar: user.avatar,
-        isEmailVerified: user.isEmailVerified,
-        authMethod: user.authMethod
-      }
-    });
-  } catch (error) {
-    logger.error('Failed to unlink Google account', { error: error.message, userId });
-    
-    res.status(400).json({
-      success: false,
-      error: error.message || 'Không thể hủy liên kết tài khoản Google'
-    });
-  }
-});
 
 // @desc    Verify email with OTP
 // @route   POST /api/auth/verify-email
@@ -687,15 +479,10 @@ const resendEmailVerification = asyncHandler(async (req, res) => {
 module.exports = {
   register,
   login,
-  getMe,
   logout,
-  updateDetails,
-  updatePassword,
   forgotPassword,
   resetPassword,
   googleAuth,
-  linkGoogleAccount,
-  unlinkGoogleAccount,
   verifyEmail,
   resendEmailVerification
 };
