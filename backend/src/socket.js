@@ -5,8 +5,9 @@ const { logger } = require('./utils/logger');
 
 const setupSocket = (server) => {
   const { Server } = require('socket.io');
+  //khởi tạo socket io dựa trên http server
   const io = new Server(server, {
-    cors: {
+    cors: {//bật cor để client có thể kết nối từ domain khác
       origin: process.env.FRONTEND_URL || '*',
       methods: ['GET', 'POST'],
       credentials: true
@@ -28,7 +29,7 @@ const setupSocket = (server) => {
       if (!user) {
         return next(new Error('Authentication error: User not found'));
       }
-
+//gắn các thông tin cần thiết lên socket để event khác dùng
       socket.userId = user._id.toString();
       socket.userRole = user.role;
       socket.userName = user.fullName;

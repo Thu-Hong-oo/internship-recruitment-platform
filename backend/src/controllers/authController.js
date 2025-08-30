@@ -17,7 +17,7 @@ const register = asyncHandler(async (req, res) => {
   if (existingUser) {
     return res.status(400).json({
       success: false,
-      error: 'User already exists with this email'
+      error: 'Email này đã được sử dụng bởi tài khoản khác'
     });
   }
 
@@ -25,7 +25,7 @@ const register = asyncHandler(async (req, res) => {
   if (!password) {
     return res.status(400).json({
       success: false,
-      error: 'Password is required for local registration'
+      error: 'Mật khẩu là bắt buộc khi đăng ký tài khoản'
     });
   }
 
@@ -40,12 +40,15 @@ const register = asyncHandler(async (req, res) => {
     isEmailVerified: false
   });
 
-  // Generate email verification token
+  // Generate email verification token and OTP
   const verificationToken = crypto.randomBytes(20).toString('hex');
+  const verificationOtp = verificationToken.substring(0, 6).toUpperCase();
+  
   user.emailVerificationToken = crypto
     .createHash('sha256')
     .update(verificationToken)
     .digest('hex');
+  user.emailVerificationOtp = verificationOtp; // Store the original OTP
   user.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
   await user.save({ validateBeforeSave: false });
 
@@ -75,7 +78,7 @@ const register = asyncHandler(async (req, res) => {
       authMethod: user.authMethod,
       isEmailVerified: user.isEmailVerified
     },
-    message: 'Registration successful. Please check your email to verify your account.'
+    message: 'Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản.'
   });
 });
 
@@ -89,7 +92,7 @@ const login = asyncHandler(async (req, res) => {
   if (!email || !password) {
     return res.status(400).json({
       success: false,
-      error: 'Please provide an email and password'
+      error: 'Vui lòng cung cấp email và mật khẩu'
     });
   }
 
@@ -99,7 +102,8 @@ const login = asyncHandler(async (req, res) => {
   if (!user) {
     return res.status(401).json({
       success: false,
-      error: 'Invalid credentials'
+      error: 'Email này chưa được đăng ký trong hệ thống',
+      errorType: 'EMAIL_NOT_REGISTERED'
     });
   }
 
@@ -107,7 +111,8 @@ const login = asyncHandler(async (req, res) => {
   if (!user.canUsePassword()) {
     return res.status(401).json({
       success: false,
-      error: 'This account uses Google OAuth. Please use Google to sign in.'
+      error: 'Tài khoản này sử dụng Google OAuth. Vui lòng đăng nhập bằng Google.',
+      errorType: 'GOOGLE_OAUTH_REQUIRED'
     });
   }
 
@@ -117,7 +122,28 @@ const login = asyncHandler(async (req, res) => {
   if (!isMatch) {
     return res.status(401).json({
       success: false,
-      error: 'Invalid credentials'
+      error: 'Mật khẩu không chính xác',
+      errorType: 'INVALID_PASSWORD'
+    });
+  }
+
+  // Check if email is verified
+  if (!user.isEmailVerified) {
+    return res.status(401).json({
+      success: false,
+      error: 'Email chưa được xác thực. Vui lòng kiểm tra email và xác thực tài khoản trước khi đăng nhập.',
+      errorType: 'EMAIL_NOT_VERIFIED',
+      requiresEmailVerification: true,
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        fullName: user.fullName,
+        isEmailVerified: user.isEmailVerified,
+        authMethod: user.authMethod
+      }
     });
   }
 
@@ -125,7 +151,8 @@ const login = asyncHandler(async (req, res) => {
   if (!user.isActive) {
     return res.status(401).json({
       success: false,
-      error: 'Account is deactivated'
+      error: 'Tài khoản đã bị vô hiệu hóa',
+      errorType: 'ACCOUNT_DISABLED'
     });
   }
 
@@ -175,7 +202,7 @@ const logout = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    message: 'Logged out successfully'
+    message: 'Đăng xuất thành công'
   });
 });
 
@@ -222,7 +249,7 @@ const updatePassword = asyncHandler(async (req, res) => {
   if (!(await user.matchPassword(req.body.currentPassword))) {
     return res.status(401).json({
       success: false,
-      error: 'Password is incorrect'
+      error: 'Mật khẩu hiện tại không chính xác'
     });
   }
 
@@ -248,18 +275,20 @@ const forgotPassword = asyncHandler(async (req, res) => {
   if (!user) {
     return res.status(404).json({
       success: false,
-      error: 'There is no user with that email'
+      error: 'Không tìm thấy tài khoản với email này'
     });
   }
 
-  // Get reset token
+  // Get reset token and OTP
   const resetToken = crypto.randomBytes(20).toString('hex');
+  const resetOtp = resetToken.substring(0, 6).toUpperCase();
 
   // Hash token and set to resetPasswordToken field
   user.resetPasswordToken = crypto
     .createHash('sha256')
     .update(resetToken)
     .digest('hex');
+  user.resetPasswordOtp = resetOtp; // Store the OTP for verification
 
   // Set expire
   user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
@@ -274,43 +303,61 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Password reset email sent successfully'
+      message: 'Email đặt lại mật khẩu đã được gửi thành công'
     });
   } catch (error) {
     logger.error('Failed to send password reset email', { error: error.message, userId: user._id });
     
     res.status(500).json({
       success: false,
-      error: 'Failed to send password reset email'
+      error: 'Không thể gửi email đặt lại mật khẩu'
     });
   }
 });
 
-// @desc    Reset password
-// @route   PUT /api/auth/resetpassword/:resettoken
+// @desc    Reset password with OTP
+// @route   PUT /api/auth/resetpassword
 // @access  Public
 const resetPassword = asyncHandler(async (req, res) => {
-  // Get hashed token
-  const resetPasswordToken = crypto
-    .createHash('sha256')
-    .update(req.params.resettoken)
-    .digest('hex');
+  const { email, otp, password } = req.body;
 
-  const user = await User.findOne({
-    resetPasswordToken,
-    resetPasswordExpire: { $gt: Date.now() }
-  });
-
-  if (!user) {
+  if (!email || !otp || !password) {
     return res.status(400).json({
       success: false,
-      error: 'Invalid token'
+      error: 'Email, OTP và mật khẩu mới là bắt buộc'
+    });
+  }
+
+  // Find user by email
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      error: 'Không tìm thấy tài khoản với email này'
+    });
+  }
+
+  // Check if OTP matches
+  if (user.resetPasswordOtp !== otp.toUpperCase()) {
+    return res.status(400).json({
+      success: false,
+      error: 'Mã OTP không chính xác'
+    });
+  }
+
+  // Check if token is expired
+  if (user.resetPasswordExpire < Date.now()) {
+    return res.status(400).json({
+      success: false,
+      error: 'Mã OTP đã hết hạn. Vui lòng yêu cầu gửi lại mã mới'
     });
   }
 
   // Set new password
   user.password = req.body.password;
   user.resetPasswordToken = undefined;
+  user.resetPasswordOtp = undefined;
   user.resetPasswordExpire = undefined;
   await user.save();
 
@@ -333,7 +380,7 @@ const googleAuth = asyncHandler(async (req, res) => {
   if (!idToken) {
     return res.status(400).json({
       success: false,
-      error: 'Google ID token is required'
+      error: 'Google ID token là bắt buộc'
     });
   }
 
@@ -351,7 +398,7 @@ const googleAuth = asyncHandler(async (req, res) => {
     
     res.status(400).json({
       success: false,
-      error: error.message || 'Google authentication failed'
+      error: error.message || 'Xác thực Google thất bại'
     });
   }
 });
@@ -366,7 +413,7 @@ const linkGoogleAccount = asyncHandler(async (req, res) => {
   if (!idToken) {
     return res.status(400).json({
       success: false,
-      error: 'Google ID token is required'
+      error: 'Google ID token là bắt buộc'
     });
   }
 
@@ -376,14 +423,14 @@ const linkGoogleAccount = asyncHandler(async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        error: 'User not found'
+        error: 'Không tìm thấy người dùng'
       });
     }
 
     if (user.authMethod === 'google') {
       return res.status(400).json({
         success: false,
-        error: 'Account is already linked to Google'
+        error: 'Tài khoản đã được liên kết với Google'
       });
     }
 
@@ -395,7 +442,7 @@ const linkGoogleAccount = asyncHandler(async (req, res) => {
     if (existingGoogleUser) {
       return res.status(400).json({
         success: false,
-        error: 'This Google account is already linked to another user'
+        error: 'Tài khoản Google này đã được liên kết với người dùng khác'
       });
     }
 
@@ -416,7 +463,7 @@ const linkGoogleAccount = asyncHandler(async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Google account linked successfully',
+      message: 'Liên kết tài khoản Google thành công',
       user: {
         id: user._id,
         email: user.email,
@@ -434,7 +481,7 @@ const linkGoogleAccount = asyncHandler(async (req, res) => {
     
     res.status(400).json({
       success: false,
-      error: error.message || 'Failed to link Google account'
+      error: error.message || 'Không thể liên kết tài khoản Google'
     });
   }
 });
@@ -451,21 +498,21 @@ const unlinkGoogleAccount = asyncHandler(async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        error: 'User not found'
+        error: 'Không tìm thấy người dùng'
       });
     }
 
     if (user.authMethod === 'google') {
       return res.status(400).json({
         success: false,
-        error: 'Cannot unlink Google account if it\'s the only authentication method'
+        error: 'Không thể hủy liên kết Google nếu đó là phương thức xác thực duy nhất'
       });
     }
 
     if (!user.googleId) {
       return res.status(400).json({
         success: false,
-        error: 'No Google account linked'
+        error: 'Không có tài khoản Google nào được liên kết'
       });
     }
 
@@ -481,7 +528,7 @@ const unlinkGoogleAccount = asyncHandler(async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Google account unlinked successfully',
+      message: 'Hủy liên kết tài khoản Google thành công',
       user: {
         id: user._id,
         email: user.email,
@@ -499,44 +546,80 @@ const unlinkGoogleAccount = asyncHandler(async (req, res) => {
     
     res.status(400).json({
       success: false,
-      error: error.message || 'Failed to unlink Google account'
+      error: error.message || 'Không thể hủy liên kết tài khoản Google'
     });
   }
 });
 
-// @desc    Verify email
-// @route   GET /api/auth/verify-email/:verificationtoken
+// @desc    Verify email with OTP
+// @route   POST /api/auth/verify-email
 // @access  Public
 const verifyEmail = asyncHandler(async (req, res) => {
-  // Get hashed token
-  const emailVerificationToken = crypto
-    .createHash('sha256')
-    .update(req.params.verificationtoken)
-    .digest('hex');
+  const { email, otp } = req.body;
 
-  const user = await User.findOne({
-    emailVerificationToken,
-    emailVerificationExpire: { $gt: Date.now() }
-  });
-
-  if (!user) {
+  if (!email || !otp) {
     return res.status(400).json({
       success: false,
-      error: 'Invalid or expired verification token'
+      error: 'Email và mã OTP là bắt buộc'
+    });
+  }
+
+  // Find user by email
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      error: 'Không tìm thấy tài khoản với email này'
+    });
+  }
+
+  if (user.isEmailVerified) {
+    return res.status(400).json({
+      success: false,
+      error: 'Email đã được xác thực trước đó'
+    });
+  }
+
+  // Check if OTP matches the stored OTP
+  const expectedOtp = user.emailVerificationOtp;
+
+  if (!expectedOtp || expectedOtp !== otp.toUpperCase()) {
+    // Log for debugging
+    logger.error('OTP verification failed', {
+      userId: user._id,
+      email: user.email,
+      providedOtp: otp.toUpperCase(),
+      expectedOtp: expectedOtp,
+      hashedToken: user.emailVerificationToken ? user.emailVerificationToken.substring(0, 10) + '...' : 'null'
+    });
+    
+    return res.status(400).json({
+      success: false,
+      error: 'Mã OTP không chính xác'
+    });
+  }
+
+  // Check if token is expired
+  if (user.emailVerificationExpire < Date.now()) {
+    return res.status(400).json({
+      success: false,
+      error: 'Mã OTP đã hết hạn. Vui lòng yêu cầu gửi lại mã mới'
     });
   }
 
   // Set email as verified
   user.isEmailVerified = true;
   user.emailVerificationToken = undefined;
+  user.emailVerificationOtp = undefined;
   user.emailVerificationExpire = undefined;
   await user.save();
 
-  logger.info(`Email verified for user: ${user.email}`, { userId: user._id });
+  logger.info(`Email verified with OTP for user: ${user.email}`, { userId: user._id });
 
   res.status(200).json({
     success: true,
-    message: 'Email verified successfully',
+    message: 'Xác thực email thành công',
     user: {
       id: user._id,
       email: user.email,
@@ -558,23 +641,26 @@ const resendEmailVerification = asyncHandler(async (req, res) => {
   if (!user) {
     return res.status(404).json({
       success: false,
-      error: 'User not found'
+      error: 'Không tìm thấy người dùng'
     });
   }
 
   if (user.isEmailVerified) {
     return res.status(400).json({
       success: false,
-      error: 'Email is already verified'
+      error: 'Email đã được xác thực'
     });
   }
 
-  // Generate new verification token
+  // Generate new verification token and OTP
   const verificationToken = crypto.randomBytes(20).toString('hex');
+  const verificationOtp = verificationToken.substring(0, 6).toUpperCase();
+  
   user.emailVerificationToken = crypto
     .createHash('sha256')
     .update(verificationToken)
     .digest('hex');
+  user.emailVerificationOtp = verificationOtp; // Store the new OTP
   user.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
   await user.save({ validateBeforeSave: false });
 
@@ -586,14 +672,14 @@ const resendEmailVerification = asyncHandler(async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Verification email sent successfully'
+      message: 'Email xác thực đã được gửi thành công'
     });
   } catch (error) {
     logger.error('Failed to resend verification email', { error: error.message, userId: user._id });
     
     res.status(500).json({
       success: false,
-      error: 'Failed to send verification email'
+      error: 'Không thể gửi email xác thực'
     });
   }
 });

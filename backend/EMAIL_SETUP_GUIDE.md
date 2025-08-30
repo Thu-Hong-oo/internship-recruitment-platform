@@ -28,7 +28,6 @@ SMTP_USER=your-email@gmail.com
 SMTP_PASS=your-app-password-here
 EMAIL_FROM_NAME=Internship Recruitment Platform
 EMAIL_FROM_ADDRESS=your-email@gmail.com
-FRONTEND_URL=http://localhost:3001
 ```
 
 ## Cấu hình khác
@@ -59,14 +58,14 @@ SMTP_PASS=your-password
 ## Tính năng Email
 
 ### 1. Xác thực Email
-- Tự động gửi email xác thực khi đăng ký
-- Token có hiệu lực trong 24 giờ
+- Tự động gửi email xác thực với mã OTP 6 số khi đăng ký
+- OTP có hiệu lực trong 24 giờ
 - Có thể gửi lại email xác thực
 
 ### 2. Đặt lại mật khẩu
-- Gửi email đặt lại mật khẩu
-- Token có hiệu lực trong 10 phút
-- Link an toàn với token được mã hóa
+- Gửi email đặt lại mật khẩu với mã OTP 6 số
+- OTP có hiệu lực trong 10 phút
+- Mã OTP an toàn với thời gian hết hạn ngắn
 
 ### 3. Template Email
 - Email được format đẹp với HTML
@@ -77,12 +76,12 @@ SMTP_PASS=your-password
 ## API Endpoints
 
 ### Xác thực Email
-- `GET /api/auth/verify-email/:token` - Xác thực email
+- `POST /api/auth/verify-email` - Xác thực email bằng OTP (email + otp)
 - `POST /api/auth/resend-verification` - Gửi lại email xác thực
 
 ### Đặt lại mật khẩu
 - `POST /api/auth/forgotpassword` - Yêu cầu đặt lại mật khẩu
-- `PUT /api/auth/resetpassword/:token` - Đặt lại mật khẩu
+- `POST /api/auth/resetpassword` - Đặt lại mật khẩu bằng OTP (email + otp + password)
 
 ## Middleware
 

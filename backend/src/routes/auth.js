@@ -141,17 +141,56 @@ router.post('/register', register);
  *             schema:
  *               $ref: '#/components/schemas/AuthResponse'
  *       401:
- *         description: Invalid credentials
+ *         description: Login failed - various error types
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 error:
- *                   type: string
+ *               oneOf:
+ *                 - type: object
+ *                   properties:
+ *                     success:
+ *                       type: boolean
+ *                       example: false
+ *                     error:
+ *                       type: string
+ *                       example: "Email này chưa được đăng ký trong hệ thống"
+ *                     errorType:
+ *                       type: string
+ *                       enum: [EMAIL_NOT_REGISTERED, GOOGLE_OAUTH_REQUIRED, INVALID_PASSWORD, EMAIL_NOT_VERIFIED, ACCOUNT_DISABLED]
+ *                       example: "EMAIL_NOT_REGISTERED"
+ *                 - type: object
+ *                   properties:
+ *                     success:
+ *                       type: boolean
+ *                       example: false
+ *                     error:
+ *                       type: string
+ *                       example: "Email chưa được xác thực. Vui lòng kiểm tra email và xác thực tài khoản trước khi đăng nhập."
+ *                     errorType:
+ *                       type: string
+ *                       example: "EMAIL_NOT_VERIFIED"
+ *                     requiresEmailVerification:
+ *                       type: boolean
+ *                       example: true
+ *                     user:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                         email:
+ *                           type: string
+ *                         firstName:
+ *                           type: string
+ *                         lastName:
+ *                           type: string
+ *                         role:
+ *                           type: string
+ *                         fullName:
+ *                           type: string
+ *                         isEmailVerified:
+ *                           type: boolean
+ *                         authMethod:
+ *                           type: string
  */
 router.post('/login', login);
 
@@ -326,17 +365,10 @@ router.post('/forgotpassword', forgotPassword);
 
 /**
  * @swagger
- * /api/auth/resetpassword/{resettoken}:
- *   put:
- *     summary: Reset password with token
+ * /api/auth/resetpassword:
+ *   post:
+ *     summary: Reset password with OTP
  *     tags: [Authentication]
- *     parameters:
- *       - in: path
- *         name: resettoken
- *         required: true
- *         schema:
- *           type: string
- *         description: Password reset token
  *     requestBody:
  *       required: true
  *       content:
@@ -344,11 +376,23 @@ router.post('/forgotpassword', forgotPassword);
  *           schema:
  *             type: object
  *             required:
+ *               - email
+ *               - otp
  *               - password
  *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: User's email address
+ *               otp:
+ *                 type: string
+ *                 minLength: 6
+ *                 maxLength: 6
+ *                 description: 6-digit OTP code from email
  *               password:
  *                 type: string
  *                 minLength: 6
+ *                 description: New password
  *     responses:
  *       200:
  *         description: Password reset successful
@@ -361,8 +405,12 @@ router.post('/forgotpassword', forgotPassword);
  *                   type: boolean
  *                 token:
  *                   type: string
+ *       400:
+ *         description: Invalid OTP or missing fields
+ *       404:
+ *         description: User not found
  */
-router.put('/resetpassword/:resettoken', resetPassword);
+router.post('/resetpassword', resetPassword);
 
 /**
  * @swagger
@@ -443,17 +491,29 @@ router.delete('/unlink-google', protect, unlinkGoogleAccount);
 
 /**
  * @swagger
- * /api/auth/verify-email/{verificationtoken}:
- *   get:
- *     summary: Verify email with token
+ * /api/auth/verify-email:
+ *   post:
+ *     summary: Verify email with OTP code
  *     tags: [Authentication]
- *     parameters:
- *       - in: path
- *         name: verificationtoken
- *         required: true
- *         schema:
- *           type: string
- *         description: Email verification token
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - otp
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: User's email address
+ *               otp:
+ *                 type: string
+ *                 minLength: 6
+ *                 maxLength: 6
+ *                 description: 6-digit OTP code from email
  *     responses:
  *       200:
  *         description: Email verified successfully
@@ -469,19 +529,11 @@ router.delete('/unlink-google', protect, unlinkGoogleAccount);
  *                 user:
  *                   type: object
  *       400:
- *         description: Invalid or expired token
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 error:
- *                   type: string
+ *         description: Invalid OTP or missing fields
+ *       404:
+ *         description: User not found
  */
-router.get('/verify-email/:verificationtoken', verifyEmail);
+router.post('/verify-email', verifyEmail);
 
 /**
  * @swagger

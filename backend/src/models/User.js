@@ -5,19 +5,19 @@ const jwt = require('jsonwebtoken');
 const UserSchema = new mongoose.Schema({
   email: {
     type: String,
-    required: [true, 'Please add an email'],
+    required: [true, 'Vui lòng nhập email'],
     unique: true,
     match: [
       /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
-      'Please add a valid email'
+      'Vui lòng nhập một email hợp lệ'
     ]
   },
   password: {
     type: String,
-    required: function() {
+    required: function () {
       return this.authMethod === 'local' || this.authMethod === 'hybrid';
     },
-    minlength: 6,
+    minlength: [6, 'Mật khẩu phải có ít nhất 6 ký tự'],
     select: false
   },
   authMethod: {
@@ -41,15 +41,15 @@ const UserSchema = new mongoose.Schema({
   },
   firstName: {
     type: String,
-    required: [true, 'Please add a first name'],
+    required: [true, 'Vui lòng nhập tên'],
     trim: true,
-    maxlength: [50, 'First name cannot be more than 50 characters']
+    maxlength: [50, 'Tên không được vượt quá 50 ký tự']
   },
   lastName: {
     type: String,
-    required: [true, 'Please add a last name'],
+    required: [true, 'Vui lòng nhập họ'],
     trim: true,
-    maxlength: [50, 'Last name cannot be more than 50 characters']
+    maxlength: [50, 'Họ không được vượt quá 50 ký tự']
   },
   role: {
     type: String,
@@ -62,7 +62,7 @@ const UserSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    match: [/^[\+]?[1-9][\d]{0,15}$/, 'Please add a valid phone number']
+    match: [/^[\+]?[1-9][\d]{0,15}$/, 'Vui lòng nhập số điện thoại hợp lệ']
   },
   dateOfBirth: {
     type: Date
@@ -116,8 +116,10 @@ const UserSchema = new mongoose.Schema({
     default: false
   },
   emailVerificationToken: String,
+  emailVerificationOtp: String, // Store the original OTP for verification
   emailVerificationExpire: Date,
   resetPasswordToken: String,
+  resetPasswordOtp: String, // Store the original OTP for password reset
   resetPasswordExpire: Date,
   lastLogin: Date,
   isActive: {
@@ -151,12 +153,12 @@ const UserSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Virtual for full name
-UserSchema.virtual('fullName').get(function() {
+// Virtual cho tên đầy đủ
+UserSchema.virtual('fullName').get(function () {
   return `${this.firstName} ${this.lastName}`;
 });
 
-// Create text index for search
+// Tạo chỉ mục text cho tìm kiếm
 UserSchema.index({
   firstName: 'text',
   lastName: 'text',
@@ -168,8 +170,8 @@ UserSchema.index({
   'experience.company': 'text'
 });
 
-// Encrypt password using bcrypt
-UserSchema.pre('save', async function(next) {
+// Mã hoá mật khẩu bằng bcrypt
+UserSchema.pre('save', async function (next) {
   if (!this.isModified('password')) {
     next();
   }
@@ -178,8 +180,8 @@ UserSchema.pre('save', async function(next) {
   this.password = await bcrypt.hash(this.password, salt);
 });
 
-// Sign JWT and return
-UserSchema.methods.getSignedJwtToken = function() {
+// Tạo JWT
+UserSchema.methods.getSignedJwtToken = function () {
   return jwt.sign(
     { id: this._id, role: this.role },
     process.env.JWT_SECRET,
@@ -187,14 +189,14 @@ UserSchema.methods.getSignedJwtToken = function() {
   );
 };
 
-// Match user entered password to hashed password in database
-UserSchema.methods.matchPassword = async function(enteredPassword) {
+// So khớp mật khẩu
+UserSchema.methods.matchPassword = async function (enteredPassword) {
   if (!this.password) return false;
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Check if user can use password authentication
-UserSchema.methods.canUsePassword = function() {
+// Kiểm tra nếu người dùng có thể dùng đăng nhập bằng mật khẩu
+UserSchema.methods.canUsePassword = function () {
   return this.authMethod === 'local' || this.authMethod === 'hybrid';
 };
 

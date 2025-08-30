@@ -3,7 +3,7 @@ const { logger } = require('../utils/logger');
 
 // Create transporter
 const createTransporter = () => {
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: process.env.SMTP_PORT,
     secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
@@ -14,12 +14,13 @@ const createTransporter = () => {
   });
 };
 
-// Send email verification
+// Send email verification with OTP
 const sendEmailVerification = async (user, verificationToken) => {
   try {
     const transporter = createTransporter();
     
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${verificationToken}`;
+    // Generate 6-digit OTP from the token
+    const otp = verificationToken.substring(0, 6).toUpperCase();
     
     const mailOptions = {
       from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
@@ -33,16 +34,16 @@ const sendEmailVerification = async (user, verificationToken) => {
           <div style="padding: 20px; background-color: #f9f9f9;">
             <h2>Xin chào ${user.firstName} ${user.lastName}!</h2>
             <p>Cảm ơn bạn đã đăng ký tài khoản tại Internship Recruitment Platform.</p>
-            <p>Để hoàn tất quá trình đăng ký, vui lòng xác thực email của bạn bằng cách nhấp vào nút bên dưới:</p>
+            <p>Để hoàn tất quá trình đăng ký, vui lòng sử dụng mã OTP sau:</p>
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${verificationUrl}" 
-                 style="background-color: #4F46E5; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
-                Xác thực Email
-              </a>
+              <div style="background-color: #4F46E5; color: white; padding: 20px; font-size: 32px; font-weight: bold; letter-spacing: 8px; border-radius: 10px; display: inline-block; min-width: 200px;">
+                ${otp}
+              </div>
             </div>
-            <p>Hoặc bạn có thể copy và paste link sau vào trình duyệt:</p>
-            <p style="word-break: break-all; color: #4F46E5;">${verificationUrl}</p>
-            <p>Link này sẽ hết hạn sau 24 giờ.</p>
+            <p style="text-align: center; font-size: 18px; color: #4F46E5; font-weight: bold;">
+              Mã OTP này sẽ hết hạn sau 24 giờ.
+            </p>
+            <p>Vui lòng nhập mã này vào trang xác thực email để hoàn tất đăng ký.</p>
             <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này.</p>
             <hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;">
             <p style="color: #666; font-size: 14px;">
@@ -55,9 +56,10 @@ const sendEmailVerification = async (user, verificationToken) => {
 
     const info = await transporter.sendMail(mailOptions);
     
-    logger.info(`Email verification sent to ${user.email}`, { 
+    logger.info(`Email verification OTP sent to ${user.email}`, { 
       userId: user._id, 
-      messageId: info.messageId 
+      messageId: info.messageId,
+      otp: otp
     });
     
     return true;
@@ -75,7 +77,8 @@ const sendPasswordResetEmail = async (user, resetToken) => {
   try {
     const transporter = createTransporter();
     
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+    // Generate 6-digit OTP from the token
+    const otp = resetToken.substring(0, 6).toUpperCase();
     
     const mailOptions = {
       from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
@@ -89,16 +92,16 @@ const sendPasswordResetEmail = async (user, resetToken) => {
           <div style="padding: 20px; background-color: #f9f9f9;">
             <h2>Xin chào ${user.firstName} ${user.lastName}!</h2>
             <p>Bạn đã yêu cầu đặt lại mật khẩu cho tài khoản của mình.</p>
-            <p>Nhấp vào nút bên dưới để đặt lại mật khẩu:</p>
+            <p>Vui lòng sử dụng mã OTP sau để đặt lại mật khẩu:</p>
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${resetUrl}" 
-                 style="background-color: #DC2626; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
-                Đặt lại mật khẩu
-              </a>
+              <div style="background-color: #DC2626; color: white; padding: 20px; font-size: 32px; font-weight: bold; letter-spacing: 8px; border-radius: 10px; display: inline-block; min-width: 200px;">
+                ${otp}
+              </div>
             </div>
-            <p>Hoặc bạn có thể copy và paste link sau vào trình duyệt:</p>
-            <p style="word-break: break-all; color: #DC2626;">${resetUrl}</p>
-            <p>Link này sẽ hết hạn sau 10 phút.</p>
+            <p style="text-align: center; font-size: 18px; color: #DC2626; font-weight: bold;">
+              Mã OTP này sẽ hết hạn sau 10 phút.
+            </p>
+            <p>Vui lòng nhập mã này vào trang đặt lại mật khẩu.</p>
             <p>Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.</p>
             <hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;">
             <p style="color: #666; font-size: 14px;">
@@ -111,9 +114,10 @@ const sendPasswordResetEmail = async (user, resetToken) => {
 
     const info = await transporter.sendMail(mailOptions);
     
-    logger.info(`Password reset email sent to ${user.email}`, { 
+    logger.info(`Password reset OTP sent to ${user.email}`, { 
       userId: user._id, 
-      messageId: info.messageId 
+      messageId: info.messageId,
+      otp: otp
     });
     
     return true;

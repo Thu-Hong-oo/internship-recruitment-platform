@@ -15,13 +15,13 @@ Documentation: http://localhost:3000/api-docs
 | Method | Endpoint | Description | Auth Required |
 |--------|----------|-------------|---------------|
 | `POST` | `/register` | Đăng ký user mới | ❌ |
-| `POST` | `/login` | Đăng nhập | ❌ |
+| `POST` | `/login` | Đăng nhập (phân biệt rõ các loại lỗi) | ❌ |
 | `GET` | `/me` | Lấy thông tin user hiện tại | ✅ |
 | `PUT` | `/profile` | Cập nhật profile | ✅ |
 | `PUT` | `/password` | Đổi mật khẩu | ✅ |
 | `POST` | `/forgotpassword` | Quên mật khẩu | ❌ |
-| `PUT` | `/resetpassword/:resettoken` | Reset mật khẩu | ❌ |
-| `GET` | `/verify-email/:verificationtoken` | Xác thực email | ❌ |
+| `POST` | `/resetpassword` | Reset mật khẩu bằng OTP (email + otp + password) | ❌ |
+| `POST` | `/verify-email` | Xác thực email bằng OTP | ❌ |
 | `POST` | `/resend-verification` | Gửi lại email xác thực | ✅ |
 | `POST` | `/logout` | Đăng xuất | ✅ |
 

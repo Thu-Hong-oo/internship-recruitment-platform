@@ -62,8 +62,15 @@
                   "    pm.response.to.have.status(201);",
                   "    var jsonData = pm.response.json();",
                   "    if (jsonData.success) {",
-                  "        pm.environment.set(\"user_id\", jsonData.data._id);",
-                  "        pm.environment.set(\"token\", jsonData.data.token);",
+                  "        pm.environment.set(\"user_id\", jsonData.user.id);",
+                  "        pm.environment.set(\"token\", jsonData.token);",
+                  "        pm.environment.set(\"is_email_verified\", jsonData.user.isEmailVerified);",
+                  "        pm.environment.set(\"auth_method\", jsonData.user.authMethod);",
+                  "        ",
+                  "        // Log email verification status",
+                  "        if (!jsonData.user.isEmailVerified) {",
+                  "            console.log(\"⚠️ Email verification required. Check your email for verification link.\");",
+                  "        }",
                   "    }",
                   "});"
                 ],
@@ -103,8 +110,15 @@
                   "    pm.response.to.have.status(200);",
                   "    var jsonData = pm.response.json();",
                   "    if (jsonData.success) {",
-                  "        pm.environment.set(\"user_id\", jsonData.data._id);",
-                  "        pm.environment.set(\"token\", jsonData.data.token);",
+                  "        pm.environment.set(\"user_id\", jsonData.user.id);",
+                  "        pm.environment.set(\"token\", jsonData.token);",
+                  "        pm.environment.set(\"is_email_verified\", jsonData.user.isEmailVerified);",
+                  "        pm.environment.set(\"auth_method\", jsonData.user.authMethod);",
+                  "        ",
+                  "        // Log email verification status",
+                  "        if (!jsonData.user.isEmailVerified) {",
+                  "            console.log(\"⚠️ Email not verified. Use 'Resend Email Verification' to get a new link.\");",
+                  "        }",
                   "    }",
                   "});"
                 ],
@@ -135,6 +149,29 @@
         },
         {
           "name": "Get Current User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Get user profile successful\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.success) {",
+                  "        pm.environment.set(\"is_email_verified\", jsonData.user.isEmailVerified);",
+                  "        pm.environment.set(\"auth_method\", jsonData.user.authMethod);",
+                  "        ",
+                  "        // Log email verification status",
+                  "        if (!jsonData.user.isEmailVerified) {",
+                  "            console.log(\"⚠️ Email not verified. Use 'Resend Email Verification' to get a new link.\");",
+                  "        }",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
@@ -143,7 +180,7 @@
               "host": ["{{api_url}}"],
               "path": ["auth", "me"]
             },
-            "description": "Get current user profile information"
+            "description": "Get current user profile information including email verification status"
           },
           "response": []
         },
@@ -162,9 +199,9 @@
               "raw": "{\n  \"firstName\": \"Nguyen Van\",\n  \"lastName\": \"A\",\n  \"phone\": \"0123456789\",\n  \"dateOfBirth\": \"2000-01-01\",\n  \"gender\": \"male\",\n  \"address\": {\n    \"street\": \"123 Main St\",\n    \"city\": \"Ho Chi Minh\",\n    \"state\": \"HCM\",\n    \"country\": \"Vietnam\"\n  },\n  \"education\": {\n    \"institution\": \"University of Technology\",\n    \"degree\": \"Bachelor\",\n    \"fieldOfStudy\": \"Computer Science\",\n    \"graduationYear\": 2024,\n    \"gpa\": 3.5\n  },\n  \"skills\": [\n    {\n      \"name\": \"JavaScript\",\n      \"level\": \"intermediate\",\n      \"yearsOfExperience\": 2\n    },\n    {\n      \"name\": \"React\",\n      \"level\": \"beginner\",\n      \"yearsOfExperience\": 1\n    }\n  ]\n}"
             },
             "url": {
-              "raw": "{{api_url}}/auth/profile",
+              "raw": "{{api_url}}/auth/updatedetails",
               "host": ["{{api_url}}"],
-              "path": ["auth", "profile"]
+              "path": ["auth", "updatedetails"]
             },
             "description": "Update user profile information"
           },
@@ -185,9 +222,9 @@
               "raw": "{\n  \"currentPassword\": \"123456\",\n  \"newPassword\": \"newpassword123\"\n}"
             },
             "url": {
-              "raw": "{{api_url}}/auth/password",
+              "raw": "{{api_url}}/auth/updatepassword",
               "host": ["{{api_url}}"],
-              "path": ["auth", "password"]
+              "path": ["auth", "updatepassword"]
             },
             "description": "Change user password"
           },
@@ -208,11 +245,98 @@
               "raw": "{\n  \"email\": \"student@example.com\"\n}"
             },
             "url": {
-              "raw": "{{api_url}}/auth/forgot-password",
+              "raw": "{{api_url}}/auth/forgotpassword",
               "host": ["{{api_url}}"],
-              "path": ["auth", "forgot-password"]
+              "path": ["auth", "forgotpassword"]
             },
-            "description": "Request password reset"
+            "description": "Request password reset - sends email with reset link"
+          },
+          "response": []
+        },
+        {
+          "name": "Reset Password with OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"otp\": \"{{otp_code}}\",\n  \"password\": \"newpassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/auth/resetpassword",
+              "host": ["{{api_url}}"],
+              "path": ["auth", "resetpassword"]
+            },
+            "description": "Reset password using OTP from email. Set 'user_email' and 'otp_code' in environment variables."
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Email with OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Email verification successful\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.success) {",
+                  "        pm.environment.set(\"user_id\", jsonData.user.id);",
+                  "        pm.environment.set(\"is_email_verified\", jsonData.user.isEmailVerified);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"otp\": \"{{otp_code}}\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/auth/verify-email",
+              "host": ["{{api_url}}"],
+              "path": ["auth", "verify-email"]
+            },
+            "description": "Verify email using OTP code from registration email. Set 'user_email' and 'otp_code' in environment variables."
+          },
+          "response": []
+        },
+        {
+          "name": "Resend Email Verification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{api_url}}/auth/resend-verification",
+              "host": ["{{api_url}}"],
+              "path": ["auth", "resend-verification"]
+            },
+            "description": "Resend email verification OTP. Requires authentication token."
           },
           "response": []
         },
@@ -320,7 +444,7 @@
           "response": []
         }
       ],
-      "description": "User authentication and profile management including Google OAuth"
+      "description": "User authentication and profile management including Google OAuth and email verification"
     },
     {
       "name": "AI Services",
