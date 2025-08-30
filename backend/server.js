@@ -117,10 +117,17 @@ app.use(limiter);
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:3001', 
+    'http://localhost:5173',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
+    'http://127.0.0.1:5173'
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept']
 }));
 
 // Body parsing middleware
@@ -267,7 +274,7 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 server.listen(PORT, () => {
   logger.info(`AI Internship Platform Server running on port ${PORT}`);
   logger.info(`API Documentation: http://localhost:${PORT}/api-docs`);
-  logger.info(`🏥 Health Check: http://localhost:${PORT}/health`);
+  logger.info(`Health Check: http://localhost:${PORT}/health`);
   
   if (!redisConnected) {
     logger.warn('Redis not connected - some features may be limited');

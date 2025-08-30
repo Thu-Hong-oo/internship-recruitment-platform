@@ -1,22 +1,19 @@
 const express = require('express');
-const asyncHandler = require('express-async-handler');
 const {
   register,
-  verifyEmail,
-  verifyEmailWithToken,
-  resendOTP,
   login,
   getMe,
   logout,
   updateDetails,
   updatePassword,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  googleAuth,
+  linkGoogleAccount,
+  unlinkGoogleAccount
 } = require('../controllers/authController');
 
 const { protect } = require('../middleware/auth');
-const User = require('../models/User');
-const { logger } = require('../utils/logger');
 
 const router = express.Router();
 
@@ -50,15 +47,9 @@ const router = express.Router();
  *           description: User's last name
  *         role:
  *           type: string
- *           enum: [student, company, admin]
+ *           enum: [student, employer, admin]
  *           default: student
  *           description: User's role
- *         companyName:
- *           type: string
- *           description: Company name (required for company registration)
- *         companyInfo:
- *           type: string
- *           description: Company information (required for company registration)
  *     LoginRequest:
  *       type: object
  *       required:
@@ -127,96 +118,6 @@ const router = express.Router();
  *                   type: string
  */
 router.post('/register', register);
-
-/**
- * @swagger
- * /api/auth/verify-email:
- *   post:
- *     summary: Verify email with OTP
- *     tags: [Authentication]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *               - otp
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *               otp:
- *                 type: string
- *                 description: 6-digit verification code
- *     responses:
- *       200:
- *         description: Email verified successfully
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/AuthResponse'
- *       400:
- *         description: Invalid OTP or email already verified
- */
-router.post('/verify-email', verifyEmail);
-
-/**
- * @swagger
- * /api/auth/verify-email/{token}:
- *   get:
- *     summary: Verify email with URL token
- *     tags: [Authentication]
- *     parameters:
- *       - in: path
- *         name: token
- *         required: true
- *         schema:
- *           type: string
- *         description: Email verification token
- *     responses:
- *       302:
- *         description: Redirects to frontend with success/error status
- *       400:
- *         description: Invalid token or verification failed
- */
-router.get('/verify-email/:token', verifyEmailWithToken);
-
-/**
- * @swagger
- * /api/auth/resend-otp:
- *   post:
- *     summary: Resend OTP for email verification
- *     tags: [Authentication]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *     responses:
- *       200:
- *         description: OTP resent successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 message:
- *                   type: string
- *       404:
- *         description: User not found
- */
-router.post('/resend-otp', resendOTP);
 
 /**
  * @swagger
@@ -350,239 +251,6 @@ router.put('/updatedetails', protect, updateDetails);
 
 /**
  * @swagger
- * /api/auth/profile:
- *   put:
- *     summary: Update user profile
- *     tags: [Authentication]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               firstName:
- *                 type: string
- *               lastName:
- *                 type: string
- *               email:
- *                 type: string
- *               phone:
- *                 type: string
- *               dateOfBirth:
- *                 type: string
- *                 format: date
- *               gender:
- *                 type: string
- *                 enum: [male, female, other]
- *               address:
- *                 type: object
- *               education:
- *                 type: object
- *               skills:
- *                 type: array
- *                 items:
- *                   type: object
- *                   properties:
- *                     name:
- *                       type: string
- *                     level:
- *                       type: string
- *                       enum: [beginner, intermediate, advanced]
- *                     yearsOfExperience:
- *                       type: number
- *               experience:
- *                 type: array
- *                 items:
- *                   type: object
- *                   properties:
- *                     title:
- *                       type: string
- *                     company:
- *                       type: string
- *                     location:
- *                       type: string
- *                     from:
- *                       type: string
- *                       format: date
- *                     to:
- *                       type: string
- *                       format: date
- *                     current:
- *                       type: boolean
- *                     description:
- *                       type: string
- *     responses:
- *       200:
- *         description: User profile updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 user:
- *                   $ref: '#/components/schemas/User'
- */
-router.put('/profile', protect, updateDetails);
-
-/**
- * @swagger
- * /api/auth/upload-avatar:
- *   post:
- *     summary: Upload user avatar
- *     tags: [Authentication]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               avatar:
- *                 type: string
- *                 format: binary
- *                 description: User avatar image file
- *     responses:
- *       200:
- *         description: Avatar uploaded successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 avatar:
- *                   type: string
- *                   description: URL of uploaded avatar
- */
-router.post('/upload-avatar', protect, (req, res) => {
-  // TODO: Implement file upload functionality
-  res.status(501).json({
-    success: false,
-    error: 'File upload functionality not implemented yet'
-  });
-});
-
-/**
- * @swagger
- * /api/auth/upload-resume:
- *   post:
- *     summary: Upload user resume
- *     tags: [Authentication]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               resume:
- *                 type: string
- *                 format: binary
- *                 description: User resume file (PDF, DOC, DOCX)
- *     responses:
- *       200:
- *         description: Resume uploaded successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 resume:
- *                   type: object
- *                   properties:
- *                     url:
- *                       type: string
- *                     filename:
- *                       type: string
- */
-router.post('/upload-resume', protect, (req, res) => {
-  // TODO: Implement file upload functionality
-  res.status(501).json({
-    success: false,
-    error: 'File upload functionality not implemented yet'
-  });
-});
-
-/**
- * @swagger
- * /api/auth/update-preferences:
- *   put:
- *     summary: Update user preferences
- *     tags: [Authentication]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               jobAlerts:
- *                 type: boolean
- *               emailNotifications:
- *                 type: boolean
- *               pushNotifications:
- *                 type: boolean
- *               privacySettings:
- *                 type: object
- *                 properties:
- *                   profileVisibility:
- *                     type: string
- *                     enum: [public, private, connections]
- *     responses:
- *       200:
- *         description: Preferences updated successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 user:
- *                   $ref: '#/components/schemas/User'
- */
-router.put('/update-preferences', protect, asyncHandler(async (req, res) => {
-  const { jobAlerts, emailNotifications, pushNotifications, privacySettings } = req.body;
-  
-  const preferencesToUpdate = {};
-  if (jobAlerts !== undefined) preferencesToUpdate['preferences.jobAlerts'] = jobAlerts;
-  if (emailNotifications !== undefined) preferencesToUpdate['preferences.emailNotifications'] = emailNotifications;
-  if (pushNotifications !== undefined) preferencesToUpdate['preferences.pushNotifications'] = pushNotifications;
-  if (privacySettings) {
-    if (privacySettings.profileVisibility) {
-      preferencesToUpdate['preferences.privacySettings.profileVisibility'] = privacySettings.profileVisibility;
-    }
-  }
-
-  const user = await User.findByIdAndUpdate(req.user.id, preferencesToUpdate, {
-    new: true,
-    runValidators: true
-  });
-
-  logger.info(`User preferences updated: ${user.email}`, { userId: user._id });
-
-  res.status(200).json({
-    success: true,
-    user
-  });
-}));
-
-/**
- * @swagger
  * /api/auth/updatepassword:
  *   put:
  *     summary: Update user password
@@ -693,5 +361,82 @@ router.post('/forgotpassword', forgotPassword);
  *                   type: string
  */
 router.put('/resetpassword/:resettoken', resetPassword);
+
+/**
+ * @swagger
+ * /api/auth/google:
+ *   post:
+ *     summary: Google OAuth login/register
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - idToken
+ *             properties:
+ *               idToken:
+ *                 type: string
+ *                 description: Google ID token
+ *     responses:
+ *       200:
+ *         description: Google OAuth successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 token:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                 isNew:
+ *                   type: boolean
+ */
+router.post('/google', googleAuth);
+
+/**
+ * @swagger
+ * /api/auth/link-google:
+ *   post:
+ *     summary: Link Google account to existing user
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - idToken
+ *             properties:
+ *               idToken:
+ *                 type: string
+ *                 description: Google ID token
+ *     responses:
+ *       200:
+ *         description: Google account linked successfully
+ */
+router.post('/link-google', protect, linkGoogleAccount);
+
+/**
+ * @swagger
+ * /api/auth/unlink-google:
+ *   delete:
+ *     summary: Unlink Google account from user
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Google account unlinked successfully
+ */
+router.delete('/unlink-google', protect, unlinkGoogleAccount);
 
 module.exports = router;

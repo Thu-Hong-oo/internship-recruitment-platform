@@ -5,6 +5,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # Environment variables
+env
 .env
 .env.local
 .env.development.local
@@ -122,3 +123,4 @@ dump.rdb
 # Docker
 .dockerignore
 docker-compose.override.yml
+".env" 

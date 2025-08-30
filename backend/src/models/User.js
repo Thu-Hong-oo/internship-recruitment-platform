@@ -14,9 +14,30 @@ const UserSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: [true, 'Please add a password'],
+    required: function() {
+      return this.authMethod === 'local' || this.authMethod === 'hybrid';
+    },
     minlength: 6,
     select: false
+  },
+  authMethod: {
+    type: String,
+    enum: ['local', 'google', 'hybrid'],
+    default: 'local'
+  },
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+  googleEmail: {
+    type: String,
+    lowercase: true
+  },
+  googleProfile: {
+    picture: String,
+    locale: String,
+    verified_email: Boolean
   },
   firstName: {
     type: String,
@@ -32,7 +53,7 @@ const UserSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['student', 'company', 'admin'],
+    enum: ['student', 'employer', 'admin'],
     default: 'student'
   },
   avatar: {
@@ -94,8 +115,8 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  otp: String,
-  otpExpiry: Date,
+  emailVerificationToken: String,
+  emailVerificationExpire: Date,
   resetPasswordToken: String,
   resetPasswordExpire: Date,
   lastLogin: Date,
@@ -168,7 +189,13 @@ UserSchema.methods.getSignedJwtToken = function() {
 
 // Match user entered password to hashed password in database
 UserSchema.methods.matchPassword = async function(enteredPassword) {
+  if (!this.password) return false;
   return await bcrypt.compare(enteredPassword, this.password);
+};
+
+// Check if user can use password authentication
+UserSchema.methods.canUsePassword = function() {
+  return this.authMethod === 'local' || this.authMethod === 'hybrid';
 };
 
 module.exports = mongoose.model('User', UserSchema);

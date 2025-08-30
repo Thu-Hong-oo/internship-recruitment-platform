@@ -229,9 +229,98 @@
             "description": "Logout user"
           },
           "response": []
+        },
+        {
+          "name": "Google OAuth Login/Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Google OAuth successful\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.success) {",
+                  "        pm.environment.set(\"user_id\", jsonData.user.id);",
+                  "        pm.environment.set(\"token\", jsonData.token);",
+                  "        pm.environment.set(\"is_new_user\", jsonData.isNew);",
+                  "        pm.environment.set(\"auth_method\", jsonData.user.authMethod);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idToken\": \"{{google_id_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/auth/google",
+              "host": ["{{api_url}}"],
+              "path": ["auth", "google"]
+            },
+            "description": "Login or register using Google OAuth. Set 'google_id_token' in environment variables."
+          },
+          "response": []
+        },
+        {
+          "name": "Link Google Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idToken\": \"{{google_id_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/auth/link-google",
+              "host": ["{{api_url}}"],
+              "path": ["auth", "link-google"]
+            },
+            "description": "Link existing account with Google OAuth. Requires authentication token. Set 'google_id_token' in environment variables."
+          },
+          "response": []
+        },
+        {
+          "name": "Unlink Google Account",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/auth/unlink-google",
+              "host": ["{{api_url}}"],
+              "path": ["auth", "unlink-google"]
+            },
+            "description": "Unlink Google account from existing account. Requires authentication token."
+          },
+          "response": []
         }
       ],
-      "description": "User authentication and profile management"
+      "description": "User authentication and profile management including Google OAuth"
     },
     {
       "name": "AI Services",
