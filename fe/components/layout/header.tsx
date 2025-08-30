@@ -5,6 +5,7 @@
    */
 }
 import React, { useState, useEffect, useCallback } from "react";
+import { useTheme } from "next-themes";
 import {
   Bell,
   User,
@@ -14,9 +15,25 @@ import {
   Eye,
   Heart,
   Building2,
+  LogOut,
+  ChevronRight,
 } from "lucide-react"; //icon
 import { Badge } from "@/components/ui/badge"; // bo tròn như badge
+import { Switch } from "@/components/ui/switch";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import {
+  HoverCard,
+  HoverCardTrigger,
+  HoverCardContent,
+} from "@/components/ui/hover-card";
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "@/components/ui/accordion";
 import Link from "next/link"; // link to other page
+import { truncate } from "fs/promises";
 
 // Custom hook để quản lý dropdown
 const useDropdown = (delay = 150) => {
@@ -50,9 +67,13 @@ const useDropdown = (delay = 150) => {
 };
 
 export default function Header() {
+  const { resolvedTheme, setTheme } = useTheme();
   // Sử dụng custom hook cho 2 dropdowns
   const jobsDropdown = useDropdown(150);
   const cvDropdown = useDropdown(150);
+
+  // State để kiểm tra trạng thái đăng nhập
+  const [isLoggedIn, setIsLoggedIn] = useState(true);
 
   // Mock data cho các vị trí việc làm (sẽ thay bằng API call sau)
   const jobPositions = [
@@ -188,7 +209,6 @@ export default function Header() {
                           </Link>
                           <Link
                             href="/applied-jobs"
-
                             className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
                           >
                             <Eye className="w-4 h-4 mr-3" />
@@ -327,7 +347,7 @@ export default function Header() {
                               <div className="w-6 h-6 mr-3 bg-gray-300 rounded flex items-center justify-center group-hover:bg-primary transition-colors duration-200"></div>
                               <span>{feature.name}</span>
                               <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
-                                  →
+                                →
                               </span>
                             </div>
                           ))}
@@ -361,14 +381,192 @@ export default function Header() {
 
           {/* User Actions */}
           <div className="flex items-center space-x-4">
-            <Bell className="w-5 h-5 text-muted-foreground hover:text-primary cursor-pointer transition-colors duration-200" />
-            <div className="flex items-center space-x-2">
-              <User className="w-5 h-5 text-muted-foreground" />
-              <span className="text-sm text-foreground">
-                Chào bạn Nguyễn Huy
-              </span>
-              <ChevronDown className="w-4 h-4 text-muted-foreground" />
-            </div>
+            {/* Theme Switch */}
+            <Switch
+              checked={resolvedTheme === "dark"}
+              onCheckedChange={(checked) =>
+                setTheme(checked ? "dark" : "light")
+              }
+              aria-label="Toggle dark mode"
+              title="Dark mode"
+              className="w-10 h-6"
+            />
+
+            {isLoggedIn ? (
+              // UI khi đã đăng nhập
+              <>
+                <Bell className="w-5 h-5 text-muted-foreground hover:text-primary cursor-pointer transition-colors duration-200" />
+                <div className="flex items-center">
+                  <HoverCard openDelay={100} closeDelay={150}>
+                    <HoverCardTrigger asChild>
+                      <button className="flex items-center space-x-2">
+                        <Avatar>
+                          <AvatarImage
+                            src="/placeholder-user.jpg"
+                            alt="User avatar"
+                          />
+                          <AvatarFallback>NH</AvatarFallback>
+                        </Avatar>
+                      </button>
+                    </HoverCardTrigger>
+                    <HoverCardContent className="w-[360px] p-0 overflow-hidden">
+                      <div className="p-4 border-b border-border flex items-center space-x-3">
+                        <Avatar>
+                          <AvatarImage
+                            src="/placeholder-user.jpg"
+                            alt="User avatar"
+                          />
+                          <AvatarFallback>NH</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="font-semibold text-foreground">
+                            Nguyễn Ngọc Tường Vân
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Tài khoản đã xác thực
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            ID 9794804 | nguyennogctuongvan4it@g...
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-2">
+                        <Accordion
+                          type="multiple"
+                          defaultValue={["jobs", "cv"]}
+                          className="space-y-1"
+                        >
+                          <AccordionItem value="jobs" className="border-0">
+                            <AccordionTrigger className="px-2 text-foreground">
+                              Quản lý tìm việc
+                            </AccordionTrigger>
+                            <AccordionContent className="pt-1 pb-2">
+                              <div className="space-y-1 text-sm text-muted-foreground">
+                                <Link
+                                  href="/saved-jobs"
+                                  className="flex items-center rounded-md px-2 py-2 hover:bg-muted hover:text-foreground"
+                                >
+                                  <span>Việc làm đã lưu</span>
+                                </Link>
+                                <Link
+                                  href="/applied-jobs"
+                                  className="flex items-center rounded-md px-2 py-2 hover:bg-muted hover:text-foreground"
+                                >
+                                  <span>Việc làm đã ứng tuyển</span>
+                                </Link>
+                                <Link
+                                  href="/recommended-jobs"
+                                  className="flex items-center rounded-md px-2 py-2 hover:bg-muted hover:text-foreground"
+                                >
+                                  <span>Việc làm phù hợp với bạn</span>
+                                </Link>
+                                <Link
+                                  href="#"
+                                  className="flex items-center rounded-md px-2 py-2 hover:bg-muted hover:text-foreground"
+                                >
+                                  <span>Cài đặt gợi ý việc làm</span>
+                                </Link>
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+
+                          <AccordionItem value="cv" className="border-0">
+                            <AccordionTrigger className="px-2 text-foreground">
+                              Quản lý CV & Cover letter
+                            </AccordionTrigger>
+                            <AccordionContent className="pt-1 pb-2">
+                              <div className="space-y-1 text-sm text-muted-foreground">
+                                <Link
+                                  href="#"
+                                  className="flex items-center rounded-md px-2 py-2 hover:bg-muted hover:text-foreground"
+                                >
+                                  <span>CV của tôi</span>
+                                </Link>
+                                <Link
+                                  href="#"
+                                  className="flex items-center rounded-md px-2 py-2 hover:bg-muted hover:text-foreground"
+                                >
+                                  <span>Cover Letter của tôi</span>
+                                </Link>
+                                <Link
+                                  href="#"
+                                  className="flex items-center rounded-md px-2 py-2 hover:bg-muted hover:text-foreground"
+                                >
+                                  <span>
+                                    Nhà tuyển dụng muốn kết nối với bạn
+                                  </span>
+                                </Link>
+                                <Link
+                                  href="#"
+                                  className="flex items-center rounded-md px-2 py-2 hover:bg-muted hover:text-foreground"
+                                >
+                                  <span>Nhà tuyển dụng xem hồ sơ</span>
+                                </Link>
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+
+                          <AccordionItem value="security" className="border-0">
+                            <AccordionTrigger className="px-2 text-foreground">
+                              Cá nhân & Bảo mật
+                            </AccordionTrigger>
+                            <AccordionContent className="pt-1 pb-2">
+                              <div className="space-y-1 text-sm text-muted-foreground">
+                                <Link
+                                  href="/profile"
+                                  className="flex items-center rounded-md px-2 py-2 hover:bg-muted hover:text-foreground"
+                                >
+                                  <span>Hồ sơ cá nhân</span>
+                                </Link>
+                                <Link
+                                  href="#"
+                                  className="flex items-center rounded-md px-2 py-2 hover:bg-muted hover:text-foreground"
+                                >
+                                  <span>Đổi mật khẩu</span>
+                                </Link>
+                                <Link
+                                  href="#"
+                                  className="flex items-center rounded-md px-2 py-2 hover:bg-muted hover:text-foreground"
+                                >
+                                  <span>Quyền riêng tư</span>
+                                </Link>
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        </Accordion>
+
+                        <div className="pt-3">
+                          <button
+                            type="button"
+                            className="group w-full flex items-center justify-center gap-2 rounded-full bg-muted text-foreground hover:bg-muted/80 active:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none shadow-sm hover:shadow transition-all py-3 active:scale-[0.98]"
+                            aria-label="Đăng xuất"
+                            onClick={() => console.log("logout")}
+                          >
+                            <LogOut className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                            <span className="font-medium">Đăng xuất</span>
+                          </button>
+                        </div>
+                      </div>
+                    </HoverCardContent>
+                  </HoverCard>
+                </div>
+              </>
+            ) : (
+              // UI khi chưa đăng nhập
+              <>
+                <Link href="/login">
+                  <button className="px-4 py-2 text-foreground hover:text-primary transition-colors duration-200 font-medium">
+                    Đăng nhập
+                  </button>
+                </Link>
+                <Link href="/register">
+                  <button className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md transition-colors duration-200 font-medium">
+                    Đăng ký
+                  </button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>
