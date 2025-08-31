@@ -11,6 +11,12 @@ const {
 } = require('../controllers/authController');
 
 const { protect } = require('../middleware/auth');
+const {
+  emailVerificationRateLimit,
+  passwordResetRateLimit,
+  otpVerificationRateLimit,
+  resendVerificationRateLimit
+} = require('../middleware/otpRateLimit');
 
 const router = express.Router();
 
@@ -114,7 +120,7 @@ const router = express.Router();
  *                 error:
  *                   type: string
  */
-router.post('/register', register);
+router.post('/register', emailVerificationRateLimit, register);
 
 /**
  * @swagger
@@ -253,7 +259,7 @@ router.post('/logout', protect, logout);
  *                 resetUrl:
  *                   type: string
  */
-router.post('/forgotpassword', forgotPassword);
+router.post('/forgotpassword', passwordResetRateLimit, forgotPassword);
 
 /**
  * @swagger
@@ -302,7 +308,7 @@ router.post('/forgotpassword', forgotPassword);
  *       404:
  *         description: User not found
  */
-router.post('/resetpassword', resetPassword);
+router.post('/resetpassword', otpVerificationRateLimit, resetPassword);
 
 /**
  * @swagger
@@ -387,7 +393,7 @@ router.post('/google', googleAuth);
  *       404:
  *         description: User not found
  */
-router.post('/verify-email', verifyEmail);
+router.post('/verify-email', otpVerificationRateLimit, verifyEmail);
 
 /**
  * @swagger
@@ -434,6 +440,6 @@ router.post('/verify-email', verifyEmail);
  *                 error:
  *                   type: string
  */
-router.post('/resend-verification', protect, resendEmailVerification);
+router.post('/resend-verification', protect, resendVerificationRateLimit, resendEmailVerification);
 
 module.exports = router;

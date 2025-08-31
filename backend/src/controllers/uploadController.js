@@ -1,5 +1,5 @@
 const asyncHandler = require('express-async-handler');
-const imageService = require('../services/imageService');
+const { cloudinary } = require('../services/cloudinaryService');
 const { logger } = require('../utils/logger');
 
 // @desc    Upload single image
@@ -7,13 +7,14 @@ const { logger } = require('../utils/logger');
 // @access  Private
 const uploadSingleImage = asyncHandler(async (req, res) => {
   try {
+    //1. validation
     if (!req.file) {
       return res.status(400).json({
         success: false,
         error: 'Không có file nào được upload'
       });
     }
-
+//2 cấu hình options
     const options = {
       folder: req.body.folder || 'internbridge',
       optimize: req.body.optimize !== 'false',
@@ -29,8 +30,14 @@ const uploadSingleImage = asyncHandler(async (req, res) => {
         quality: parseInt(req.body.thumbQuality) || 70
       }
     };
-
-    const result = await imageService.uploadOptimizedImage(req.file.path, options);
+//2. upload lên cloundinary với transformation
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      folder: options.folder || 'internbridge',
+      transformation: [
+        { width: options.optimization?.maxWidth || 1920, height: options.optimization?.maxHeight || 1080, crop: 'limit' },
+        { quality: options.optimization?.quality || 100, fetch_format: 'auto' }
+      ]
+    });
 
     logger.info('Single image upload successful', {
       userId: req.user?.id,
@@ -45,27 +52,14 @@ const uploadSingleImage = asyncHandler(async (req, res) => {
       data: {
         originalName: req.file.originalname,
         originalSize: req.file.size,
-        main: {
-          publicId: result.main.publicId,
-          url: result.main.url,
-          thumbnailUrl: result.main.thumbnailUrl,
-          size: result.main.size,
-          format: result.main.format,
-          dimensions: {
-            width: result.main.width,
-            height: result.main.height
-          }
-        },
-        thumbnail: result.thumbnail ? {
-          publicId: result.thumbnail.publicId,
-          url: result.thumbnail.url,
-          size: result.thumbnail.size,
-          format: result.thumbnail.format,
-          dimensions: {
-            width: result.thumbnail.width,
-            height: result.thumbnail.height
-          }
-        } : null
+        publicId: result.public_id,
+        url: result.secure_url,
+        size: result.bytes,
+        format: result.format,
+        dimensions: {
+          width: result.width,
+          height: result.height
+        }
       }
     });
   } catch (error) {
@@ -111,10 +105,20 @@ const uploadMultipleImages = asyncHandler(async (req, res) => {
     };
 
     const filePaths = req.files.map(file => file.path);
-    const results = await imageService.uploadMultipleImages(filePaths, options);
-
-    const successfulUploads = results.filter(result => !result.error);
-    const failedUploads = results.filter(result => result.error);
+    // 1. Tạo array promises cho việc upload
+    const uploadPromises = req.files.map(file => 
+      cloudinary.uploader.upload(file.path, {
+        folder: options.folder || 'internbridge',
+        transformation: [
+          { width: options.optimization?.maxWidth || 1920, height: options.optimization?.maxHeight || 1080, crop: 'limit' },
+          { quality: options.optimization?.quality || 80, fetch_format: 'auto' }
+        ]
+      })
+    );
+    
+    const results = await Promise.allSettled(uploadPromises);
+    const successfulUploads = results.filter(result => result.status === 'fulfilled');
+    const failedUploads = results.filter(result => result.status === 'rejected');
 
     logger.info('Multiple images upload completed', {
       userId: req.user?.id,
@@ -130,10 +134,17 @@ const uploadMultipleImages = asyncHandler(async (req, res) => {
         totalFiles: req.files.length,
         successful: successfulUploads.length,
         failed: failedUploads.length,
-        results: results.map((result, index) => ({
+        results: successfulUploads.map((result, index) => ({
           originalName: req.files[index].originalname,
           originalSize: req.files[index].size,
-          ...result
+          publicId: result.value.public_id,
+          url: result.value.secure_url,
+          size: result.value.bytes,
+          format: result.value.format,
+          dimensions: {
+            width: result.value.width,
+            height: result.value.height
+          }
         }))
       }
     });
@@ -178,12 +189,18 @@ const uploadAvatar = asyncHandler(async (req, res) => {
       }
     };
 
-    const result = await imageService.uploadOptimizedImage(req.file.path, options);
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      folder: 'internbridge/avatars',
+      transformation: [
+        { width: 800, height: 800, crop: 'fill', gravity: 'face' },
+        { quality: 85, fetch_format: 'auto' }
+      ]
+    });
 
     logger.info('Avatar upload successful', {
       userId: req.user.id,
       originalName: req.file.originalname,
-      publicId: result.main.publicId
+      publicId: result.public_id
     });
 
     res.status(200).json({
@@ -191,14 +208,13 @@ const uploadAvatar = asyncHandler(async (req, res) => {
       message: 'Upload avatar thành công',
       data: {
         avatar: {
-          publicId: result.main.publicId,
-          url: result.main.url,
-          thumbnailUrl: result.main.thumbnailUrl,
-          size: result.main.size,
-          format: result.main.format,
+          publicId: result.public_id,
+          url: result.secure_url,
+          size: result.bytes,
+          format: result.format,
           dimensions: {
-            width: result.main.width,
-            height: result.main.height
+            width: result.width,
+            height: result.height
           }
         }
       }
@@ -244,7 +260,13 @@ const uploadCompanyLogo = asyncHandler(async (req, res) => {
       }
     };
 
-    const result = await imageService.uploadOptimizedImage(req.file.path, options);
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      folder: 'internbridge/logos',
+      transformation: [
+        { width: 1200, height: 600, crop: 'limit' },
+        { quality: 90, fetch_format: 'auto' }
+      ]
+    });
 
     logger.info('Company logo upload successful', {
       userId: req.user.id,

@@ -1,6 +1,7 @@
 const express = require('express');
 const { protect, authorize } = require('../middleware/auth');
 const { uploadAvatar: uploadAvatarMiddleware, handleUploadError } = require('../middleware/upload');
+const { uploadRateLimit } = require('../middleware/globalRateLimit');
 const {
   getUsers,
   getUser,
@@ -251,7 +252,7 @@ router.delete('/:id', authorize('admin'), deleteUser);
  *       500:
  *         description: Failed to update avatar in database
  */
-router.post('/upload-avatar', uploadAvatarMiddleware, handleUploadError, uploadAvatar);
+router.post('/upload-avatar', uploadRateLimit, uploadAvatarMiddleware, handleUploadError, uploadAvatar);
 
 /**
  * @swagger

@@ -1,43 +1,64 @@
 const User = require( '../models/User' );
-const asyncHandler = require( 'express-async-handler' );
+const asyncHandler = require( 'express-async-handler' );//wrapper giúp xử lý lỗi async (không cần try/catch ở mỗi route); khi có lỗi nó gọi next(err) cho Express.
 const jwt = require( 'jsonwebtoken' );
 const crypto = require( 'crypto' );
 const { logger } = require( '../utils/logger' );
 const googleAuthService = require( '../services/googleAuth' );
 const { sendEmailVerification, sendPasswordResetEmail } = require( '../services/emailService' );
+const OTPService = require( '../services/otpService' );
+const OTPCooldownService = require( '../services/otpCooldownService' );
+
+// Initialize OTP service with Redis client
+let otpService = null;
+let otpCooldownService = null;
+
+// Function to initialize OTP service
+const initializeOTPService = (redisClient) => {
+  if (redisClient) {
+    otpService = new OTPService(redisClient);
+    otpCooldownService = new OTPCooldownService(redisClient);
+    logger.info('OTP Service and Cooldown Service initialized with Redis');
+  } else {
+    logger.warn('OTP Service initialized without Redis - falling back to database');
+  }
+};
+
+// Export initialization function - will be added to final exports
 
 // @desc    Register user
-
 // @route   POST /api/auth/register
-
 // @access  Public
 const register = asyncHandler( async ( req, res ) => {
-
     const {
-
         email,
         password,
         firstName,
         lastName,
         role
-
     } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne( { email } );
     if ( existingUser ) {
-
         return res.status( 400 ).json( { success: false, error: 'Email này đã được sử dụng bởi tài khoản khác' } );
-
     }
 
+    // Check cooldown for email verification (registration)
+    if (otpCooldownService) {
+      const inCooldown = await otpCooldownService.isInCooldown('email_verification', email);
+      if (inCooldown) {
+        const remainingTime = await otpCooldownService.getRemainingCooldown('email_verification', email);
+        return res.status(429).json({
+          success: false,
+          error: `Vui lòng đợi ${Math.ceil(remainingTime / 60)} phút trước khi thử đăng ký lại.`,
+          retryAfter: remainingTime
+        });
+      }
+    }
     // Validate password for local registration
     if ( !password ) {
-
         return res.status( 400 ).json( { success: false, error: 'Mật khẩu là bắt buộc khi đăng ký tài khoản' } );
-
     }
-
     // Create user with local authentication
     const user = await User.create( {
 
@@ -55,9 +76,31 @@ const register = asyncHandler( async ( req, res ) => {
     const verificationToken = crypto.randomBytes( 20 ).toString( 'hex' );
     const verificationOtp = verificationToken.substring( 0, 6 ).toUpperCase();
 
-    user.emailVerificationToken = crypto.createHash( 'sha256' ).update( verificationToken ).digest( 'hex' );
-    user.emailVerificationOtp = verificationOtp; // Store the original OTP
-    user.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+    // Store OTP in Redis if available, otherwise fallback to database
+    if (otpService) {
+      try {
+        await otpService.storeOTP('email_verification', user.email, verificationOtp);
+        // Only store hashed token in database for security
+        user.emailVerificationToken = crypto.createHash( 'sha256' ).update( verificationToken ).digest( 'hex' );
+        user.emailVerificationOtp = undefined; // Clear OTP from database
+        user.emailVerificationExpire = undefined; // Clear expiry from database
+      } catch (error) {
+        logger.error('Failed to store OTP in Redis, falling back to database', {
+          error: error.message,
+          userId: user._id
+        });
+        // Fallback to database storage
+        user.emailVerificationToken = crypto.createHash( 'sha256' ).update( verificationToken ).digest( 'hex' );
+        user.emailVerificationOtp = verificationOtp;
+        user.emailVerificationExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+      }
+    } else {
+      // Fallback to database storage
+      user.emailVerificationToken = crypto.createHash( 'sha256' ).update( verificationToken ).digest( 'hex' );
+      user.emailVerificationOtp = verificationOtp;
+      user.emailVerificationExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+    }
+    
     await user.save( { validateBeforeSave: false } );
 
     // Send verification email
@@ -253,9 +296,7 @@ const logout = asyncHandler( async ( req, res ) => {
 
 
 // @desc    Forgot password
-
 // @route   POST /api/auth/forgotpassword
-
 // @access  Public
 const forgotPassword = asyncHandler( async ( req, res ) => {
 
@@ -267,18 +308,47 @@ const forgotPassword = asyncHandler( async ( req, res ) => {
 
     }
 
+    // Check cooldown for password reset
+    if (otpCooldownService) {
+      const inCooldown = await otpCooldownService.isInCooldown('password_reset', user.email);
+      if (inCooldown) {
+        const remainingTime = await otpCooldownService.getRemainingCooldown('password_reset', user.email);
+        return res.status(429).json({
+          success: false,
+          error: `Vui lòng đợi ${Math.ceil(remainingTime / 60)} phút trước khi yêu cầu OTP mới.`,
+          retryAfter: remainingTime
+        });
+      }
+    }
+
     // Get reset token and OTP
     const resetToken = crypto.randomBytes( 20 ).toString( 'hex' );
     const resetOtp = resetToken.substring( 0, 6 ).toUpperCase();
 
-    // Hash token and set to resetPasswordToken field
-    user.resetPasswordToken = crypto.createHash( 'sha256' ).update( resetToken ).digest( 'hex' );
-    user.resetPasswordOtp = resetOtp;
-
-    // Store the OTP for verification
-
-    // Set expire
-    user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+    // Store OTP in Redis if available, otherwise fallback to database
+    if (otpService) {
+      try {
+        await otpService.storeOTP('password_reset', user.email, resetOtp);
+        // Only store hashed token in database for security
+        user.resetPasswordToken = crypto.createHash( 'sha256' ).update( resetToken ).digest( 'hex' );
+        user.resetPasswordOtp = undefined; // Clear OTP from database
+        user.resetPasswordExpire = undefined; // Clear expiry from database
+      } catch (error) {
+        logger.error('Failed to store OTP in Redis, falling back to database', {
+          error: error.message,
+          userId: user._id
+        });
+        // Fallback to database storage
+        user.resetPasswordToken = crypto.createHash( 'sha256' ).update( resetToken ).digest( 'hex' );
+        user.resetPasswordOtp = resetOtp;
+        user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+      }
+    } else {
+      // Fallback to database storage
+      user.resetPasswordToken = crypto.createHash( 'sha256' ).update( resetToken ).digest( 'hex' );
+      user.resetPasswordOtp = resetOtp;
+      user.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+    }
 
     await user.save( { validateBeforeSave: false } );
 
@@ -290,6 +360,11 @@ const forgotPassword = asyncHandler( async ( req, res ) => {
         logger.info( `Password reset email sent to: ${
             user.email
         }`, { userId: user._id } );
+
+        // Set cooldown after successful email send
+        if (otpCooldownService) {
+          await otpCooldownService.setCooldown('password_reset', user.email);
+        }
 
         res.status( 200 ).json( { success: true, message: 'Email đặt lại mật khẩu đã được gửi thành công' } );
 
@@ -332,19 +407,42 @@ const resetPassword = asyncHandler(async ( req, res ) => {
 
     }
 
-    // Check if OTP matches
-    if ( user.resetPasswordOtp !== otp.toUpperCase() ) {
-
-        return res.status( 400 ).json( { success: false, error: 'Mã OTP không chính xác' } );
-
+    // Verify OTP from Redis or database
+    let otpValid = false;
+    
+    if (otpService) {
+      try {
+        otpValid = await otpService.verifyAndDeleteOTP('password_reset', email, otp);
+      } catch (error) {
+        logger.error('Failed to verify OTP from Redis, falling back to database', {
+          error: error.message,
+          userId: user._id
+        });
+        // Fallback to database verification
+        if (user.resetPasswordOtp && user.resetPasswordOtp === otp.toUpperCase()) {
+          if (user.resetPasswordExpire && user.resetPasswordExpire < Date.now()) {
+            return res.status(400).json({
+              success: false, error: 'Mã OTP đã hết hạn. Vui lòng yêu cầu gửi lại mã mới'
+            });
+          }
+          otpValid = true;
+        }
+      }
+    } else {
+      // Fallback to database verification
+      if (user.resetPasswordOtp && user.resetPasswordOtp === otp.toUpperCase()) {
+        if (user.resetPasswordExpire && user.resetPasswordExpire < Date.now()) {
+          return res.status(400).json({
+            success: false, error: 'Mã OTP đã hết hạn. Vui lòng yêu cầu gửi lại mã mới'
+          });
+        }
+        otpValid = true;
+      }
     }
 
-    // Check if token is expired
-    if ( user.resetPasswordExpire<Date.now()) {
-    return res.status(400).json({
-      success: false, error: 'Mã OTP đã hết hạn. Vui lòng yêu cầu gửi lại mã mới'
-    });
-  }
+    if (!otpValid) {
+      return res.status(400).json({ success: false, error: 'Mã OTP không chính xác' });
+    }
 
   // Set new password
   user.password = req.body.password;
@@ -378,24 +476,16 @@ const googleAuth = asyncHandler(async (req, res) => {
         try {
 
             const result = await googleAuthService.processGoogleAuth( idToken );
-
             logger.info( `Google OAuth successful: ${
                 result.user.email
             }`, {
-
                 userId: result.user.id,
                 isNew: result.isNew
-
             } );
-
             res.status( 200 ).json( result );
-
         } catch ( error ) {
-
             logger.error( 'Google OAuth failed', { error: error.message } );
-
             res.status( 400 ).json( {
-
                 success: false,
                 error: error.message || 'Xác thực Google thất bại'
 
@@ -406,11 +496,8 @@ const googleAuth = asyncHandler(async (req, res) => {
     } ) 
     
 
-
     // @desc    Verify email with OTP
-
     // @route   POST /api/auth/verify-email
-
     // @access  Public
     const verifyEmail = asyncHandler(async ( req, res ) => {
 
@@ -437,30 +524,48 @@ const googleAuth = asyncHandler(async (req, res) => {
 
         }
 
-        // Check if OTP matches the stored OTP
-        const expectedOtp = user.emailVerificationOtp;
-
-        if ( ! expectedOtp || expectedOtp !== otp.toUpperCase() ) { // Log for debugging
-            logger.error( 'OTP verification failed', {
-
-                userId: user._id,
-                email: user.email,
-                providedOtp: otp.toUpperCase(),
-                expectedOtp: expectedOtp,
-                hashedToken: user.emailVerificationToken ? user.emailVerificationToken.substring( 0, 10 ) + '...' : 'null'
-
-            } );
-
-            return res.status( 400 ).json( { success: false, error: 'Mã OTP không chính xác' } );
-
+        // Verify OTP from Redis or database
+        let otpValid = false;
+        
+        if (otpService) {
+          try {
+            otpValid = await otpService.verifyAndDeleteOTP('email_verification', email, otp);
+          } catch (error) {
+            logger.error('Failed to verify OTP from Redis, falling back to database', {
+              error: error.message,
+              userId: user._id
+            });
+            // Fallback to database verification
+            const expectedOtp = user.emailVerificationOtp;
+            if (expectedOtp && expectedOtp === otp.toUpperCase()) {
+              if (user.emailVerificationExpire && user.emailVerificationExpire < Date.now()) {
+                return res.status(400).json({
+                  success: false, error: 'Mã OTP đã hết hạn. Vui lòng yêu cầu gửi lại mã mới'
+                });
+              }
+              otpValid = true;
+            }
+          }
+        } else {
+          // Fallback to database verification
+          const expectedOtp = user.emailVerificationOtp;
+          if (expectedOtp && expectedOtp === otp.toUpperCase()) {
+            if (user.emailVerificationExpire && user.emailVerificationExpire < Date.now()) {
+              return res.status(400).json({
+                success: false, error: 'Mã OTP đã hết hạn. Vui lòng yêu cầu gửi lại mã mới'
+              });
+            }
+            otpValid = true;
+          }
         }
-
-        // Check if token is expired
-        if ( user.emailVerificationExpire<Date.now()) {
-    return res.status(400).json({
-      success: false, error: 'Mã OTP đã hết hạn. Vui lòng yêu cầu gửi lại mã mới'
-    });
-  }
+        if (!otpValid) {
+          logger.error('OTP verification failed', {
+            userId: user._id,
+            email: user.email,
+            providedOtp: otp.toUpperCase()
+          });
+          return res.status(400).json({ success: false, error: 'Mã OTP không chính xác' });
+        }
 
   // Set email as verified
   user.isEmailVerified = true;
@@ -482,52 +587,76 @@ const googleAuth = asyncHandler(async (req, res) => {
 // @route   POST /api/auth/resend-verification
 // @access  Private
 const resendEmailVerification = asyncHandler(async (req, res) => {
-
             const user = await User.findById( req.user.id );
-
             if ( ! user ) {
-
                 return res.status( 404 ).json( { success: false, error: 'Không tìm thấy người dùng' } );
-
             }
-
             if ( user.isEmailVerified ) {
-
                 return res.status( 400 ).json( { success: false, error: 'Email đã được xác thực' } );
-
+            }
+            // Check cooldown for resend verification
+            if (otpCooldownService) {
+              const inCooldown = await otpCooldownService.isInCooldown('resend_verification', user.email);
+              if (inCooldown) {
+                const remainingTime = await otpCooldownService.getRemainingCooldown('resend_verification', user.email);
+                return res.status(429).json({
+                  success: false,
+                  error: `Vui lòng đợi ${Math.ceil(remainingTime)} giây trước khi gửi lại OTP.`,
+                  retryAfter: remainingTime
+                });
+              }
             }
 
             // Generate new verification token and OTP
             const verificationToken = crypto.randomBytes( 20 ).toString( 'hex' );
             const verificationOtp = verificationToken.substring( 0, 6 ).toUpperCase();
 
-            user.emailVerificationToken = crypto.createHash( 'sha256' ).update( verificationToken ).digest( 'hex' );
-            user.emailVerificationOtp = verificationOtp; // Store the new OTP
-            user.emailVerificationExpire = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+            // Store OTP in Redis if available, otherwise fallback to database
+            if (otpService) {
+              try {
+                await otpService.storeOTP('email_verification', user.email, verificationOtp);
+                // Only store hashed token in database for security
+                user.emailVerificationToken = crypto.createHash( 'sha256' ).update( verificationToken ).digest( 'hex' );
+                user.emailVerificationOtp = undefined; // Clear OTP from database
+                user.emailVerificationExpire = undefined; // Clear expiry from database
+              } catch (error) {
+                logger.error('Failed to store OTP in Redis, falling back to database', {
+                  error: error.message,
+                  userId: user._id
+                });
+                // Fallback to database storage
+                user.emailVerificationToken = crypto.createHash( 'sha256' ).update( verificationToken ).digest( 'hex' );
+                user.emailVerificationOtp = verificationOtp;
+                user.emailVerificationExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+              }
+            } else {
+              // Fallback to database storage
+              user.emailVerificationToken = crypto.createHash( 'sha256' ).update( verificationToken ).digest( 'hex' );
+              user.emailVerificationOtp = verificationOtp;
+              user.emailVerificationExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+            }
+            
             await user.save( { validateBeforeSave: false } );
-
             // Send verification email
             try {
-
                 await sendEmailVerification( user, verificationToken );
-
                 logger.info( `Email verification resent to: ${
                     user.email
                 }`, { userId: user._id } );
 
+                // Set cooldown after successful email send
+                if (otpCooldownService) {
+                  await otpCooldownService.setCooldown('resend_verification', user.email);
+                }
                 res.status( 200 ).json( { success: true, message: 'Email xác thực đã được gửi thành công' } );
-
             } catch ( error ) {
-
                 logger.error( 'Failed to resend verification email', {
-
                     error: error.message,
                     userId: user._id
 
                 } );
 
                 res.status( 500 ).json( { success: false, error: 'Không thể gửi email xác thực' } );
-
             }
 
         } ) 
@@ -542,6 +671,7 @@ const resendEmailVerification = asyncHandler(async (req, res) => {
             resetPassword,
             googleAuth,
             verifyEmail,
-            resendEmailVerification
+            resendEmailVerification,
+            initializeOTPService
 
         };
