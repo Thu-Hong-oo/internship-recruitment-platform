@@ -13,6 +13,11 @@ const JobSchema = new mongoose.Schema({
     required: [true, 'Please add a job description'],
     maxlength: [2000, 'Description cannot be more than 2000 characters']
   },
+  companyId: {
+    type: mongoose.Schema.ObjectId,
+    ref: 'Company',
+    required: [true, 'Please add a company']
+  },
   company: {
     type: String,
     required: [true, 'Please add a company name'],
