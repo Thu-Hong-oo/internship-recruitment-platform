@@ -116,12 +116,12 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  emailVerificationToken: String,
-  emailVerificationOtp: String, // Store the original OTP for verification
-  emailVerificationExpire: Date,
-  resetPasswordToken: String,
-  resetPasswordOtp: String, // Store the original OTP for password reset
-  resetPasswordExpire: Date,
+  emailVerificationToken: String, // Only store hashed token for security
+  emailVerificationOtp: String, // Fallback OTP storage when Redis is unavailable
+  emailVerificationExpire: Date, // Fallback expiry when Redis is unavailable
+  resetPasswordToken: String, // Only store hashed token for security
+  resetPasswordOtp: String, // Fallback OTP storage when Redis is unavailable
+  resetPasswordExpire: Date, // Fallback expiry when Redis is unavailable
   lastLogin: Date,
   isActive: {
     type: Boolean,

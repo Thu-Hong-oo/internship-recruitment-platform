@@ -9,7 +9,9 @@ require('dotenv').config();
 // Security & Performance middleware
 const helmet = require('helmet');
 const compression = require('compression');
-const rateLimit = require('express-rate-limit');
+
+// Rate limiting middleware
+const { globalRateLimit, apiRateLimit, searchRateLimit, uploadRateLimit } = require('./src/middleware/globalRateLimit');
 
 // Swagger documentation
 const swaggerJsdoc = require('swagger-jsdoc');
@@ -26,6 +28,7 @@ const applicationRoutes = require('./src/routes/applications');
 const aiRoutes = require('./src/routes/ai');
 const roadmapRoutes = require('./src/routes/roadmaps');
 const analyticsRoutes = require('./src/routes/analytics');
+const uploadRoutes = require('./src/routes/upload');
 
 // Middleware & Utils
 const errorHandler = require('./src/middleware/errorHandler');
@@ -100,25 +103,26 @@ async function connectDB() {
 
 // Initialize database and Redis
 connectDB();
-initializeRedis();
+initializeRedis().then(() => {
+  // Initialize OTP service after Redis is ready
+  try {
+    const authController = require('./src/controllers/authController');
+    if (authController.initializeOTPService) {
+      authController.initializeOTPService(redisClient);
+    } else {
+      logger.warn('initializeOTPService function not found in authController');
+    }
+  } catch (error) {
+    logger.error('Failed to initialize OTP service:', error.message);
+  }
+});
 
 // Security middleware
 app.use(helmet());
 app.use(compression());
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
-  message: {
-    success: false,
-    error: 'Too many requests from this IP, please try again later.'
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-app.use(limiter);
+// Global rate limiting - áp dụng cho tất cả requests
+app.use(globalRateLimit);
 
 // CORS configuration
 app.use(cors({
@@ -200,6 +204,7 @@ app.use('/api/applications', applicationRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/roadmaps', roadmapRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

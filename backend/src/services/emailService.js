@@ -41,7 +41,7 @@ const sendEmailVerification = async (user, verificationToken) => {
               </div>
             </div>
             <p style="text-align: center; font-size: 18px; color: #4F46E5; font-weight: bold;">
-              Mã OTP này sẽ hết hạn sau 24 giờ.
+              Mã OTP này sẽ hết hạn sau 10 phút.
             </p>
             <p>Vui lòng nhập mã này vào trang xác thực email để hoàn tất đăng ký.</p>
             <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này.</p>
