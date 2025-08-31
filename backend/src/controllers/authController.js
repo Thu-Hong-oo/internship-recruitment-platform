@@ -190,6 +190,22 @@ const login = asyncHandler(async (req, res) => {
 const logout = asyncHandler(async (req, res) => {
   logger.info(`User logged out: ${req.user.email}`, { userId: req.user._id });
 
+  // Get token from request
+  let token;
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    token = req.headers.authorization.split(' ')[1];
+  } else if (req.cookies && req.cookies.token) {
+    token = req.cookies.token;
+  }
+
+  // Clear cookie if exists
+  if (req.cookies && req.cookies.token) {
+    res.clearCookie('token');
+  }
+
+  // TODO: Add token to blacklist if using Redis
+  // await addToBlacklist(token);
+
   res.status(200).json({
     success: true,
     message: 'Đăng xuất thành công'
