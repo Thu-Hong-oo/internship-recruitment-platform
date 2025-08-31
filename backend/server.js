@@ -3,6 +3,7 @@ const http = require('http');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const cron = require('node-cron');
+
 require('dotenv').config();
 
 // Security & Performance middleware
@@ -82,19 +83,23 @@ const initializeRedis = async () => {
 };
 
 // Database connection
+
 async function connectDB() {
   try {
     const mongoUri = process.env.MONGO_URI;
     if (!mongoUri) throw new Error('MONGO_URI environment variable is not defined');
+
     
     await mongoose.connect(mongoUri);
     
     logger.info('Database Connected Successfully');
   } catch (error) {
     logger.error('Database connection error:', error.message);
+
     process.exit(1);
   }
 }
+
 
 // Initialize database and Redis
 connectDB();
@@ -290,3 +295,4 @@ server.listen(PORT, () => {
 
 // Export for testing
 module.exports = { app, server, redisClient, redisConnected };
+
