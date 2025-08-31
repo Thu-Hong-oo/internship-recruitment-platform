@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
@@ -199,5 +200,6 @@ UserSchema.methods.matchPassword = async function (enteredPassword) {
 UserSchema.methods.canUsePassword = function () {
   return this.authMethod === 'local' || this.authMethod === 'hybrid';
 };
+
 
 module.exports = mongoose.model('User', UserSchema);
