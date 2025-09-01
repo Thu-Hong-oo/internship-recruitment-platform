@@ -73,7 +73,7 @@ export default function Header() {
   const cvDropdown = useDropdown(150);
 
   // State để kiểm tra trạng thái đăng nhập
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   // Mock data cho các vị trí việc làm (sẽ thay bằng API call sau)
   const jobPositions = [
