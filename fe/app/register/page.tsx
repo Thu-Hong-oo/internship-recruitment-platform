@@ -106,7 +106,7 @@ export default function RegisterPage() {
         setSuccess(response.message || "Đăng ký thành công!");
         // Redirect to email verification page after 2 seconds
         setTimeout(() => {
-          router.push("/http://localhost:3001/email-verification");
+          router.push("/email-verification");
         }, 2000);
       } else {
         setError(response.error || response.message || "Đăng ký thất bại");
@@ -165,6 +165,8 @@ export default function RegisterPage() {
                 <Input
                   id="fullName"
                   type="text"
+                  name="fullName"
+                  autoComplete="name"
                   placeholder="Nhập họ tên"
                   value={formData.fullName}
                   onChange={(e) =>
@@ -190,6 +192,8 @@ export default function RegisterPage() {
                 <Input
                   id="email"
                   type="email"
+                  name="email"
+                  autoComplete="email"
                   placeholder="Nhập email"
                   value={formData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
@@ -213,6 +217,8 @@ export default function RegisterPage() {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
+                  name="password"
+                  autoComplete="new-password"
                   placeholder="Nhập mật khẩu"
                   value={formData.password}
                   onChange={(e) =>
@@ -254,6 +260,8 @@ export default function RegisterPage() {
                 <Input
                   id="confirmPassword"
                   type={showConfirmPassword ? "text" : "password"}
+                  name="confirmPassword"
+                  autoComplete="new-password"
                   placeholder="Nhập lại mật khẩu"
                   value={formData.confirmPassword}
                   onChange={(e) =>
