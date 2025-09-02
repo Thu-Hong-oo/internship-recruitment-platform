@@ -125,9 +125,19 @@ class ApiClient {
   }
 
   async logout() {
-    this.token = null;
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("token");
+    try {
+      // Notify server to invalidate token
+      await this.request<{ success: boolean; message?: string }>(
+        "/auth/logout",
+        { method: "POST" }
+      );
+    } catch (e) {
+      // Ignore server errors; proceed to clear local auth
+    } finally {
+      this.token = null;
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("token");
+      }
     }
   }
 
