@@ -151,7 +151,6 @@ export default function ProfilePage() {
                 <Badge variant="secondary" className="mb-3">
                   Tài khoản đã xác thực
                 </Badge>
-
               </div>
 
               {/* Job Seeking Status */}
@@ -178,7 +177,7 @@ export default function ProfilePage() {
               {/* Profile Visibility */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">
+                  <span className="text-sm font-medium text-foreground">
                     Cho phép NTD tìm kiếm hồ sơ
                   </span>
                   <Switch
@@ -192,7 +191,7 @@ export default function ProfilePage() {
 
               {/* Contact Preferences */}
               <div className="space-y-3">
-                <h3 className="text-sm font-medium text-gray-700">
+                <h3 className="text-sm font-medium text-foreground">
                   Khi có cơ hội việc làm phù hợp, NTD sẽ liên hệ và trao đổi với
                   bạn qua:
                 </h3>
