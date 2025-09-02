@@ -5,13 +5,19 @@ import Link from "next/link";
 import { Eye, EyeOff, Mail, Lock, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/useAuth";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({
@@ -20,10 +26,23 @@ export default function LoginPage() {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Form submitted:", formData);
-    // TODO: Implement login logic
+    if (submitting) return;
+    setError(null);
+    setSubmitting(true);
+    try {
+      const res = await login(formData.email, formData.password);
+      if (res.success) {
+        router.push("/");
+        return;
+      }
+      setError(res.message || "Đăng nhập thất bại");
+    } catch (err: any) {
+      setError(err?.message || "Đăng nhập thất bại");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -44,6 +63,11 @@ export default function LoginPage() {
 
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
+            {error && (
+              <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-3">
+                {error}
+              </div>
+            )}
             {/* Email */}
             <div className="space-y-2">
               <label
@@ -57,6 +81,11 @@ export default function LoginPage() {
                 <Input
                   id="email"
                   type="email"
+                  name="email"
+                  autoComplete="username email"
+                  inputMode="email"
+                  autoCorrect="off"
+                  spellCheck={false}
                   placeholder="Email"
                   value={formData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
@@ -79,6 +108,8 @@ export default function LoginPage() {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
+                  name="password"
+                  autoComplete="current-password"
                   placeholder="Mật khẩu"
                   value={formData.password}
                   onChange={(e) =>
@@ -114,9 +145,10 @@ export default function LoginPage() {
             {/* Login Button */}
             <Button
               type="submit"
-              className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-lg rounded-lg transition-colors duration-200"
+              disabled={submitting}
+              className="w-full h-12 bg-primary hover:bg-primary/90 disabled:opacity-70 disabled:cursor-not-allowed text-primary-foreground font-semibold text-lg rounded-lg transition-colors duration-200"
             >
-              Đăng nhập
+              {submitting ? "Đang đăng nhập..." : "Đăng nhập"}
             </Button>
           </form>
 
