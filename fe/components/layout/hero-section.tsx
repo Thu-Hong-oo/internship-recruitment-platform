@@ -1,32 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { Search, MapPin, ChevronDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 
 interface HeroSectionProps {
-  onSearch: (keyword: string) => void;
+  onSearch?: (keyword: string) => void;
 }
 
 export default function HeroSection({ onSearch }: HeroSectionProps) {
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState("Tất cả địa điểm");
+  const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showJobCategoryModal, setShowJobCategoryModal] = useState(false);
-  const [selectedLocation, setSelectedLocation] = useState("Hồ Chí Minh");
-  const [selectedDistricts, setSelectedDistricts] = useState([
-    "Tất cả",
-    "Bình Chánh",
-    "Bình Tân",
-    "Bình Thạnh",
-    "Cần Giờ",
-    "Củ Chi",
-    "Gò Vấp",
-  ]);
-  const [searchKeyword, setSearchKeyword] = useState("");
 
   const handleSearch = () => {
-    onSearch(searchKeyword);
+    if (onSearch) {
+      onSearch(searchKeyword);
+    }
   };
 
   return (
@@ -61,14 +55,146 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
                 </div>
 
                 {/* Job category dropdown */}
-                <Button
-                  onClick={() => setShowJobCategoryModal(true)}
-                  className="dropdown-button flex-1 min-w-[200px] justify-start font-medium"
-                >
-                  <div className="w-3 h-3 bg-primary rounded-full mr-3"></div>
-                  Danh mục nghề
-                  <ChevronDown className="w-4 h-4 ml-auto opacity-60" />
-                </Button>
+                <div className="relative flex-1 min-w-[200px]">
+                  <Button
+                    onClick={() => setShowJobCategoryModal(true)}
+                    className="dropdown-button w-full justify-start font-medium"
+                  >
+                    <div className="w-3 h-3 bg-primary rounded-full mr-3"></div>
+                    Danh mục nghề
+                    <ChevronDown className="w-4 h-4 ml-auto opacity-60" />
+                  </Button>
+
+                  {/* Job Category Dropdown */}
+                  {showJobCategoryModal && (
+                    <div className="absolute top-full left-0 mt-2 w-full max-w-6xl bg-white rounded-lg shadow-xl border border-border z-50 max-h-[80vh] overflow-hidden">
+                      <div className="p-6 border-b border-gray-200">
+                        <div className="flex items-center justify-between mb-4">
+                          <h2 className="text-xl font-semibold text-gray-900">
+                            Chọn Nhóm nghề, Nghề hoặc Chuyên môn
+                          </h2>
+                          <button
+                            onClick={() => setShowJobCategoryModal(false)}
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                        </div>
+                        <div className="relative">
+                          <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+                          <Input
+                            placeholder="Nhập từ khóa tìm kiếm"
+                            className="pl-10"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex max-h-96">
+                        <div className="w-1/3 border-r border-gray-200">
+                          <div className="p-4">
+                            <h3 className="font-semibold mb-4 text-gray-900">
+                              NHÓM NGHỀ
+                            </h3>
+                            <div className="space-y-2">
+                              {[
+                                "Kinh doanh/Bán hàng",
+                                "Marketing/PR/Quảng cáo",
+                                "Chăm sóc khách hàng (Customer Service)/Vận hành",
+                                "Nhân sự/Hành chính/Pháp chế",
+                                "Công nghệ Thông tin",
+                                "Lao động phổ thông",
+                              ].map((category) => (
+                                <div
+                                  key={category}
+                                  className="flex items-center justify-between p-2 hover:bg-gray-50 rounded cursor-pointer"
+                                >
+                                  <div className="flex items-center">
+                                    <Checkbox />
+                                    <span className="ml-3 text-sm">
+                                      {category}
+                                    </span>
+                                  </div>
+                                  <ChevronDown className="w-4 h-4" />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="w-1/3 border-r border-gray-200">
+                          <div className="p-4">
+                            <h3 className="font-semibold mb-4 text-gray-900">
+                              NGHỀ
+                            </h3>
+                            <div className="space-y-2">
+                              {[
+                                {
+                                  name: "Software Engineering",
+                                  checked: false,
+                                },
+                                { name: "Software Testing", checked: false },
+                                {
+                                  name: "Artificial Intelligence (AI)",
+                                  checked: false,
+                                },
+                              ].map((job) => (
+                                <div key={job.name} className="p-2">
+                                  <div className="flex items-center mb-2">
+                                    <Checkbox checked={job.checked} />
+                                    <span className="ml-3 font-medium">
+                                      {job.name}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="w-1/3">
+                          <div className="p-4">
+                            <h3 className="font-semibold mb-4 text-gray-900">
+                              VỊ TRÍ CHUYÊN MÔN
+                            </h3>
+                            <div className="space-y-2">
+                              <div className="flex flex-wrap gap-2">
+                                {[
+                                  "Software Engineer",
+                                  "Backend Developer",
+                                  "Frontend Developer",
+                                  "Mobile Developer",
+                                  "Fullstack Developer",
+                                  "Blockchain Engineer",
+                                ].map((position) => (
+                                  <div
+                                    key={position}
+                                    className="px-2 py-1 text-xs border border-gray-300 rounded"
+                                  >
+                                    {position}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-4 border-t border-gray-200 flex justify-between">
+                        <div className="text-sm text-gray-600">
+                          Bạn gặp vấn đề với Danh mục Nghề?{" "}
+                          <span className="text-green-600 cursor-pointer">
+                            Gửi góp ý
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="outline">Bỏ chọn tất cả</Button>
+                          <Button variant="outline">Hủy</Button>
+                          <Button
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={() => setShowJobCategoryModal(false)}
+                          >
+                            Chọn
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
 
                 {/* Location dropdown */}
                 <Button
@@ -158,45 +284,6 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
                           />
                           <span className="ml-3">{city}</span>
                         </div>
-                        {city === "Hồ Chí Minh" && (
-                          <span className="text-sm text-gray-500">Tất cả</span>
-                        )}
-                        <ChevronDown className="w-4 h-4" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="w-1/2">
-                <div className="p-4">
-                  <h3 className="font-semibold mb-4">QUẬN/HUYỆN</h3>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {[
-                      "Tất cả",
-                      "Bình Chánh",
-                      "Bình Tân",
-                      "Bình Thạnh",
-                      "Cần Giờ",
-                      "Củ Chi",
-                      "Gò Vấp",
-                    ].map((district) => (
-                      <div key={district} className="flex items-center">
-                        <Checkbox
-                          checked={selectedDistricts.includes(district)}
-                          onChange={(checked) => {
-                            if (checked) {
-                              setSelectedDistricts([
-                                ...selectedDistricts,
-                                district,
-                              ]);
-                            } else {
-                              setSelectedDistricts(
-                                selectedDistricts.filter((d) => d !== district)
-                              );
-                            }
-                          }}
-                        />
-                        <span className="ml-3">{district}</span>
                       </div>
                     ))}
                   </div>
@@ -216,115 +303,6 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
               >
                 Áp dụng
               </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Job Category Modal */}
-      {showJobCategoryModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg w-full max-w-6xl mx-4 max-h-[80vh] overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold">
-                  Chọn Nhóm nghề, Nghề hoặc Chuyên môn
-                </h2>
-                <button onClick={() => setShowJobCategoryModal(false)}>
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
-                <Input placeholder="Nhập từ khóa tìm kiếm" className="pl-10" />
-              </div>
-            </div>
-            <div className="flex max-h-96">
-              <div className="w-1/3 border-r border-gray-200">
-                <div className="p-4">
-                  <h3 className="font-semibold mb-4">NHÓM NGHỀ</h3>
-                  <div className="space-y-2">
-                    {[
-                      "Kinh doanh/Bán hàng",
-                      "Marketing/PR/Quảng cáo",
-                      "Chăm sóc khách hàng (Customer Service)/Vận hành",
-                      "Nhân sự/Hành chính/Pháp chế",
-                      "Công nghệ Thông tin",
-                      "Lao động phổ thông",
-                    ].map((category) => (
-                      <div
-                        key={category}
-                        className="flex items-center justify-between p-2 hover:bg-gray-50 rounded cursor-pointer"
-                      >
-                        <div className="flex items-center">
-                          <Checkbox />
-                          <span className="ml-3 text-sm">{category}</span>
-                        </div>
-                        <ChevronDown className="w-4 h-4" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="w-1/3 border-r border-gray-200">
-                <div className="p-4">
-                  <h3 className="font-semibold mb-4">NGHỀ</h3>
-                  <div className="space-y-2">
-                    {[
-                      { name: "Software Engineering", checked: false },
-                      { name: "Software Testing", checked: false },
-                      { name: "Artificial Intelligence (AI)", checked: false },
-                    ].map((job) => (
-                      <div key={job.name} className="p-2">
-                        <div className="flex items-center mb-2">
-                          <Checkbox checked={job.checked} />
-                          <span className="ml-3 font-medium">{job.name}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="w-1/3">
-                <div className="p-4">
-                  <h3 className="font-semibold mb-4">VỊ TRÍ CHUYÊN MÔN</h3>
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        "Software Engineer",
-                        "Backend Developer",
-                        "Frontend Developer",
-                        "Mobile Developer",
-                        "Fullstack Developer",
-                        "Blockchain Engineer",
-                      ].map((position) => (
-                        <div
-                          key={position}
-                          className="px-2 py-1 text-xs border border-gray-300 rounded"
-                        >
-                          {position}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 border-t border-gray-200 flex justify-between">
-              <div className="text-sm text-gray-600">
-                Bạn gặp vấn đề với Danh mục Nghề?{" "}
-                <span className="text-green-600 cursor-pointer">Gửi góp ý</span>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline">Bỏ chọn tất cả</Button>
-                <Button variant="outline">Hủy</Button>
-                <Button
-                  className="bg-green-600 hover:bg-green-700"
-                  onClick={() => setShowJobCategoryModal(false)}
-                >
-                  Chọn
-                </Button>
-              </div>
             </div>
           </div>
         </div>
