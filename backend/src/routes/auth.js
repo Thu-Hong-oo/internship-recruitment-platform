@@ -401,8 +401,19 @@ router.post('/verify-email', otpVerificationRateLimit, verifyEmail);
  *   post:
  *     summary: Resend email verification
  *     tags: [Authentication]
- *     security:
- *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: User's email address
  *     responses:
  *       200:
  *         description: Verification email sent successfully
@@ -440,6 +451,6 @@ router.post('/verify-email', otpVerificationRateLimit, verifyEmail);
  *                 error:
  *                   type: string
  */
-router.post('/resend-verification', protect, resendVerificationRateLimit, resendEmailVerification);
+router.post('/resend-verification', resendVerificationRateLimit, resendEmailVerification);
 
 module.exports = router;

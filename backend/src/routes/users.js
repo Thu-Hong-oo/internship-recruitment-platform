@@ -1,5 +1,5 @@
 const express = require('express');
-const { protect, authorize } = require('../middleware/auth');
+const { protect, authorize, requireEmailVerification } = require('../middleware/auth');
 const { uploadAvatar: uploadAvatarMiddleware, handleUploadError } = require('../middleware/upload');
 const { uploadRateLimit } = require('../middleware/globalRateLimit');
 const {
@@ -252,7 +252,7 @@ router.delete('/:id', authorize('admin'), deleteUser);
  *       500:
  *         description: Failed to update avatar in database
  */
-router.post('/upload-avatar', uploadRateLimit, uploadAvatarMiddleware, handleUploadError, uploadAvatar);
+router.post('/upload-avatar', requireEmailVerification, uploadRateLimit, uploadAvatarMiddleware, handleUploadError, uploadAvatar);
 
 /**
  * @swagger
@@ -327,7 +327,7 @@ router.get('/me', getMe);
  *       401:
  *         description: Not authorized
  */
-router.put('/profile', updateProfile);
+router.put('/profile', requireEmailVerification, updateProfile);
 
 /**
  * @swagger
@@ -367,7 +367,7 @@ router.put('/profile', updateProfile);
  *       401:
  *         description: Current password incorrect
  */
-router.put('/password', changePassword);
+router.put('/password', requireEmailVerification, changePassword);
 
 /**
  * @swagger
@@ -395,7 +395,7 @@ router.put('/password', changePassword);
  *       400:
  *         description: Invalid token or account already linked
  */
-router.post('/link-google', linkGoogleAccount);
+router.post('/link-google', requireEmailVerification, linkGoogleAccount);
 
 /**
  * @swagger
@@ -411,6 +411,6 @@ router.post('/link-google', linkGoogleAccount);
  *       400:
  *         description: Cannot unlink if it's the only auth method
  */
-router.delete('/unlink-google', unlinkGoogleAccount);
+router.delete('/unlink-google', requireEmailVerification, unlinkGoogleAccount);
 
 module.exports = router;

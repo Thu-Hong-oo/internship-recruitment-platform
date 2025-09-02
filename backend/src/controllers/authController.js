@@ -120,9 +120,6 @@ const register = asyncHandler( async ( req, res ) => {
         // Don't fail registration if email fails, just log it
     }
 
-    // Create token
-    const token = user.getSignedJwtToken();
-
     logger.info( `New user registered with local auth: ${
         user.email
     }`, {
@@ -135,7 +132,6 @@ const register = asyncHandler( async ( req, res ) => {
     res.status( 201 ).json( {
 
         success: true,
-        token,
         user: {
 
             id: user._id,
@@ -574,22 +570,43 @@ const googleAuth = asyncHandler(async (req, res) => {
   user.emailVerificationExpire = undefined;
   await user.save();
 
+  // Create new token after email verification
+  const token = user.getSignedJwtToken();
+
   logger.info(`Email verified with OTP for user: ${user.email}`, { userId: user._id });
 
   res.status(200).json({
-    success: true, message: 'Xác thực email thành công', user: {
-      id: user._id, email: user.email, firstName: user.firstName, lastName: user.lastName, role: user.role, fullName: user.fullName, isEmailVerified: user.isEmailVerified
+    success: true, 
+    token,
+    message: 'Xác thực email thành công', 
+    user: {
+      id: user._id, 
+      email: user.email, 
+      firstName: user.firstName, 
+      lastName: user.lastName, 
+      role: user.role, 
+      fullName: user.fullName, 
+      isEmailVerified: user.isEmailVerified
     }
   });
 });
 
 // @desc    Resend email verification
 // @route   POST /api/auth/resend-verification
-// @access  Private
+// @access  Public
 const resendEmailVerification = asyncHandler(async (req, res) => {
-            const user = await User.findById( req.user.id );
+            const { email } = req.body;
+            
+            if (!email) {
+                return res.status(400).json({ 
+                    success: false, 
+                    error: 'Email là bắt buộc' 
+                });
+            }
+            
+            const user = await User.findOne({ email });
             if ( ! user ) {
-                return res.status( 404 ).json( { success: false, error: 'Không tìm thấy người dùng' } );
+                return res.status( 404 ).json( { success: false, error: 'Không tìm thấy tài khoản với email này' } );
             }
             if ( user.isEmailVerified ) {
                 return res.status( 400 ).json( { success: false, error: 'Email đã được xác thực' } );

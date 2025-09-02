@@ -93,8 +93,22 @@ const optionalAuth = asyncHandler(async (req, res, next) => {
   next();
 });
 
+// Require email verification for protected routes
+const requireEmailVerification = asyncHandler(async (req, res, next) => {
+  if (!req.user.isEmailVerified) {
+    return res.status(403).json({
+      success: false,
+      error: 'Email chưa được xác thực. Vui lòng xác thực email trước khi truy cập tính năng này.',
+      errorType: 'EMAIL_NOT_VERIFIED',
+      requiresEmailVerification: true
+    });
+  }
+  next();
+});
+
 module.exports = {
   protect,
   authorize,
-  optionalAuth
+  optionalAuth,
+  requireEmailVerification
 };
