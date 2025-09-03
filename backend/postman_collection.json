@@ -63,13 +63,14 @@
                   "    var jsonData = pm.response.json();",
                   "    if (jsonData.success) {",
                   "        pm.environment.set(\"user_id\", jsonData.user.id);",
-                  "        pm.environment.set(\"token\", jsonData.token);",
+                  "        // Note: No token returned on registration, need email verification first",
                   "        pm.environment.set(\"is_email_verified\", jsonData.user.isEmailVerified);",
                   "        pm.environment.set(\"auth_method\", jsonData.user.authMethod);",
                   "        ",
                   "        // Log email verification status",
                   "        if (!jsonData.user.isEmailVerified) {",
                   "            console.log(\"⚠️ Email verification required. Check your email for verification link.\");",
+                  "            console.log(\"📧 Use 'Resend Email Verification' if needed.\");",
                   "        }",
                   "    }",
                   "});"
@@ -95,7 +96,7 @@
               "host": ["{{api_url}}"],
               "path": ["auth", "register"]
             },
-            "description": "Register a new user (student, employer, or admin)"
+            "description": "Register a new user (candidate, employer, or admin)"
           },
           "response": []
         },
@@ -154,7 +155,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test(\"Get user profile successful\", function () {",
+                  "pm.test(\"Get current user successful\", function () {",
                   "    pm.response.to.have.status(200);",
                   "    var jsonData = pm.response.json();",
                   "    if (jsonData.success) {",
@@ -182,11 +183,11 @@
               }
             ],
             "url": {
-              "raw": "{{api_url}}/users/me",
+              "raw": "{{api_url}}/auth/me",
               "host": ["{{api_url}}"],
-              "path": ["users", "me"]
+              "path": ["auth", "me"]
             },
-            "description": "Get current user profile information including email verification status"
+            "description": "Get current authenticated user information"
           },
           "response": []
         },
@@ -237,14 +238,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Nguyen Van\",\n  \"lastName\": \"A\",\n  \"phone\": \"0123456789\",\n  \"dateOfBirth\": \"2000-01-01\",\n  \"gender\": \"male\",\n  \"address\": {\n    \"street\": \"123 Main St\",\n    \"city\": \"Ho Chi Minh\",\n    \"state\": \"HCM\",\n    \"country\": \"Vietnam\"\n  },\n  \"education\": {\n    \"institution\": \"University of Technology\",\n    \"degree\": \"Bachelor\",\n    \"fieldOfStudy\": \"Computer Science\",\n    \"graduationYear\": 2024,\n    \"gpa\": 3.5\n  },\n  \"skills\": [\n    {\n      \"name\": \"JavaScript\",\n      \"level\": \"intermediate\",\n      \"yearsOfExperience\": 2\n    },\n    {\n      \"name\": \"React\",\n      \"level\": \"beginner\",\n      \"yearsOfExperience\": 1\n    }\n  ]\n}"
+              "raw": "{\n  \"firstName\": \"Nguyen Van\",\n  \"lastName\": \"A\",\n  \"phone\": \"0123456789\",\n  \"bio\": \"Passionate developer with experience in web technologies\",\n  \"location\": {\n    \"city\": \"Ho Chi Minh\",\n    \"district\": \"District 1\",\n    \"country\": \"Vietnam\"\n  }\n}"
             },
             "url": {
               "raw": "{{api_url}}/users/profile",
               "host": ["{{api_url}}"],
               "path": ["users", "profile"]
             },
-            "description": "Update user profile information"
+            "description": "Update user basic profile information"
           },
           "response": []
         },
@@ -288,7 +289,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"student@example.com\"\n}"
+              "raw": "{\n  \"email\": \"candidate@example.com\"\n}"
             },
             "url": {
               "raw": "{{api_url}}/auth/forgotpassword",
@@ -369,20 +370,20 @@
             "method": "POST",
             "header": [
               {
-                "key": "Authorization",
-                "value": "Bearer {{token}}"
+                "key": "Content-Type",
+                "value": "application/json"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": ""
+              "raw": "{\n  \"email\": \"{{user_email}}\"\n}"
             },
             "url": {
               "raw": "{{api_url}}/auth/resend-verification",
               "host": ["{{api_url}}"],
               "path": ["auth", "resend-verification"]
             },
-            "description": "Resend email verification OTP. Requires authentication token."
+            "description": "Resend email verification OTP. Public route, only requires email."
           },
           "response": []
         },
@@ -397,6 +398,29 @@
               "path": ["auth", "logout"]
             },
             "description": "Logout user"
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/auth/refresh-token",
+              "host": ["{{api_url}}"],
+              "path": ["auth", "refresh-token"]
+            },
+            "description": "Refresh access token using refresh token"
           },
           "response": []
         },
@@ -491,6 +515,304 @@
         }
       ],
       "description": "User authentication and profile management including Google OAuth and email verification"
+    },
+    {
+      "name": "Candidate Profile Management",
+      "item": [
+        {
+          "name": "Get Candidate Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/users/candidate/profile",
+              "host": ["{{api_url}}"],
+              "path": ["users", "candidate", "profile"]
+            },
+            "description": "Get current user's candidate profile"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Candidate Profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"personalInfo\": {\n    \"dateOfBirth\": \"2000-01-01\",\n    \"gender\": \"male\",\n    \"phone\": \"0123456789\",\n    \"address\": {\n      \"city\": \"Ho Chi Minh\",\n      \"district\": \"District 1\",\n      \"fullAddress\": \"123 ABC Street\"\n    },\n    \"linkedin\": \"https://linkedin.com/in/example\",\n    \"github\": \"https://github.com/example\",\n    \"portfolio\": \"https://portfolio.example.com\"\n  },\n  \"education\": {\n    \"currentStatus\": \"student\",\n    \"university\": \"FPT University\",\n    \"major\": \"Computer Science\",\n    \"degree\": \"Bachelor\",\n    \"graduationYear\": 2024,\n    \"gpa\": 3.5,\n    \"expectedGraduation\": \"2024-06-01\",\n    \"currentSemester\": 8\n  },\n  \"experience\": [\n    {\n      \"type\": \"internship\",\n      \"title\": \"Frontend Developer Intern\",\n      \"company\": \"Tech Company\",\n      \"description\": \"Developed responsive web applications\",\n      \"startDate\": \"2023-06-01\",\n      \"endDate\": \"2023-09-01\",\n      \"isCurrent\": false,\n      \"skills\": [\"React\", \"JavaScript\", \"HTML\", \"CSS\"],\n      \"achievements\": [\"Improved website performance by 30%\"],\n      \"technologies\": [\"React\", \"Node.js\", \"MongoDB\"]\n    }\n  ],\n  \"skills\": [\n    {\n      \"skillId\": \"{{skill_id}}\",\n      \"level\": \"intermediate\",\n      \"experience\": 12,\n      \"isTransferSkill\": false\n    }\n  ],\n  \"preferences\": {\n    \"internshipType\": [\"full-time\", \"remote\"],\n    \"duration\": \"3-months\",\n    \"location\": [\"Ho Chi Minh\", \"Ha Noi\"],\n    \"industries\": [\"Technology\", \"E-commerce\"],\n    \"salaryExpectation\": {\n      \"min\": 5000000,\n      \"max\": 8000000,\n      \"currency\": \"VND\"\n    },\n    \"careerGoals\": [\"Become a Full Stack Developer\"],\n    \"preferredRoles\": [\"Frontend Developer\", \"Backend Developer\"]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/users/candidate/profile",
+              "host": ["{{api_url}}"],
+              "path": ["users", "candidate", "profile"]
+            },
+            "description": "Create a new candidate profile for the current user"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Candidate Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"personalInfo\": {\n    \"phone\": \"0987654321\",\n    \"address\": {\n      \"city\": \"Ho Chi Minh\",\n      \"district\": \"District 7\",\n      \"fullAddress\": \"456 XYZ Street\"\n    }\n  },\n  \"education\": {\n    \"gpa\": 3.7\n  },\n  \"preferences\": {\n    \"salaryExpectation\": {\n      \"min\": 6000000,\n      \"max\": 10000000,\n      \"currency\": \"VND\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/users/candidate/profile",
+              "host": ["{{api_url}}"],
+              "path": ["users", "candidate", "profile"]
+            },
+            "description": "Update candidate profile information"
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Resume",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "resume",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{api_url}}/users/candidate/resume",
+              "host": ["{{api_url}}"],
+              "path": ["users", "candidate", "resume"]
+            },
+            "description": "Upload resume/CV file for candidate profile"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Resume",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/users/candidate/resume",
+              "host": ["{{api_url}}"],
+              "path": ["users", "candidate", "resume"]
+            },
+            "description": "Delete resume/CV file from candidate profile"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Candidate Skills",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/users/candidate/skills",
+              "host": ["{{api_url}}"],
+              "path": ["users", "candidate", "skills"]
+            },
+            "description": "Get all skills for the current candidate"
+          },
+          "response": []
+        },
+        {
+          "name": "Add Candidate Skills",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"skills\": [\n    {\n      \"skillId\": \"{{skill_id}}\",\n      \"level\": \"beginner\",\n      \"experience\": 6,\n      \"isTransferSkill\": false\n    },\n    {\n      \"skillId\": \"{{skill_id_2}}\",\n      \"level\": \"intermediate\",\n      \"experience\": 12,\n      \"isTransferSkill\": true\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/users/candidate/skills",
+              "host": ["{{api_url}}"],
+              "path": ["users", "candidate", "skills"]
+            },
+            "description": "Add new skills to candidate profile"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Candidate Skill",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"level\": \"advanced\",\n  \"experience\": 18\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/users/candidate/skills/{{skill_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["users", "candidate", "skills", "{{skill_id}}"]
+            },
+            "description": "Update specific skill level and experience"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Candidate Skill",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/users/candidate/skills/{{skill_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["users", "candidate", "skills", "{{skill_id}}"]
+            },
+            "description": "Remove specific skill from candidate profile"
+          },
+          "response": []
+        }
+      ],
+      "description": "Candidate profile management including personal info, education, experience, skills, and resume"
+    },
+    {
+      "name": "Employer Profile Management",
+      "item": [
+        {
+          "name": "Get Employer Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/users/employer/profile",
+              "host": ["{{api_url}}"],
+              "path": ["users", "employer", "profile"]
+            },
+            "description": "Get current user's employer profile"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Employer Profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company\": {\n    \"name\": \"Tech Solutions Inc.\",\n    \"industry\": \"Technology\",\n    \"size\": \"medium\",\n    \"website\": \"https://techsolutions.com\",\n    \"description\": \"Leading technology company specializing in web development\",\n    \"foundedYear\": 2018,\n    \"headquarters\": {\n      \"city\": \"Ho Chi Minh\",\n      \"country\": \"Vietnam\"\n    }\n  },\n  \"position\": {\n    \"title\": \"HR Manager\",\n    \"department\": \"Human Resources\",\n    \"level\": \"manager\",\n    \"responsibilities\": [\n      \"Recruit and hire new employees\",\n      \"Manage employee benefits\",\n      \"Handle employee relations\"\n    ],\n    \"hiringAuthority\": true\n  },\n  \"contact\": {\n    \"phone\": \"0123456789\",\n    \"linkedin\": \"https://linkedin.com/in/hrmanager\",\n    \"workEmail\": \"hr@techsolutions.com\",\n    \"availability\": \"weekdays\"\n  },\n  \"preferences\": {\n    \"internshipTypes\": [\"full-time\", \"part-time\"],\n    \"durations\": [\"3-months\", \"6-months\"],\n    \"locations\": [\"Ho Chi Minh\", \"Ha Noi\"],\n    \"skills\": [\n      {\n        \"skillId\": \"{{skill_id}}\",\n        \"priority\": \"required\"\n      }\n    ],\n    \"salaryRange\": {\n      \"min\": 5000000,\n      \"max\": 10000000,\n      \"currency\": \"VND\"\n    }\n  },\n  \"hiring\": {\n    \"totalPositions\": 10,\n    \"activePositions\": 5,\n    \"averageHiringTime\": 30,\n    \"successRate\": 85\n  }\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/users/employer/profile",
+              "host": ["{{api_url}}"],
+              "path": ["users", "employer", "profile"]
+            },
+            "description": "Create a new employer profile for the current user"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Employer Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company\": {\n    \"description\": \"Updated company description\"\n  },\n  \"position\": {\n    \"title\": \"Senior HR Manager\"\n  },\n  \"hiring\": {\n    \"activePositions\": 8\n  }\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/users/employer/profile",
+              "host": ["{{api_url}}"],
+              "path": ["users", "employer", "profile"]
+            },
+            "description": "Update employer profile information"
+          },
+          "response": []
+        }
+      ],
+      "description": "Employer profile management including company info, position details, and hiring preferences"
     },
     {
       "name": "AI Services",
@@ -857,16 +1179,40 @@
       "name": "Analytics",
       "item": [
         {
-          "name": "Dashboard Analytics",
+          "name": "Dashboard Analytics (Candidate)",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
-              "raw": "{{api_url}}/analytics/dashboard",
+              "raw": "{{api_url}}/analytics/dashboard/candidate",
               "host": ["{{api_url}}"],
-              "path": ["analytics", "dashboard"]
+              "path": ["analytics", "dashboard", "candidate"]
             },
-            "description": "Get dashboard analytics and statistics"
+            "description": "Get candidate dashboard analytics and statistics"
+          },
+          "response": []
+        },
+        {
+          "name": "Dashboard Analytics (Employer)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/analytics/dashboard/employer",
+              "host": ["{{api_url}}"],
+              "path": ["analytics", "dashboard", "employer"]
+            },
+            "description": "Get employer dashboard analytics and statistics"
           },
           "response": []
         },
@@ -874,7 +1220,12 @@
           "name": "Application Statistics",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{api_url}}/analytics/applications",
               "host": ["{{api_url}}"],
@@ -888,7 +1239,12 @@
           "name": "Job Statistics",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
               "raw": "{{api_url}}/analytics/jobs",
               "host": ["{{api_url}}"],
@@ -899,34 +1255,339 @@
           "response": []
         },
         {
-          "name": "User Statistics",
+          "name": "AI Performance Analytics",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
-              "raw": "{{api_url}}/analytics/users",
+              "raw": "{{api_url}}/analytics/ai-performance",
               "host": ["{{api_url}}"],
-              "path": ["analytics", "users"]
+              "path": ["analytics", "ai-performance"]
             },
-            "description": "Get user statistics (admin only)"
+            "description": "Get AI performance analytics and metrics"
           },
           "response": []
         }
       ],
-      "description": "Analytics and reporting endpoints"
+      "description": "Role-based analytics and reporting endpoints"
     },
     {
-      "name": "Users",
+      "name": "User Management",
       "item": [
         {
-          "name": "Get All Users",
+          "name": "Get User Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/users/profile",
+              "host": ["{{api_url}}"],
+              "path": ["users", "profile"]
+            },
+            "description": "Get current user's profile information"
+          },
+          "response": []
+        },
+        {
+          "name": "Get User by ID (Public)",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{api_url}}/users?page=1&limit=10&role=student",
+              "raw": "{{api_url}}/users/{{user_id}}",
               "host": ["{{api_url}}"],
-              "path": ["users"],
+              "path": ["users", "{{user_id}}"]
+            },
+            "description": "Get public user information by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Search Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_url}}/users/search?q=developer&role=candidate&location=Ho Chi Minh",
+              "host": ["{{api_url}}"],
+              "path": ["users", "search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "developer"
+                },
+                {
+                  "key": "role",
+                  "value": "candidate"
+                },
+                {
+                  "key": "location",
+                  "value": "Ho Chi Minh"
+                }
+              ]
+            },
+            "description": "Search users by name, skills, or location"
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Statistics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/users/stats",
+              "host": ["{{api_url}}"],
+              "path": ["users", "stats"]
+            },
+            "description": "Get user statistics (applications, saved jobs, profile completion)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update User Preferences",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notifications\": {\n    \"email\": true,\n    \"push\": true,\n    \"jobAlerts\": true,\n    \"applicationUpdates\": true\n  },\n  \"privacy\": {\n    \"profileVisibility\": \"public\",\n    \"showEmail\": false,\n    \"showPhone\": false\n  },\n  \"language\": \"vi\",\n  \"timezone\": \"Asia/Ho_Chi_Minh\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/users/preferences",
+              "host": ["{{api_url}}"],
+              "path": ["users", "preferences"]
+            },
+            "description": "Update user preferences (notifications, privacy, language, timezone)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/users/notifications?page=1&limit=20&unreadOnly=false",
+              "host": ["{{api_url}}"],
+              "path": ["users", "notifications"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "unreadOnly",
+                  "value": "false"
+                }
+              ]
+            },
+            "description": "Get user notifications with pagination"
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Notification as Read",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/users/notifications/{{notification_id}}/read",
+              "host": ["{{api_url}}"],
+              "path": ["users", "notifications", "{{notification_id}}", "read"]
+            },
+            "description": "Mark a specific notification as read"
+          },
+          "response": []
+        },
+        {
+          "name": "Mark All Notifications as Read",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/users/notifications/read-all",
+              "host": ["{{api_url}}"],
+              "path": ["users", "notifications", "read-all"]
+            },
+            "description": "Mark all notifications as read"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Notification",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/users/notifications/{{notification_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["users", "notifications", "{{notification_id}}"]
+            },
+            "description": "Delete a specific notification"
+          },
+          "response": []
+        },
+        {
+          "name": "Deactivate Account",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Taking a break from job hunting\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/users/deactivate",
+              "host": ["{{api_url}}"],
+              "path": ["users", "deactivate"]
+            },
+            "description": "Deactivate user account temporarily"
+          },
+          "response": []
+        },
+        {
+          "name": "Reactivate Account",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/users/reactivate",
+              "host": ["{{api_url}}"],
+              "path": ["users", "reactivate"]
+            },
+            "description": "Reactivate user account"
+          },
+          "response": []
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/users/{{user_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["users", "{{user_id}}"]
+            },
+            "description": "Get user information by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Update User Preferences",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preferences\": {\n    \"privacySettings\": {\n      \"profileVisibility\": \"public\",\n      \"showEmail\": false,\n      \"showPhone\": false\n    },\n    \"notifications\": {\n      \"emailNotifications\": true,\n      \"pushNotifications\": true,\n      \"jobAlerts\": true,\n      \"applicationUpdates\": true\n    },\n    \"language\": \"vi\",\n    \"timezone\": \"Asia/Ho_Chi_Minh\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/users/preferences",
+              "host": ["{{api_url}}"],
+              "path": ["users", "preferences"]
+            },
+            "description": "Update user preferences"
+          },
+          "response": []
+        }
+      ],
+      "description": "Complete user management including profile, preferences, notifications, and account management"
+    },
+    {
+      "name": "Admin Management",
+      "item": [
+        {
+          "name": "Get All Users (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/users?page=1&limit=10&role=candidate",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "users"],
               "query": [
                 {
                   "key": "page",
@@ -938,7 +1599,7 @@
                 },
                 {
                   "key": "role",
-                  "value": "student"
+                  "value": "candidate"
                 }
               ]
             },
@@ -947,27 +1608,36 @@
           "response": []
         },
         {
-          "name": "Get User by ID",
+          "name": "Get User by ID (Admin)",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
-              "raw": "{{api_url}}/users/{{user_id}}",
+              "raw": "{{api_url}}/admin/users/{{user_id}}",
               "host": ["{{api_url}}"],
-              "path": ["users", "{{user_id}}"]
+              "path": ["admin", "users", "{{user_id}}"]
             },
-            "description": "Get user information by ID"
+            "description": "Get detailed user information by ID (admin only)"
           },
           "response": []
         },
         {
-          "name": "Create User",
+          "name": "Create User (Admin)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
               }
             ],
             "body": {
@@ -975,53 +1645,183 @@
               "raw": "{\n  \"email\": \"employer@company.com\",\n  \"password\": \"123456\",\n  \"firstName\": \"Tran Thi\",\n  \"lastName\": \"B\",\n  \"role\": \"employer\"\n}"
             },
             "url": {
-              "raw": "{{api_url}}/users",
+              "raw": "{{api_url}}/admin/users",
               "host": ["{{api_url}}"],
-              "path": ["users"]
+              "path": ["admin", "users"]
             },
             "description": "Create new user (admin only)"
           },
           "response": []
         },
         {
-          "name": "Update User",
+          "name": "Update User (Admin)",
           "request": {
             "method": "PUT",
             "header": [
               {
                 "key": "Content-Type",
                 "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
               }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Updated Name\",\n  \"isActive\": true\n}"
+              "raw": "{\n  \"firstName\": \"Updated Name\",\n  \"isActive\": true,\n  \"role\": \"employer\"\n}"
             },
             "url": {
-              "raw": "{{api_url}}/users/{{user_id}}",
+              "raw": "{{api_url}}/admin/users/{{user_id}}",
               "host": ["{{api_url}}"],
-              "path": ["users", "{{user_id}}"]
+              "path": ["admin", "users", "{{user_id}}"]
             },
             "description": "Update user information (admin only)"
           },
           "response": []
         },
         {
-          "name": "Delete User",
+          "name": "Delete User (Admin)",
           "request": {
             "method": "DELETE",
-            "header": [],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
             "url": {
-              "raw": "{{api_url}}/users/{{user_id}}",
+              "raw": "{{api_url}}/admin/users/{{user_id}}",
               "host": ["{{api_url}}"],
-              "path": ["users", "{{user_id}}"]
+              "path": ["admin", "users", "{{user_id}}"]
             },
             "description": "Delete user (admin only)"
           },
           "response": []
+        },
+        {
+          "name": "Get Dashboard Stats (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/dashboard",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "dashboard"]
+            },
+            "description": "Get admin dashboard statistics"
+          },
+          "response": []
+        },
+        {
+          "name": "Get System Analytics (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/analytics",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "analytics"]
+            },
+            "description": "Get system analytics and performance metrics"
+          },
+          "response": []
+        },
+        {
+          "name": "Update User Status (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": true,\n  \"reason\": \"Account reactivated by admin\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/users/{{user_id}}/status",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "users", "{{user_id}}", "status"]
+            },
+            "description": "Update user status (active/inactive) by admin"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Pending Verifications (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/verifications?page=1&limit=10",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "verifications"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Get pending employer verifications"
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Employer (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"verified\": true,\n  \"notes\": \"Company verified successfully\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/verifications/{{verification_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "verifications", "{{verification_id}}"]
+            },
+            "description": "Verify employer account by admin"
+          },
+          "response": []
         }
       ],
-      "description": "User management endpoints (admin only)"
+      "description": "Admin management endpoints for user management and system analytics"
     },
     {
       "name": "Skill Roadmaps",
@@ -1126,6 +1926,498 @@
         }
       ],
       "description": "Skill roadmap management endpoints"
+    },
+    {
+      "name": "Skills Management",
+      "item": [
+        {
+          "name": "Get All Skills",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_url}}/skills?page=1&limit=20&category=programming",
+              "host": ["{{api_url}}"],
+              "path": ["skills"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "category",
+                  "value": "programming"
+                }
+              ]
+            },
+            "description": "Get paginated list of skills with filters"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Skill by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_url}}/skills/{{skill_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["skills", "{{skill_id}}"]
+            },
+            "description": "Get detailed skill information by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Search Skills",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_url}}/skills/search?q=javascript&category=programming",
+              "host": ["{{api_url}}"],
+              "path": ["skills", "search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "javascript"
+                },
+                {
+                  "key": "category",
+                  "value": "programming"
+                }
+              ]
+            },
+            "description": "Search skills by name or category"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Popular Skills",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_url}}/skills/popular?limit=10&category=programming",
+              "host": ["{{api_url}}"],
+              "path": ["skills", "popular"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "category",
+                  "value": "programming"
+                }
+              ]
+            },
+            "description": "Get most popular skills"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Skill Categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_url}}/skills/categories",
+              "host": ["{{api_url}}"],
+              "path": ["skills", "categories"]
+            },
+            "description": "Get all skill categories"
+          },
+          "response": []
+        }
+      ],
+      "description": "Skills management and search endpoints"
+    },
+    {
+      "name": "Company Management",
+      "item": [
+        {
+          "name": "Get All Companies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_url}}/companies?page=1&limit=10&verified=true",
+              "host": ["{{api_url}}"],
+              "path": ["companies"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "verified",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Get paginated list of companies with filters"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Company by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_url}}/companies/{{company_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["companies", "{{company_id}}"]
+            },
+            "description": "Get detailed company information by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Create Company",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Tech Solutions Inc.\",\n  \"industry\": \"Technology\",\n  \"size\": \"medium\",\n  \"website\": \"https://techsolutions.com\",\n  \"description\": \"Leading technology company specializing in web development\",\n  \"foundedYear\": 2018,\n  \"headquarters\": {\n    \"city\": \"Ho Chi Minh\",\n    \"country\": \"Vietnam\"\n  },\n  \"contact\": {\n    \"email\": \"contact@techsolutions.com\",\n    \"phone\": \"0123456789\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/companies",
+              "host": ["{{api_url}}"],
+              "path": ["companies"]
+            },
+            "description": "Create a new company (employer or admin only)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Company",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Tech Solutions Inc.\",\n  \"description\": \"Updated company description\",\n  \"website\": \"https://updated-techsolutions.com\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/companies/{{company_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["companies", "{{company_id}}"]
+            },
+            "description": "Update company information (employer or admin only)"
+          },
+          "response": []
+        },
+        {
+          "name": "Upload Company Logo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "logo",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{api_url}}/companies/{{company_id}}/logo",
+              "host": ["{{api_url}}"],
+              "path": ["companies", "{{company_id}}", "logo"]
+            },
+            "description": "Upload company logo image"
+          },
+          "response": []
+        },
+        {
+          "name": "Search Companies",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_url}}/companies/search?q=tech&industry=technology&location=Ho Chi Minh",
+              "host": ["{{api_url}}"],
+              "path": ["companies", "search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "tech"
+                },
+                {
+                  "key": "industry",
+                  "value": "technology"
+                },
+                {
+                  "key": "location",
+                  "value": "Ho Chi Minh"
+                }
+              ]
+            },
+            "description": "Search companies by name, industry, or location"
+          },
+          "response": []
+        }
+      ],
+      "description": "Company management endpoints"
+    },
+    {
+      "name": "File Upload",
+      "item": [
+        {
+          "name": "Upload File",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "type",
+                  "value": "resume",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{api_url}}/upload",
+              "host": ["{{api_url}}"],
+              "path": ["upload"]
+            },
+            "description": "Upload file (resume, avatar, company logo, etc.)"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete File",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/upload/{{file_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["upload", "{{file_id}}"]
+            },
+            "description": "Delete uploaded file"
+          },
+          "response": []
+        }
+      ],
+      "description": "File upload and management endpoints"
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Get User Notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/notifications?page=1&limit=20&unreadOnly=false",
+              "host": ["{{api_url}}"],
+              "path": ["notifications"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "unreadOnly",
+                  "value": "false"
+                }
+              ]
+            },
+            "description": "Get user notifications with pagination"
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Notification as Read",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/notifications/{{notification_id}}/read",
+              "host": ["{{api_url}}"],
+              "path": ["notifications", "{{notification_id}}", "read"]
+            },
+            "description": "Mark a specific notification as read"
+          },
+          "response": []
+        },
+        {
+          "name": "Mark All Notifications as Read",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/notifications/read-all",
+              "host": ["{{api_url}}"],
+              "path": ["notifications", "read-all"]
+            },
+            "description": "Mark all notifications as read"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Notification",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/notifications/{{notification_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["notifications", "{{notification_id}}"]
+            },
+            "description": "Delete a specific notification"
+          },
+          "response": []
+        }
+      ],
+      "description": "Notification management endpoints"
+    },
+    {
+      "name": "System Management",
+      "item": [
+        {
+          "name": "Get System Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_url}}/system/health",
+              "host": ["{{api_url}}"],
+              "path": ["system", "health"]
+            },
+            "description": "Get system health status and metrics"
+          },
+          "response": []
+        },
+        {
+          "name": "Get System Logs (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/system/logs?level=error&limit=50",
+              "host": ["{{api_url}}"],
+              "path": ["system", "logs"],
+              "query": [
+                {
+                  "key": "level",
+                  "value": "error"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            },
+            "description": "Get system logs (admin only)"
+          },
+          "response": []
+        },
+        {
+          "name": "Clear System Cache (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/system/cache/clear",
+              "host": ["{{api_url}}"],
+              "path": ["system", "cache", "clear"]
+            },
+            "description": "Clear system cache (admin only)"
+          },
+          "response": []
+        }
+      ],
+      "description": "System management and monitoring endpoints"
     }
   ]
 }

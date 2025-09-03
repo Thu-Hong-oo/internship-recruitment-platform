@@ -3,6 +3,7 @@ const {
   register,
   login,
   logout,
+  getMe,
   forgotPassword,
   resetPassword,
   googleAuth,
@@ -220,11 +221,30 @@ router.post('/login', login);
  */
 router.post('/logout', protect, logout);
 
-
-
-
-
-
+/**
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Get current user information
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Current user information retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       401:
+ *         description: Not authorized
+ */
+router.get('/me', protect, getMe);
 
 /**
  * @swagger
@@ -401,8 +421,19 @@ router.post('/verify-email', otpVerificationRateLimit, verifyEmail);
  *   post:
  *     summary: Resend email verification
  *     tags: [Authentication]
- *     security:
- *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: User's email address
  *     responses:
  *       200:
  *         description: Verification email sent successfully
@@ -440,6 +471,6 @@ router.post('/verify-email', otpVerificationRateLimit, verifyEmail);
  *                 error:
  *                   type: string
  */
-router.post('/resend-verification', protect, resendVerificationRateLimit, resendEmailVerification);
+router.post('/resend-verification', resendVerificationRateLimit, resendEmailVerification);
 
 module.exports = router;

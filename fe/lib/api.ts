@@ -2,6 +2,12 @@ const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
 
 // Types based on your API
+export interface UserProfile {
+  firstName: string;
+  lastName: string;
+  avatar?: string; // URL của avatar
+}
+
 export interface User {
   id: string;
   email: string;
@@ -11,6 +17,8 @@ export interface User {
   fullName: string;
   authMethod: "local" | "google";
   isEmailVerified: boolean;
+  profile?: UserProfile; // Profile object từ backend
+  avatar?: string; // Fallback cho avatar trực tiếp
 }
 
 export interface RegisterRequest {
@@ -30,10 +38,12 @@ export interface LoginRequest {
 
 export interface AuthResponse {
   success: boolean;
-  token: string;
+  token?: string; // Optional vì register có thể không trả về token
   user: User;
-  message: string;
+  message?: string;
   error?: string; // Optional error field
+  errorType?: string; // For specific error types
+  requiresEmailVerification?: boolean; // For login when email not verified
 }
 
 // API Client
@@ -56,11 +66,18 @@ class ApiClient {
 
     const config: RequestInit = {
       headers: {
-        "Content-Type": "application/json",
         ...options.headers,
       },
       ...options,
     };
+
+    // Add Content-Type only if not FormData
+    if (!(options.body instanceof FormData)) {
+      config.headers = {
+        "Content-Type": "application/json",
+        ...config.headers,
+      };
+    }
 
     // Add auth token if available
     if (this.token) {
@@ -97,7 +114,7 @@ class ApiClient {
       body: JSON.stringify(data),
     });
 
-    // Store token if registration is successful
+    // Store token if registration is successful and token is provided
     if (response.success && response.token) {
       this.token = response.token;
       if (typeof window !== "undefined") {
@@ -142,7 +159,7 @@ class ApiClient {
   }
 
   async getCurrentUser(): Promise<User> {
-    return this.request<User>("/auth/me");
+    return this.request<User>("/users/me");
   }
 
   async verifyEmail(email: string, otp: string): Promise<AuthResponse> {
@@ -151,16 +168,32 @@ class ApiClient {
       body: JSON.stringify({ email, otp }),
     });
 
-    if (response.success && response.token) {
-      this.token = response.token;
-      if (typeof window !== "undefined") {
-        localStorage.setItem("token", response.token);
-      }
-    }
+    // Note: Backend doesn't return token on email verification
+    // Token is only returned on successful login after email verification
+    return response;
+  }
+
+  async uploadAvatar(file: File): Promise<{ success: boolean; avatar?: string; error?: string; user?: User }> {
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    const response = await this.request<{ success: boolean; avatar?: string; error?: string; user?: User }>("/users/upload-avatar", {
+      method: "POST",
+      headers: {
+        // Don't set Content-Type for FormData, let browser set it
+      },
+      body: formData,
+    });
 
     return response;
   }
 }
+
+// Helper function to get avatar URL from user object
+export const getUserAvatar = (user: User | null): string | undefined => {
+  if (!user) return undefined;
+  return user.profile?.avatar || user.avatar;
+};
 
 // Create singleton instance
 export const apiClient = new ApiClient();
@@ -172,4 +205,5 @@ export const authAPI = {
   logout: apiClient.logout.bind(apiClient),
   getCurrentUser: apiClient.getCurrentUser.bind(apiClient),
   verifyEmail: apiClient.verifyEmail.bind(apiClient),
+  uploadAvatar: apiClient.uploadAvatar.bind(apiClient),
 };

@@ -1,12 +1,15 @@
 const { logger } = require('../utils/logger');
 
 class OTPCooldownService {
+  // - Testable: Có thể mock Redis client
+  // - Flexible: Có thể inject different Redis instances
+  // - Decoupled: Service không phụ thuộc vào Redis implementation
   constructor(redisClient) {
     this.redisClient = redisClient;
     this.COOLDOWN_PERIODS = {
       email_verification: 60, // 1 phút cooldown cho email verification
       password_reset: 60, // 1 phút cooldown cho password reset
-      resend_verification: 30 // 30 giây cooldown cho resend
+      resend_verification: 30, // 30 giây cooldown cho resend
     };
   }
 
@@ -24,13 +27,13 @@ class OTPCooldownService {
 
       const key = this.generateCooldownKey(type, identifier);
       const cooldown = await this.redisClient.get(key);
-      
+
       return cooldown !== null;
     } catch (error) {
       logger.error('Failed to check cooldown', {
         error: error.message,
         type,
-        identifier
+        identifier,
       });
       return false;
     }
@@ -45,13 +48,13 @@ class OTPCooldownService {
 
       const key = this.generateCooldownKey(type, identifier);
       const ttl = await this.redisClient.ttl(key);
-      
+
       return Math.max(0, ttl);
     } catch (error) {
       logger.error('Failed to get remaining cooldown', {
         error: error.message,
         type,
-        identifier
+        identifier,
       });
       return 0;
     }
@@ -66,13 +69,13 @@ class OTPCooldownService {
 
       const key = this.generateCooldownKey(type, identifier);
       const cooldownPeriod = this.COOLDOWN_PERIODS[type] || 60;
-      
+
       await this.redisClient.setEx(key, cooldownPeriod, '1');
-      
+
       logger.info(`OTP cooldown set`, {
         type,
         identifier,
-        cooldownPeriod
+        cooldownPeriod,
       });
 
       return true;
@@ -80,7 +83,7 @@ class OTPCooldownService {
       logger.error('Failed to set cooldown', {
         error: error.message,
         type,
-        identifier
+        identifier,
       });
       return false;
     }
@@ -95,10 +98,10 @@ class OTPCooldownService {
 
       const key = this.generateCooldownKey(type, identifier);
       await this.redisClient.del(key);
-      
+
       logger.info(`OTP cooldown cleared`, {
         type,
-        identifier
+        identifier,
       });
 
       return true;
@@ -106,7 +109,7 @@ class OTPCooldownService {
       logger.error('Failed to clear cooldown', {
         error: error.message,
         type,
-        identifier
+        identifier,
       });
       return false;
     }
@@ -119,29 +122,29 @@ class OTPCooldownService {
         return {
           inCooldown: false,
           remainingTime: 0,
-          cooldownPeriod: this.COOLDOWN_PERIODS[type] || 60
+          cooldownPeriod: this.COOLDOWN_PERIODS[type] || 60,
         };
       }
 
       const key = this.generateCooldownKey(type, identifier);
       const inCooldown = await this.isInCooldown(type, identifier);
       const remainingTime = await this.getRemainingCooldown(type, identifier);
-      
+
       return {
         inCooldown,
         remainingTime,
-        cooldownPeriod: this.COOLDOWN_PERIODS[type] || 60
+        cooldownPeriod: this.COOLDOWN_PERIODS[type] || 60,
       };
     } catch (error) {
       logger.error('Failed to get cooldown info', {
         error: error.message,
         type,
-        identifier
+        identifier,
       });
       return {
         inCooldown: false,
         remainingTime: 0,
-        cooldownPeriod: this.COOLDOWN_PERIODS[type] || 60
+        cooldownPeriod: this.COOLDOWN_PERIODS[type] || 60,
       };
     }
   }
