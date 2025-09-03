@@ -2,8 +2,8 @@ const express = require('express');
 const {
   protect,
   authorize,
-  requireEmailVerification,
 } = require('../middleware/auth');
+const { requireEmailVerification } = require('../middleware/emailVerification');
 const {
   uploadAvatar: uploadAvatarMiddleware,
   handleUploadError,
@@ -37,39 +37,11 @@ const router = express.Router();
 // All routes require authentication
 router.use(protect);
 
-/**
- * @swagger
- * /api/users/{id}:
- *   get:
- *     summary: Get single user
- *     tags: [Users]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: User ID
- *     responses:
- *       200:
- *         description: User retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   $ref: '#/components/schemas/User'
- *       401:
- *         description: Not authorized
- *       404:
- *         description: User not found
- */
-router.get('/:id', getUser);
+// ========================================
+// USER MANAGEMENT ROUTES
+// ========================================
+
+
 
 /**
  * @swagger
@@ -636,5 +608,43 @@ router.post('/employer/profile', authorize('employer'), createEmployerProfile);
  *         description: Employer profile not found
  */
 router.put('/employer/profile', authorize('employer'), updateEmployerProfile);
+
+// ========================================
+// GENERAL USER ROUTES (must be last to avoid conflicts)
+// ========================================
+
+/**
+ * @swagger
+ * /api/users/{id}:
+ *   get:
+ *     summary: Get single user
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: User retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   $ref: '#/components/schemas/User'
+ *       401:
+ *         description: Not authorized
+ *       404:
+ *         description: User not found
+ */
+router.get('/:id', getUser);
 
 module.exports = router;

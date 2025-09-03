@@ -36,6 +36,7 @@ import Link from "next/link"; // link to other page
 import { truncate } from "fs/promises";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
+import { getUserAvatar } from "@/lib/api";
 
 // Custom hook để quản lý dropdown
 const useDropdown = (delay = 150) => {
@@ -402,31 +403,31 @@ export default function Header() {
                 <div className="flex items-center">
                   <HoverCard openDelay={100} closeDelay={150}>
                     <HoverCardTrigger asChild>
-                      <button className="flex items-center space-x-2">
-                        <Avatar>
-                          <AvatarImage
-                            src={"/placeholder-user.jpg"}
-                            alt="User avatar"
-                          />
-                          <AvatarFallback>
-                            {user.firstName?.[0]}
-                            {user.lastName?.[0]}
-                          </AvatarFallback>
-                        </Avatar>
-                      </button>
+                                                           <button className="flex items-center space-x-2">
+                     <Avatar>
+                       <AvatarImage
+                         src={getUserAvatar(user) || "/placeholder-user.jpg"}
+                         alt="User avatar"
+                       />
+                       <AvatarFallback>
+                         {user.firstName?.[0]}
+                         {user.lastName?.[0]}
+                       </AvatarFallback>
+                     </Avatar>
+                   </button>
                     </HoverCardTrigger>
                     <HoverCardContent className="w-[360px] p-0 overflow-hidden">
                       <div className="p-4 border-b border-border flex items-center space-x-3">
-                        <Avatar>
-                          <AvatarImage
-                            src={"/placeholder-user.jpg"}
-                            alt="User avatar"
-                          />
-                          <AvatarFallback>
-                            {user.firstName?.[0]}
-                            {user.lastName?.[0]}
-                          </AvatarFallback>
-                        </Avatar>
+                                                 <Avatar>
+                           <AvatarImage
+                             src={getUserAvatar(user) || "/placeholder-user.jpg"}
+                             alt="User avatar"
+                           />
+                           <AvatarFallback>
+                             {user.firstName?.[0]}
+                             {user.lastName?.[0]}
+                           </AvatarFallback>
+                         </Avatar>
                         <div>
                           <div className="font-semibold text-foreground">
                             {user.fullName ||

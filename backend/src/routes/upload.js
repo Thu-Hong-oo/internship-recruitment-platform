@@ -1,5 +1,5 @@
 const express = require('express');
-const { protect, authorize, requireEmailVerification } = require('../middleware/auth');
+const { protect, authorize } = require('../middleware/auth');
 const { uploadRateLimit } = require('../middleware/globalRateLimit');
 const {
   uploadSingleImage,
@@ -73,7 +73,7 @@ const router = express.Router();
  *       429:
  *         description: Too many upload requests
  */
-router.post('/single', protect, requireEmailVerification, uploadRateLimit, uploadSingleImage);
+router.post('/single', protect, uploadRateLimit, uploadSingleImage);
 
 /**
  * @swagger
@@ -119,7 +119,7 @@ router.post('/single', protect, requireEmailVerification, uploadRateLimit, uploa
  *       429:
  *         description: Too many upload requests
  */
-router.post('/multiple', protect, requireEmailVerification, uploadRateLimit, uploadMultipleImages);
+router.post('/multiple', protect, uploadRateLimit, uploadMultipleImages);
 
 /**
  * @swagger
@@ -154,7 +154,7 @@ router.post('/multiple', protect, requireEmailVerification, uploadRateLimit, upl
  *       429:
  *         description: Too many upload requests
  */
-router.post('/avatar', protect, requireEmailVerification, uploadRateLimit, uploadAvatar);
+router.post('/avatar', protect, uploadRateLimit, uploadAvatar);
 
 /**
  * @swagger
@@ -189,7 +189,7 @@ router.post('/avatar', protect, requireEmailVerification, uploadRateLimit, uploa
  *       429:
  *         description: Too many upload requests
  */
-router.post('/logo', protect, requireEmailVerification, authorize('employer', 'admin'), uploadRateLimit, uploadCompanyLogo);
+router.post('/logo', protect, authorize('employer', 'admin'), uploadRateLimit, uploadCompanyLogo);
 
 /**
  * @swagger
@@ -223,7 +223,7 @@ router.post('/logo', protect, requireEmailVerification, authorize('employer', 'a
  *       404:
  *         description: Image not found
  */
-router.delete('/:publicId', protect, requireEmailVerification, deleteImage);
+router.delete('/:publicId', protect, deleteImage);
 
 /**
  * @swagger

@@ -72,12 +72,12 @@ export default function EmailVerificationPage() {
 
       if (response.success) {
         setSuccess(response.message || "Xác thực email thành công!");
-        // Redirect to home page after 2 seconds
+        // Redirect to login page after 2 seconds since backend doesn't return new token
         setTimeout(() => {
-          router.push("/");
+          router.push("/login");
         }, 2000);
       } else {
-        setError(response.message || "Xác thực email thất bại");
+        setError(response.error || response.message || "Xác thực email thất bại");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Xác thực email thất bại");
