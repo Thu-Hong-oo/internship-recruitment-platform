@@ -7,10 +7,7 @@ const requireEmailVerification = asyncHandler(async (req, res, next) => {
   const user = await User.findById(req.user.id);
 
   if (!user) {
-    return res.status(404).json({
-      success: false,
-      error: 'User not found'
-    });
+    return res.status(404).json({ success: false, error: 'User not found' });
   }
 
   // Skip email verification for Google OAuth users
@@ -21,8 +18,9 @@ const requireEmailVerification = asyncHandler(async (req, res, next) => {
   if (!user.isEmailVerified) {
     return res.status(403).json({
       success: false,
-      error: 'Email verification required. Please check your email and verify your account.',
-      requiresVerification: true
+      error:
+        'Email verification required. Please check your email and verify your account.',
+      requiresVerification: true,
     });
   }
 
@@ -35,10 +33,7 @@ const checkEmailVerification = asyncHandler(async (req, res, next) => {
   const user = await User.findById(req.user.id);
 
   if (!user) {
-    return res.status(404).json({
-      success: false,
-      error: 'User not found'
-    });
+    return res.status(404).json({ success: false, error: 'User not found' });
   }
 
   // Skip email verification for Google OAuth users
@@ -56,5 +51,5 @@ const checkEmailVerification = asyncHandler(async (req, res, next) => {
 
 module.exports = {
   requireEmailVerification,
-  checkEmailVerification
+  checkEmailVerification,
 };

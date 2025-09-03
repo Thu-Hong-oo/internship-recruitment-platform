@@ -37,7 +37,17 @@ export default function LoginPage() {
         router.push("/");
         return;
       }
-      setError(res.message || "Đăng nhập thất bại");
+      
+      // Handle email not verified case
+      if (res.errorType === "EMAIL_NOT_VERIFIED" && res.requiresEmailVerification) {
+        // Store email for verification
+        localStorage.setItem("pendingEmail", formData.email);
+        // Redirect to email verification page
+        router.push("/email-verification");
+        return;
+      }
+      
+      setError(res.error || res.message || "Đăng nhập thất bại");
     } catch (err: any) {
       setError(err?.message || "Đăng nhập thất bại");
     } finally {

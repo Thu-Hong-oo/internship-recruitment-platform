@@ -191,12 +191,13 @@ redis-cli monitor
 
 ## 📝 API Endpoints
 
-### Không thay đổi:
-- `POST /api/auth/register` - Đăng ký (OTP lưu Redis)
-- `POST /api/auth/verify-email` - Xác thực email (OTP từ Redis)
+### Quy trình Authentication chuẩn:
+- `POST /api/auth/register` - Đăng ký (tạo tài khoản + gửi OTP, KHÔNG trả token)
+- `POST /api/auth/verify-email` - Xác thực email (OTP từ Redis, không cần token)
+- `POST /api/auth/login` - Đăng nhập (chỉ thành công khi email đã verify)
+- `POST /api/auth/resend-verification` - Gửi lại OTP (chỉ cần email, không cần token)
 - `POST /api/auth/forgotpassword` - Quên mật khẩu (OTP lưu Redis)
 - `PUT /api/auth/resetpassword` - Đặt lại mật khẩu (OTP từ Redis)
-- `POST /api/auth/resend-verification` - Gửi lại OTP (OTP lưu Redis)
 
 ### Response format giữ nguyên
 ```json

@@ -17,6 +17,8 @@ interface AuthContextType {
   logout: () => void;
   verifyEmail: (email: string, otp: string) => Promise<AuthResponse>;
   getStoredEmail: () => string | null;
+  needsEmailVerification: () => boolean;
+  uploadAvatar: (file: File) => Promise<{ success: boolean; avatar?: string; error?: string; user?: User }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -52,9 +54,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }) => {
     const response = await authAPI.register(data);
     if (response.success) {
-      setUser(response.user);
-      // Lưu email vào localStorage để sử dụng cho email verification
-      localStorage.setItem("pendingEmail", data.email);
+      // Backend trả về token ngay khi đăng ký
+      if (response.token) {
+        setUser(response.user);
+        // Token đã được lưu trong apiClient
+      } else {
+        // Nếu không có token, chỉ lưu user info và email pending
+        setUser(response.user);
+        localStorage.setItem("pendingEmail", data.email);
+      }
     }
     return response;
   };
@@ -63,6 +71,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const response = await authAPI.login({ email, password });
     if (response.success) {
       setUser(response.user);
+      // Xóa email pending nếu đăng nhập thành công
+      localStorage.removeItem("pendingEmail");
     }
     return response;
   };
@@ -77,15 +87,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const verifyEmail = async (email: string, otp: string) => {
     const response = await authAPI.verifyEmail(email, otp);
     if (response.success) {
+      // Cập nhật user info sau khi xác thực email
       setUser(response.user);
       // Xóa email pending sau khi verify thành công
       localStorage.removeItem("pendingEmail");
+      // Note: Backend không trả về token mới, user cần đăng nhập lại
     }
     return response;
   };
 
   const getStoredEmail = () => {
     return localStorage.getItem("pendingEmail");
+  };
+
+  const needsEmailVerification = () => {
+    return user !== null && !user.isEmailVerified;
+  };
+
+  const uploadAvatar = async (file: File) => {
+    const response = await authAPI.uploadAvatar(file);
+    if (response.success && response.user) {
+      // Cập nhật user với dữ liệu mới từ backend
+      setUser(response.user);
+    }
+    return response;
   };
 
   return React.createElement(
@@ -99,6 +124,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logout,
         verifyEmail,
         getStoredEmail,
+        needsEmailVerification,
+        uploadAvatar,
       },
     },
     children

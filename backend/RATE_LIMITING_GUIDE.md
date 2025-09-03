@@ -1,132 +1,288 @@
-# 🛡️ Hướng dẫn Rate Limiting
+# Rate Limiting Guide
 
 ## 📋 Tổng quan
 
-Hệ thống đã được trang bị nhiều lớp rate limiting để bảo vệ khỏi spam, DDoS attacks và lạm dụng API.
+Hệ thống rate limiting được chia thành 2 loại chính:
 
-## 🔒 Các loại Rate Limiting
+### **1. OTPCooldownService** - Chống spam OTP
 
-### 1. **Global Rate Limiting** (Áp dụng cho tất cả requests)
-- **Giới hạn**: 100 requests/15 phút/IP
-- **Mục đích**: Bảo vệ server khỏi spam từ một IP
-- **Áp dụng**: Tất cả endpoints
+- **Mục đích**: Ngăn gửi OTP quá nhiều lần
+- **Storage**: Redis (persistent)
+- **Scope**: User-specific operations
+- **Window**: 30-60 seconds
 
-### 2. **Auth Rate Limiting** (Chỉ cho authentication)
-- **Email Verification**: 3 requests/15 phút/email
-- **Password Reset**: 3 requests/15 phút/email  
-- **OTP Verification**: 5 requests/15 phút/email
-- **Resend Verification**: 3 requests/15 phút/email
-- **Mục đích**: Ngăn spam OTP và brute force
+### **2. GlobalRateLimit** - Chống DDoS/API abuse
 
-### 3. **Upload Rate Limiting** (Cho file uploads)
-- **Giới hạn**: 10 uploads/10 phút/user
-- **Áp dụng**: 
-  - `/api/upload/*` - Tất cả upload endpoints
-  - `/api/users/upload-avatar` - Upload avatar
-  - `/api/ai/analyze-cv` - Upload CV để phân tích
+- **Mục đích**: Ngăn gọi API quá nhiều lần
+- **Storage**: Memory (express-rate-limit)
+- **Scope**: IP/User-based requests
+- **Window**: 5-15 minutes
 
-### 4. **API Rate Limiting** (Cho API endpoints)
-- **Giới hạn**: 200 requests/15 phút/user
-- **Mục đích**: Bảo vệ API khỏi lạm dụng
+---
 
-### 5. **Search Rate Limiting** (Cho tìm kiếm)
-- **Giới hạn**: 30 requests/5 phút/user
-- **Mục đích**: Ngăn spam search requests
+## 🔧 Cấu hình Environment Variables
 
-## ⚙️ Cấu hình
+### **OTP Cooldown (Redis-based)**
 
-### Environment Variables
-```env
-# Rate Limiting Configuration
-RATE_LIMIT_WINDOW_MS=900000  # 15 minutes in milliseconds
-RATE_LIMIT_MAX_REQUESTS=100  # Max requests per window
+```bash
+# OTP Cooldown periods (seconds)
+EMAIL_VERIFICATION_COOLDOWN=60
+PASSWORD_RESET_COOLDOWN=60
+RESEND_VERIFICATION_COOLDOWN=30
 ```
 
-### Redis Configuration (Cho OTP cooldown)
-```env
-REDIS_URL=redis://localhost:6379
+### **Global Rate Limiting (Memory-based)**
+
+```bash
+# Global rate limiting
+GLOBAL_RATE_LIMIT_WINDOW=900000    # 15 minutes (ms)
+GLOBAL_RATE_LIMIT_MAX=100          # 100 requests per window
+
+# API rate limiting
+API_RATE_LIMIT_WINDOW=900000       # 15 minutes (ms)
+API_RATE_LIMIT_MAX=200             # 200 requests per window
+
+# Search rate limiting
+SEARCH_RATE_LIMIT_WINDOW=300000    # 5 minutes (ms)
+SEARCH_RATE_LIMIT_MAX=30           # 30 requests per window
+
+# Upload rate limiting
+UPLOAD_RATE_LIMIT_WINDOW=600000    # 10 minutes (ms)
+UPLOAD_RATE_LIMIT_MAX=10           # 10 requests per window
 ```
 
-## 📊 Response Headers
+---
 
-Khi rate limit bị vượt quá, response sẽ bao gồm:
+## 🎯 Sử dụng trong Routes
 
-```json
-{
-  "success": false,
-  "error": "Quá nhiều yêu cầu từ IP này. Vui lòng thử lại sau 15 phút.",
-  "retryAfter": 900
-}
-```
-
-Headers:
-- `X-RateLimit-Limit`: Giới hạn requests
-- `X-RateLimit-Remaining`: Số requests còn lại
-- `X-RateLimit-Reset`: Thời gian reset (Unix timestamp)
-- `Retry-After`: Thời gian chờ (giây)
-
-## 🔧 Customization
-
-### Thay đổi giới hạn cho từng loại
+### **1. Global Rate Limiting**
 
 ```javascript
-// Trong globalRateLimit.js
-const globalRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 phút
-  max: 100, // Thay đổi số này
-  // ...
+// server.js - Áp dụng cho tất cả routes
+const { globalRateLimit } = require('./src/middleware/globalRateLimit');
+app.use(globalRateLimit);
+```
+
+### **2. Specific Rate Limiting**
+
+```javascript
+// routes/auth.js
+const { apiRateLimit } = require('../middleware/globalRateLimit');
+
+// Áp dụng cho auth routes
+router.post('/register', apiRateLimit, register);
+router.post('/login', apiRateLimit, login);
+
+// routes/search.js
+const { searchRateLimit } = require('../middleware/globalRateLimit');
+
+// Áp dụng cho search routes
+router.get('/jobs', searchRateLimit, searchJobs);
+router.get('/companies', searchRateLimit, searchCompanies);
+
+// routes/upload.js
+const { uploadRateLimit } = require('../middleware/globalRateLimit');
+
+// Áp dụng cho upload routes
+router.post('/cv', uploadRateLimit, uploadCV);
+router.post('/avatar', uploadRateLimit, uploadAvatar);
+```
+
+### **3. OTP Cooldown**
+
+```javascript
+// controllers/authController.js
+const { otpCooldownService } = require('../services/otpService');
+
+// Kiểm tra cooldown trước khi gửi OTP
+const inCooldown = await otpCooldownService.isInCooldown(
+  'email_verification',
+  email
+);
+
+if (inCooldown) {
+  const remainingTime = await otpCooldownService.getRemainingCooldown(
+    'email_verification',
+    email
+  );
+  return res.status(429).json({
+    success: false,
+    error: `Vui lòng đợi ${Math.ceil(remainingTime / 60)} phút`,
+    retryAfter: remainingTime,
+  });
+}
+
+// Set cooldown sau khi gửi OTP
+await otpCooldownService.setCooldown('email_verification', email);
+```
+
+---
+
+## 📊 Monitoring & Analytics
+
+### **1. Rate Limit Metrics**
+
+```javascript
+// Log rate limit violations
+logger.warn('Rate limit exceeded', {
+  type: 'Global/API/Search/Upload',
+  ip: req.ip,
+  userId: req.user?.id,
+  userAgent: req.get('User-Agent'),
+  path: req.path,
+  method: req.method,
 });
 ```
 
-### Thêm rate limiting cho route mới
+### **2. OTP Cooldown Metrics**
 
 ```javascript
-const { apiRateLimit } = require('../middleware/globalRateLimit');
-
-router.post('/new-endpoint', apiRateLimit, controllerFunction);
+// Log OTP cooldown operations
+logger.info('OTP cooldown set', {
+  type: 'email_verification',
+  identifier: email,
+  cooldownPeriod: 60,
+});
 ```
 
-## 🚨 Monitoring
+### **3. Health Check**
 
-### Logs
-Rate limiting violations được log với level `warn`:
+```javascript
+// Check Redis connection for OTP cooldown
+const healthCheck = async () => {
+  try {
+    await redisClient.ping();
+    return { status: 'healthy', redis: 'connected' };
+  } catch (error) {
+    return { status: 'unhealthy', redis: 'disconnected' };
+  }
+};
 ```
-WARN: Global rate limit exceeded - IP: 192.168.1.1, Path: /api/auth/login
+
+---
+
+## 🚀 Best Practices
+
+### **1. Layered Rate Limiting**
+
+```javascript
+// Layer 1: Global rate limiting (IP-based)
+app.use(globalRateLimit);
+
+// Layer 2: Specific rate limiting (User-based)
+router.use('/api', apiRateLimit);
+
+// Layer 3: OTP cooldown (Operation-based)
+await otpCooldownService.setCooldown('email_verification', email);
 ```
 
-### Metrics
-Có thể monitor qua:
-- Redis keys cho OTP cooldown
-- Express rate limit headers
-- Application logs
+### **2. Graceful Degradation**
 
-## 🛠️ Troubleshooting
+```javascript
+// OTP cooldown falls back to no rate limiting when Redis is down
+if (!this.redisClient) {
+  return false; // No cooldown when Redis is down
+}
+```
 
-### Rate limit quá thấp
-- Tăng `max` value trong rate limit config
-- Tăng `windowMs` để mở rộng window
+### **3. User-Friendly Messages**
 
-### Redis không khả dụng
-- OTP sẽ fallback về database
-- Cooldown sẽ không hoạt động
-- Log warning message
+```javascript
+// Provide clear error messages with retry information
+res.status(429).json({
+  success: false,
+  error: 'Quá nhiều yêu cầu. Vui lòng thử lại sau 15 phút.',
+  retryAfter: 15 * 60,
+  type: 'rate_limit',
+});
+```
 
-### Performance issues
-- Monitor Redis memory usage
-- Clean up expired keys
-- Adjust rate limit values
+### **4. Admin Override**
 
-## 📈 Best Practices
+```javascript
+// Allow admins to bypass rate limits
+if (req.user?.role === 'admin') {
+  return next(); // Skip rate limiting for admins
+}
+```
 
-1. **Phân loại endpoints**: Áp dụng rate limit khác nhau cho từng loại
-2. **User-based limiting**: Sử dụng user ID thay vì chỉ IP
-3. **Graceful degradation**: Fallback khi Redis down
-4. **Monitoring**: Log và alert khi có violations
-5. **Documentation**: Thông báo rõ ràng cho users
+---
 
-## 🔐 Security Considerations
+## 🔍 Debugging
 
-- Rate limiting không thay thế authentication
-- Kết hợp với các biện pháp bảo mật khác
-- Monitor và alert cho suspicious patterns
-- Regular review và update limits
+### **1. Check Rate Limit Status**
+
+```javascript
+// Check current rate limit status
+const rateLimitInfo = await getRateLimitInfo(req.ip);
+console.log('Rate limit info:', rateLimitInfo);
+```
+
+### **2. Check OTP Cooldown Status**
+
+```javascript
+// Check OTP cooldown status
+const cooldownInfo = await otpCooldownService.getCooldownInfo(
+  'email_verification',
+  email
+);
+console.log('Cooldown info:', cooldownInfo);
+```
+
+### **3. Clear Rate Limits (Admin only)**
+
+```javascript
+// Clear rate limits for testing/admin purposes
+await clearRateLimit(req.ip);
+await otpCooldownService.clearCooldown('email_verification', email);
+```
+
+---
+
+## 📈 Performance Considerations
+
+### **1. Redis Optimization**
+
+```javascript
+// Use Redis pipeline for batch operations
+const pipeline = redis.pipeline();
+pipeline.get(key1);
+pipeline.get(key2);
+pipeline.exec();
+```
+
+### **2. Memory Usage**
+
+```javascript
+// Monitor memory usage of express-rate-limit
+// Consider using Redis store for distributed systems
+const RedisStore = require('rate-limit-redis');
+const limiter = rateLimit({
+  store: new RedisStore({
+    client: redisClient,
+  }),
+});
+```
+
+### **3. Key Strategy**
+
+```javascript
+// Use consistent key generation
+const key = req.user ? `user:${req.user.id}` : `ip:${req.ip}`;
+```
+
+---
+
+## 🎉 Kết luận
+
+**Hệ thống rate limiting hoàn chỉnh bao gồm:**
+
+✅ **OTPCooldownService** - Chống spam OTP operations
+✅ **GlobalRateLimit** - Chống DDoS và API abuse
+✅ **Environment configuration** - Dễ customize
+✅ **Monitoring & logging** - Debug và analytics
+✅ **Graceful degradation** - Hoạt động khi Redis down
+✅ **Admin override** - Bypass cho admin
+✅ **User-friendly messages** - Clear error messages
+
+**Cả hai system đều cần thiết và bổ sung cho nhau!** 🔒
