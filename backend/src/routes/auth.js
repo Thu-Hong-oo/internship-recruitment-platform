@@ -3,6 +3,7 @@ const {
   register,
   login,
   logout,
+  getMe,
   forgotPassword,
   resetPassword,
   googleAuth,
@@ -220,11 +221,30 @@ router.post('/login', login);
  */
 router.post('/logout', protect, logout);
 
-
-
-
-
-
+/**
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Get current user information
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Current user information retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       401:
+ *         description: Not authorized
+ */
+router.get('/me', protect, getMe);
 
 /**
  * @swagger
