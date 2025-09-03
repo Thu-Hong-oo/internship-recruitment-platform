@@ -1,1322 +1,608 @@
+const mongoose = require('mongoose');
+
+// Sample Jobs Data
 const sampleJobs = [
+  // FPT Software Jobs
   {
     title: 'Frontend Developer Intern',
-    description: 'Chúng tôi đang tìm kiếm một Frontend Developer Intern để tham gia phát triển các ứng dụng web hiện đại. Bạn sẽ được làm việc với các công nghệ như React, Vue.js, TypeScript và các thư viện UI hiện đại.',
-    company: 'FPT Software',
-    location: {
-      city: 'Hanoi',
-      state: 'Hanoi',
-      country: 'Vietnam',
-      remote: false
-    },
-    employmentType: 'internship',
-    salaryRange: {
-      min: 5000000,
-      max: 8000000,
-      currency: 'VND',
-      period: 'monthly'
+    companyId: null, // Will be set dynamically
+    internship: {
+      type: 'summer',
+      duration: 3,
+      startDate: '2024-06-01',
+      endDate: '2024-08-31',
+      isPaid: true,
+      stipend: {
+        amount: 8000000,
+        currency: 'VND',
+        period: 'month'
+      },
+      academicCredit: true,
+      remoteOption: true
     },
     requirements: {
       education: {
-        level: 'bachelor',
-        field: ['Computer Science', 'Information Technology', 'Software Engineering']
+        level: 'Bachelor',
+        majors: ['Computer Science', 'Information Technology', 'Software Engineering'],
+        minGpa: 3.0,
+        year: [2, 3, 4]
       },
-      experience: {
-        years: 0,
-        level: 'entry'
-      },
-      skills: {
-        required: [
-          {
-            name: 'JavaScript',
-            level: 'intermediate',
-            priority: 'must-have'
-          },
-          {
-            name: 'HTML/CSS',
-            level: 'intermediate',
-            priority: 'must-have'
-          },
-          {
-            name: 'React',
-            level: 'beginner',
-            priority: 'nice-to-have'
-          },
-          {
-            name: 'Git',
-            level: 'beginner',
-            priority: 'must-have'
-          }
-        ],
-        preferred: ['TypeScript', 'Vue.js', 'Tailwind CSS', 'REST API']
-      },
-      languages: [
+      skills: [
         {
-          name: 'Vietnamese',
-          level: 'fluent'
+          skillId: null, // Will be set dynamically
+          level: 'required',
+          importance: 9
         },
         {
-          name: 'English',
-          level: 'conversational'
+          skillId: null, // Will be set dynamically
+          level: 'required',
+          importance: 8
+        },
+        {
+          skillId: null, // Will be set dynamically
+          level: 'preferred',
+          importance: 7
         }
-      ]
+      ],
+      experience: {
+        minMonths: 0,
+        projectBased: true
+      }
     },
-    benefits: [
-      'Môi trường làm việc trẻ trung, năng động',
-      'Được đào tạo công nghệ mới nhất',
-      'Cơ hội chuyển thành nhân viên chính thức',
-      'Lương thưởng hấp dẫn',
-      'Bảo hiểm sức khỏe'
+    description: 'Thực tập sinh Frontend Developer sẽ tham gia phát triển giao diện người dùng cho các dự án web application của FPT Software. Bạn sẽ được làm việc với các công nghệ hiện đại như React, TypeScript và được mentor bởi các developer có kinh nghiệm.',
+    responsibilities: [
+      'Phát triển giao diện người dùng responsive và user-friendly',
+      'Tối ưu hóa performance và trải nghiệm người dùng',
+      'Làm việc với REST APIs và tích hợp backend services',
+      'Tham gia code review và đóng góp vào best practices',
+      'Học hỏi và áp dụng các công nghệ mới'
     ],
-    applicationDeadline: new Date('2024-12-31'),
-    startDate: new Date('2024-01-15'),
-    duration: {
-      months: 6,
-      description: 'Thực tập 6 tháng với khả năng chuyển thành nhân viên chính thức'
+    benefits: [
+      'Môi trường làm việc chuyên nghiệp, năng động',
+      'Được mentor bởi các developer có kinh nghiệm',
+      'Cơ hội tham gia các dự án thực tế với khách hàng quốc tế',
+      'Đào tạo kỹ năng mềm và kỹ thuật',
+      'Cơ hội được nhận việc làm chính thức sau khi thực tập'
+    ],
+    learningOutcomes: [
+      'Thành thạo React, TypeScript và các công nghệ frontend hiện đại',
+      'Hiểu biết về software development lifecycle',
+      'Kỹ năng làm việc nhóm và giao tiếp hiệu quả',
+      'Kinh nghiệm thực tế với các dự án enterprise',
+      'Cơ hội networking với các chuyên gia trong ngành'
+    ],
+    location: {
+      city: 'TP.HCM',
+      district: 'Quận 9',
+      country: 'VN',
+      remote: true,
+      hybrid: true
     },
-    contactInfo: {
-      email: 'hr@fptsoftware.com',
-      phone: '+84 24 7300 9999',
-      website: 'https://fptsoftware.com/careers'
+    aiAnalysis: {
+      skillsExtracted: ['JavaScript', 'React', 'TypeScript', 'HTML', 'CSS'],
+      difficulty: 'intermediate',
+      category: 'tech',
+      lastAnalyzedAt: new Date()
+    },
+    applicationSettings: {
+      requireCoverLetter: true,
+      requireResume: true,
+      requirePortfolio: false,
+      maxApplications: 50,
+      deadline: '2024-05-15',
+      rollingBasis: false
     },
     status: 'active',
     isVerified: true,
-    viewCount: 1250,
-    applicationCount: 89,
-    tags: ['Frontend', 'React', 'JavaScript', 'Internship', 'Hanoi'],
-    aiAnalysis: {
-      skillsExtracted: ['JavaScript', 'React', 'HTML', 'CSS', 'Git', 'TypeScript'],
-      difficultyLevel: 'entry',
-      matchingScore: 85,
-      keywords: ['frontend', 'react', 'javascript', 'internship'],
-      category: 'Frontend Development',
-      estimatedApplications: 100
-    }
+    isFeatured: true,
+    stats: {
+      views: 245,
+      applications: 18,
+      saves: 32
+    },
+    postedBy: null // Will be set dynamically
   },
   {
     title: 'Backend Developer Intern',
-    description: 'Tham gia phát triển backend cho các ứng dụng web và mobile. Bạn sẽ được làm việc với Node.js, Python, databases và cloud services.',
-    company: 'VNG Corporation',
-    location: {
-      city: 'Ho Chi Minh City',
-      state: 'Ho Chi Minh',
-      country: 'Vietnam',
-      remote: false
-    },
-    employmentType: 'internship',
-    salaryRange: {
-      min: 6000000,
-      max: 9000000,
-      currency: 'VND',
-      period: 'monthly'
+    companyId: null, // Will be set dynamically
+    internship: {
+      type: 'semester',
+      duration: 6,
+      startDate: '2024-09-01',
+      endDate: '2025-02-28',
+      isPaid: true,
+      stipend: {
+        amount: 10000000,
+        currency: 'VND',
+        period: 'month'
+      },
+      academicCredit: true,
+      remoteOption: false
     },
     requirements: {
       education: {
-        level: 'bachelor',
-        field: ['Computer Science', 'Information Technology', 'Software Engineering']
+        level: 'Bachelor',
+        majors: ['Computer Science', 'Information Technology', 'Software Engineering'],
+        minGpa: 3.2,
+        year: [3, 4]
       },
-      experience: {
-        years: 0,
-        level: 'entry'
-      },
-      skills: {
-        required: [
-          {
-            name: 'Python',
-            level: 'intermediate',
-            priority: 'must-have'
-          },
-          {
-            name: 'Node.js',
-            level: 'beginner',
-            priority: 'must-have'
-          },
-          {
-            name: 'SQL',
-            level: 'intermediate',
-            priority: 'must-have'
-          },
-          {
-            name: 'REST API',
-            level: 'beginner',
-            priority: 'must-have'
-          }
-        ],
-        preferred: ['MongoDB', 'Redis', 'Docker', 'AWS', 'Microservices']
-      },
-      languages: [
+      skills: [
         {
-          name: 'Vietnamese',
-          level: 'fluent'
+          skillId: null, // Will be set dynamically
+          level: 'required',
+          importance: 9
         },
         {
-          name: 'English',
-          level: 'conversational'
+          skillId: null, // Will be set dynamically
+          level: 'required',
+          importance: 8
+        },
+        {
+          skillId: null, // Will be set dynamically
+          level: 'preferred',
+          importance: 7
         }
-      ]
+      ],
+      experience: {
+        minMonths: 3,
+        projectBased: true
+      }
     },
-    benefits: [
-      'Làm việc với sản phẩm có hàng triệu người dùng',
-      'Môi trường startup năng động',
-      'Đào tạo công nghệ mới nhất',
-      'Lương thưởng hấp dẫn',
-      'Cơ hội thăng tiến'
+    description: 'Thực tập sinh Backend Developer sẽ tham gia phát triển các hệ thống backend cho các ứng dụng web và mobile. Bạn sẽ được học về microservices architecture, database design và cloud deployment.',
+    responsibilities: [
+      'Phát triển RESTful APIs và microservices',
+      'Thiết kế và tối ưu hóa database schema',
+      'Tích hợp với các third-party services',
+      'Implement security best practices',
+      'Deploy và maintain applications trên cloud'
     ],
-    applicationDeadline: new Date('2024-12-31'),
-    startDate: new Date('2024-01-20'),
-    duration: {
-      months: 6,
-      description: 'Thực tập 6 tháng với khả năng chuyển thành nhân viên chính thức'
+    benefits: [
+      'Lương thực tập cạnh tranh',
+      'Được làm việc với các công nghệ cloud hiện đại',
+      'Cơ hội học hỏi về microservices architecture',
+      'Mentorship từ các senior developers',
+      'Cơ hội thăng tiến sau khi tốt nghiệp'
+    ],
+    learningOutcomes: [
+      'Thành thạo Node.js, Express và các framework backend',
+      'Hiểu biết về microservices và cloud deployment',
+      'Kỹ năng database design và optimization',
+      'Kinh nghiệm với Docker và containerization',
+      'Kiến thức về security và best practices'
+    ],
+    location: {
+      city: 'TP.HCM',
+      district: 'Quận 9',
+      country: 'VN',
+      remote: false,
+      hybrid: true
     },
-    contactInfo: {
-      email: 'hr@vng.com.vn',
-      phone: '+84 28 7300 9999',
-      website: 'https://vng.com.vn/careers'
+    aiAnalysis: {
+      skillsExtracted: ['Node.js', 'Express', 'MongoDB', 'Docker', 'AWS'],
+      difficulty: 'intermediate',
+      category: 'tech',
+      lastAnalyzedAt: new Date()
+    },
+    applicationSettings: {
+      requireCoverLetter: true,
+      requireResume: true,
+      requirePortfolio: true,
+      maxApplications: 30,
+      deadline: '2024-08-15',
+      rollingBasis: false
     },
     status: 'active',
     isVerified: true,
-    viewCount: 980,
-    applicationCount: 67,
-    tags: ['Backend', 'Python', 'Node.js', 'Internship', 'Ho Chi Minh City'],
-    aiAnalysis: {
-      skillsExtracted: ['Python', 'Node.js', 'SQL', 'REST API', 'MongoDB'],
-      difficultyLevel: 'entry',
-      matchingScore: 82,
-      keywords: ['backend', 'python', 'nodejs', 'internship'],
-      category: 'Backend Development',
-      estimatedApplications: 80
-    }
+    isFeatured: false,
+    stats: {
+      views: 189,
+      applications: 12,
+      saves: 25
+    },
+    postedBy: null // Will be set dynamically
   },
+  // Tiki Jobs
   {
-    title: 'Mobile Developer Intern (React Native)',
-    description: 'Tham gia phát triển ứng dụng mobile cross-platform sử dụng React Native. Bạn sẽ được làm việc với các sản phẩm có hàng triệu người dùng.',
-    company: 'Grab Vietnam',
-    location: {
-      city: 'Ho Chi Minh City',
-      state: 'Ho Chi Minh',
-      country: 'Vietnam',
-      remote: false
-    },
-    employmentType: 'internship',
-    salaryRange: {
-      min: 7000000,
-      max: 10000000,
-      currency: 'VND',
-      period: 'monthly'
+    title: 'Data Analyst Intern',
+    companyId: null, // Will be set dynamically
+    internship: {
+      type: 'summer',
+      duration: 3,
+      startDate: '2024-06-01',
+      endDate: '2024-08-31',
+      isPaid: true,
+      stipend: {
+        amount: 7000000,
+        currency: 'VND',
+        period: 'month'
+      },
+      academicCredit: true,
+      remoteOption: true
     },
     requirements: {
       education: {
-        level: 'bachelor',
-        field: ['Computer Science', 'Information Technology', 'Software Engineering']
+        level: 'Bachelor',
+        majors: ['Statistics', 'Mathematics', 'Economics', 'Business Administration'],
+        minGpa: 3.0,
+        year: [2, 3, 4]
       },
-      experience: {
-        years: 0,
-        level: 'entry'
-      },
-      skills: {
-        required: [
-          {
-            name: 'React Native',
-            level: 'beginner',
-            priority: 'must-have'
-          },
-          {
-            name: 'JavaScript',
-            level: 'intermediate',
-            priority: 'must-have'
-          },
-          {
-            name: 'Mobile Development',
-            level: 'beginner',
-            priority: 'must-have'
-          },
-          {
-            name: 'Git',
-            level: 'beginner',
-            priority: 'must-have'
-          }
-        ],
-        preferred: ['TypeScript', 'Redux', 'Firebase', 'App Store', 'Google Play']
-      },
-      languages: [
+      skills: [
         {
-          name: 'Vietnamese',
-          level: 'fluent'
+          skillId: null, // Will be set dynamically
+          level: 'required',
+          importance: 9
         },
         {
-          name: 'English',
-          level: 'conversational'
+          skillId: null, // Will be set dynamically
+          level: 'required',
+          importance: 8
+        },
+        {
+          skillId: null, // Will be set dynamically
+          level: 'preferred',
+          importance: 6
         }
-      ]
+      ],
+      experience: {
+        minMonths: 0,
+        projectBased: true
+      }
     },
-    benefits: [
-      'Môi trường quốc tế đa văn hóa',
-      'Tiếp cận công nghệ AI/ML hàng đầu',
-      'Lương USD cạnh tranh',
-      'Đào tạo chuyên sâu',
-      'Cơ hội thăng tiến'
+    description: 'Thực tập sinh Data Analyst sẽ tham gia phân tích dữ liệu để hỗ trợ các quyết định kinh doanh tại Tiki. Bạn sẽ được học về data visualization, statistical analysis và business intelligence.',
+    responsibilities: [
+      'Thu thập và làm sạch dữ liệu từ nhiều nguồn khác nhau',
+      'Phân tích dữ liệu để tìm ra insights và trends',
+      'Tạo báo cáo và dashboard cho các bộ phận kinh doanh',
+      'Hỗ trợ A/B testing và performance analysis',
+      'Làm việc với các công cụ BI và visualization'
     ],
-    applicationDeadline: new Date('2024-12-31'),
-    startDate: new Date('2024-02-01'),
-    duration: {
-      months: 6,
-      description: 'Thực tập 6 tháng với khả năng chuyển thành nhân viên chính thức'
+    benefits: [
+      'Được làm việc với big data thực tế',
+      'Học hỏi về e-commerce analytics',
+      'Mentorship từ các data scientists có kinh nghiệm',
+      'Cơ hội tham gia các dự án machine learning',
+      'Môi trường làm việc trẻ, năng động'
+    ],
+    learningOutcomes: [
+      'Thành thạo SQL, Python và các công cụ phân tích dữ liệu',
+      'Hiểu biết về e-commerce metrics và KPIs',
+      'Kỹ năng data visualization và storytelling',
+      'Kinh nghiệm với big data platforms',
+      'Kiến thức về statistical analysis và A/B testing'
+    ],
+    location: {
+      city: 'TP.HCM',
+      district: 'Quận 4',
+      country: 'VN',
+      remote: true,
+      hybrid: true
     },
-    contactInfo: {
-      email: 'vietnam.careers@grab.com',
-      phone: '+84 28 7300 7777',
-      website: 'https://grab.com/vn/careers'
+    aiAnalysis: {
+      skillsExtracted: ['SQL', 'Python', 'Data Analysis', 'Statistics', 'Excel'],
+      difficulty: 'beginner',
+      category: 'data',
+      lastAnalyzedAt: new Date()
+    },
+    applicationSettings: {
+      requireCoverLetter: true,
+      requireResume: true,
+      requirePortfolio: false,
+      maxApplications: 40,
+      deadline: '2024-05-20',
+      rollingBasis: false
     },
     status: 'active',
     isVerified: true,
-    viewCount: 1450,
-    applicationCount: 123,
-    tags: ['Mobile', 'React Native', 'JavaScript', 'Internship', 'Ho Chi Minh City'],
-    aiAnalysis: {
-      skillsExtracted: ['React Native', 'JavaScript', 'Mobile Development', 'Git'],
-      difficultyLevel: 'entry',
-      matchingScore: 88,
-      keywords: ['mobile', 'react native', 'javascript', 'internship'],
-      category: 'Mobile Development',
-      estimatedApplications: 120
-    }
+    isFeatured: true,
+    stats: {
+      views: 312,
+      applications: 25,
+      saves: 45
+    },
+    postedBy: null // Will be set dynamically
   },
+  // VNG Jobs
   {
-    title: 'Data Science Intern',
-    description: 'Tham gia phân tích dữ liệu và xây dựng các mô hình machine learning cho các sản phẩm e-commerce. Bạn sẽ được làm việc với big data và AI.',
-    company: 'Shopee Vietnam',
-    location: {
-      city: 'Ho Chi Minh City',
-      state: 'Ho Chi Minh',
-      country: 'Vietnam',
-      remote: false
-    },
-    employmentType: 'internship',
-    salaryRange: {
-      min: 8000000,
-      max: 12000000,
-      currency: 'VND',
-      period: 'monthly'
+    title: 'UI/UX Design Intern',
+    companyId: null, // Will be set dynamically
+    internship: {
+      type: 'year-round',
+      duration: 12,
+      startDate: '2024-09-01',
+      endDate: '2025-08-31',
+      isPaid: true,
+      stipend: {
+        amount: 12000000,
+        currency: 'VND',
+        period: 'month'
+      },
+      academicCredit: true,
+      remoteOption: true
     },
     requirements: {
       education: {
-        level: 'bachelor',
-        field: ['Computer Science', 'Mathematics', 'Statistics', 'Data Science']
+        level: 'Bachelor',
+        majors: ['Graphic Design', 'Digital Arts', 'Industrial Design', 'Computer Science'],
+        minGpa: 3.0,
+        year: [2, 3, 4]
       },
-      experience: {
-        years: 0,
-        level: 'entry'
-      },
-      skills: {
-        required: [
-          {
-            name: 'Python',
-            level: 'intermediate',
-            priority: 'must-have'
-          },
-          {
-            name: 'Machine Learning',
-            level: 'beginner',
-            priority: 'must-have'
-          },
-          {
-            name: 'SQL',
-            level: 'intermediate',
-            priority: 'must-have'
-          },
-          {
-            name: 'Statistics',
-            level: 'intermediate',
-            priority: 'must-have'
-          }
-        ],
-        preferred: ['TensorFlow', 'PyTorch', 'Pandas', 'NumPy', 'Scikit-learn']
-      },
-      languages: [
+      skills: [
         {
-          name: 'Vietnamese',
-          level: 'fluent'
+          skillId: null, // Will be set dynamically
+          level: 'required',
+          importance: 9
         },
         {
-          name: 'English',
-          level: 'conversational'
+          skillId: null, // Will be set dynamically
+          level: 'required',
+          importance: 8
+        },
+        {
+          skillId: null, // Will be set dynamically
+          level: 'preferred',
+          importance: 7
         }
-      ]
+      ],
+      experience: {
+        minMonths: 6,
+        projectBased: true
+      }
     },
-    benefits: [
-      'Làm việc với big data thực tế',
-      'Tiếp cận công nghệ AI/ML mới nhất',
-      'Môi trường quốc tế',
-      'Lương cạnh tranh',
-      'Đào tạo chuyên sâu'
+    description: 'Thực tập sinh UI/UX Design sẽ tham gia thiết kế giao diện người dùng cho các sản phẩm của VNG. Bạn sẽ được học về user research, design thinking và product design process.',
+    responsibilities: [
+      'Thực hiện user research và usability testing',
+      'Thiết kế wireframes, mockups và prototypes',
+      'Tạo design system và component library',
+      'Làm việc với product managers và developers',
+      'Tham gia design reviews và feedback sessions'
     ],
-    applicationDeadline: new Date('2024-12-31'),
-    startDate: new Date('2024-02-15'),
-    duration: {
-      months: 6,
-      description: 'Thực tập 6 tháng với khả năng chuyển thành nhân viên chính thức'
+    benefits: [
+      'Được làm việc với các sản phẩm có hàng triệu người dùng',
+      'Học hỏi từ các senior designers có kinh nghiệm',
+      'Cơ hội tham gia các dự án đa dạng',
+      'Được sử dụng các công cụ design hiện đại',
+      'Môi trường sáng tạo và đổi mới'
+    ],
+    learningOutcomes: [
+      'Thành thạo Figma và các công cụ design',
+      'Hiểu biết về user-centered design process',
+      'Kỹ năng design thinking và problem solving',
+      'Kinh nghiệm với design systems',
+      'Kiến thức về accessibility và usability'
+    ],
+    location: {
+      city: 'TP.HCM',
+      district: 'Quận 7',
+      country: 'VN',
+      remote: true,
+      hybrid: true
     },
-    contactInfo: {
-      email: 'vietnam.careers@shopee.com',
-      phone: '+84 28 7300 6666',
-      website: 'https://shopee.vn/careers'
+    aiAnalysis: {
+      skillsExtracted: ['Figma', 'UI Design', 'UX Design', 'Prototyping', 'User Research'],
+      difficulty: 'intermediate',
+      category: 'design',
+      lastAnalyzedAt: new Date()
+    },
+    applicationSettings: {
+      requireCoverLetter: true,
+      requireResume: true,
+      requirePortfolio: true,
+      maxApplications: 25,
+      deadline: '2024-08-30',
+      rollingBasis: false
     },
     status: 'active',
     isVerified: true,
-    viewCount: 2100,
-    applicationCount: 156,
-    tags: ['Data Science', 'Machine Learning', 'Python', 'Internship', 'Ho Chi Minh City'],
-    aiAnalysis: {
-      skillsExtracted: ['Python', 'Machine Learning', 'SQL', 'Statistics', 'TensorFlow'],
-      difficultyLevel: 'entry',
-      matchingScore: 90,
-      keywords: ['data science', 'machine learning', 'python', 'internship'],
-      category: 'Data Science',
-      estimatedApplications: 150
-    }
+    isFeatured: true,
+    stats: {
+      views: 278,
+      applications: 15,
+      saves: 38
+    },
+    postedBy: null // Will be set dynamically
   },
+  // Grab Jobs
   {
-    title: 'UI/UX Designer Intern',
-    description: 'Tham gia thiết kế giao diện người dùng và trải nghiệm người dùng cho các sản phẩm fintech. Bạn sẽ được làm việc với các công cụ thiết kế hiện đại.',
-    company: 'MoMo',
-    location: {
-      city: 'Ho Chi Minh City',
-      state: 'Ho Chi Minh',
-      country: 'Vietnam',
-      remote: false
-    },
-    employmentType: 'internship',
-    salaryRange: {
-      min: 5000000,
-      max: 8000000,
-      currency: 'VND',
-      period: 'monthly'
+    title: 'Mobile Developer Intern',
+    companyId: null, // Will be set dynamically
+    internship: {
+      type: 'semester',
+      duration: 6,
+      startDate: '2024-09-01',
+      endDate: '2025-02-28',
+      isPaid: true,
+      stipend: {
+        amount: 15000000,
+        currency: 'VND',
+        period: 'month'
+      },
+      academicCredit: true,
+      remoteOption: false
     },
     requirements: {
       education: {
-        level: 'bachelor',
-        field: ['Design', 'Graphic Design', 'Digital Arts', 'Computer Science']
+        level: 'Bachelor',
+        majors: ['Computer Science', 'Information Technology', 'Software Engineering'],
+        minGpa: 3.2,
+        year: [3, 4]
       },
-      experience: {
-        years: 0,
-        level: 'entry'
-      },
-      skills: {
-        required: [
-          {
-            name: 'Figma',
-            level: 'intermediate',
-            priority: 'must-have'
-          },
-          {
-            name: 'Adobe Creative Suite',
-            level: 'beginner',
-            priority: 'must-have'
-          },
-          {
-            name: 'User Research',
-            level: 'beginner',
-            priority: 'must-have'
-          },
-          {
-            name: 'Prototyping',
-            level: 'beginner',
-            priority: 'must-have'
-          }
-        ],
-        preferred: ['Sketch', 'InVision', 'User Testing', 'Design Systems']
-      },
-      languages: [
+      skills: [
         {
-          name: 'Vietnamese',
-          level: 'fluent'
+          skillId: null, // Will be set dynamically
+          level: 'required',
+          importance: 9
         },
         {
-          name: 'English',
-          level: 'conversational'
+          skillId: null, // Will be set dynamically
+          level: 'required',
+          importance: 8
+        },
+        {
+          skillId: null, // Will be set dynamically
+          level: 'preferred',
+          importance: 7
         }
-      ]
+      ],
+      experience: {
+        minMonths: 6,
+        projectBased: true
+      }
     },
-    benefits: [
-      'Tiếp cận công nghệ fintech hàng đầu',
-      'Môi trường startup năng động',
-      'Đào tạo kỹ năng thiết kế',
-      'Lương thưởng hấp dẫn',
-      'Cơ hội thăng tiến'
+    description: 'Thực tập sinh Mobile Developer sẽ tham gia phát triển ứng dụng mobile cho Grab. Bạn sẽ được học về mobile app development, API integration và mobile UI/UX best practices.',
+    responsibilities: [
+      'Phát triển ứng dụng mobile cho iOS và Android',
+      'Tích hợp với backend APIs và third-party services',
+      'Tối ưu hóa performance và user experience',
+      'Tham gia code review và testing',
+      'Làm việc với cross-functional teams'
     ],
-    applicationDeadline: new Date('2024-12-31'),
-    startDate: new Date('2024-01-25'),
-    duration: {
-      months: 6,
-      description: 'Thực tập 6 tháng với khả năng chuyển thành nhân viên chính thức'
+    benefits: [
+      'Lương thực tập cao nhất trong ngành',
+      'Được làm việc với ứng dụng có hàng triệu người dùng',
+      'Học hỏi về mobile development best practices',
+      'Mentorship từ các senior mobile developers',
+      'Cơ hội tham gia hackathons và innovation projects'
+    ],
+    learningOutcomes: [
+      'Thành thạo React Native hoặc Flutter',
+      'Hiểu biết về mobile app architecture',
+      'Kỹ năng API integration và state management',
+      'Kinh nghiệm với mobile testing và debugging',
+      'Kiến thức về app store deployment'
+    ],
+    location: {
+      city: 'TP.HCM',
+      district: 'Quận 1',
+      country: 'VN',
+      remote: false,
+      hybrid: true
     },
-    contactInfo: {
-      email: 'careers@momo.vn',
-      phone: '+84 28 7300 5555',
-      website: 'https://momo.vn/careers'
+    aiAnalysis: {
+      skillsExtracted: ['React Native', 'Flutter', 'Mobile Development', 'API Integration', 'UI/UX'],
+      difficulty: 'advanced',
+      category: 'tech',
+      lastAnalyzedAt: new Date()
+    },
+    applicationSettings: {
+      requireCoverLetter: true,
+      requireResume: true,
+      requirePortfolio: true,
+      maxApplications: 20,
+      deadline: '2024-08-15',
+      rollingBasis: false
     },
     status: 'active',
     isVerified: true,
-    viewCount: 890,
-    applicationCount: 45,
-    tags: ['UI/UX', 'Design', 'Figma', 'Internship', 'Ho Chi Minh City'],
-    aiAnalysis: {
-      skillsExtracted: ['Figma', 'Adobe Creative Suite', 'User Research', 'Prototyping'],
-      difficultyLevel: 'entry',
-      matchingScore: 78,
-      keywords: ['ui/ux', 'design', 'figma', 'internship'],
-      category: 'UI/UX Design',
-      estimatedApplications: 50
-    }
+    isFeatured: true,
+    stats: {
+      views: 198,
+      applications: 8,
+      saves: 22
+    },
+    postedBy: null // Will be set dynamically
   },
+  // Shopee Jobs
   {
-    title: 'DevOps Engineer Intern',
-    description: 'Tham gia xây dựng và quản lý infrastructure cho các ứng dụng web. Bạn sẽ được làm việc với cloud services, containers và automation.',
-    company: 'Viettel',
-    location: {
-      city: 'Hanoi',
-      state: 'Hanoi',
-      country: 'Vietnam',
-      remote: false
-    },
-    employmentType: 'internship',
-    salaryRange: {
-      min: 6000000,
-      max: 9000000,
-      currency: 'VND',
-      period: 'monthly'
+    title: 'Marketing Intern',
+    companyId: null, // Will be set dynamically
+    internship: {
+      type: 'summer',
+      duration: 3,
+      startDate: '2024-06-01',
+      endDate: '2024-08-31',
+      isPaid: true,
+      stipend: {
+        amount: 6000000,
+        currency: 'VND',
+        period: 'month'
+      },
+      academicCredit: true,
+      remoteOption: true
     },
     requirements: {
       education: {
-        level: 'bachelor',
-        field: ['Computer Science', 'Information Technology', 'Network Engineering']
+        level: 'Bachelor',
+        majors: ['Marketing', 'Business Administration', 'Communication', 'Economics'],
+        minGpa: 3.0,
+        year: [2, 3, 4]
       },
-      experience: {
-        years: 0,
-        level: 'entry'
-      },
-      skills: {
-        required: [
-          {
-            name: 'Linux',
-            level: 'intermediate',
-            priority: 'must-have'
-          },
-          {
-            name: 'Docker',
-            level: 'beginner',
-            priority: 'must-have'
-          },
-          {
-            name: 'Git',
-            level: 'intermediate',
-            priority: 'must-have'
-          },
-          {
-            name: 'Shell Scripting',
-            level: 'beginner',
-            priority: 'must-have'
-          }
-        ],
-        preferred: ['Kubernetes', 'AWS', 'CI/CD', 'Monitoring', 'Ansible']
-      },
-      languages: [
+      skills: [
         {
-          name: 'Vietnamese',
-          level: 'fluent'
+          skillId: null, // Will be set dynamically
+          level: 'required',
+          importance: 8
         },
         {
-          name: 'English',
-          level: 'conversational'
+          skillId: null, // Will be set dynamically
+          level: 'preferred',
+          importance: 7
+        },
+        {
+          skillId: null, // Will be set dynamically
+          level: 'preferred',
+          importance: 6
         }
-      ]
+      ],
+      experience: {
+        minMonths: 0,
+        projectBased: true
+      }
     },
-    benefits: [
-      'Làm việc với infrastructure quy mô lớn',
-      'Lương thưởng cao',
-      'Bảo hiểm toàn diện',
-      'Cơ hội thăng tiến',
-      'Đào tạo liên tục'
+    description: 'Thực tập sinh Marketing sẽ tham gia các hoạt động marketing digital tại Shopee. Bạn sẽ được học về social media marketing, content creation và campaign management.',
+    responsibilities: [
+      'Hỗ trợ lập kế hoạch và thực hiện marketing campaigns',
+      'Tạo content cho social media và website',
+      'Phân tích hiệu quả marketing và báo cáo KPI',
+      'Làm việc với các agency và partners',
+      'Tham gia các sự kiện marketing và brand activation'
     ],
-    applicationDeadline: new Date('2024-12-31'),
-    startDate: new Date('2024-02-10'),
-    duration: {
-      months: 6,
-      description: 'Thực tập 6 tháng với khả năng chuyển thành nhân viên chính thức'
-    },
-    contactInfo: {
-      email: 'tuyendung@viettel.com.vn',
-      phone: '+84 24 6266 6666',
-      website: 'https://viettel.com.vn/careers'
-    },
-    status: 'active',
-    isVerified: true,
-    viewCount: 750,
-    applicationCount: 38,
-    tags: ['DevOps', 'Linux', 'Docker', 'Internship', 'Hanoi'],
-    aiAnalysis: {
-      skillsExtracted: ['Linux', 'Docker', 'Git', 'Shell Scripting', 'Kubernetes'],
-      difficultyLevel: 'entry',
-      matchingScore: 85,
-      keywords: ['devops', 'linux', 'docker', 'internship'],
-      category: 'DevOps',
-      estimatedApplications: 40
-    }
-  },
-  {
-    title: 'Product Manager Intern',
-    description: 'Tham gia quản lý sản phẩm và phát triển chiến lược sản phẩm. Bạn sẽ được làm việc với các sản phẩm có hàng triệu người dùng.',
-    company: 'Tiki',
+    benefits: [
+      'Được làm việc với thương hiệu e-commerce hàng đầu',
+      'Học hỏi về digital marketing trends',
+      'Cơ hội tham gia các campaign lớn',
+      'Mentorship từ các marketing professionals',
+      'Môi trường làm việc sáng tạo và năng động'
+    ],
+    learningOutcomes: [
+      'Thành thạo các công cụ marketing digital',
+      'Hiểu biết về e-commerce marketing',
+      'Kỹ năng content creation và storytelling',
+      'Kinh nghiệm với campaign management',
+      'Kiến thức về marketing analytics và ROI'
+    ],
     location: {
-      city: 'Ho Chi Minh City',
-      state: 'Ho Chi Minh',
-      country: 'Vietnam',
-      remote: false
+      city: 'Hà Nội',
+      district: 'Ba Đình',
+      country: 'VN',
+      remote: true,
+      hybrid: true
     },
-    employmentType: 'internship',
-    salaryRange: {
-      min: 7000000,
-      max: 10000000,
-      currency: 'VND',
-      period: 'monthly'
+    aiAnalysis: {
+      skillsExtracted: ['Digital Marketing', 'Social Media', 'Content Creation', 'Analytics', 'Communication'],
+      difficulty: 'beginner',
+      category: 'marketing',
+      lastAnalyzedAt: new Date()
     },
-    requirements: {
-      education: {
-        level: 'bachelor',
-        field: ['Business Administration', 'Marketing', 'Computer Science', 'Economics']
-      },
-      experience: {
-        years: 0,
-        level: 'entry'
-      },
-      skills: {
-        required: [
-          {
-            name: 'Product Management',
-            level: 'beginner',
-            priority: 'must-have'
-          },
-          {
-            name: 'Data Analysis',
-            level: 'intermediate',
-            priority: 'must-have'
-          },
-          {
-            name: 'User Research',
-            level: 'beginner',
-            priority: 'must-have'
-          },
-          {
-            name: 'Project Management',
-            level: 'beginner',
-            priority: 'must-have'
-          }
-        ],
-        preferred: ['SQL', 'Google Analytics', 'A/B Testing', 'Agile', 'Jira']
-      },
-      languages: [
-        {
-          name: 'Vietnamese',
-          level: 'fluent'
-        },
-        {
-          name: 'English',
-          level: 'conversational'
-        }
-      ]
-    },
-    benefits: [
-      'Làm việc với sản phẩm thực tế',
-      'Môi trường trẻ trung, năng động',
-      'Đào tạo kỹ năng quản lý sản phẩm',
-      'Thưởng dự án',
-      'Cơ hội thăng tiến'
-    ],
-    applicationDeadline: new Date('2024-12-31'),
-    startDate: new Date('2024-02-20'),
-    duration: {
-      months: 6,
-      description: 'Thực tập 6 tháng với khả năng chuyển thành nhân viên chính thức'
-    },
-    contactInfo: {
-      email: 'careers@tiki.vn',
-      phone: '+84 28 7300 8888',
-      website: 'https://tiki.vn/careers'
+    applicationSettings: {
+      requireCoverLetter: true,
+      requireResume: true,
+      requirePortfolio: false,
+      maxApplications: 35,
+      deadline: '2024-05-25',
+      rollingBasis: false
     },
     status: 'active',
     isVerified: true,
-    viewCount: 1100,
-    applicationCount: 78,
-    tags: ['Product Management', 'Data Analysis', 'User Research', 'Internship', 'Ho Chi Minh City'],
-    aiAnalysis: {
-      skillsExtracted: ['Product Management', 'Data Analysis', 'User Research', 'Project Management'],
-      difficultyLevel: 'entry',
-      matchingScore: 82,
-      keywords: ['product management', 'data analysis', 'internship'],
-      category: 'Product Management',
-      estimatedApplications: 80
-    }
-  },
-  {
-    title: 'Cybersecurity Intern',
-    description: 'Tham gia bảo vệ hệ thống và dữ liệu khỏi các mối đe dọa bảo mật. Bạn sẽ được làm việc với các công nghệ bảo mật tiên tiến.',
-    company: 'Bkav',
-    location: {
-      city: 'Hanoi',
-      state: 'Hanoi',
-      country: 'Vietnam',
-      remote: false
+    isFeatured: false,
+    stats: {
+      views: 156,
+      applications: 20,
+      saves: 28
     },
-    employmentType: 'internship',
-    salaryRange: {
-      min: 5000000,
-      max: 8000000,
-      currency: 'VND',
-      period: 'monthly'
-    },
-    requirements: {
-      education: {
-        level: 'bachelor',
-        field: ['Computer Science', 'Information Security', 'Network Security']
-      },
-      experience: {
-        years: 0,
-        level: 'entry'
-      },
-      skills: {
-        required: [
-          {
-            name: 'Network Security',
-            level: 'beginner',
-            priority: 'must-have'
-          },
-          {
-            name: 'Linux',
-            level: 'intermediate',
-            priority: 'must-have'
-          },
-          {
-            name: 'Python',
-            level: 'beginner',
-            priority: 'must-have'
-          },
-          {
-            name: 'Security Tools',
-            level: 'beginner',
-            priority: 'must-have'
-          }
-        ],
-        preferred: ['Wireshark', 'Metasploit', 'Nmap', 'SIEM', 'Penetration Testing']
-      },
-      languages: [
-        {
-          name: 'Vietnamese',
-          level: 'fluent'
-        },
-        {
-          name: 'English',
-          level: 'conversational'
-        }
-      ]
-    },
-    benefits: [
-      'Làm việc với công nghệ bảo mật tiên tiến',
-      'Đào tạo chuyên sâu về cybersecurity',
-      'Lương thưởng hấp dẫn',
-      'Môi trường chuyên nghiệp',
-      'Cơ hội thăng tiến'
-    ],
-    applicationDeadline: new Date('2024-12-31'),
-    startDate: new Date('2024-02-05'),
-    duration: {
-      months: 6,
-      description: 'Thực tập 6 tháng với khả năng chuyển thành nhân viên chính thức'
-    },
-    contactInfo: {
-      email: 'hr@bkav.com.vn',
-      phone: '+84 24 7300 3333',
-      website: 'https://bkav.com.vn/careers'
-    },
-    status: 'active',
-    isVerified: true,
-    viewCount: 650,
-    applicationCount: 29,
-    tags: ['Cybersecurity', 'Network Security', 'Python', 'Internship', 'Hanoi'],
-    aiAnalysis: {
-      skillsExtracted: ['Network Security', 'Linux', 'Python', 'Security Tools'],
-      difficultyLevel: 'entry',
-      matchingScore: 80,
-      keywords: ['cybersecurity', 'network security', 'python', 'internship'],
-      category: 'Cybersecurity',
-      estimatedApplications: 30
-    }
-  },
-  {
-    title: 'Full Stack Developer Intern',
-    description: 'Tham gia phát triển toàn bộ ứng dụng web từ frontend đến backend. Bạn sẽ được làm việc với các công nghệ hiện đại và thực tế.',
-    company: 'CMC Technology',
-    location: {
-      city: 'Hanoi',
-      state: 'Hanoi',
-      country: 'Vietnam',
-      remote: false
-    },
-    employmentType: 'internship',
-    salaryRange: {
-      min: 6000000,
-      max: 9000000,
-      currency: 'VND',
-      period: 'monthly'
-    },
-    requirements: {
-      education: {
-        level: 'bachelor',
-        field: ['Computer Science', 'Information Technology', 'Software Engineering']
-      },
-      experience: {
-        years: 0,
-        level: 'entry'
-      },
-      skills: {
-        required: [
-          {
-            name: 'JavaScript',
-            level: 'intermediate',
-            priority: 'must-have'
-          },
-          {
-            name: 'Node.js',
-            level: 'beginner',
-            priority: 'must-have'
-          },
-          {
-            name: 'React',
-            level: 'beginner',
-            priority: 'must-have'
-          },
-          {
-            name: 'SQL',
-            level: 'intermediate',
-            priority: 'must-have'
-          }
-        ],
-        preferred: ['TypeScript', 'MongoDB', 'Express.js', 'Docker', 'AWS']
-      },
-      languages: [
-        {
-          name: 'Vietnamese',
-          level: 'fluent'
-        },
-        {
-          name: 'English',
-          level: 'conversational'
-        }
-      ]
-    },
-    benefits: [
-      'Tiếp cận nhiều công nghệ khác nhau',
-      'Đào tạo liên tục',
-      'Lương thưởng hấp dẫn',
-      'Môi trường chuyên nghiệp',
-      'Cơ hội thăng tiến'
-    ],
-    applicationDeadline: new Date('2024-12-31'),
-    startDate: new Date('2024-02-15'),
-    duration: {
-      months: 6,
-      description: 'Thực tập 6 tháng với khả năng chuyển thành nhân viên chính thức'
-    },
-    contactInfo: {
-      email: 'hr@cmctechnology.vn',
-      phone: '+84 24 7300 2222',
-      website: 'https://cmctechnology.vn/careers'
-    },
-    status: 'active',
-    isVerified: true,
-    viewCount: 920,
-    applicationCount: 52,
-    tags: ['Full Stack', 'JavaScript', 'Node.js', 'React', 'Internship', 'Hanoi'],
-    aiAnalysis: {
-      skillsExtracted: ['JavaScript', 'Node.js', 'React', 'SQL', 'TypeScript'],
-      difficultyLevel: 'entry',
-      matchingScore: 87,
-      keywords: ['full stack', 'javascript', 'nodejs', 'react', 'internship'],
-      category: 'Full Stack Development',
-      estimatedApplications: 55
-    }
-  },
-  
-  // Bổ sung thêm các job không phải internship
-  {
-    title: 'Junior Frontend Developer',
-    description: 'Tuyển dụng Frontend Developer có kinh nghiệm 1-2 năm để tham gia phát triển các ứng dụng web hiện đại. Bạn sẽ được làm việc với React, TypeScript và các thư viện UI tiên tiến.',
-    company: 'FPT Software',
-    location: {
-      city: 'Hanoi',
-      state: 'Hanoi',
-      country: 'Vietnam',
-      remote: true
-    },
-    employmentType: 'full-time',
-    salaryRange: {
-      min: 15000000,
-      max: 25000000,
-      currency: 'VND',
-      period: 'monthly'
-    },
-    requirements: {
-      education: {
-        level: 'bachelor',
-        field: ['Computer Science', 'Information Technology', 'Software Engineering']
-      },
-      experience: {
-        years: 1,
-        level: 'junior'
-      },
-      skills: {
-        required: [
-          {
-            name: 'React',
-            level: 'intermediate',
-            priority: 'must-have'
-          },
-          {
-            name: 'TypeScript',
-            level: 'intermediate',
-            priority: 'must-have'
-          },
-          {
-            name: 'JavaScript',
-            level: 'advanced',
-            priority: 'must-have'
-          },
-          {
-            name: 'HTML/CSS',
-            level: 'advanced',
-            priority: 'must-have'
-          }
-        ],
-        preferred: ['Vue.js', 'Next.js', 'Tailwind CSS', 'Redux', 'Jest']
-      },
-      languages: [
-        {
-          name: 'Vietnamese',
-          level: 'fluent'
-        },
-        {
-          name: 'English',
-          level: 'fluent'
-        }
-      ]
-    },
-    benefits: [
-      'Lương cạnh tranh trong ngành',
-      'Làm việc remote linh hoạt',
-      'Đào tạo công nghệ mới nhất',
-      'Bảo hiểm sức khỏe toàn diện',
-      'Cơ hội thăng tiến nhanh'
-    ],
-    applicationDeadline: new Date('2024-12-31'),
-    startDate: new Date('2024-03-01'),
-    duration: {
-      months: null,
-      description: 'Vị trí full-time dài hạn'
-    },
-    contactInfo: {
-      email: 'hr@fptsoftware.com',
-      phone: '+84 24 7300 9999',
-      website: 'https://fptsoftware.com/careers'
-    },
-    status: 'active',
-    isVerified: true,
-    viewCount: 2100,
-    applicationCount: 156,
-    tags: ['Frontend', 'React', 'TypeScript', 'Full-time', 'Remote', 'Hanoi'],
-    aiAnalysis: {
-      skillsExtracted: ['React', 'TypeScript', 'JavaScript', 'HTML', 'CSS'],
-      difficultyLevel: 'junior',
-      matchingScore: 92,
-      keywords: ['frontend', 'react', 'typescript', 'full-time', 'junior'],
-      category: 'Frontend Development',
-      estimatedApplications: 150
-    }
-  },
-  {
-    title: 'Mid-level Backend Developer',
-    description: 'Tuyển dụng Backend Developer có kinh nghiệm 3-5 năm để tham gia phát triển hệ thống backend cho các ứng dụng quy mô lớn. Bạn sẽ được làm việc với microservices, cloud và database.',
-    company: 'VNG Corporation',
-    location: {
-      city: 'Ho Chi Minh City',
-      state: 'Ho Chi Minh',
-      country: 'Vietnam',
-      remote: false
-    },
-    employmentType: 'full-time',
-    salaryRange: {
-      min: 30000000,
-      max: 45000000,
-      currency: 'VND',
-      period: 'monthly'
-    },
-    requirements: {
-      education: {
-        level: 'bachelor',
-        field: ['Computer Science', 'Information Technology', 'Software Engineering']
-      },
-      experience: {
-        years: 3,
-        level: 'mid'
-      },
-      skills: {
-        required: [
-          {
-            name: 'Node.js',
-            level: 'advanced',
-            priority: 'must-have'
-          },
-          {
-            name: 'Python',
-            level: 'intermediate',
-            priority: 'must-have'
-          },
-          {
-            name: 'MongoDB',
-            level: 'intermediate',
-            priority: 'must-have'
-          },
-          {
-            name: 'Microservices',
-            level: 'intermediate',
-            priority: 'must-have'
-          }
-        ],
-        preferred: ['Docker', 'Kubernetes', 'Redis', 'RabbitMQ', 'AWS']
-      },
-      languages: [
-        {
-          name: 'Vietnamese',
-          level: 'fluent'
-        },
-        {
-          name: 'English',
-          level: 'fluent'
-        }
-      ]
-    },
-    benefits: [
-      'Lương cao cạnh tranh',
-      'Làm việc với sản phẩm có hàng triệu người dùng',
-      'Môi trường startup năng động',
-      'Thưởng cổ phiếu hấp dẫn',
-      'Đào tạo công nghệ tiên tiến'
-    ],
-    applicationDeadline: new Date('2024-12-31'),
-    startDate: new Date('2024-03-15'),
-    duration: {
-      months: null,
-      description: 'Vị trí full-time dài hạn'
-    },
-    contactInfo: {
-      email: 'hr@vng.com.vn',
-      phone: '+84 28 7300 9999',
-      website: 'https://vng.com.vn/careers'
-    },
-    status: 'active',
-    isVerified: true,
-    viewCount: 1800,
-    applicationCount: 89,
-    tags: ['Backend', 'Node.js', 'Python', 'Microservices', 'Full-time', 'Ho Chi Minh City'],
-    aiAnalysis: {
-      skillsExtracted: ['Node.js', 'Python', 'MongoDB', 'Microservices', 'Docker'],
-      difficultyLevel: 'mid',
-      matchingScore: 88,
-      keywords: ['backend', 'nodejs', 'python', 'microservices', 'mid-level'],
-      category: 'Backend Development',
-      estimatedApplications: 90
-    }
-  },
-  {
-    title: 'Senior Data Engineer',
-    description: 'Tuyển dụng Data Engineer có kinh nghiệm 5+ năm để xây dựng và quản lý data pipeline, data warehouse cho các sản phẩm AI/ML. Bạn sẽ được làm việc với big data và cloud infrastructure.',
-    company: 'Shopee Vietnam',
-    location: {
-      city: 'Ho Chi Minh City',
-      state: 'Ho Chi Minh',
-      country: 'Vietnam',
-      remote: true
-    },
-    employmentType: 'full-time',
-    salaryRange: {
-      min: 50000000,
-      max: 80000000,
-      currency: 'VND',
-      period: 'monthly'
-    },
-    requirements: {
-      education: {
-        level: 'master',
-        field: ['Computer Science', 'Data Science', 'Information Technology']
-      },
-      experience: {
-        years: 5,
-        level: 'senior'
-      },
-      skills: {
-        required: [
-          {
-            name: 'Python',
-            level: 'advanced',
-            priority: 'must-have'
-          },
-          {
-            name: 'Apache Spark',
-            level: 'advanced',
-            priority: 'must-have'
-          },
-          {
-            name: 'Data Pipeline',
-            level: 'advanced',
-            priority: 'must-have'
-          },
-          {
-            name: 'SQL',
-            level: 'advanced',
-            priority: 'must-have'
-          }
-        ],
-        preferred: ['Airflow', 'Kafka', 'Hadoop', 'AWS', 'Machine Learning']
-      },
-      languages: [
-        {
-          name: 'Vietnamese',
-          level: 'fluent'
-        },
-        {
-          name: 'English',
-          level: 'native'
-        }
-      ]
-    },
-    benefits: [
-      'Lương cao nhất ngành',
-      'Làm việc remote toàn thời gian',
-      'Tiếp cận công nghệ AI/ML hàng đầu',
-      'Môi trường quốc tế đa văn hóa',
-      'Thưởng dự án hấp dẫn'
-    ],
-    applicationDeadline: new Date('2024-12-31'),
-    startDate: new Date('2024-04-01'),
-    duration: {
-      months: null,
-      description: 'Vị trí full-time dài hạn'
-    },
-    contactInfo: {
-      email: 'vietnam.careers@shopee.com',
-      phone: '+84 28 7300 6666',
-      website: 'https://shopee.vn/careers'
-    },
-    status: 'active',
-    isVerified: true,
-    viewCount: 3200,
-    applicationCount: 234,
-    tags: ['Data Engineering', 'Python', 'Spark', 'Senior', 'Full-time', 'Remote', 'Ho Chi Minh City'],
-    aiAnalysis: {
-      skillsExtracted: ['Python', 'Apache Spark', 'Data Pipeline', 'SQL', 'Airflow'],
-      difficultyLevel: 'senior',
-      matchingScore: 95,
-      keywords: ['data engineering', 'python', 'spark', 'senior', 'big data'],
-      category: 'Data Engineering',
-      estimatedApplications: 230
-    }
-  },
-  {
-    title: 'Part-time Content Writer',
-    description: 'Tuyển dụng Content Writer làm việc part-time để viết nội dung cho blog công nghệ, hướng dẫn sử dụng sản phẩm và marketing content. Phù hợp cho sinh viên hoặc freelancer.',
-    company: 'Tiki',
-    location: {
-      city: 'Ho Chi Minh City',
-      state: 'Ho Chi Minh',
-      country: 'Vietnam',
-      remote: true
-    },
-    employmentType: 'part-time',
-    salaryRange: {
-      min: 200000,
-      max: 500000,
-      currency: 'VND',
-      period: 'hourly'
-    },
-    requirements: {
-      education: {
-        level: 'bachelor',
-        field: ['Marketing', 'Journalism', 'Literature', 'Computer Science']
-      },
-      experience: {
-        years: 0,
-        level: 'entry'
-      },
-      skills: {
-        required: [
-          {
-            name: 'Content Writing',
-            level: 'intermediate',
-            priority: 'must-have'
-          },
-          {
-            name: 'Vietnamese',
-            level: 'native',
-            priority: 'must-have'
-          },
-          {
-            name: 'SEO',
-            level: 'beginner',
-            priority: 'must-have'
-          },
-          {
-            name: 'Research',
-            level: 'intermediate',
-            priority: 'must-have'
-          }
-        ],
-        preferred: ['English', 'Social Media', 'Copywriting', 'Analytics']
-      },
-      languages: [
-        {
-          name: 'Vietnamese',
-          level: 'native'
-        },
-        {
-          name: 'English',
-          level: 'conversational'
-        }
-      ]
-    },
-    benefits: [
-      'Làm việc linh hoạt theo giờ',
-      'Làm việc remote hoàn toàn',
-      'Tiếp cận sản phẩm thực tế',
-      'Cơ hội học hỏi về e-commerce',
-      'Thưởng dựa trên hiệu suất'
-    ],
-    applicationDeadline: new Date('2024-12-31'),
-    startDate: new Date('2024-02-01'),
-    duration: {
-      months: 12,
-      description: 'Hợp đồng part-time 12 tháng, có thể gia hạn'
-    },
-    contactInfo: {
-      email: 'careers@tiki.vn',
-      phone: '+84 28 7300 8888',
-      website: 'https://tiki.vn/careers'
-    },
-    status: 'active',
-    isVerified: true,
-    viewCount: 650,
-    applicationCount: 45,
-    tags: ['Content Writing', 'Part-time', 'Remote', 'SEO', 'Marketing', 'Ho Chi Minh City'],
-    aiAnalysis: {
-      skillsExtracted: ['Content Writing', 'Vietnamese', 'SEO', 'Research', 'English'],
-      difficultyLevel: 'entry',
-      matchingScore: 75,
-      keywords: ['content writing', 'part-time', 'remote', 'seo', 'marketing'],
-      category: 'Content & Marketing',
-      estimatedApplications: 50
-    }
-  },
-  {
-    title: 'Contract UI/UX Designer',
-    description: 'Tuyển dụng UI/UX Designer làm việc theo dự án để thiết kế giao diện cho ứng dụng mobile và web. Dự án kéo dài 3-6 tháng với khả năng gia hạn.',
-    company: 'MoMo',
-    location: {
-      city: 'Ho Chi Minh City',
-      state: 'Ho Chi Minh',
-      country: 'Vietnam',
-      remote: true
-    },
-    employmentType: 'contract',
-    salaryRange: {
-      min: 25000000,
-      max: 40000000,
-      currency: 'VND',
-      period: 'monthly'
-    },
-    requirements: {
-      education: {
-        level: 'bachelor',
-        field: ['Design', 'Graphic Design', 'Digital Arts', 'Computer Science']
-      },
-      experience: {
-        years: 2,
-        level: 'junior'
-      },
-      skills: {
-        required: [
-          {
-            name: 'Figma',
-            level: 'advanced',
-            priority: 'must-have'
-          },
-          {
-            name: 'UI/UX Design',
-            level: 'intermediate',
-            priority: 'must-have'
-          },
-          {
-            name: 'Prototyping',
-            level: 'intermediate',
-            priority: 'must-have'
-          },
-          {
-            name: 'User Research',
-            level: 'intermediate',
-            priority: 'must-have'
-          }
-        ],
-        preferred: ['Sketch', 'Adobe Creative Suite', 'Design Systems', 'User Testing']
-      },
-      languages: [
-        {
-          name: 'Vietnamese',
-          level: 'fluent'
-        },
-        {
-          name: 'English',
-          level: 'fluent'
-        }
-      ]
-    },
-    benefits: [
-      'Lương cạnh tranh theo dự án',
-      'Làm việc remote linh hoạt',
-      'Tiếp cận công nghệ fintech hàng đầu',
-      'Portfolio đa dạng',
-      'Cơ hội chuyển thành full-time'
-    ],
-    applicationDeadline: new Date('2024-12-31'),
-    startDate: new Date('2024-03-01'),
-    duration: {
-      months: 6,
-      description: 'Hợp đồng 6 tháng, có thể gia hạn'
-    },
-    contactInfo: {
-      email: 'careers@momo.vn',
-      phone: '+84 28 7300 5555',
-      website: 'https://momo.vn/careers'
-    },
-    status: 'active',
-    isVerified: true,
-    viewCount: 890,
-    applicationCount: 67,
-    tags: ['UI/UX Design', 'Contract', 'Remote', 'Figma', 'Fintech', 'Ho Chi Minh City'],
-    aiAnalysis: {
-      skillsExtracted: ['Figma', 'UI/UX Design', 'Prototyping', 'User Research', 'Sketch'],
-      difficultyLevel: 'junior',
-      matchingScore: 85,
-      keywords: ['ui/ux design', 'contract', 'remote', 'figma', 'fintech'],
-      category: 'UI/UX Design',
-      estimatedApplications: 70
-    }
+    postedBy: null // Will be set dynamically
   }
 ];
 
-module.exports = sampleJobs;
+module.exports = {
+  sampleJobs
+};
