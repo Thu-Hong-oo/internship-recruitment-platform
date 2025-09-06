@@ -1,4 +1,5 @@
 const Job = require('../models/Job');
+const Company = require('../models/Company');
 const Application = require('../models/Application');
 const CandidateProfile = require('../models/CandidateProfile');
 const Skill = require('../models/Skill');
@@ -23,7 +24,18 @@ const getAllJobs = async (req, res) => {
       remote,
       skills,
       difficulty,
-      company
+      company,
+      // Thêm các điều kiện lọc mới
+      salaryMin,
+      salaryMax,
+      experienceLevel,
+      educationLevel,
+      jobType,
+      isUrgent,
+      isFeatured,
+      status = 'active',
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
     } = req.query;
 
     const query = {};
@@ -35,6 +47,22 @@ const getAllJobs = async (req, res) => {
     if (remote) query['location.remote'] = remote === 'true';
     if (difficulty) query['aiAnalysis.difficulty'] = difficulty;
     if (company) query['companyId'] = company;
+    if (status) query['status'] = status;
+    if (isUrgent !== undefined) query['isUrgent'] = isUrgent === 'true';
+    if (isFeatured !== undefined) query['isFeatured'] = isFeatured === 'true';
+    if (jobType) query['jobType'] = jobType;
+
+    // Salary range filter
+    if (salaryMin || salaryMax) {
+      query['salary'] = {};
+      if (salaryMin) query['salary.min'] = { $gte: parseInt(salaryMin) };
+      if (salaryMax) query['salary.max'] = { $lte: parseInt(salaryMax) };
+    }
+
+    // Experience and education filter
+    if (experienceLevel)
+      query['requirements.experience.experienceLevel'] = experienceLevel;
+    if (educationLevel) query['requirements.education.level'] = educationLevel;
 
     // Skills filter
     if (skills) {
@@ -44,10 +72,22 @@ const getAllJobs = async (req, res) => {
 
     const skip = (page - 1) * limit;
 
+    // Build sort object
+    const sortObj = {};
+    if (sortBy === 'salary') {
+      sortObj['salary.min'] = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'views') {
+      sortObj['stats.views'] = sortOrder === 'desc' ? -1 : 1;
+    } else if (sortBy === 'applications') {
+      sortObj['stats.applications'] = sortOrder === 'desc' ? -1 : 1;
+    } else {
+      sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    }
+
     const jobs = await Job.find(query)
       .populate('companyId', 'name logo industry')
       .populate('requirements.skills.skillId', 'name category')
-      .sort({ createdAt: -1 })
+      .sort(sortObj)
       .skip(skip)
       .limit(parseInt(limit));
 
@@ -60,14 +100,32 @@ const getAllJobs = async (req, res) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / limit)
-      }
+        pages: Math.ceil(total / limit),
+      },
+      filters: {
+        appliedFilters: Object.keys(query).length,
+        availableFilters: {
+          category: !!category,
+          location: !!location,
+          type: !!type,
+          remote: !!remote,
+          skills: !!skills,
+          difficulty: !!difficulty,
+          company: !!company,
+          salaryRange: !!(salaryMin || salaryMax),
+          experienceLevel: !!experienceLevel,
+          educationLevel: !!educationLevel,
+          jobType: !!jobType,
+          isUrgent: isUrgent !== undefined,
+          isFeatured: isFeatured !== undefined,
+        },
+      },
     });
   } catch (error) {
     logger.error('Error getting jobs:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy danh sách công việc'
+      message: 'Lỗi khi lấy danh sách công việc',
     });
   }
 };
@@ -77,43 +135,102 @@ const getAllJobs = async (req, res) => {
 // @access  Public
 const searchJobs = async (req, res) => {
   try {
-    const { q, skills, location, type, limit = 10 } = req.query;
+    const {
+      q,
+      skills,
+      location,
+      locationType,
+      category,
+      jobType,
+      salaryMin,
+      salaryMax,
+      experienceLevel,
+      educationLevel,
+      isRemote,
+      isUrgent,
+      isFeatured,
+      limit = 10,
+    } = req.query;
 
     let jobs = [];
 
     if (q) {
       // Use AI service for semantic search
-      const searchResults = await aiService.semanticSearch(q, 'jobs');
-      const jobIds = searchResults.map(result => result.id);
-      jobs = await Job.find({ _id: { $in: jobIds } })
-        .populate('companyId', 'name logo industry')
-        .populate('requirements.skills.skillId', 'name category')
-        .limit(parseInt(limit));
-    } else {
-      // Fallback to regular search
+      try {
+        const searchResults = await aiService.semanticSearch(q, 'jobs');
+        const jobIds = searchResults.map(result => result.id);
+
+        // If we have search results, use them
+        if (jobIds.length > 0) {
+          jobs = await Job.find({ _id: { $in: jobIds } })
+            .populate('companyId', 'name logo industry')
+            .populate('requirements.skills.skillId', 'name category')
+            .limit(parseInt(limit));
+        }
+      } catch (aiError) {
+        logger.warn('AI search failed, falling back to text search:', aiError);
+        // Fallback to text search if AI fails
+      }
+    }
+
+    // If no AI results or no query, use regular search
+    if (jobs.length === 0) {
       const query = {};
+
+      // Text search
+      if (q) {
+        query.$or = [
+          { title: { $regex: q, $options: 'i' } },
+          { description: { $regex: q, $options: 'i' } },
+          { 'requirements.skills.skillId.name': { $regex: q, $options: 'i' } },
+        ];
+      }
+
+      // Filters
       if (skills) {
         const skillIds = skills.split(',').map(skill => skill.trim());
         query['requirements.skills.skillId'] = { $in: skillIds };
       }
-      if (location) query['location.city'] = { $regex: location, $options: 'i' };
-      if (type) query['internship.type'] = type;
+      if (location)
+        query['location.city'] = { $regex: location, $options: 'i' };
+      if (locationType) query['location.type'] = locationType;
+      if (category) query['category'] = category;
+      if (jobType) query['jobType'] = jobType;
+      if (isRemote !== undefined)
+        query['location.remote'] = isRemote === 'true';
+      if (isUrgent !== undefined) query['isUrgent'] = isUrgent === 'true';
+      if (isFeatured !== undefined) query['isFeatured'] = isFeatured === 'true';
+
+      // Salary range
+      if (salaryMin || salaryMax) {
+        query['salary'] = {};
+        if (salaryMin) query['salary.min'] = { $gte: parseInt(salaryMin) };
+        if (salaryMax) query['salary.max'] = { $lte: parseInt(salaryMax) };
+      }
+
+      // Experience and education
+      if (experienceLevel)
+        query['requirements.experience.experienceLevel'] = experienceLevel;
+      if (educationLevel)
+        query['requirements.education.level'] = educationLevel;
 
       jobs = await Job.find(query)
         .populate('companyId', 'name logo industry')
         .populate('requirements.skills.skillId', 'name category')
+        .sort({ createdAt: -1 })
         .limit(parseInt(limit));
     }
 
     res.status(200).json({
       success: true,
-      data: jobs
+      data: jobs,
+      total: jobs.length,
     });
   } catch (error) {
     logger.error('Error searching jobs:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi tìm kiếm công việc'
+      message: 'Lỗi khi tìm kiếm công việc',
     });
   }
 };
@@ -125,24 +242,27 @@ const getJob = async (req, res) => {
   try {
     const job = await Job.findById(req.params.id)
       .populate('companyId', 'name logo industry description')
-      .populate('requirements.skills.skillId', 'name category description level');
+      .populate(
+        'requirements.skills.skillId',
+        'name category description level'
+      );
 
     if (!job) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy công việc'
+        message: 'Không tìm thấy công việc',
       });
     }
 
     res.status(200).json({
       success: true,
-      data: job
+      data: job,
     });
   } catch (error) {
     logger.error('Error getting job:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy thông tin công việc'
+      message: 'Lỗi khi lấy thông tin công việc',
     });
   }
 };
@@ -158,7 +278,7 @@ const getJobRecommendations = async (req, res) => {
     if (!userId) {
       return res.status(400).json({
         success: false,
-        message: 'User ID là bắt buộc'
+        message: 'User ID là bắt buộc',
       });
     }
 
@@ -167,7 +287,7 @@ const getJobRecommendations = async (req, res) => {
     if (!userProfile) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy hồ sơ người dùng'
+        message: 'Không tìm thấy hồ sơ người dùng',
       });
     }
 
@@ -176,21 +296,25 @@ const getJobRecommendations = async (req, res) => {
     if (!job) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy công việc'
+        message: 'Không tìm thấy công việc',
       });
     }
 
-    const recommendations = await recommendationEngine.getSimilarJobs(job, userProfile, 10);
+    const recommendations = await recommendationEngine.getSimilarJobs(
+      job,
+      userProfile,
+      10
+    );
 
     res.status(200).json({
       success: true,
-      data: recommendations
+      data: recommendations,
     });
   } catch (error) {
     logger.error('Error getting job recommendations:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy gợi ý công việc'
+      message: 'Lỗi khi lấy gợi ý công việc',
     });
   }
 };
@@ -206,17 +330,19 @@ const getJobMatchScore = async (req, res) => {
     if (!userId) {
       return res.status(400).json({
         success: false,
-        message: 'User ID là bắt buộc'
+        message: 'User ID là bắt buộc',
       });
     }
 
-    const job = await Job.findById(id)
-      .populate('requirements.skills.skillId', 'name category');
-    
+    const job = await Job.findById(id).populate(
+      'requirements.skills.skillId',
+      'name category'
+    );
+
     if (!job) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy công việc'
+        message: 'Không tìm thấy công việc',
       });
     }
 
@@ -224,7 +350,7 @@ const getJobMatchScore = async (req, res) => {
     if (!userProfile) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy hồ sơ người dùng'
+        message: 'Không tìm thấy hồ sơ người dùng',
       });
     }
 
@@ -232,13 +358,13 @@ const getJobMatchScore = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: matchScore
+      data: matchScore,
     });
   } catch (error) {
     logger.error('Error calculating match score:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi tính điểm phù hợp'
+      message: 'Lỗi khi tính điểm phù hợp',
     });
   }
 };
@@ -249,11 +375,11 @@ const getJobMatchScore = async (req, res) => {
 const analyzeJobSkills = async (req, res) => {
   try {
     const job = await Job.findById(req.params.id);
-    
+
     if (!job) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy công việc'
+        message: 'Không tìm thấy công việc',
       });
     }
 
@@ -262,13 +388,13 @@ const analyzeJobSkills = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: analysis
+      data: analysis,
     });
   } catch (error) {
     logger.error('Error analyzing job skills:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi phân tích kỹ năng công việc'
+      message: 'Lỗi khi phân tích kỹ năng công việc',
     });
   }
 };
@@ -281,13 +407,15 @@ const generateSkillRoadmap = async (req, res) => {
     const { userId, duration = 8 } = req.query;
     const { id } = req.params;
 
-    const job = await Job.findById(id)
-      .populate('requirements.skills.skillId', 'name category level');
-    
+    const job = await Job.findById(id).populate(
+      'requirements.skills.skillId',
+      'name category level'
+    );
+
     if (!job) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy công việc'
+        message: 'Không tìm thấy công việc',
       });
     }
 
@@ -296,17 +424,21 @@ const generateSkillRoadmap = async (req, res) => {
       userProfile = await CandidateProfile.findOne({ userId });
     }
 
-    const roadmap = await aiService.generateSkillRoadmap(job, userProfile, parseInt(duration));
+    const roadmap = await aiService.generateSkillRoadmap(
+      job,
+      userProfile,
+      parseInt(duration)
+    );
 
     res.status(200).json({
       success: true,
-      data: roadmap
+      data: roadmap,
     });
   } catch (error) {
     logger.error('Error generating skill roadmap:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi tạo lộ trình kỹ năng'
+      message: 'Lỗi khi tạo lộ trình kỹ năng',
     });
   }
 };
@@ -320,7 +452,9 @@ const createJob = async (req, res) => {
     jobData.companyId = req.user.companyId;
 
     // Analyze job with AI
-    const aiAnalysis = await aiService.analyzeJobDescription(jobData.description);
+    const aiAnalysis = await aiService.analyzeJobDescription(
+      jobData.description
+    );
     jobData.aiAnalysis = aiAnalysis;
 
     const job = await Job.create(jobData);
@@ -331,13 +465,13 @@ const createJob = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      data: job
+      data: job,
     });
   } catch (error) {
     logger.error('Error creating job:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi tạo công việc'
+      message: 'Lỗi khi tạo công việc',
     });
   }
 };
@@ -352,7 +486,7 @@ const updateJob = async (req, res) => {
     if (!job) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy công việc'
+        message: 'Không tìm thấy công việc',
       });
     }
 
@@ -360,7 +494,7 @@ const updateJob = async (req, res) => {
     if (job.companyId.toString() !== req.user.companyId.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Không có quyền chỉnh sửa công việc này'
+        message: 'Không có quyền chỉnh sửa công việc này',
       });
     }
 
@@ -368,27 +502,28 @@ const updateJob = async (req, res) => {
 
     // Re-analyze if description changed
     if (updateData.description && updateData.description !== job.description) {
-      const aiAnalysis = await aiService.analyzeJobDescription(updateData.description);
+      const aiAnalysis = await aiService.analyzeJobDescription(
+        updateData.description
+      );
       updateData.aiAnalysis = aiAnalysis;
     }
 
-    const updatedJob = await Job.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true, runValidators: true }
-    )
+    const updatedJob = await Job.findByIdAndUpdate(req.params.id, updateData, {
+      new: true,
+      runValidators: true,
+    })
       .populate('companyId', 'name logo industry')
       .populate('requirements.skills.skillId', 'name category');
 
     res.status(200).json({
       success: true,
-      data: updatedJob
+      data: updatedJob,
     });
   } catch (error) {
     logger.error('Error updating job:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi cập nhật công việc'
+      message: 'Lỗi khi cập nhật công việc',
     });
   }
 };
@@ -403,7 +538,7 @@ const deleteJob = async (req, res) => {
     if (!job) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy công việc'
+        message: 'Không tìm thấy công việc',
       });
     }
 
@@ -411,7 +546,7 @@ const deleteJob = async (req, res) => {
     if (job.companyId.toString() !== req.user.companyId.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Không có quyền xóa công việc này'
+        message: 'Không có quyền xóa công việc này',
       });
     }
 
@@ -419,13 +554,13 @@ const deleteJob = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Xóa công việc thành công'
+      message: 'Xóa công việc thành công',
     });
   } catch (error) {
     logger.error('Error deleting job:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi xóa công việc'
+      message: 'Lỗi khi xóa công việc',
     });
   }
 };
@@ -442,28 +577,31 @@ const applyForJob = async (req, res) => {
     if (!job) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy công việc'
+        message: 'Không tìm thấy công việc',
       });
     }
 
     // Check if already applied
     const existingApplication = await Application.findOne({
       jobId: id,
-      jobseekerId: req.user.id
+      jobseekerId: req.user.id,
     });
 
     if (existingApplication) {
       return res.status(400).json({
         success: false,
-        message: 'Bạn đã ứng tuyển cho công việc này'
+        message: 'Bạn đã ứng tuyển cho công việc này',
       });
     }
 
     // Check application deadline
-    if (job.applicationSettings.deadline && new Date() > job.applicationSettings.deadline) {
+    if (
+      job.applicationSettings.deadline &&
+      new Date() > job.applicationSettings.deadline
+    ) {
       return res.status(400).json({
         success: false,
-        message: 'Đã hết hạn ứng tuyển'
+        message: 'Đã hết hạn ứng tuyển',
       });
     }
 
@@ -473,18 +611,18 @@ const applyForJob = async (req, res) => {
       coverLetter,
       resumeUrl,
       portfolioUrl,
-      status: 'pending'
+      status: 'pending',
     });
 
     res.status(201).json({
       success: true,
-      data: application
+      data: application,
     });
   } catch (error) {
     logger.error('Error applying for job:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi ứng tuyển'
+      message: 'Lỗi khi ứng tuyển',
     });
   }
 };
@@ -501,7 +639,7 @@ const getJobApplications = async (req, res) => {
     if (!job) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy công việc'
+        message: 'Không tìm thấy công việc',
       });
     }
 
@@ -509,7 +647,7 @@ const getJobApplications = async (req, res) => {
     if (job.companyId.toString() !== req.user.companyId.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Không có quyền xem ứng viên của công việc này'
+        message: 'Không có quyền xem ứng viên của công việc này',
       });
     }
 
@@ -534,14 +672,14 @@ const getJobApplications = async (req, res) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / limit)
-      }
+        pages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     logger.error('Error getting job applications:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy danh sách ứng viên'
+      message: 'Lỗi khi lấy danh sách ứng viên',
     });
   }
 };
@@ -558,7 +696,7 @@ const updateApplicationStatus = async (req, res) => {
     if (!job) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy công việc'
+        message: 'Không tìm thấy công việc',
       });
     }
 
@@ -566,7 +704,7 @@ const updateApplicationStatus = async (req, res) => {
     if (job.companyId.toString() !== req.user.companyId.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Không có quyền cập nhật ứng viên của công việc này'
+        message: 'Không có quyền cập nhật ứng viên của công việc này',
       });
     }
 
@@ -574,7 +712,7 @@ const updateApplicationStatus = async (req, res) => {
     if (!application) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy đơn ứng tuyển'
+        message: 'Không tìm thấy đơn ứng tuyển',
       });
     }
 
@@ -584,13 +722,13 @@ const updateApplicationStatus = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: application
+      data: application,
     });
   } catch (error) {
     logger.error('Error updating application status:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi cập nhật trạng thái ứng tuyển'
+      message: 'Lỗi khi cập nhật trạng thái ứng tuyển',
     });
   }
 };
@@ -606,7 +744,7 @@ const getJobAnalytics = async (req, res) => {
     if (!job) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy công việc'
+        message: 'Không tìm thấy công việc',
       });
     }
 
@@ -614,63 +752,533 @@ const getJobAnalytics = async (req, res) => {
     if (job.companyId.toString() !== req.user.companyId.toString()) {
       return res.status(403).json({
         success: false,
-        message: 'Không có quyền xem thống kê của công việc này'
+        message: 'Không có quyền xem thống kê của công việc này',
       });
     }
 
     const applications = await Application.find({ jobId: id });
-    
+
     const analytics = {
       totalApplications: applications.length,
       statusBreakdown: {
         pending: applications.filter(app => app.status === 'pending').length,
-        reviewing: applications.filter(app => app.status === 'reviewing').length,
+        reviewing: applications.filter(app => app.status === 'reviewing')
+          .length,
         accepted: applications.filter(app => app.status === 'accepted').length,
-        rejected: applications.filter(app => app.status === 'rejected').length
+        rejected: applications.filter(app => app.status === 'rejected').length,
       },
       applicationsByDay: await getApplicationsByDay(id),
       topSkills: await getTopSkillsFromApplications(applications),
-      averageMatchScore: await calculateAverageMatchScore(applications)
+      averageMatchScore: await calculateAverageMatchScore(applications),
     };
 
     res.status(200).json({
       success: true,
-      data: analytics
+      data: analytics,
     });
   } catch (error) {
     logger.error('Error getting job analytics:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy thống kê công việc'
+      message: 'Lỗi khi lấy thống kê công việc',
     });
   }
 };
 
 // Helper functions
-const getApplicationsByDay = async (jobId) => {
+const getApplicationsByDay = async jobId => {
   const applications = await Application.aggregate([
     { $match: { jobId: jobId } },
     {
       $group: {
-        _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-        count: { $sum: 1 }
-      }
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        count: { $sum: 1 },
+      },
     },
-    { $sort: { _id: 1 } }
+    { $sort: { _id: 1 } },
   ]);
   return applications;
 };
 
-const getTopSkillsFromApplications = async (applications) => {
+const getTopSkillsFromApplications = async applications => {
   // This would require analyzing CVs of applicants
   // For now, return empty array
   return [];
 };
 
-const calculateAverageMatchScore = async (applications) => {
+const calculateAverageMatchScore = async applications => {
   // This would require calculating match scores for all applications
   // For now, return 0
   return 0;
+};
+
+// @desc    Get featured jobs
+// @route   GET /api/jobs/featured
+// @access  Public
+const getFeaturedJobs = async (req, res) => {
+  try {
+    const { limit = 10 } = req.query;
+
+    const jobs = await Job.find({ isFeatured: true, status: 'active' })
+      .populate('companyId', 'name logo industry')
+      .populate('requirements.skills.skillId', 'name category')
+      .sort({ priority: -1, createdAt: -1 })
+      .limit(parseInt(limit));
+
+    res.status(200).json({
+      success: true,
+      data: jobs,
+    });
+  } catch (error) {
+    logger.error('Error getting featured jobs:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách công việc nổi bật',
+    });
+  }
+};
+
+// @desc    Get urgent jobs
+// @route   GET /api/jobs/urgent
+// @access  Public
+const getUrgentJobs = async (req, res) => {
+  try {
+    const { limit = 10 } = req.query;
+
+    const jobs = await Job.find({ isUrgent: true, status: 'active' })
+      .populate('companyId', 'name logo industry')
+      .populate('requirements.skills.skillId', 'name category')
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit));
+
+    res.status(200).json({
+      success: true,
+      data: jobs,
+    });
+  } catch (error) {
+    logger.error('Error getting urgent jobs:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách công việc khẩn cấp',
+    });
+  }
+};
+
+// @desc    Get hot jobs (most viewed)
+// @route   GET /api/jobs/hot
+// @access  Public
+const getHotJobs = async (req, res) => {
+  try {
+    const { limit = 10 } = req.query;
+
+    const jobs = await Job.find({ status: 'active' })
+      .populate('companyId', 'name logo industry')
+      .populate('requirements.skills.skillId', 'name category')
+      .sort({ 'stats.views': -1, createdAt: -1 })
+      .limit(parseInt(limit));
+
+    res.status(200).json({
+      success: true,
+      data: jobs,
+    });
+  } catch (error) {
+    logger.error('Error getting hot jobs:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách công việc phổ biến',
+    });
+  }
+};
+
+// @desc    Get jobs by category
+// @route   GET /api/jobs/category/:category
+// @access  Public
+const getJobsByCategory = async (req, res) => {
+  try {
+    const { category } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+
+    const skip = (page - 1) * limit;
+
+    const jobs = await Job.find({ category, status: 'active' })
+      .populate('companyId', 'name logo industry')
+      .populate('requirements.skills.skillId', 'name category')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Job.countDocuments({ category, status: 'active' });
+
+    res.status(200).json({
+      success: true,
+      data: jobs,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    logger.error('Error getting jobs by category:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách công việc theo danh mục',
+    });
+  }
+};
+
+// @desc    Get jobs by location
+// @route   GET /api/jobs/location/:location
+// @access  Public
+const getJobsByLocation = async (req, res) => {
+  try {
+    const { location } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+
+    const skip = (page - 1) * limit;
+
+    const jobs = await Job.find({
+      'location.city': { $regex: location, $options: 'i' },
+      status: 'active',
+    })
+      .populate('companyId', 'name logo industry')
+      .populate('requirements.skills.skillId', 'name category')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Job.countDocuments({
+      'location.city': { $regex: location, $options: 'i' },
+      status: 'active',
+    });
+
+    res.status(200).json({
+      success: true,
+      data: jobs,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    logger.error('Error getting jobs by location:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách công việc theo địa điểm',
+    });
+  }
+};
+
+// @desc    Get job by slug
+// @route   GET /api/jobs/slug/:slug
+// @access  Public
+const getJobBySlug = async (req, res) => {
+  try {
+    const { slug } = req.params;
+
+    const job = await Job.findOne({ slug, status: 'active' })
+      .populate('companyId', 'name logo industry description')
+      .populate(
+        'requirements.skills.skillId',
+        'name category description level'
+      );
+
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy công việc',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: job,
+    });
+  } catch (error) {
+    logger.error('Error getting job by slug:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy thông tin công việc',
+    });
+  }
+};
+
+// @desc    Get similar jobs
+// @route   GET /api/jobs/:id/similar
+// @access  Public
+const getSimilarJobs = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { limit = 5 } = req.query;
+
+    const job = await Job.findById(id);
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy công việc',
+      });
+    }
+
+    // Find similar jobs based on category and skills
+    const similarJobs = await Job.find({
+      _id: { $ne: id },
+      category: job.category,
+      status: 'active',
+    })
+      .populate('companyId', 'name logo industry')
+      .populate('requirements.skills.skillId', 'name category')
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit));
+
+    res.status(200).json({
+      success: true,
+      data: similarJobs,
+    });
+  } catch (error) {
+    logger.error('Error getting similar jobs:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách công việc tương tự',
+    });
+  }
+};
+
+// @desc    Get job statistics
+// @route   GET /api/jobs/:id/stats
+// @access  Public
+const getJobStats = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const job = await Job.findById(id);
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy công việc',
+      });
+    }
+
+    const applications = await Application.find({ jobId: id });
+
+    const stats = {
+      views: job.stats?.views || 0,
+      applications: applications.length,
+      saves: job.stats?.saves || 0,
+      shares: job.stats?.shares || 0,
+      clicks: job.stats?.clicks || 0,
+    };
+
+    res.status(200).json({
+      success: true,
+      data: stats,
+    });
+  } catch (error) {
+    logger.error('Error getting job stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy thống kê công việc',
+    });
+  }
+};
+
+// @desc    Increment job views
+// @route   POST /api/jobs/:id/view
+// @access  Public
+const incrementJobViews = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const job = await Job.findByIdAndUpdate(
+      id,
+      { $inc: { 'stats.views': 1 } },
+      { new: true }
+    );
+
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy công việc',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Đã cập nhật lượt xem',
+    });
+  } catch (error) {
+    logger.error('Error incrementing job views:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi cập nhật lượt xem',
+    });
+  }
+};
+
+// @desc    Get jobs by company
+// @route   GET /api/jobs/company/:companyId
+// @access  Public
+const getJobsByCompany = async (req, res) => {
+  try {
+    const { companyId } = req.params;
+    const { page = 1, limit = 10, status = 'active' } = req.query;
+
+    const skip = (page - 1) * limit;
+
+    const jobs = await Job.find({ companyId, status })
+      .populate('companyId', 'name logo industry')
+      .populate('requirements.skills.skillId', 'name category')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Job.countDocuments({ companyId, status });
+
+    res.status(200).json({
+      success: true,
+      data: jobs,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    logger.error('Error getting jobs by company:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách công việc của công ty',
+    });
+  }
+};
+
+// @desc    Get jobs by skills
+// @route   GET /api/jobs/skills
+// @access  Public
+const getJobsBySkills = async (req, res) => {
+  try {
+    const { skillIds, page = 1, limit = 10 } = req.query;
+
+    if (!skillIds) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng cung cấp danh sách kỹ năng',
+      });
+    }
+
+    const skillIdArray = skillIds.split(',').map(skill => skill.trim());
+    const skip = (page - 1) * limit;
+
+    const jobs = await Job.find({
+      'requirements.skills.skillId': { $in: skillIdArray },
+      status: 'active',
+    })
+      .populate('companyId', 'name logo industry')
+      .populate('requirements.skills.skillId', 'name category')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Job.countDocuments({
+      'requirements.skills.skillId': { $in: skillIdArray },
+      status: 'active',
+    });
+
+    res.status(200).json({
+      success: true,
+      data: jobs,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    logger.error('Error getting jobs by skills:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách công việc theo kỹ năng',
+    });
+  }
+};
+
+// @desc    Get recent jobs
+// @route   GET /api/jobs/recent
+// @access  Public
+const getRecentJobs = async (req, res) => {
+  try {
+    const { limit = 10, category } = req.query;
+
+    const query = { status: 'active' };
+    if (category) query.category = category;
+
+    const jobs = await Job.find(query)
+      .populate('companyId', 'name logo industry')
+      .populate('requirements.skills.skillId', 'name category')
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit));
+
+    res.status(200).json({
+      success: true,
+      data: jobs,
+    });
+  } catch (error) {
+    logger.error('Error getting recent jobs:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách công việc gần đây',
+    });
+  }
+};
+
+// @desc    Get popular jobs
+// @route   GET /api/jobs/popular
+// @access  Public
+const getPopularJobs = async (req, res) => {
+  try {
+    const { limit = 10, period = 'week' } = req.query;
+
+    // Calculate date range based on period
+    const now = new Date();
+    let startDate;
+    switch (period) {
+      case 'day':
+        startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case 'week':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'month':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    }
+
+    const jobs = await Job.find({
+      status: 'active',
+      createdAt: { $gte: startDate },
+    })
+      .populate('companyId', 'name logo industry')
+      .populate('requirements.skills.skillId', 'name category')
+      .sort({ 'stats.views': -1, 'stats.applications': -1 })
+      .limit(parseInt(limit));
+
+    res.status(200).json({
+      success: true,
+      data: jobs,
+    });
+  } catch (error) {
+    logger.error('Error getting popular jobs:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách công việc phổ biến',
+    });
+  }
 };
 
 module.exports = {
@@ -687,5 +1295,18 @@ module.exports = {
   getJobAnalytics,
   applyForJob,
   getJobApplications,
-  updateApplicationStatus
+  updateApplicationStatus,
+  getFeaturedJobs,
+  getUrgentJobs,
+  getHotJobs,
+  getJobsByCategory,
+  getJobsByLocation,
+  getJobBySlug,
+  getSimilarJobs,
+  getJobStats,
+  incrementJobViews,
+  getJobsByCompany,
+  getJobsBySkills,
+  getRecentJobs,
+  getPopularJobs,
 };

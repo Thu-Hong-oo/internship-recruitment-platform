@@ -1,5 +1,6 @@
 const SkillRoadmap = require('../models/SkillRoadmap');
 const Job = require('../models/Job');
+const Company = require('../models/Company');
 const CandidateProfile = require('../models/CandidateProfile');
 const Skill = require('../models/Skill');
 const aiService = require('../services/aiService');
@@ -34,14 +35,14 @@ const getRoadmaps = async (req, res) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / limit)
-      }
+        pages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     logger.error('Error getting roadmaps:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy danh sách roadmap'
+      message: 'Lỗi khi lấy danh sách roadmap',
     });
   }
 };
@@ -58,7 +59,7 @@ const getRoadmap = async (req, res) => {
     if (!roadmap) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy roadmap'
+        message: 'Không tìm thấy roadmap',
       });
     }
 
@@ -66,19 +67,19 @@ const getRoadmap = async (req, res) => {
     if (roadmap.userId.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
-        message: 'Không có quyền xem roadmap này'
+        message: 'Không có quyền xem roadmap này',
       });
     }
 
     res.status(200).json({
       success: true,
-      data: roadmap
+      data: roadmap,
     });
   } catch (error) {
     logger.error('Error getting roadmap:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy thông tin roadmap'
+      message: 'Lỗi khi lấy thông tin roadmap',
     });
   }
 };
@@ -98,13 +99,13 @@ const createRoadmap = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      data: roadmap
+      data: roadmap,
     });
   } catch (error) {
     logger.error('Error creating roadmap:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi tạo roadmap'
+      message: 'Lỗi khi tạo roadmap',
     });
   }
 };
@@ -119,7 +120,7 @@ const updateRoadmap = async (req, res) => {
     if (!roadmap) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy roadmap'
+        message: 'Không tìm thấy roadmap',
       });
     }
 
@@ -127,7 +128,7 @@ const updateRoadmap = async (req, res) => {
     if (roadmap.userId.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
-        message: 'Không có quyền chỉnh sửa roadmap này'
+        message: 'Không có quyền chỉnh sửa roadmap này',
       });
     }
 
@@ -141,13 +142,13 @@ const updateRoadmap = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: updatedRoadmap
+      data: updatedRoadmap,
     });
   } catch (error) {
     logger.error('Error updating roadmap:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi cập nhật roadmap'
+      message: 'Lỗi khi cập nhật roadmap',
     });
   }
 };
@@ -162,7 +163,7 @@ const deleteRoadmap = async (req, res) => {
     if (!roadmap) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy roadmap'
+        message: 'Không tìm thấy roadmap',
       });
     }
 
@@ -170,7 +171,7 @@ const deleteRoadmap = async (req, res) => {
     if (roadmap.userId.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
-        message: 'Không có quyền xóa roadmap này'
+        message: 'Không có quyền xóa roadmap này',
       });
     }
 
@@ -178,13 +179,13 @@ const deleteRoadmap = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Xóa roadmap thành công'
+      message: 'Xóa roadmap thành công',
     });
   } catch (error) {
     logger.error('Error deleting roadmap:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi xóa roadmap'
+      message: 'Lỗi khi xóa roadmap',
     });
   }
 };
@@ -202,7 +203,7 @@ const completeWeek = async (req, res) => {
     if (!roadmap) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy roadmap'
+        message: 'Không tìm thấy roadmap',
       });
     }
 
@@ -210,7 +211,7 @@ const completeWeek = async (req, res) => {
     if (roadmap.userId.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
-        message: 'Không có quyền cập nhật roadmap này'
+        message: 'Không có quyền cập nhật roadmap này',
       });
     }
 
@@ -219,13 +220,13 @@ const completeWeek = async (req, res) => {
     res.status(200).json({
       success: true,
       data: roadmap,
-      message: `Hoàn thành tuần ${weekNumber}`
+      message: `Hoàn thành tuần ${weekNumber}`,
     });
   } catch (error) {
     logger.error('Error completing week:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi hoàn thành tuần'
+      message: 'Lỗi khi hoàn thành tuần',
     });
   }
 };
@@ -243,7 +244,7 @@ const updateProgress = async (req, res) => {
     if (!roadmap) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy roadmap'
+        message: 'Không tìm thấy roadmap',
       });
     }
 
@@ -251,7 +252,7 @@ const updateProgress = async (req, res) => {
     if (roadmap.userId.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
-        message: 'Không có quyền cập nhật roadmap này'
+        message: 'Không có quyền cập nhật roadmap này',
       });
     }
 
@@ -260,13 +261,13 @@ const updateProgress = async (req, res) => {
     res.status(200).json({
       success: true,
       data: roadmap,
-      message: 'Cập nhật tiến độ thành công'
+      message: 'Cập nhật tiến độ thành công',
     });
   } catch (error) {
     logger.error('Error updating progress:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi cập nhật tiến độ'
+      message: 'Lỗi khi cập nhật tiến độ',
     });
   }
 };
@@ -281,7 +282,7 @@ const getRoadmapAnalytics = async (req, res) => {
     if (!roadmap) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy roadmap'
+        message: 'Không tìm thấy roadmap',
       });
     }
 
@@ -289,7 +290,7 @@ const getRoadmapAnalytics = async (req, res) => {
     if (roadmap.userId.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
-        message: 'Không có quyền xem thống kê roadmap này'
+        message: 'Không có quyền xem thống kê roadmap này',
       });
     }
 
@@ -300,28 +301,28 @@ const getRoadmapAnalytics = async (req, res) => {
         completed: week.completed,
         objectivesCount: week.objectives.length,
         resourcesCount: week.resources.length,
-        completedAt: week.completedAt
+        completedAt: week.completedAt,
       })),
       skillProgress: roadmap.targetSkills.map(skill => ({
         skill: skill.skillId,
         currentLevel: skill.currentLevel,
         targetLevel: skill.targetLevel,
-        priority: skill.priority
+        priority: skill.priority,
       })),
       timeSpent: calculateTimeSpent(roadmap),
       estimatedCompletion: estimateCompletionDate(roadmap),
-      recommendations: generateRecommendations(roadmap)
+      recommendations: generateRecommendations(roadmap),
     };
 
     res.status(200).json({
       success: true,
-      data: analytics
+      data: analytics,
     });
   } catch (error) {
     logger.error('Error getting roadmap analytics:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy thống kê roadmap'
+      message: 'Lỗi khi lấy thống kê roadmap',
     });
   }
 };
@@ -343,7 +344,7 @@ const generateRoadmapFromJob = async (req, res) => {
     if (!job) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy công việc'
+        message: 'Không tìm thấy công việc',
       });
     }
 
@@ -352,7 +353,7 @@ const generateRoadmapFromJob = async (req, res) => {
     if (!userProfile) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy hồ sơ người dùng'
+        message: 'Không tìm thấy hồ sơ người dùng',
       });
     }
 
@@ -361,12 +362,16 @@ const generateRoadmapFromJob = async (req, res) => {
     if (existingRoadmap) {
       return res.status(400).json({
         success: false,
-        message: 'Roadmap cho công việc này đã tồn tại'
+        message: 'Roadmap cho công việc này đã tồn tại',
       });
     }
 
     // Generate roadmap using AI
-    const aiRoadmap = await aiService.generateSkillRoadmapForJob(job, userProfile, parseInt(duration));
+    const aiRoadmap = await aiService.generateSkillRoadmapForJob(
+      job,
+      userProfile,
+      parseInt(duration)
+    );
 
     // Create roadmap document
     const roadmapData = {
@@ -378,28 +383,28 @@ const generateRoadmapFromJob = async (req, res) => {
         skillId: skill.skillId._id,
         currentLevel: 'beginner',
         targetLevel: skill.level === 'required' ? 'intermediate' : 'beginner',
-        priority: skill.importance || 5
+        priority: skill.importance || 5,
       })),
       weeks: aiRoadmap.weeks || [],
       settings: {
         duration: parseInt(duration),
         difficulty: aiRoadmap.difficulty || 'beginner',
         estimatedTotalHours: aiRoadmap.estimatedTotalHours || 0,
-        pace: 'normal'
+        pace: 'normal',
       },
       metadata: {
         skillGaps: aiRoadmap.skillGaps || [],
         userProfile: {
           currentSkills: userProfile.skills?.map(s => s.name) || [],
           education: userProfile.education?.fieldOfStudy,
-          experience: userProfile.experience?.length || 0
+          experience: userProfile.experience?.length || 0,
         },
         targetJob: {
           title: job.title,
           company: job.companyId.name,
-          category: job.aiAnalysis?.category
-        }
-      }
+          category: job.aiAnalysis?.category,
+        },
+      },
     };
 
     const roadmap = await SkillRoadmap.create(roadmapData);
@@ -410,13 +415,13 @@ const generateRoadmapFromJob = async (req, res) => {
     res.status(201).json({
       success: true,
       data: roadmap,
-      message: 'Tạo roadmap thành công'
+      message: 'Tạo roadmap thành công',
     });
   } catch (error) {
     logger.error('Error generating roadmap from job:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi tạo roadmap từ công việc'
+      message: 'Lỗi khi tạo roadmap từ công việc',
     });
   }
 };
@@ -434,19 +439,19 @@ const getRecommendedRoadmaps = async (req, res) => {
     if (!userProfile) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy hồ sơ người dùng'
+        message: 'Không tìm thấy hồ sơ người dùng',
       });
     }
 
     // Get jobs that match user skills
     const userSkills = userProfile.skills?.map(s => s.name.toLowerCase()) || [];
-    
+
     const matchingJobs = await Job.find({
       'requirements.skills.skillId': {
         $in: await Skill.find({
-          name: { $regex: userSkills.join('|'), $options: 'i' }
-        }).distinct('_id')
-      }
+          name: { $regex: userSkills.join('|'), $options: 'i' },
+        }).distinct('_id'),
+      },
     })
       .populate('companyId', 'name')
       .populate('requirements.skills.skillId', 'name category')
@@ -454,12 +459,15 @@ const getRecommendedRoadmaps = async (req, res) => {
 
     // Generate recommendations
     const recommendations = await Promise.all(
-      matchingJobs.map(async (job) => {
-        const matchScore = await aiService.calculateJobMatchScore(job, userProfile);
+      matchingJobs.map(async job => {
+        const matchScore = await aiService.calculateJobMatchScore(
+          job,
+          userProfile
+        );
         return {
           job,
           matchScore: matchScore.overall,
-          reasons: matchScore.breakdown
+          reasons: matchScore.breakdown,
         };
       })
     );
@@ -469,28 +477,31 @@ const getRecommendedRoadmaps = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: recommendations
+      data: recommendations,
     });
   } catch (error) {
     logger.error('Error getting recommended roadmaps:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy roadmap gợi ý'
+      message: 'Lỗi khi lấy roadmap gợi ý',
     });
   }
 };
 
 // Helper functions
-const calculateTimeSpent = (roadmap) => {
+const calculateTimeSpent = roadmap => {
   const completedWeeks = roadmap.weeks.filter(week => week.completed);
   return completedWeeks.reduce((total, week) => {
-    return total + week.resources.reduce((weekTotal, resource) => {
-      return weekTotal + (resource.duration || 1);
-    }, 0);
+    return (
+      total +
+      week.resources.reduce((weekTotal, resource) => {
+        return weekTotal + (resource.duration || 1);
+      }, 0)
+    );
   }, 0);
 };
 
-const estimateCompletionDate = (roadmap) => {
+const estimateCompletionDate = roadmap => {
   if (roadmap.progress.completionPercentage === 100) {
     return roadmap.weeks.find(week => week.completed)?.completedAt;
   }
@@ -498,30 +509,39 @@ const estimateCompletionDate = (roadmap) => {
   const completedWeeks = roadmap.progress.completedWeeks;
   const totalWeeks = roadmap.weeks.length;
   const remainingWeeks = totalWeeks - completedWeeks;
-  
+
   const estimatedDays = remainingWeeks * 7; // Assuming 1 week per week
   const completionDate = new Date();
   completionDate.setDate(completionDate.getDate() + estimatedDays);
-  
+
   return completionDate;
 };
 
-const generateRecommendations = (roadmap) => {
+const generateRecommendations = roadmap => {
   const recommendations = [];
-  
+
   if (roadmap.progress.completionPercentage < 25) {
-    recommendations.push('Bạn mới bắt đầu roadmap. Hãy tập trung vào các mục tiêu tuần đầu tiên.');
+    recommendations.push(
+      'Bạn mới bắt đầu roadmap. Hãy tập trung vào các mục tiêu tuần đầu tiên.'
+    );
   }
-  
-  if (roadmap.progress.completionPercentage > 50 && roadmap.progress.completionPercentage < 75) {
-    recommendations.push('Bạn đã hoàn thành hơn một nửa roadmap. Hãy duy trì động lực!');
+
+  if (
+    roadmap.progress.completionPercentage > 50 &&
+    roadmap.progress.completionPercentage < 75
+  ) {
+    recommendations.push(
+      'Bạn đã hoàn thành hơn một nửa roadmap. Hãy duy trì động lực!'
+    );
   }
-  
-  const currentWeek = roadmap.weeks.find(week => week.week === roadmap.progress.currentWeek);
+
+  const currentWeek = roadmap.weeks.find(
+    week => week.week === roadmap.progress.currentWeek
+  );
   if (currentWeek && !currentWeek.completed) {
     recommendations.push(`Tuần ${currentWeek.week}: ${currentWeek.milestone}`);
   }
-  
+
   return recommendations;
 };
 
@@ -535,5 +555,5 @@ module.exports = {
   updateProgress,
   getRoadmapAnalytics,
   generateRoadmapFromJob,
-  getRecommendedRoadmaps
+  getRecommendedRoadmaps,
 };

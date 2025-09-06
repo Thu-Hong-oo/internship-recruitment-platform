@@ -14,7 +14,20 @@ const {
   getJobAnalytics,
   applyForJob,
   getJobApplications,
-  updateApplicationStatus
+  updateApplicationStatus,
+  getFeaturedJobs,
+  getUrgentJobs,
+  getHotJobs,
+  getJobsByCategory,
+  getJobsByLocation,
+  getJobBySlug,
+  getSimilarJobs,
+  getJobStats,
+  incrementJobViews,
+  getJobsByCompany,
+  getJobsBySkills,
+  getRecentJobs,
+  getPopularJobs
 } = require('../controllers/jobController');
 
 const router = express.Router();
@@ -22,11 +35,24 @@ const router = express.Router();
 // Public routes
 router.get('/', getAllJobs);
 router.get('/search', searchJobs);
+router.get('/featured', getFeaturedJobs);
+router.get('/urgent', getUrgentJobs);
+router.get('/hot', getHotJobs);
+router.get('/category/:category', getJobsByCategory);
+router.get('/location/:location', getJobsByLocation);
+router.get('/slug/:slug', getJobBySlug);
+router.get('/recent', getRecentJobs);
+router.get('/popular', getPopularJobs);
+router.get('/company/:companyId', getJobsByCompany);
+router.get('/skills', getJobsBySkills);
 router.get('/:id', getJob);
 router.get('/:id/recommendations', getJobRecommendations);
 router.get('/:id/match-score', getJobMatchScore);
 router.get('/:id/skill-analysis', analyzeJobSkills);
 router.get('/:id/roadmap', generateSkillRoadmap);
+router.get('/:id/similar', getSimilarJobs);
+router.get('/:id/stats', getJobStats);
+router.post('/:id/view', incrementJobViews);
 
 // Protected routes
 router.use(protect);

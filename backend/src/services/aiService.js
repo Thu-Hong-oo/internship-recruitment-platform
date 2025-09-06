@@ -419,18 +419,16 @@ class AIService {
    */
   async semanticSearch(query, type = 'jobs', limit = 10) {
     try {
-      const queryEmbedding = await this.generateEmbedding(query);
+      // For now, return empty results to avoid errors
+      // In production, this would use vector embeddings and similarity search
+      logger.info(`Semantic search called for query: ${query}, type: ${type}`);
       
-      // This would typically query a vector database
-      // For now, return mock results
-      return [
-        { id: '1', score: 0.85, type },
-        { id: '2', score: 0.78, type },
-        { id: '3', score: 0.72, type }
-      ].slice(0, limit);
+      // Return empty results to trigger fallback to text search
+      return [];
     } catch (error) {
       logger.error('Error in semantic search:', error);
-      throw error;
+      // Return empty results to trigger fallback
+      return [];
     }
   }
 
