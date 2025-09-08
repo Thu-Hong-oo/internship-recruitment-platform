@@ -36,6 +36,12 @@ const roadmapRoutes = require('./src/routes/roadmaps');
 const analyticsRoutes = require('./src/routes/analytics');
 const uploadRoutes = require('./src/routes/upload');
 const webhookRoutes = require('./src/routes/webhooks');
+const companyRoutes = require('./src/routes/companies');
+const skillRoutes = require('./src/routes/skills');
+const notificationRoutes = require('./src/routes/notifications');
+const savedJobRoutes = require('./src/routes/savedJobs');
+const candidateProfileRoutes = require('./src/routes/candidateProfiles');
+const employerProfileRoutes = require('./src/routes/employerProfiles');
 
 // Middleware & Utils
 const errorHandler = require('./src/middleware/errorHandler');
@@ -223,6 +229,13 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/roadmaps', roadmapRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/webhooks', webhookRoutes);
+app.use('/api/companies', companyRoutes);
+app.use('/api/skills', skillRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/saved-jobs', savedJobRoutes);
+app.use('/api/candidate-profiles', candidateProfileRoutes);
+app.use('/api/employer-profiles', employerProfileRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
