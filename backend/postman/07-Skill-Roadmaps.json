@@ -1,0 +1,137 @@
+{
+  "info": {
+    "name": "Skill Roadmaps API",
+    "description": "Skill roadmap management endpoints for learning paths and progress tracking",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "api_url",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Get User Roadmaps",
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+        "url": {
+          "raw": "{{api_url}}/roadmaps?status=active&page=1&limit=10",
+          "host": ["{{api_url}}"],
+          "path": ["roadmaps"],
+          "query": [
+            {"key": "status", "value": "active"},
+            {"key": "page", "value": "1"},
+            {"key": "limit", "value": "10"}
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Roadmap by ID",
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+        "url": {
+          "raw": "{{api_url}}/roadmaps/{{roadmap_id}}",
+          "host": ["{{api_url}}"],
+          "path": ["roadmaps", "{{roadmap_id}}"]
+        }
+      }
+    },
+    {
+      "name": "Create Roadmap",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Authorization", "value": "Bearer {{token}}"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"React Developer Roadmap\",\n  \"description\": \"8-week roadmap to become a React developer\",\n  \"targetSkills\": [\"{{skill_id}}\", \"{{skill_id_2}}\"],\n  \"settings\": {\n    \"duration\": 8,\n    \"difficulty\": \"intermediate\",\n    \"timeCommitment\": \"10-15 hours/week\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{api_url}}/roadmaps",
+          "host": ["{{api_url}}"],
+          "path": ["roadmaps"]
+        }
+      }
+    },
+    {
+      "name": "Generate Roadmap from Job",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Authorization", "value": "Bearer {{token}}"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jobId\": \"{{job_id}}\",\n  \"duration\": 8\n}"
+        },
+        "url": {
+          "raw": "{{api_url}}/roadmaps/generate-from-job",
+          "host": ["{{api_url}}"],
+          "path": ["roadmaps", "generate-from-job"]
+        }
+      }
+    },
+    {
+      "name": "Complete Roadmap Week",
+      "request": {
+        "method": "POST",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Authorization", "value": "Bearer {{token}}"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"weekNumber\": 1,\n  \"completedTasks\": [\"task1\", \"task2\"],\n  \"feedback\": \"Great week, learned a lot about React basics\"\n}"
+        },
+        "url": {
+          "raw": "{{api_url}}/roadmaps/{{roadmap_id}}/complete-week",
+          "host": ["{{api_url}}"],
+          "path": ["roadmaps", "{{roadmap_id}}", "complete-week"]
+        }
+      }
+    },
+    {
+      "name": "Update Roadmap Progress",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {"key": "Content-Type", "value": "application/json"},
+          {"key": "Authorization", "value": "Bearer {{token}}"}
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"progressData\": {\n    \"completedWeeks\": 3,\n    \"currentWeek\": 4,\n    \"skillsAcquired\": [\"{{skill_id}}\"],\n    \"timeSpent\": 120\n  }\n}"
+        },
+        "url": {
+          "raw": "{{api_url}}/roadmaps/{{roadmap_id}}/progress",
+          "host": ["{{api_url}}"],
+          "path": ["roadmaps", "{{roadmap_id}}", "progress"]
+        }
+      }
+    }
+  ]
+}
