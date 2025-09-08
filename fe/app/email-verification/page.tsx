@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
+import { authAPI } from "@/lib/api";
 
 export default function EmailVerificationPage() {
   const [otp, setOtp] = useState("");
@@ -21,6 +22,8 @@ export default function EmailVerificationPage() {
   const [success, setSuccess] = useState("");
   const [email, setEmail] = useState("");
   const [countdown, setCountdown] = useState(0);
+  const [emailStatus, setEmailStatus] = useState<'checking' | 'valid' | 'invalid' | 'unknown'>('checking');
+  const [emailError, setEmailError] = useState("");
 
   const { verifyEmail, getStoredEmail } = useAuth();
   const router = useRouter();
@@ -30,11 +33,49 @@ export default function EmailVerificationPage() {
     const storedEmail = getStoredEmail();
     if (storedEmail) {
       setEmail(storedEmail);
+      // Kiểm tra tài khoản chưa xác thực với email từ localStorage
+      checkUnverifiedAccount(storedEmail);
     } else {
       // Nếu không có email, redirect về trang đăng ký
       router.push("/register");
     }
   }, [getStoredEmail, router]);
+
+  const checkUnverifiedAccount = async (emailToCheck: string) => {
+    try {
+      const data = await authAPI.getUnverifiedAccount(emailToCheck);
+      
+      if (data.success && data.data) {
+        // Tài khoản chưa xác thực tồn tại
+        setEmailStatus('valid');
+        
+        // Hiển thị thông tin tài khoản
+        setSuccess(`Tìm thấy tài khoản chưa xác thực cho ${data.data.firstName} ${data.data.lastName}`);
+      } else if (data.expired) {
+        // Mã xác thực đã hết hạn
+        setEmailStatus('invalid');
+        setEmailError('Mã xác thực đã hết hạn. Vui lòng đăng ký lại.');
+      } else {
+        // Không tìm thấy tài khoản chưa xác thực
+        setEmailStatus('unknown');
+        setEmailError('Không tìm thấy tài khoản chưa xác thực với email này.');
+      }
+    } catch (error) {
+      console.error('Error checking unverified account:', error);
+      setEmailStatus('unknown');
+      setEmailError('Lỗi khi kiểm tra tài khoản. Vui lòng thử lại.');
+    }
+  };
+
+  const checkEmailStatus = async (emailToCheck: string) => {
+    try {
+      // Fallback function - not used in current flow
+      setEmailStatus('unknown');
+    } catch (error) {
+      console.error('Error checking email status:', error);
+      setEmailStatus('unknown');
+    }
+  };
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
@@ -87,10 +128,25 @@ export default function EmailVerificationPage() {
   };
 
   const handleResendOTP = async () => {
+    if (!email) return;
+    
     setCountdown(60); // 60 seconds cooldown
-    // TODO: Implement resend OTP API call
-    setSuccess("Mã OTP đã được gửi lại!");
+    setError("");
+    setSuccess("");
+    
+    try {
+      const response = await authAPI.resendEmailVerification(email);
+      
+      if (response.success) {
+        setSuccess(response.message || "Mã OTP đã được gửi lại!");
+      } else {
+        setError(response.error || response.message || "Không thể gửi lại mã OTP");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thể gửi lại mã OTP");
+    }
   };
+
 
   if (!email) {
     return (
@@ -100,6 +156,80 @@ export default function EmailVerificationPage() {
         </div>
       </div>
     );
+  }
+
+  // Show loading while checking email status
+  if (emailStatus === 'checking') {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+            <RefreshCw className="w-8 h-8 text-primary animate-spin" />
+          </div>
+          <h1 className="text-2xl font-bold text-primary">Đang kiểm tra email...</h1>
+          <p className="text-muted-foreground">Vui lòng chờ trong giây lát</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if email is invalid
+  if (emailStatus === 'invalid') {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-8">
+        <div className="w-full max-w-md space-y-8 text-center">
+          <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
+            <AlertCircle className="w-8 h-8 text-red-600" />
+          </div>
+          
+          <div className="space-y-3">
+            <h1 className="text-3xl font-bold text-red-600">Email không hợp lệ</h1>
+            <p className="text-muted-foreground text-lg">
+              {emailError}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Email: <strong className="text-red-600">{email}</strong>
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <Button
+              onClick={() => {
+                localStorage.removeItem('pendingEmail');
+                router.push('/register');
+              }}
+              className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-lg"
+            >
+              Đăng ký với email khác
+            </Button>
+            
+            <Button
+              variant="outline"
+              onClick={() => {
+                localStorage.removeItem('pendingEmail');
+                router.push('/login');
+              }}
+              className="w-full h-12"
+            >
+              Quay lại đăng nhập
+            </Button>
+          </div>
+
+          <div className="text-center text-sm text-muted-foreground">
+            <p>
+              Bạn gặp khó khăn? Vui lòng gọi tới số{" "}
+              <span className="text-primary font-medium">(024) 6680 5588</span>{" "}
+              (giờ hành chính).
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Only show OTP form if email is valid or unknown (fallback)
+  if (emailStatus !== 'valid' && emailStatus !== 'unknown') {
+    return null; // This should not happen due to early returns above
   }
 
   return (
@@ -116,9 +246,16 @@ export default function EmailVerificationPage() {
             <p className="text-muted-foreground text-lg">
               Chúng tôi đã gửi mã OTP đến email của bạn
             </p>
-            <p className="text-sm text-muted-foreground">
-              <strong>{email}</strong>
-            </p>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                <strong>{email}</strong>
+              </p>
+              {emailStatus === 'unknown' && (
+                <p className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                  ⚠️ Không thể xác minh email, vui lòng kiểm tra hộp thư
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Success Message */}
@@ -137,71 +274,76 @@ export default function EmailVerificationPage() {
             </div>
           )}
 
-          {/* Verification Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* OTP Input */}
-            <div className="space-y-2">
-              <label
-                htmlFor="otp"
-                className="text-sm font-medium text-foreground"
-              >
-                Mã OTP
-              </label>
-              <Input
-                id="otp"
-                type="text"
-                placeholder="Nhập mã OTP 6 số"
-                value={otp}
-                onChange={(e) => handleInputChange(e.target.value)}
-                className="h-12 text-center text-lg font-mono tracking-widest border-border focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                maxLength={6}
-                required
-                disabled={loading}
-              />
-              <p className="text-xs text-muted-foreground text-center">
-                Nhập mã 6 số được gửi đến email của bạn
-              </p>
-            </div>
 
-            {/* Verify Button */}
-            <Button
-              type="submit"
-              className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-lg rounded-lg transition-colors duration-200"
-              disabled={loading}
-            >
-              {loading ? "Đang xác thực..." : "Xác thực email"}
-            </Button>
-          </form>
+          {/* Verification Form - Only show if email is valid */}
+          {emailStatus === 'valid' && (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* OTP Input */}
+              <div className="space-y-2">
+                <label
+                  htmlFor="otp"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Mã OTP
+                </label>
+                <Input
+                  id="otp"
+                  type="text"
+                  placeholder="Nhập mã OTP 6 số"
+                  value={otp}
+                  onChange={(e) => handleInputChange(e.target.value)}
+                  className="h-12 text-center text-lg font-mono tracking-widest border-border focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  maxLength={6}
+                  required
+                  disabled={loading}
+                />
+                <p className="text-xs text-muted-foreground text-center">
+                  Nhập mã 6 số được gửi đến email của bạn
+                </p>
+              </div>
+
+              {/* Verify Button */}
+              <Button
+                type="submit"
+                className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-lg rounded-lg transition-colors duration-200"
+                disabled={loading}
+              >
+                {loading ? "Đang xác thực..." : "Xác thực email"}
+              </Button>
+            </form>
+          )}
 
           {/* Resend OTP */}
-          <div className="text-center space-y-4">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-border" />
+          {emailStatus === 'valid' && (
+            <div className="text-center space-y-4">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-background text-muted-foreground">
+                    Không nhận được mã?
+                  </span>
+                </div>
               </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-background text-muted-foreground">
-                  Không nhận được mã?
-                </span>
-              </div>
-            </div>
 
-            <Button
-              variant="outline"
-              onClick={handleResendOTP}
-              disabled={countdown > 0 || loading}
-              className="w-full"
-            >
-              {countdown > 0 ? (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Gửi lại mã ({countdown}s)
-                </>
-              ) : (
-                "Gửi lại mã OTP"
-              )}
-            </Button>
-          </div>
+              <Button
+                variant="outline"
+                onClick={handleResendOTP}
+                disabled={countdown > 0 || loading}
+                className="w-full"
+              >
+                {countdown > 0 ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Gửi lại mã ({countdown}s)
+                  </>
+                ) : (
+                  "Gửi lại mã OTP"
+                )}
+              </Button>
+            </div>
+          )}
 
           {/* Back to Register */}
           <div className="text-center">

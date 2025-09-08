@@ -35,6 +35,7 @@ const aiRoutes = require('./src/routes/ai');
 const roadmapRoutes = require('./src/routes/roadmaps');
 const analyticsRoutes = require('./src/routes/analytics');
 const uploadRoutes = require('./src/routes/upload');
+const webhookRoutes = require('./src/routes/webhooks');
 
 // Middleware & Utils
 const errorHandler = require('./src/middleware/errorHandler');

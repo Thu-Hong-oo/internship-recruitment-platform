@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
 import { splitFullName, validateEmail, validatePassword } from "@/lib/utils";
+import { authAPI } from "@/lib/api";
 
 export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -103,13 +104,32 @@ export default function RegisterPage() {
       });
 
       if (response.success) {
+        // Email is valid and user created, proceed to verification
         setSuccess(response.message || "Đăng ký thành công!");
-        // Redirect to email verification page after 2 seconds
+        // Store email for verification page
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('pendingEmail', formData.email);
+        }
         setTimeout(() => {
           router.push("/email-verification");
         }, 2000);
       } else {
-        setError(response.error || response.message || "Đăng ký thất bại");
+        // Registration failed
+        if (response.errorType === 'INVALID_EMAIL_ADDRESS') {
+          setError(response.error || "Email không tồn tại hoặc không thể nhận thư. Vui lòng kiểm tra lại địa chỉ email.");
+        } else if (response.errorType === 'EMAIL_NOT_VERIFIED') {
+          setError(response.error || "Email này đã được đăng ký nhưng chưa xác thực. Vui lòng kiểm tra email để xác thực hoặc đợi hết hạn để đăng ký lại.");
+          // Store email for verification page
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('pendingEmail', formData.email);
+          }
+          // Auto redirect to verification page after 2 seconds
+          setTimeout(() => {
+            router.push("/email-verification");
+          }, 2000);
+        } else {
+          setError(response.error || response.message || "Đăng ký thất bại");
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Đăng ký thất bại");
@@ -144,9 +164,28 @@ export default function RegisterPage() {
 
           {/* Error Message */}
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center">
-              <AlertCircle className="w-5 h-5 mr-2" />
-              {error}
+            <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
+              <div className="flex items-center mb-2">
+                <AlertCircle className="w-5 h-5 mr-2" />
+                {error}
+              </div>
+              {(error.includes('chưa xác thực') || error.includes('EMAIL_NOT_VERIFIED')) && (
+                <Button
+                  onClick={() => {
+                    console.log('Button clicked, email:', formData.email);
+                    // Ensure email is stored before redirecting
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('pendingEmail', formData.email);
+                      console.log('Email stored in localStorage:', formData.email);
+                    }
+                    console.log('Redirecting to email-verification...');
+                    router.push('/email-verification');
+                  }}
+                  className="w-full mt-2 bg-primary hover:bg-primary/90 text-primary-foreground"
+                >
+                  Kiểm tra email để xác thực
+                </Button>
+              )}
             </div>
           )}
 
