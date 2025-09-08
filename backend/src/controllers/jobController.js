@@ -10,7 +10,7 @@ const { logger } = require('../utils/logger');
 // Initialize AI services
 const recommendationEngine = new JobRecommendationEngine();
 
-// @desc    Get all jobs with filtering and pagination
+// @desc    Get all jobs with filtering and pagination (supports text search)
 // @route   GET /api/jobs
 // @access  Public
 const getAllJobs = async (req, res) => {
@@ -18,6 +18,9 @@ const getAllJobs = async (req, res) => {
     const {
       page = 1,
       limit = 10,
+      // Search parameters
+      q, // Text search query
+      // Filter parameters
       category,
       location,
       type,
@@ -25,7 +28,6 @@ const getAllJobs = async (req, res) => {
       skills,
       difficulty,
       company,
-      // Thêm các điều kiện lọc mới
       salaryMin,
       salaryMax,
       experienceLevel,
@@ -39,6 +41,15 @@ const getAllJobs = async (req, res) => {
     } = req.query;
 
     const query = {};
+
+    // Text search (if query provided)
+    if (q) {
+      query.$or = [
+        { title: { $regex: q, $options: 'i' } },
+        { description: { $regex: q, $options: 'i' } },
+        { 'requirements.skills.skillId.name': { $regex: q, $options: 'i' } },
+      ];
+    }
 
     // Build filter query
     if (category) query['aiAnalysis.category'] = category;
@@ -104,6 +115,7 @@ const getAllJobs = async (req, res) => {
       },
       filters: {
         appliedFilters: Object.keys(query).length,
+        searchQuery: q || null,
         availableFilters: {
           category: !!category,
           location: !!location,
@@ -130,16 +142,18 @@ const getAllJobs = async (req, res) => {
   }
 };
 
-// @desc    Search jobs with semantic search
+// @desc    Advanced semantic search for jobs using AI
 // @route   GET /api/jobs/search
 // @access  Public
 const searchJobs = async (req, res) => {
   try {
     const {
-      q,
+      q, // Required search query
+      page = 1,
+      limit = 10,
+      // Additional filters for AI search
       skills,
       location,
-      locationType,
       category,
       jobType,
       salaryMin,
@@ -149,55 +163,84 @@ const searchJobs = async (req, res) => {
       isRemote,
       isUrgent,
       isFeatured,
-      limit = 10,
     } = req.query;
 
-    let jobs = [];
-
-    if (q) {
-      // Use AI service for semantic search
-      try {
-        const searchResults = await aiService.semanticSearch(q, 'jobs');
-        const jobIds = searchResults.map(result => result.id);
-
-        // If we have search results, use them
-        if (jobIds.length > 0) {
-          jobs = await Job.find({ _id: { $in: jobIds } })
-            .populate('companyId', 'name logo industry')
-            .populate('requirements.skills.skillId', 'name category')
-            .limit(parseInt(limit));
-        }
-      } catch (aiError) {
-        logger.warn('AI search failed, falling back to text search:', aiError);
-        // Fallback to text search if AI fails
-      }
+    if (!q) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng cung cấp từ khóa tìm kiếm (q)',
+      });
     }
 
-    // If no AI results or no query, use regular search
-    if (jobs.length === 0) {
-      const query = {};
+    let jobs = [];
+    let searchMethod = 'text'; // Track which search method was used
 
-      // Text search
-      if (q) {
-        query.$or = [
-          { title: { $regex: q, $options: 'i' } },
-          { description: { $regex: q, $options: 'i' } },
-          { 'requirements.skills.skillId.name': { $regex: q, $options: 'i' } },
-        ];
+    // Try AI semantic search first
+    try {
+      const searchResults = await aiService.semanticSearch(q, 'jobs');
+      const jobIds = searchResults.map(result => result.id);
+
+      if (jobIds.length > 0) {
+        const query = { _id: { $in: jobIds }, status: 'active' };
+        
+        // Apply additional filters to AI results
+        if (skills) {
+          const skillIds = skills.split(',').map(skill => skill.trim());
+          query['requirements.skills.skillId'] = { $in: skillIds };
+        }
+        if (location) query['location.city'] = { $regex: location, $options: 'i' };
+        if (category) query['aiAnalysis.category'] = category;
+        if (jobType) query['jobType'] = jobType;
+        if (isRemote !== undefined) query['location.remote'] = isRemote === 'true';
+        if (isUrgent !== undefined) query['isUrgent'] = isUrgent === 'true';
+        if (isFeatured !== undefined) query['isFeatured'] = isFeatured === 'true';
+
+        // Salary range
+        if (salaryMin || salaryMax) {
+          query['salary'] = {};
+          if (salaryMin) query['salary.min'] = { $gte: parseInt(salaryMin) };
+          if (salaryMax) query['salary.max'] = { $lte: parseInt(salaryMax) };
+        }
+
+        // Experience and education
+        if (experienceLevel) query['requirements.experience.experienceLevel'] = experienceLevel;
+        if (educationLevel) query['requirements.education.level'] = educationLevel;
+
+        const skip = (page - 1) * limit;
+        jobs = await Job.find(query)
+          .populate('companyId', 'name logo industry')
+          .populate('requirements.skills.skillId', 'name category')
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(parseInt(limit));
+
+        searchMethod = 'ai';
       }
+    } catch (aiError) {
+      logger.warn('AI search failed, falling back to text search:', aiError);
+    }
 
-      // Filters
+    // Fallback to enhanced text search if AI fails or returns no results
+    if (jobs.length === 0) {
+      const query = { status: 'active' };
+
+      // Enhanced text search
+      query.$or = [
+        { title: { $regex: q, $options: 'i' } },
+        { description: { $regex: q, $options: 'i' } },
+        { 'requirements.skills.skillId.name': { $regex: q, $options: 'i' } },
+        { 'companyId.name': { $regex: q, $options: 'i' } },
+      ];
+
+      // Apply filters
       if (skills) {
         const skillIds = skills.split(',').map(skill => skill.trim());
         query['requirements.skills.skillId'] = { $in: skillIds };
       }
-      if (location)
-        query['location.city'] = { $regex: location, $options: 'i' };
-      if (locationType) query['location.type'] = locationType;
-      if (category) query['category'] = category;
+      if (location) query['location.city'] = { $regex: location, $options: 'i' };
+      if (category) query['aiAnalysis.category'] = category;
       if (jobType) query['jobType'] = jobType;
-      if (isRemote !== undefined)
-        query['location.remote'] = isRemote === 'true';
+      if (isRemote !== undefined) query['location.remote'] = isRemote === 'true';
       if (isUrgent !== undefined) query['isUrgent'] = isUrgent === 'true';
       if (isFeatured !== undefined) query['isFeatured'] = isFeatured === 'true';
 
@@ -209,22 +252,36 @@ const searchJobs = async (req, res) => {
       }
 
       // Experience and education
-      if (experienceLevel)
-        query['requirements.experience.experienceLevel'] = experienceLevel;
-      if (educationLevel)
-        query['requirements.education.level'] = educationLevel;
+      if (experienceLevel) query['requirements.experience.experienceLevel'] = experienceLevel;
+      if (educationLevel) query['requirements.education.level'] = educationLevel;
 
+      const skip = (page - 1) * limit;
       jobs = await Job.find(query)
         .populate('companyId', 'name logo industry')
         .populate('requirements.skills.skillId', 'name category')
         .sort({ createdAt: -1 })
+        .skip(skip)
         .limit(parseInt(limit));
+
+      searchMethod = 'text';
     }
+
+    const total = await Job.countDocuments(query);
 
     res.status(200).json({
       success: true,
       data: jobs,
-      total: jobs.length,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit),
+      },
+      search: {
+        query: q,
+        method: searchMethod,
+        totalResults: total,
+      },
     });
   } catch (error) {
     logger.error('Error searching jobs:', error);
@@ -819,7 +876,10 @@ const getFeaturedJobs = async (req, res) => {
   try {
     const { limit = 10 } = req.query;
 
-    const jobs = await Job.find({ isFeatured: true, status: 'active' })
+    const query = { isFeatured: true, status: 'active' };
+    const total = await Job.countDocuments(query);
+
+    const jobs = await Job.find(query)
       .populate('companyId', 'name logo industry')
       .populate('requirements.skills.skillId', 'name category')
       .sort({ priority: -1, createdAt: -1 })
@@ -828,6 +888,9 @@ const getFeaturedJobs = async (req, res) => {
     res.status(200).json({
       success: true,
       data: jobs,
+      total,
+      limit: parseInt(limit),
+      message: `Tìm thấy ${total} công việc nổi bật`,
     });
   } catch (error) {
     logger.error('Error getting featured jobs:', error);
@@ -845,7 +908,10 @@ const getUrgentJobs = async (req, res) => {
   try {
     const { limit = 10 } = req.query;
 
-    const jobs = await Job.find({ isUrgent: true, status: 'active' })
+    const query = { isUrgent: true, status: 'active' };
+    const total = await Job.countDocuments(query);
+
+    const jobs = await Job.find(query)
       .populate('companyId', 'name logo industry')
       .populate('requirements.skills.skillId', 'name category')
       .sort({ createdAt: -1 })
@@ -854,6 +920,9 @@ const getUrgentJobs = async (req, res) => {
     res.status(200).json({
       success: true,
       data: jobs,
+      total,
+      limit: parseInt(limit),
+      message: `Tìm thấy ${total} công việc khẩn cấp`,
     });
   } catch (error) {
     logger.error('Error getting urgent jobs:', error);
@@ -871,7 +940,10 @@ const getHotJobs = async (req, res) => {
   try {
     const { limit = 10 } = req.query;
 
-    const jobs = await Job.find({ status: 'active' })
+    const query = { status: 'active' };
+    const total = await Job.countDocuments(query);
+
+    const jobs = await Job.find(query)
       .populate('companyId', 'name logo industry')
       .populate('requirements.skills.skillId', 'name category')
       .sort({ 'stats.views': -1, createdAt: -1 })
@@ -880,6 +952,9 @@ const getHotJobs = async (req, res) => {
     res.status(200).json({
       success: true,
       data: jobs,
+      total,
+      limit: parseInt(limit),
+      message: `Tìm thấy ${total} công việc phổ biến`,
     });
   } catch (error) {
     logger.error('Error getting hot jobs:', error);
@@ -1023,11 +1098,14 @@ const getSimilarJobs = async (req, res) => {
     }
 
     // Find similar jobs based on category and skills
-    const similarJobs = await Job.find({
+    const query = {
       _id: { $ne: id },
       category: job.category,
       status: 'active',
-    })
+    };
+    const total = await Job.countDocuments(query);
+
+    const similarJobs = await Job.find(query)
       .populate('companyId', 'name logo industry')
       .populate('requirements.skills.skillId', 'name category')
       .sort({ createdAt: -1 })
@@ -1036,6 +1114,9 @@ const getSimilarJobs = async (req, res) => {
     res.status(200).json({
       success: true,
       data: similarJobs,
+      total,
+      limit: parseInt(limit),
+      message: `Tìm thấy ${total} công việc tương tự`,
     });
   } catch (error) {
     logger.error('Error getting similar jobs:', error);
@@ -1216,6 +1297,8 @@ const getRecentJobs = async (req, res) => {
     const query = { status: 'active' };
     if (category) query.category = category;
 
+    const total = await Job.countDocuments(query);
+
     const jobs = await Job.find(query)
       .populate('companyId', 'name logo industry')
       .populate('requirements.skills.skillId', 'name category')
@@ -1225,6 +1308,9 @@ const getRecentJobs = async (req, res) => {
     res.status(200).json({
       success: true,
       data: jobs,
+      total,
+      limit: parseInt(limit),
+      message: `Tìm thấy ${total} công việc gần đây`,
     });
   } catch (error) {
     logger.error('Error getting recent jobs:', error);
@@ -1259,10 +1345,13 @@ const getPopularJobs = async (req, res) => {
         startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     }
 
-    const jobs = await Job.find({
+    const query = {
       status: 'active',
       createdAt: { $gte: startDate },
-    })
+    };
+    const total = await Job.countDocuments(query);
+
+    const jobs = await Job.find(query)
       .populate('companyId', 'name logo industry')
       .populate('requirements.skills.skillId', 'name category')
       .sort({ 'stats.views': -1, 'stats.applications': -1 })
@@ -1271,6 +1360,10 @@ const getPopularJobs = async (req, res) => {
     res.status(200).json({
       success: true,
       data: jobs,
+      total,
+      limit: parseInt(limit),
+      period,
+      message: `Tìm thấy ${total} công việc phổ biến trong ${period}`,
     });
   } catch (error) {
     logger.error('Error getting popular jobs:', error);
