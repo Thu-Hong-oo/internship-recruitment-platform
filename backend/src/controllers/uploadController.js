@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const { cloudinary } = require('../services/cloudinaryService');
 const { logger } = require('../utils/logger');
+const Company = require('../models/Company');
 
 // @desc    Upload single image
 // @route   POST /api/upload/single
@@ -11,10 +12,10 @@ const uploadSingleImage = asyncHandler(async (req, res) => {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        error: 'Không có file nào được upload'
+        error: 'Không có file nào được upload',
       });
     }
-//2 cấu hình options
+    //2 cấu hình options
     const options = {
       folder: req.body.folder || 'internbridge',
       optimize: req.body.optimize !== 'false',
@@ -22,28 +23,32 @@ const uploadSingleImage = asyncHandler(async (req, res) => {
       optimization: {
         quality: parseInt(req.body.quality) || 80,
         maxWidth: parseInt(req.body.maxWidth) || 1920,
-        maxHeight: parseInt(req.body.maxHeight) || 1080
+        maxHeight: parseInt(req.body.maxHeight) || 1080,
       },
       thumbnail: {
         width: parseInt(req.body.thumbWidth) || 300,
         height: parseInt(req.body.thumbHeight) || 300,
-        quality: parseInt(req.body.thumbQuality) || 70
-      }
+        quality: parseInt(req.body.thumbQuality) || 70,
+      },
     };
-//2. upload lên cloundinary với transformation
+    //2. upload lên cloundinary với transformation
     const result = await cloudinary.uploader.upload(req.file.path, {
       folder: options.folder || 'internbridge',
       transformation: [
-        { width: options.optimization?.maxWidth || 1920, height: options.optimization?.maxHeight || 1080, crop: 'limit' },
-        { quality: options.optimization?.quality || 100, fetch_format: 'auto' }
-      ]
+        {
+          width: options.optimization?.maxWidth || 1920,
+          height: options.optimization?.maxHeight || 1080,
+          crop: 'limit',
+        },
+        { quality: options.optimization?.quality || 100, fetch_format: 'auto' },
+      ],
     });
 
     logger.info('Single image upload successful', {
       userId: req.user?.id,
       originalName: req.file.originalname,
       size: req.file.size,
-      result: result.main.publicId
+      result: result.main.publicId,
     });
 
     res.status(200).json({
@@ -58,20 +63,20 @@ const uploadSingleImage = asyncHandler(async (req, res) => {
         format: result.format,
         dimensions: {
           width: result.width,
-          height: result.height
-        }
-      }
+          height: result.height,
+        },
+      },
     });
   } catch (error) {
-    logger.error('Single image upload failed:', { 
-      error: error.message, 
+    logger.error('Single image upload failed:', {
+      error: error.message,
       userId: req.user?.id,
-      fileName: req.file?.originalname 
+      fileName: req.file?.originalname,
     });
 
     res.status(500).json({
       success: false,
-      error: error.message || 'Upload ảnh thất bại'
+      error: error.message || 'Upload ảnh thất bại',
     });
   }
 });
@@ -84,7 +89,7 @@ const uploadMultipleImages = asyncHandler(async (req, res) => {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({
         success: false,
-        error: 'Không có file nào được upload'
+        error: 'Không có file nào được upload',
       });
     }
 
@@ -95,36 +100,47 @@ const uploadMultipleImages = asyncHandler(async (req, res) => {
       optimization: {
         quality: parseInt(req.body.quality) || 80,
         maxWidth: parseInt(req.body.maxWidth) || 1920,
-        maxHeight: parseInt(req.body.maxHeight) || 1080
+        maxHeight: parseInt(req.body.maxHeight) || 1080,
       },
       thumbnail: {
         width: parseInt(req.body.thumbWidth) || 300,
         height: parseInt(req.body.thumbHeight) || 300,
-        quality: parseInt(req.body.thumbQuality) || 70
-      }
+        quality: parseInt(req.body.thumbQuality) || 70,
+      },
     };
 
     const filePaths = req.files.map(file => file.path);
     // 1. Tạo array promises cho việc upload
-    const uploadPromises = req.files.map(file => 
+    const uploadPromises = req.files.map(file =>
       cloudinary.uploader.upload(file.path, {
         folder: options.folder || 'internbridge',
         transformation: [
-          { width: options.optimization?.maxWidth || 1920, height: options.optimization?.maxHeight || 1080, crop: 'limit' },
-          { quality: options.optimization?.quality || 80, fetch_format: 'auto' }
-        ]
+          {
+            width: options.optimization?.maxWidth || 1920,
+            height: options.optimization?.maxHeight || 1080,
+            crop: 'limit',
+          },
+          {
+            quality: options.optimization?.quality || 80,
+            fetch_format: 'auto',
+          },
+        ],
       })
     );
-    
+
     const results = await Promise.allSettled(uploadPromises);
-    const successfulUploads = results.filter(result => result.status === 'fulfilled');
-    const failedUploads = results.filter(result => result.status === 'rejected');
+    const successfulUploads = results.filter(
+      result => result.status === 'fulfilled'
+    );
+    const failedUploads = results.filter(
+      result => result.status === 'rejected'
+    );
 
     logger.info('Multiple images upload completed', {
       userId: req.user?.id,
       totalFiles: req.files.length,
       successful: successfulUploads.length,
-      failed: failedUploads.length
+      failed: failedUploads.length,
     });
 
     res.status(200).json({
@@ -143,20 +159,20 @@ const uploadMultipleImages = asyncHandler(async (req, res) => {
           format: result.value.format,
           dimensions: {
             width: result.value.width,
-            height: result.value.height
-          }
-        }))
-      }
+            height: result.value.height,
+          },
+        })),
+      },
     });
   } catch (error) {
-    logger.error('Multiple images upload failed:', { 
-      error: error.message, 
-      userId: req.user?.id 
+    logger.error('Multiple images upload failed:', {
+      error: error.message,
+      userId: req.user?.id,
     });
 
     res.status(500).json({
       success: false,
-      error: error.message || 'Upload nhiều ảnh thất bại'
+      error: error.message || 'Upload nhiều ảnh thất bại',
     });
   }
 });
@@ -169,7 +185,7 @@ const uploadAvatar = asyncHandler(async (req, res) => {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        error: 'Không có file nào được upload'
+        error: 'Không có file nào được upload',
       });
     }
 
@@ -180,27 +196,27 @@ const uploadAvatar = asyncHandler(async (req, res) => {
       optimization: {
         quality: 85,
         maxWidth: 800,
-        maxHeight: 800
+        maxHeight: 800,
       },
       thumbnail: {
         width: 200,
         height: 200,
-        quality: 80
-      }
+        quality: 80,
+      },
     };
 
     const result = await cloudinary.uploader.upload(req.file.path, {
       folder: 'internbridge/avatars',
       transformation: [
         { width: 800, height: 800, crop: 'fill', gravity: 'face' },
-        { quality: 85, fetch_format: 'auto' }
-      ]
+        { quality: 85, fetch_format: 'auto' },
+      ],
     });
 
     logger.info('Avatar upload successful', {
       userId: req.user.id,
       originalName: req.file.originalname,
-      publicId: result.public_id
+      publicId: result.public_id,
     });
 
     res.status(200).json({
@@ -214,20 +230,20 @@ const uploadAvatar = asyncHandler(async (req, res) => {
           format: result.format,
           dimensions: {
             width: result.width,
-            height: result.height
-          }
-        }
-      }
+            height: result.height,
+          },
+        },
+      },
     });
   } catch (error) {
-    logger.error('Avatar upload failed:', { 
-      error: error.message, 
-      userId: req.user?.id 
+    logger.error('Avatar upload failed:', {
+      error: error.message,
+      userId: req.user?.id,
     });
 
     res.status(500).json({
       success: false,
-      error: error.message || 'Upload avatar thất bại'
+      error: error.message || 'Upload avatar thất bại',
     });
   }
 });
@@ -240,7 +256,7 @@ const uploadCompanyLogo = asyncHandler(async (req, res) => {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        error: 'Không có file nào được upload'
+        error: 'Không có file nào được upload',
       });
     }
 
@@ -251,27 +267,27 @@ const uploadCompanyLogo = asyncHandler(async (req, res) => {
       optimization: {
         quality: 90,
         maxWidth: 1200,
-        maxHeight: 600
+        maxHeight: 600,
       },
       thumbnail: {
         width: 300,
         height: 150,
-        quality: 85
-      }
+        quality: 85,
+      },
     };
 
     const result = await cloudinary.uploader.upload(req.file.path, {
       folder: 'internbridge/logos',
       transformation: [
         { width: 1200, height: 600, crop: 'limit' },
-        { quality: 90, fetch_format: 'auto' }
-      ]
+        { quality: 90, fetch_format: 'auto' },
+      ],
     });
 
     logger.info('Company logo upload successful', {
       userId: req.user.id,
       originalName: req.file.originalname,
-      publicId: result.main.publicId
+      publicId: result.main.publicId,
     });
 
     res.status(200).json({
@@ -286,20 +302,20 @@ const uploadCompanyLogo = asyncHandler(async (req, res) => {
           format: result.main.format,
           dimensions: {
             width: result.main.width,
-            height: result.main.height
-          }
-        }
-      }
+            height: result.main.height,
+          },
+        },
+      },
     });
   } catch (error) {
-    logger.error('Company logo upload failed:', { 
-      error: error.message, 
-      userId: req.user?.id 
+    logger.error('Company logo upload failed:', {
+      error: error.message,
+      userId: req.user?.id,
     });
 
     res.status(500).json({
       success: false,
-      error: error.message || 'Upload logo công ty thất bại'
+      error: error.message || 'Upload logo công ty thất bại',
     });
   }
 });
@@ -314,7 +330,7 @@ const deleteImage = asyncHandler(async (req, res) => {
     if (!publicId) {
       return res.status(400).json({
         success: false,
-        error: 'Public ID không được cung cấp'
+        error: 'Public ID không được cung cấp',
       });
     }
 
@@ -323,30 +339,30 @@ const deleteImage = asyncHandler(async (req, res) => {
     if (result) {
       logger.info('Image deleted successfully', {
         userId: req.user.id,
-        publicId
+        publicId,
       });
 
       res.status(200).json({
         success: true,
         message: 'Xóa ảnh thành công',
-        data: { publicId }
+        data: { publicId },
       });
     } else {
       res.status(400).json({
         success: false,
-        error: 'Không thể xóa ảnh'
+        error: 'Không thể xóa ảnh',
       });
     }
   } catch (error) {
-    logger.error('Image deletion failed:', { 
-      error: error.message, 
+    logger.error('Image deletion failed:', {
+      error: error.message,
       userId: req.user?.id,
-      publicId: req.params.publicId 
+      publicId: req.params.publicId,
     });
 
     res.status(500).json({
       success: false,
-      error: error.message || 'Xóa ảnh thất bại'
+      error: error.message || 'Xóa ảnh thất bại',
     });
   }
 });
@@ -361,7 +377,7 @@ const getImageInfo = asyncHandler(async (req, res) => {
     if (!publicId) {
       return res.status(400).json({
         success: false,
-        error: 'Public ID không được cung cấp'
+        error: 'Public ID không được cung cấp',
       });
     }
 
@@ -369,18 +385,18 @@ const getImageInfo = asyncHandler(async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: imageInfo
+      data: imageInfo,
     });
   } catch (error) {
-    logger.error('Get image info failed:', { 
-      error: error.message, 
+    logger.error('Get image info failed:', {
+      error: error.message,
       userId: req.user?.id,
-      publicId: req.params.publicId 
+      publicId: req.params.publicId,
     });
 
     res.status(500).json({
       success: false,
-      error: error.message || 'Không thể lấy thông tin ảnh'
+      error: error.message || 'Không thể lấy thông tin ảnh',
     });
   }
 });
@@ -391,5 +407,5 @@ module.exports = {
   uploadAvatar,
   uploadCompanyLogo,
   deleteImage,
-  getImageInfo
+  getImageInfo,
 };

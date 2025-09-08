@@ -21,6 +21,16 @@ const SkillSchema = new mongoose.Schema(
         'devops',
         'mobile',
         'web',
+        'finance',
+        'hr',
+        'sales',
+        'content',
+        'analytics',
+        'security',
+        'cloud',
+        'ai-ml',
+        'blockchain',
+        'gaming',
         'other',
       ],
       required: [true, 'Danh mục kỹ năng là bắt buộc'],
@@ -82,10 +92,36 @@ const SkillSchema = new mongoose.Schema(
       resources: [
         {
           type: String,
-          enum: ['course', 'video', 'book', 'project', 'tutorial'],
+          enum: [
+            'course',
+            'video',
+            'book',
+            'project',
+            'tutorial',
+            'bootcamp',
+            'certification',
+          ],
           default: 'course',
         },
       ],
+      // Thêm thông tin về skill
+      prerequisites: [String], // Kỹ năng cần có trước
+      careerPaths: [String], // Các nghề nghiệp sử dụng skill này
+      industryDemand: {
+        type: String,
+        enum: ['low', 'medium', 'high', 'critical'],
+        default: 'medium',
+      },
+      salaryImpact: {
+        type: Number, // % tăng lương khi có skill này
+        min: 0,
+        max: 100,
+      },
+      futureTrend: {
+        type: String,
+        enum: ['declining', 'stable', 'growing', 'emerging'],
+        default: 'stable',
+      },
     },
   },
   {
@@ -96,11 +132,13 @@ const SkillSchema = new mongoose.Schema(
 );
 
 // Indexes
-SkillSchema.index({ name: 1 }, { unique: true });
 SkillSchema.index({ category: 1 });
 SkillSchema.index({ popularity: -1 });
 SkillSchema.index({ isActive: 1 });
 SkillSchema.index({ name: 'text', description: 'text' });
+SkillSchema.index({ 'metadata.industryDemand': 1 });
+SkillSchema.index({ 'metadata.futureTrend': 1 });
+SkillSchema.index({ 'metadata.difficulty': 1 });
 
 // Virtual để lấy số lượng users có skill này
 SkillSchema.virtual('userCount', {
@@ -153,6 +191,76 @@ SkillSchema.methods.updatePopularity = async function () {
   return this.save();
 };
 
+// Method để get skill recommendations dựa trên user skills
+SkillSchema.methods.getRecommendations = async function (userSkills = []) {
+  const recommendations = [];
+
+  // Tìm skills liên quan
+  const relatedSkills = await this.getRelatedSkills();
+  recommendations.push(...relatedSkills);
+
+  // Tìm skills cùng category
+  const categorySkills = await this.getSkillsByCategory();
+  recommendations.push(...categorySkills);
+
+  // Tìm skills có prerequisites là skills hiện tại
+  const prerequisiteSkills = await this.model('Skill').findByPrerequisites([
+    this.name,
+  ]);
+  recommendations.push(...prerequisiteSkills);
+
+  // Loại bỏ duplicates và skills user đã có
+  const uniqueRecommendations = recommendations.filter(
+    (skill, index, self) =>
+      index ===
+        self.findIndex(s => s._id.toString() === skill._id.toString()) &&
+      !userSkills.includes(skill._id.toString())
+  );
+
+  return uniqueRecommendations.slice(0, 10); // Top 10 recommendations
+};
+
+// Method để check if skill is trending
+SkillSchema.methods.isTrending = function () {
+  return (
+    this.metadata.futureTrend === 'growing' ||
+    this.metadata.futureTrend === 'emerging' ||
+    this.metadata.industryDemand === 'high' ||
+    this.metadata.industryDemand === 'critical'
+  );
+};
+
+// Method để get skill value score
+SkillSchema.methods.getValueScore = function () {
+  let score = 0;
+
+  // Base popularity
+  score += Math.min(this.popularity / 10, 50);
+
+  // Industry demand bonus
+  const demandBonus = {
+    low: 0,
+    medium: 10,
+    high: 20,
+    critical: 30,
+  };
+  score += demandBonus[this.metadata.industryDemand] || 0;
+
+  // Future trend bonus
+  const trendBonus = {
+    declining: -10,
+    stable: 0,
+    growing: 15,
+    emerging: 20,
+  };
+  score += trendBonus[this.metadata.futureTrend] || 0;
+
+  // Salary impact bonus
+  score += (this.metadata.salaryImpact || 0) * 0.5;
+
+  return Math.min(Math.max(score, 0), 100); // Clamp between 0-100
+};
+
 // Static method để tìm skills theo category
 SkillSchema.statics.findByCategory = function (category) {
   return this.find({
@@ -174,6 +282,62 @@ SkillSchema.statics.findPopular = function (limit = 20) {
 SkillSchema.statics.search = function (query) {
   return this.find({
     $text: { $search: query },
+    isActive: true,
+  }).sort({ popularity: -1 });
+};
+
+// Static method để tìm skills theo industry demand
+SkillSchema.statics.findByIndustryDemand = function (demand) {
+  return this.find({
+    'metadata.industryDemand': demand,
+    isActive: true,
+  }).sort({ popularity: -1 });
+};
+
+// Static method để tìm skills theo future trend
+SkillSchema.statics.findByFutureTrend = function (trend) {
+  return this.find({
+    'metadata.futureTrend': trend,
+    isActive: true,
+  }).sort({ popularity: -1 });
+};
+
+// Static method để tìm skills theo difficulty
+SkillSchema.statics.findByDifficulty = function (difficulty) {
+  return this.find({
+    'metadata.difficulty': difficulty,
+    isActive: true,
+  }).sort({ popularity: -1 });
+};
+
+// Static method để tìm skills theo career path
+SkillSchema.statics.findByCareerPath = function (careerPath) {
+  return this.find({
+    'metadata.careerPaths': { $in: [careerPath] },
+    isActive: true,
+  }).sort({ popularity: -1 });
+};
+
+// Static method để tìm skills có salary impact cao
+SkillSchema.statics.findHighSalaryImpact = function (minImpact = 20) {
+  return this.find({
+    'metadata.salaryImpact': { $gte: minImpact },
+    isActive: true,
+  }).sort({ 'metadata.salaryImpact': -1 });
+};
+
+// Static method để tìm skills emerging (đang phát triển)
+SkillSchema.statics.findEmergingSkills = function () {
+  return this.find({
+    'metadata.futureTrend': 'emerging',
+    isActive: true,
+  }).sort({ popularity: -1 });
+};
+
+// Static method để tìm skills theo prerequisites
+SkillSchema.statics.findByPrerequisites = function (prerequisiteSkills) {
+  return this.find({
+    'metadata.prerequisites': { $in: prerequisiteSkills },
     isActive: true,
   }).sort({ popularity: -1 });
 };

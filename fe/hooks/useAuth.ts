@@ -26,8 +26,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     checkAuth();
   }, []);
 
@@ -101,7 +103,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const needsEmailVerification = () => {
-    return user !== null && !user.isEmailVerified;
+    // Don't show verification banner if:
+    // 1. User is not logged in
+    // 2. User is still loading
+    // 3. User email is already verified
+    if (!user || loading) {
+      return false;
+    }
+    return !user.isEmailVerified;
   };
 
   const uploadAvatar = async (file: File) => {
@@ -112,6 +121,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     return response;
   };
+
+  // Prevent hydration mismatch by not rendering until mounted
+  if (!mounted) {
+    return React.createElement(
+      AuthContext.Provider,
+      {
+        value: {
+          user: null,
+          loading: true,
+          register,
+          login,
+          logout,
+          verifyEmail,
+          getStoredEmail,
+          needsEmailVerification,
+          uploadAvatar,
+        },
+      },
+      children
+    );
+  }
 
   return React.createElement(
     AuthContext.Provider, //cung cấp value cho children, bất cứ component nào trong authprovider sẽ có thể truy cập vào context: user, loading, register, login, logout,...

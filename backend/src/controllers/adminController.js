@@ -2,6 +2,7 @@ const User = require('../models/User');
 const CandidateProfile = require('../models/CandidateProfile');
 const EmployerProfile = require('../models/EmployerProfile');
 const Job = require('../models/Job');
+const Company = require('../models/Company');
 const Application = require('../models/Application');
 const asyncHandler = require('express-async-handler');
 const { logger } = require('../utils/logger');

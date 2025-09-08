@@ -1,5 +1,4 @@
 // AI Job Recommendation System
-const tf = require('@tensorflow/tfjs-node');
 const natural = require('natural');
 
 class JobRecommendationEngine {
@@ -12,9 +11,6 @@ class JobRecommendationEngine {
 
   async initialize() {
     try {
-      // Initialize TensorFlow
-      await tf.ready();
-      
       // Load pre-trained embeddings or train new ones
       await this.loadJobEmbeddings();
       
@@ -83,6 +79,32 @@ class JobRecommendationEngine {
       }))
       .sort((a, b) => b.score - a.score)
       .slice(0, limit);
+  }
+
+  // Get similar jobs based on job and user profile
+  async getSimilarJobs(job, userProfile, limit = 10) {
+    try {
+      // For now, return jobs with similar skills
+      const jobSkills = job.requirements.skills.map(s => s.skillId.name.toLowerCase());
+      const userSkills = userProfile.skills.map(s => s.name.toLowerCase());
+      
+      // Find jobs with matching skills
+      const similarJobs = [];
+      
+      // This would typically query the database for similar jobs
+      // For now, return mock data
+      similarJobs.push({
+        jobId: 'similar_job_1',
+        score: 0.85,
+        method: 'skill-based',
+        reasons: ['Similar technical skills', 'Matching experience level']
+      });
+      
+      return similarJobs.slice(0, limit);
+    } catch (error) {
+      console.error('Error getting similar jobs:', error);
+      return [];
+    }
   }
 
   // Hybrid recommendation
