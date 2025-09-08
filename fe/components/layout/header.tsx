@@ -72,7 +72,7 @@ const useDropdown = (delay = 150) => {
 export default function Header() {
   const { resolvedTheme, setTheme } = useTheme();
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, loading, logout } = useAuth();
   // Sử dụng custom hook cho 2 dropdowns
   const jobsDropdown = useDropdown(150);
   const cvDropdown = useDropdown(150);
@@ -396,7 +396,13 @@ export default function Header() {
               className="w-10 h-6"
             />
 
-            {user ? (
+            {loading ? (
+              // UI khi đang loading - hiển thị skeleton hoặc ẩn
+              <div className="flex items-center space-x-4">
+                <div className="w-5 h-5 bg-muted animate-pulse rounded"></div>
+                <div className="w-8 h-8 bg-muted animate-pulse rounded-full"></div>
+              </div>
+            ) : user ? (
               // UI khi đã đăng nhập
               <>
                 <Bell className="w-5 h-5 text-muted-foreground hover:text-primary cursor-pointer transition-colors duration-200" />

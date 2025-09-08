@@ -72,13 +72,29 @@ const register = asyncHandler(async (req, res) => {
       error: 'Mật khẩu là bắt buộc khi đăng ký tài khoản',
     });
   }
+
+  // Validate firstName and lastName
+  if (!firstName || firstName.trim() === '') {
+    return res.status(400).json({
+      success: false,
+      error: 'Tên là bắt buộc khi đăng ký tài khoản',
+    });
+  }
+
+  if (!lastName || lastName.trim() === '') {
+    return res.status(400).json({
+      success: false,
+      error: 'Họ là bắt buộc khi đăng ký tài khoản',
+    });
+  }
+
   // Create user with local authentication
   const user = await User.create({
     email,
     password,
     profile: {
-      firstName,
-      lastName,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
     },
     role: role || 'student',
     authMethod: 'local',
@@ -151,15 +167,17 @@ const register = asyncHandler(async (req, res) => {
     user: {
       id: user._id,
       email: user.email,
+      firstName: user.profile.firstName,
+      lastName: user.profile.lastName,
+      role: user.role,
+      fullName: user.fullName,
+      authMethod: user.authMethod,
+      isEmailVerified: user.isEmailVerified,
       profile: {
         firstName: user.profile.firstName,
         lastName: user.profile.lastName,
         avatar: user.profile.avatar,
       },
-      role: user.role,
-      fullName: user.fullName,
-      authMethod: user.authMethod,
-      isEmailVerified: user.isEmailVerified,
     },
     message:
       'Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản.',
@@ -224,15 +242,17 @@ const login = asyncHandler(async (req, res) => {
       user: {
         id: user._id,
         email: user.email,
+        firstName: user.profile.firstName,
+        lastName: user.profile.lastName,
+        role: user.role,
+        fullName: user.fullName,
+        isEmailVerified: user.isEmailVerified,
+        authMethod: user.authMethod,
         profile: {
           firstName: user.profile.firstName,
           lastName: user.profile.lastName,
           avatar: user.profile.avatar,
         },
-        role: user.role,
-        fullName: user.fullName,
-        isEmailVerified: user.isEmailVerified,
-        authMethod: user.authMethod,
       },
     });
   }
@@ -263,15 +283,17 @@ const login = asyncHandler(async (req, res) => {
     user: {
       id: user._id,
       email: user.email,
+      firstName: user.profile.firstName,
+      lastName: user.profile.lastName,
+      role: user.role,
+      fullName: user.fullName,
+      isEmailVerified: user.isEmailVerified,
+      authMethod: user.authMethod,
       profile: {
         firstName: user.profile.firstName,
         lastName: user.profile.lastName,
         avatar: user.profile.avatar,
       },
-      role: user.role,
-      fullName: user.fullName,
-      isEmailVerified: user.isEmailVerified,
-      authMethod: user.authMethod,
     },
   });
 });
@@ -641,6 +663,12 @@ const verifyEmail = asyncHandler(async (req, res) => {
       role: user.role,
       fullName: user.fullName,
       isEmailVerified: user.isEmailVerified,
+      authMethod: user.authMethod,
+      profile: {
+        firstName: user.profile.firstName,
+        lastName: user.profile.lastName,
+        avatar: user.profile.avatar,
+      },
     },
   });
 });
@@ -775,6 +803,18 @@ const getMe = asyncHandler(async (req, res) => {
     user: {
       id: user._id,
       email: user.email,
+      firstName: user.profile?.firstName,
+      lastName: user.profile?.lastName,
+      role: user.role,
+      fullName: user.fullName,
+      authMethod: user.authMethod,
+      isEmailVerified: user.isEmailVerified,
+      isActive: user.isActive,
+      lastLogin: user.lastLogin,
+      candidateProfile: user.candidateProfile,
+      employerProfile: user.employerProfile,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
       profile: {
         firstName: user.profile?.firstName,
         lastName: user.profile?.lastName,
@@ -786,16 +826,6 @@ const getMe = asyncHandler(async (req, res) => {
         gender: user.profile?.gender,
       },
       preferences: user.preferences,
-      role: user.role,
-      fullName: user.fullName,
-      authMethod: user.authMethod,
-      isEmailVerified: user.isEmailVerified,
-      isActive: user.isActive,
-      lastLogin: user.lastLogin,
-      candidateProfile: user.candidateProfile,
-      employerProfile: user.employerProfile,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
     },
   });
 });

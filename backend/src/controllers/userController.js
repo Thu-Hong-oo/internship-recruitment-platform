@@ -61,15 +61,17 @@ const uploadAvatar = asyncHandler(async (req, res) => {
       user: {
         id: user._id,
         email: user.email,
+        firstName: user.profile.firstName,
+        lastName: user.profile.lastName,
+        role: user.role,
+        fullName: user.fullName,
+        isEmailVerified: user.isEmailVerified,
+        authMethod: user.authMethod,
         profile: {
           firstName: user.profile.firstName,
           lastName: user.profile.lastName,
           avatar: user.profile.avatar,
         },
-        role: user.role,
-        fullName: user.fullName,
-        isEmailVerified: user.isEmailVerified,
-        authMethod: user.authMethod,
       },
     });
   } catch (error) {
@@ -217,9 +219,13 @@ const linkGoogleAccount = asyncHandler(async (req, res) => {
         lastName: user.profile.lastName,
         role: user.role,
         fullName: user.fullName,
-        avatar: user.profile.avatar || user.googleProfile?.picture,
         isEmailVerified: user.isEmailVerified,
         authMethod: user.authMethod,
+        profile: {
+          firstName: user.profile.firstName,
+          lastName: user.profile.lastName,
+          avatar: user.profile.avatar || user.googleProfile?.picture,
+        },
       },
     });
   } catch (error) {
@@ -288,9 +294,13 @@ const unlinkGoogleAccount = asyncHandler(async (req, res) => {
         lastName: user.profile.lastName,
         role: user.role,
         fullName: user.fullName,
-        avatar: user.profile.avatar,
         isEmailVerified: user.isEmailVerified,
         authMethod: user.authMethod,
+        profile: {
+          firstName: user.profile.firstName,
+          lastName: user.profile.lastName,
+          avatar: user.profile.avatar,
+        },
       },
     });
   } catch (error) {

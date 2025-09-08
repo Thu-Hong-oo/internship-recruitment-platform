@@ -32,6 +32,9 @@ const {
   updateEmployerProfile,
 } = require('../controllers/userController');
 
+const { getMe } = require('../controllers/authController');
+
+
 const router = express.Router();
 
 // All routes require authentication
@@ -612,6 +615,31 @@ router.put('/employer/profile', authorize('employer'), updateEmployerProfile);
 // ========================================
 // GENERAL USER ROUTES (must be last to avoid conflicts)
 // ========================================
+
+/**
+ * @swagger
+ * /api/users/profile:
+ *   get:
+ *     summary: Get user profile
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       401:
+ *         description: Not authorized
+ */
+router.get('/profile', getMe);
 
 /**
  * @swagger

@@ -1,0 +1,3628 @@
+{
+	"info": {
+		"_postman_id": "f05c9a24-7b1b-4980-a523-ef1728d4e63b",
+		"name": "Internship AI Platform API - Complete",
+		"description": "Complete API collection for AI-powered internship recruitment platform",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "38146107",
+		"_collection_link": "https://intership-platform.postman.co/workspace/Team-Workspace~96be9a72-219c-4bbc-8714-71a2edb8a68d/collection/38146107-f05c9a24-7b1b-4980-a523-ef1728d4e63b?action=share&source=collection_link&creator=38146107"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Register",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"role\": \"student\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/auth/register",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"auth",
+								"register"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Successful Registration",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"role\": \"student\"\n}"
+								},
+								"url": {
+									"raw": "{{api_url}}/auth/register",
+									"host": [
+										"{{api_url}}"
+									],
+									"path": [
+										"auth",
+										"register"
+									]
+								}
+							},
+							"status": "Created",
+							"code": 201,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"user\": {\n    \"id\": \"64f1a2b3c4d5e6f7a8b9c0d1\",\n    \"email\": \"john@example.com\",\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"role\": \"student\",\n    \"fullName\": \"John Doe\",\n    \"authMethod\": \"local\",\n    \"isEmailVerified\": false,\n    \"profile\": {\n      \"firstName\": \"John\",\n      \"lastName\": \"Doe\",\n      \"avatar\": \"\"\n    }\n  },\n  \"message\": \"Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản.\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Login successful\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.token) {",
+									"        pm.environment.set(\"token\", jsonData.token);",
+									"        pm.environment.set(\"user_id\", jsonData.user.id);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/auth/login",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"auth",
+								"login"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Successful Login",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}"
+								},
+								"url": {
+									"raw": "{{api_url}}/auth/login",
+									"host": [
+										"{{api_url}}"
+									],
+									"path": [
+										"auth",
+										"login"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n  \"user\": {\n    \"id\": \"64f1a2b3c4d5e6f7a8b9c0d1\",\n    \"email\": \"john@example.com\",\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"role\": \"student\",\n    \"fullName\": \"John Doe\",\n    \"isEmailVerified\": true,\n    \"authMethod\": \"local\",\n    \"profile\": {\n      \"firstName\": \"John\",\n      \"lastName\": \"Doe\",\n      \"avatar\": \"\"\n    }\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/auth/logout",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"auth",
+								"logout"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Current User",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/auth/me",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"auth",
+								"me"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Current User Info",
+							"originalRequest": {
+								"method": "GET",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}"
+									}
+								],
+								"url": {
+									"raw": "{{api_url}}/auth/me",
+									"host": [
+										"{{api_url}}"
+									],
+									"path": [
+										"auth",
+										"me"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"user\": {\n    \"id\": \"64f1a2b3c4d5e6f7a8b9c0d1\",\n    \"email\": \"john@example.com\",\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"role\": \"student\",\n    \"fullName\": \"John Doe\",\n    \"authMethod\": \"local\",\n    \"isEmailVerified\": true,\n    \"isActive\": true,\n    \"lastLogin\": \"2024-01-15T10:30:00.000Z\",\n    \"candidateProfile\": null,\n    \"employerProfile\": null,\n    \"createdAt\": \"2024-01-01T00:00:00.000Z\",\n    \"updatedAt\": \"2024-01-15T10:30:00.000Z\",\n    \"profile\": {\n      \"firstName\": \"John\",\n      \"lastName\": \"Doe\",\n      \"phone\": \"0123456789\",\n      \"avatar\": \"\",\n      \"bio\": \"Software developer passionate about AI\",\n      \"location\": {\n        \"city\": \"Ho Chi Minh\",\n        \"district\": \"District 1\",\n        \"country\": \"VN\"\n      },\n      \"dateOfBirth\": \"1998-01-01T00:00:00.000Z\",\n      \"gender\": \"male\"\n    },\n    \"preferences\": {\n      \"privacySettings\": {\n        \"profileVisibility\": \"public\",\n        \"showEmail\": false,\n        \"showPhone\": false\n      },\n      \"notifications\": {\n        \"emailNotifications\": true,\n        \"pushNotifications\": true,\n        \"jobAlerts\": true,\n        \"applicationUpdates\": true\n      },\n      \"language\": \"vi\",\n      \"timezone\": \"Asia/Ho_Chi_Minh\"\n    }\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "Forgot Password",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"john@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/auth/forgotpassword",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"auth",
+								"forgotpassword"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Forgot Password Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"john@example.com\"\n}"
+								},
+								"url": {
+									"raw": "{{api_url}}/auth/forgotpassword",
+									"host": [
+										"{{api_url}}"
+									],
+									"path": [
+										"auth",
+										"forgotpassword"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"message\": \"Email đặt lại mật khẩu đã được gửi thành công\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Reset Password",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"john@example.com\",\n  \"otp\": \"123456\",\n  \"password\": \"newpassword123\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/auth/resetpassword",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"auth",
+								"resetpassword"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Password Reset Success",
+							"originalRequest": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"john@example.com\",\n  \"otp\": \"123456\",\n  \"password\": \"newpassword123\"\n}"
+								},
+								"url": {
+									"raw": "{{api_url}}/auth/resetpassword",
+									"host": [
+										"{{api_url}}"
+									],
+									"path": [
+										"auth",
+										"resetpassword"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Google Auth",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"idToken\": \"{{google_id_token}}\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/auth/google",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"auth",
+								"google"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Verify Email",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"john@example.com\",\n  \"otp\": \"123456\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/auth/verify-email",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"auth",
+								"verify-email"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Email Verification Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"john@example.com\",\n  \"otp\": \"123456\"\n}"
+								},
+								"url": {
+									"raw": "{{api_url}}/auth/verify-email",
+									"host": [
+										"{{api_url}}"
+									],
+									"path": [
+										"auth",
+										"verify-email"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n  \"message\": \"Xác thực email thành công\",\n  \"user\": {\n    \"id\": \"64f1a2b3c4d5e6f7a8b9c0d1\",\n    \"email\": \"john@example.com\",\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"role\": \"student\",\n    \"fullName\": \"John Doe\",\n    \"isEmailVerified\": true,\n    \"authMethod\": \"local\",\n    \"profile\": {\n      \"firstName\": \"John\",\n      \"lastName\": \"Doe\",\n      \"avatar\": \"\"\n    }\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "Resend Email Verification",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"john@example.com\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/auth/resend-verification",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"auth",
+								"resend-verification"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Resend Verification Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"email\": \"john@example.com\"\n}"
+								},
+								"url": {
+									"raw": "{{api_url}}/auth/resend-verification",
+									"host": [
+										"{{api_url}}"
+									],
+									"path": [
+										"auth",
+										"resend-verification"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"message\": \"Email xác thực đã được gửi thành công\"\n}"
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Users",
+			"item": [
+				{
+					"name": "Get User Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/users/profile",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"users",
+								"profile"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"phone\": \"0123456789\",\n  \"bio\": \"Software developer passionate about AI\",\n  \"location\": \"Ho Chi Minh\",\n  \"dateOfBirth\": \"1998-01-01\",\n  \"gender\": \"male\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/users/profile",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"users",
+								"profile"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Avatar",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "avatar",
+									"type": "file",
+									"src": "path/to/avatar.jpg"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{api_url}}/users/upload-avatar",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"users",
+								"upload-avatar"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Avatar Upload Success",
+							"originalRequest": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}"
+									}
+								],
+								"body": {
+									"mode": "formdata",
+									"formdata": [
+										{
+											"key": "avatar",
+											"type": "file",
+											"src": "path/to/avatar.jpg"
+										}
+									]
+								},
+								"url": {
+									"raw": "{{api_url}}/users/upload-avatar",
+									"host": [
+										"{{api_url}}"
+									],
+									"path": [
+										"users",
+										"upload-avatar"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"message\": \"Upload avatar thành công\",\n  \"avatar\": \"https://res.cloudinary.com/your-cloud/image/upload/v1234567890/avatar.jpg\",\n  \"user\": {\n    \"id\": \"64f1a2b3c4d5e6f7a8b9c0d1\",\n    \"email\": \"john@example.com\",\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"role\": \"student\",\n    \"fullName\": \"John Doe\",\n    \"isEmailVerified\": true,\n    \"authMethod\": \"local\",\n    \"profile\": {\n      \"firstName\": \"John\",\n      \"lastName\": \"Doe\",\n      \"avatar\": \"https://res.cloudinary.com/your-cloud/image/upload/v1234567890/avatar.jpg\"\n    }\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "Change Password",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"currentPassword\": \"oldpassword123\",\n  \"newPassword\": \"newpassword123\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/users/password",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"users",
+								"password"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Password Change Success",
+							"originalRequest": {
+								"method": "PUT",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									},
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n  \"currentPassword\": \"oldpassword123\",\n  \"newPassword\": \"newpassword123\"\n}"
+								},
+								"url": {
+									"raw": "{{api_url}}/users/password",
+									"host": [
+										"{{api_url}}"
+									],
+									"path": [
+										"users",
+										"password"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Link Google Account",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"idToken\": \"{{google_id_token}}\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/users/link-google",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"users",
+								"link-google"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Unlink Google Account",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/users/unlink-google",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"users",
+								"unlink-google"
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "Google Account Unlinked",
+							"originalRequest": {
+								"method": "DELETE",
+								"header": [
+									{
+										"key": "Authorization",
+										"value": "Bearer {{token}}"
+									}
+								],
+								"url": {
+									"raw": "{{api_url}}/users/unlink-google",
+									"host": [
+										"{{api_url}}"
+									],
+									"path": [
+										"users",
+										"unlink-google"
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"message\": \"Hủy liên kết tài khoản Google thành công\",\n  \"user\": {\n    \"id\": \"64f1a2b3c4d5e6f7a8b9c0d1\",\n    \"email\": \"john@example.com\",\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"role\": \"student\",\n    \"fullName\": \"John Doe\",\n    \"isEmailVerified\": true,\n    \"authMethod\": \"local\",\n    \"profile\": {\n      \"firstName\": \"John\",\n      \"lastName\": \"Doe\",\n      \"avatar\": \"\"\n    }\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "Search Users",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/users/search?q=john&role=student&page=1&limit=10",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"users",
+								"search"
+							],
+							"query": [
+								{
+									"key": "q",
+									"value": "john"
+								},
+								{
+									"key": "role",
+									"value": "student"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get User Stats",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/users/stats",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"users",
+								"stats"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update User Preferences",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"notifications\": {\n    \"email\": true,\n    \"push\": true,\n    \"sms\": false\n  },\n  \"privacy\": {\n    \"profileVisibility\": \"public\",\n    \"showEmail\": false,\n    \"showPhone\": false\n  },\n  \"jobPreferences\": {\n    \"categories\": [\"tech\", \"marketing\"],\n    \"locations\": [\"Ho Chi Minh\", \"Ha Noi\"],\n    \"remotePreference\": \"hybrid\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/users/preferences",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"users",
+								"preferences"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Deactivate Account",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"reason\": \"Taking a break from job search\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/users/deactivate",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"users",
+								"deactivate"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Reactivate Account",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/users/reactivate",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"users",
+								"reactivate"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Profiles",
+			"item": [
+				{
+					"name": "Get Candidate Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/profiles/candidate",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"profiles",
+								"candidate"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Candidate Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"personalInfo\": {\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"dateOfBirth\": \"1998-01-01\",\n    \"phone\": \"0123456789\",\n    \"address\": \"123 ABC Street\",\n    \"city\": \"Ho Chi Minh\",\n    \"country\": \"Vietnam\"\n  },\n  \"education\": [\n    {\n      \"institution\": \"ABC University\",\n      \"degree\": \"Bachelor\",\n      \"fieldOfStudy\": \"Computer Science\",\n      \"startDate\": \"2020-09-01\",\n      \"endDate\": \"2024-06-01\",\n      \"gpa\": 3.5,\n      \"isCurrentlyStudying\": true\n    }\n  ],\n  \"skills\": [\n    {\n      \"skillId\": \"{{skill_id}}\",\n      \"level\": \"intermediate\",\n      \"yearsOfExperience\": 2\n    }\n  ],\n  \"experience\": [\n    {\n      \"company\": \"Tech Startup\",\n      \"position\": \"Junior Developer\",\n      \"startDate\": \"2023-01-01\",\n      \"endDate\": \"2023-12-31\",\n      \"description\": \"Developed web applications using React\",\n      \"isCurrentPosition\": false\n    }\n  ],\n  \"portfolio\": {\n    \"website\": \"https://johndoe.dev\",\n    \"github\": \"https://github.com/johndoe\",\n    \"linkedin\": \"https://linkedin.com/in/johndoe\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/profiles/candidate",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"profiles",
+								"candidate"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Employer Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/profiles/employer",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"profiles",
+								"employer"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Employer Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"companyId\": \"{{company_id}}\",\n  \"position\": \"HR Manager\",\n  \"department\": \"Human Resources\",\n  \"permissions\": [\"post_jobs\", \"review_applications\", \"manage_company\"]\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/profiles/employer",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"profiles",
+								"employer"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Companies",
+			"item": [
+				{
+					"name": "Get All Companies",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/companies?page=1&limit=10&industry=technology&location=Ho Chi Minh&size=startup",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"companies"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "industry",
+									"value": "technology"
+								},
+								{
+									"key": "location",
+									"value": "Ho Chi Minh"
+								},
+								{
+									"key": "size",
+									"value": "startup"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Companies",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/companies/search?q=tech company&industry=technology&location=Ho Chi Minh&size=startup&hasInternship=true",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"companies",
+								"search"
+							],
+							"query": [
+								{
+									"key": "q",
+									"value": "tech company"
+								},
+								{
+									"key": "industry",
+									"value": "technology"
+								},
+								{
+									"key": "location",
+									"value": "Ho Chi Minh"
+								},
+								{
+									"key": "size",
+									"value": "startup"
+								},
+								{
+									"key": "hasInternship",
+									"value": "true"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Company by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/companies/{{company_id}}",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"companies",
+								"{{company_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Company",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Tech Solutions Inc\",\n  \"shortDescription\": \"Leading technology solutions provider\",\n  \"description\": \"We are a technology company focused on innovative solutions\",\n  \"industry\": {\n    \"primary\": \"technology\",\n    \"secondary\": [\"software\", \"ai\"],\n    \"tags\": [\"startup\", \"innovation\", \"ai\"]\n  },\n  \"size\": \"startup\",\n  \"employeeCount\": 50,\n  \"companyType\": \"private\",\n  \"foundedYear\": 2020,\n  \"website\": \"https://techsolutions.com\",\n  \"location\": {\n    \"type\": \"single\",\n    \"headquarters\": {\n      \"city\": \"Ho Chi Minh\",\n      \"district\": \"District 1\",\n      \"address\": \"123 Tech Street\",\n      \"country\": \"Vietnam\"\n    }\n  },\n  \"contact\": {\n    \"email\": \"contact@techsolutions.com\",\n    \"phone\": \"0123456789\"\n  },\n  \"internshipProgram\": {\n    \"hasProgram\": true,\n    \"name\": \"Summer Tech Internship\",\n    \"description\": \"3-month intensive program\",\n    \"duration\": \"3 months\",\n    \"stipend\": {\n      \"amount\": 8000000,\n      \"currency\": \"VND\"\n    },\n    \"benefits\": [\"mentorship\", \"training\", \"networking\"]\n  }\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/companies",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"companies"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Skills",
+			"item": [
+				{
+					"name": "Get All Skills",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/skills?category=technical&level=beginner",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"skills"
+							],
+							"query": [
+								{
+									"key": "category",
+									"value": "technical"
+								},
+								{
+									"key": "level",
+									"value": "beginner"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Skills",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/skills/search?q=javascript",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"skills",
+								"search"
+							],
+							"query": [
+								{
+									"key": "q",
+									"value": "javascript"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Skill",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"React.js\",\n  \"category\": \"technical\",\n  \"subcategory\": \"frontend\",\n  \"description\": \"JavaScript library for building user interfaces\",\n  \"level\": \"intermediate\",\n  \"tags\": [\"javascript\", \"frontend\", \"ui\"]\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/skills",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"skills"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Applications",
+			"item": [
+				{
+					"name": "Get User Applications",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/applications?status=pending&page=1&limit=10",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"applications"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "pending"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Application by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/applications/{{application_id}}",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"applications",
+								"{{application_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Application",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"coverLetter\": \"Updated cover letter\",\n  \"additionalInfo\": {\n    \"availableStartDate\": \"2024-07-01\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/applications/{{application_id}}",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"applications",
+								"{{application_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Application",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/applications/{{application_id}}",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"applications",
+								"{{application_id}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Skill Roadmaps",
+			"item": [
+				{
+					"name": "Get User Roadmaps",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/roadmaps?status=active&page=1&limit=10",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"roadmaps"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "active"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Roadmap by ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/roadmaps/{{roadmap_id}}",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"roadmaps",
+								"{{roadmap_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create Roadmap",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"React Developer Roadmap\",\n  \"description\": \"8-week roadmap to become a React developer\",\n  \"targetSkills\": [\"{{skill_id}}\", \"{{skill_id_2}}\"],\n  \"settings\": {\n    \"duration\": 8,\n    \"difficulty\": \"intermediate\",\n    \"timeCommitment\": \"10-15 hours/week\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/roadmaps",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"roadmaps"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Generate Roadmap from Job",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"jobId\": \"{{job_id}}\",\n  \"duration\": 8\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/roadmaps/generate-from-job",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"roadmaps",
+								"generate-from-job"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Complete Roadmap Week",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"weekNumber\": 1,\n  \"completedTasks\": [\"task1\", \"task2\"],\n  \"feedback\": \"Great week, learned a lot about React basics\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/roadmaps/{{roadmap_id}}/complete-week",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"roadmaps",
+								"{{roadmap_id}}",
+								"complete-week"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Roadmap Progress",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"progressData\": {\n    \"completedWeeks\": 3,\n    \"currentWeek\": 4,\n    \"skillsAcquired\": [\"{{skill_id}}\"],\n    \"timeSpent\": 120\n  }\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/roadmaps/{{roadmap_id}}/progress",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"roadmaps",
+								"{{roadmap_id}}",
+								"progress"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Jobs - Enhanced",
+			"item": [
+				{
+					"name": "Get All Jobs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/jobs?page=1&limit=10&category=tech&location=Ho Chi Minh&jobType=internship&isRemote=true&isUrgent=true&isFeatured=true&salaryMin=5000000&salaryMax=15000000&experienceLevel=beginner&educationLevel=Bachelor",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "category",
+									"value": "tech"
+								},
+								{
+									"key": "location",
+									"value": "Ho Chi Minh"
+								},
+								{
+									"key": "jobType",
+									"value": "internship"
+								},
+								{
+									"key": "isRemote",
+									"value": "true"
+								},
+								{
+									"key": "isUrgent",
+									"value": "true"
+								},
+								{
+									"key": "isFeatured",
+									"value": "true"
+								},
+								{
+									"key": "salaryMin",
+									"value": "5000000"
+								},
+								{
+									"key": "salaryMax",
+									"value": "15000000"
+								},
+								{
+									"key": "experienceLevel",
+									"value": "beginner"
+								},
+								{
+									"key": "educationLevel",
+									"value": "Bachelor"
+								}
+							]
+						},
+						"description": "Get paginated list of jobs with advanced filters (TopCV style)"
+					},
+					"response": []
+				},
+				{
+					"name": "Search Jobs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/jobs/search?q=react developer&skills=64f1a2b3c4d5e6f7a8b9c0d1,64f1a2b3c4d5e6f7a8b9c0d2&location=Ho Chi Minh&locationType=onsite&category=tech&jobType=internship&salaryMin=5000000&salaryMax=15000000&experienceLevel=beginner&educationLevel=Bachelor&isRemote=false&isUrgent=true&isFeatured=true&limit=10",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"search"
+							],
+							"query": [
+								{
+									"key": "q",
+									"value": "react developer"
+								},
+								{
+									"key": "skills",
+									"value": "64f1a2b3c4d5e6f7a8b9c0d1,64f1a2b3c4d5e6f7a8b9c0d2"
+								},
+								{
+									"key": "location",
+									"value": "Ho Chi Minh"
+								},
+								{
+									"key": "locationType",
+									"value": "onsite"
+								},
+								{
+									"key": "category",
+									"value": "tech"
+								},
+								{
+									"key": "jobType",
+									"value": "internship"
+								},
+								{
+									"key": "salaryMin",
+									"value": "5000000"
+								},
+								{
+									"key": "salaryMax",
+									"value": "15000000"
+								},
+								{
+									"key": "experienceLevel",
+									"value": "beginner"
+								},
+								{
+									"key": "educationLevel",
+									"value": "Bachelor"
+								},
+								{
+									"key": "isRemote",
+									"value": "false"
+								},
+								{
+									"key": "isUrgent",
+									"value": "true"
+								},
+								{
+									"key": "isFeatured",
+									"value": "true"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						},
+						"description": "Search jobs with semantic search and advanced filters"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Featured Jobs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/jobs/featured?limit=10",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"featured"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						},
+						"description": "Get featured jobs (TopCV style)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Urgent Jobs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/jobs/urgent?limit=10",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"urgent"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						},
+						"description": "Get urgent jobs"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Hot Jobs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/jobs/hot?limit=10",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"hot"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						},
+						"description": "Get hot jobs (most viewed)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Jobs by Category",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/jobs/category/tech?page=1&limit=10",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"category",
+								"tech"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						},
+						"description": "Get jobs by category"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Jobs by Location",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/jobs/location/Ho Chi Minh?page=1&limit=10",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"location",
+								"Ho Chi Minh"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						},
+						"description": "Get jobs by location"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Job by ID",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Get job successful\", function () {",
+									"    pm.response.to.have.status(200);",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.success) {",
+									"        pm.environment.set(\"job_id\", jsonData.data._id);",
+									"        pm.environment.set(\"job_slug\", jsonData.data.slug);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/jobs/{{job_id}}",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"{{job_id}}"
+							]
+						},
+						"description": "Get detailed job information by ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Job by Slug",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/jobs/slug/{{job_slug}}",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"slug",
+								"{{job_slug}}"
+							]
+						},
+						"description": "Get job by URL-friendly slug"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Job Recommendations",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/jobs/{{job_id}}/recommendations?userId={{user_id}}&limit=5",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"{{job_id}}",
+								"recommendations"
+							],
+							"query": [
+								{
+									"key": "userId",
+									"value": "{{user_id}}"
+								},
+								{
+									"key": "limit",
+									"value": "5"
+								}
+							]
+						},
+						"description": "Get AI-powered job recommendations based on current job"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Job Match Score",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/jobs/{{job_id}}/match-score?userId={{user_id}}",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"{{job_id}}",
+								"match-score"
+							],
+							"query": [
+								{
+									"key": "userId",
+									"value": "{{user_id}}"
+								}
+							]
+						},
+						"description": "Get AI-calculated match score between user and job"
+					},
+					"response": []
+				},
+				{
+					"name": "Analyze Job Skills",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/jobs/{{job_id}}/skill-analysis",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"{{job_id}}",
+								"skill-analysis"
+							]
+						},
+						"description": "Get AI analysis of job skills and requirements"
+					},
+					"response": []
+				},
+				{
+					"name": "Generate Skill Roadmap",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/jobs/{{job_id}}/roadmap?userId={{user_id}}&duration=8",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"{{job_id}}",
+								"roadmap"
+							],
+							"query": [
+								{
+									"key": "userId",
+									"value": "{{user_id}}"
+								},
+								{
+									"key": "duration",
+									"value": "8"
+								}
+							]
+						},
+						"description": "Generate personalized skill roadmap for job"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Job",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Frontend Developer Intern\",\n  \"jobType\": \"internship\",\n  \"category\": \"tech\",\n  \"subCategory\": \"web-development\",\n  \"companyId\": \"{{company_id}}\",\n  \"internship\": {\n    \"type\": \"summer\",\n    \"duration\": 3,\n    \"startDate\": \"2024-06-01\",\n    \"endDate\": \"2024-09-01\",\n    \"isPaid\": true,\n    \"stipend\": {\n      \"amount\": 8000000,\n      \"currency\": \"VND\",\n      \"period\": \"month\",\n      \"isNegotiable\": true\n    },\n    \"academicCredit\": true,\n    \"remoteOption\": true,\n    \"flexibleHours\": true\n  },\n  \"requirements\": {\n    \"education\": {\n      \"level\": \"Bachelor\",\n      \"majors\": [\"Computer Science\", \"Information Technology\"],\n      \"minGpa\": 3.0,\n      \"year\": [2, 3, 4]\n    },\n    \"skills\": [\n      {\n        \"skillId\": \"{{skill_id}}\",\n        \"level\": \"required\",\n        \"importance\": 9\n      },\n      {\n        \"skillId\": \"{{skill_id_2}}\",\n        \"level\": \"preferred\",\n        \"importance\": 7\n      }\n    ],\n    \"experience\": {\n      \"minMonths\": 0,\n      \"projectBased\": true,\n      \"experienceLevel\": \"beginner\"\n    },\n    \"languages\": [\n      {\n        \"language\": \"English\",\n        \"level\": \"intermediate\"\n      }\n    ]\n  },\n  \"description\": \"We are looking for a talented Frontend Developer Intern to join our team. You will work on modern web applications using React and JavaScript.\",\n  \"responsibilities\": [\n    \"Develop user interfaces using React\",\n    \"Collaborate with design team\",\n    \"Write clean, maintainable code\",\n    \"Participate in code reviews\"\n  ],\n  \"requirements\": [\n    \"Knowledge of JavaScript, HTML, CSS\",\n    \"Basic understanding of React\",\n    \"Good problem-solving skills\",\n    \"Team player\"\n  ],\n  \"benefits\": [\n    \"Flexible working hours\",\n    \"Remote work options\",\n    \"Learning opportunities\",\n    \"Certificate upon completion\"\n  ],\n  \"learningOutcomes\": [\n    \"Master React development\",\n    \"Learn modern web development practices\",\n    \"Gain real-world project experience\",\n    \"Develop problem-solving skills\"\n  ],\n  \"location\": {\n    \"type\": \"hybrid\",\n    \"city\": \"Ho Chi Minh\",\n    \"district\": \"District 1\",\n    \"address\": \"123 ABC Street\",\n    \"country\": \"VN\",\n    \"coordinates\": {\n      \"latitude\": 10.762622,\n      \"longitude\": 106.660172\n    },\n    \"remote\": true,\n    \"hybrid\": true\n  },\n  \"salary\": {\n    \"type\": \"range\",\n    \"min\": 5000000,\n    \"max\": 15000000,\n    \"currency\": \"VND\",\n    \"period\": \"month\",\n    \"isNegotiable\": true,\n    \"benefits\": [\n      \"transportation\",\n      \"meals\",\n      \"learning\",\n      \"mentorship\",\n      \"networking\",\n      \"employment-opportunity\"\n    ]\n  },\n  \"applicationSettings\": {\n    \"requireCoverLetter\": true,\n    \"requireResume\": true,\n    \"requirePortfolio\": false,\n    \"requireReferences\": false,\n    \"maxApplications\": 100,\n    \"deadline\": \"2024-05-31\",\n    \"rollingBasis\": false,\n    \"questions\": [\n      {\n        \"question\": \"Why are you interested in this internship?\",\n        \"required\": true,\n        \"type\": \"textarea\"\n      },\n      {\n        \"question\": \"What is your experience with React?\",\n        \"required\": true,\n        \"type\": \"text\"\n      }\n    ]\n  },\n  \"status\": \"active\",\n  \"isFeatured\": true,\n  \"isUrgent\": false,\n  \"isHot\": false,\n  \"priority\": 8,\n  \"contact\": {\n    \"name\": \"HR Manager\",\n    \"email\": \"hr@techsolutions.com\",\n    \"phone\": \"0123456789\",\n    \"linkedin\": \"https://linkedin.com/in/hrmanager\"\n  },\n  \"seo\": {\n    \"keywords\": [\"react\", \"frontend\", \"internship\", \"developer\"],\n    \"metaDescription\": \"Frontend Developer Internship opportunity at Tech Solutions Inc. Learn React and modern web development.\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/jobs",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs"
+							]
+						},
+						"description": "Create a new job posting with enhanced features (employer only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Job",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Updated Frontend Developer Intern\",\n  \"description\": \"Updated job description with new requirements\",\n  \"salary\": {\n    \"min\": 6000000,\n    \"max\": 18000000\n  },\n  \"isUrgent\": true,\n  \"priority\": 9,\n  \"status\": \"active\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/jobs/{{job_id}}",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"{{job_id}}"
+							]
+						},
+						"description": "Update job information (employer only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Job",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/jobs/{{job_id}}",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"{{job_id}}"
+							]
+						},
+						"description": "Delete job posting (employer only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Apply for Job",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Application submitted\", function () {",
+									"    pm.response.to.have.status(201);",
+									"    var jsonData = pm.response.json();",
+									"    if (jsonData.success) {",
+									"        pm.environment.set(\"application_id\", jsonData.data._id);",
+									"    }",
+									"});"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"coverLetter\": \"Dear Hiring Manager,\\n\\nI am excited to apply for the Frontend Developer Intern position at Tech Solutions Inc. I am a Computer Science student with strong skills in JavaScript and React, and I believe I would be a great fit for your team.\\n\\nI have completed several projects using React and have a good understanding of modern web development practices. I am eager to learn and contribute to your company's success.\\n\\nThank you for considering my application.\\n\\nBest regards,\\nNguyen Van A\",\n  \"resumeUrl\": \"https://example.com/resume.pdf\",\n  \"portfolioUrl\": \"https://github.com/example/portfolio\",\n  \"additionalInfo\": {\n    \"availableStartDate\": \"2024-06-01\",\n    \"expectedSalary\": {\n      \"amount\": 8000000,\n      \"currency\": \"VND\"\n    },\n    \"workPreference\": \"hybrid\",\n    \"motivationLetter\": \"I am passionate about web development and eager to learn from experienced developers.\"\n  },\n  \"questions\": [\n    {\n      \"question\": \"Why are you interested in this internship?\",\n      \"answer\": \"I want to gain real-world experience in React development and learn from industry professionals.\"\n    },\n    {\n      \"question\": \"What is your experience with React?\",\n      \"answer\": \"I have been using React for 1 year and have built several projects including an e-commerce website.\"\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/jobs/{{job_id}}/apply",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"{{job_id}}",
+								"apply"
+							]
+						},
+						"description": "Apply for job with enhanced application form (candidate only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Job Applications",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/jobs/{{job_id}}/applications?status=pending&page=1&limit=10",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"{{job_id}}",
+								"applications"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "pending"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						},
+						"description": "Get job applications with pagination (employer only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Application Status",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"shortlisted\",\n  \"feedback\": {\n    \"fromEmployer\": {\n      \"rating\": 4,\n      \"comments\": \"Strong technical skills and good communication.\",\n      \"strengths\": [\"Technical skills\", \"Problem solving\"],\n      \"areas\": [\"More experience needed\"]\n    }\n  }\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/jobs/{{job_id}}/applications/{{application_id}}",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"{{job_id}}",
+								"applications",
+								"{{application_id}}"
+							]
+						},
+						"description": "Update application status and add feedback (employer only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Job Analytics",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/jobs/{{job_id}}/analytics",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"{{job_id}}",
+								"analytics"
+							]
+						},
+						"description": "Get job analytics and statistics (employer only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Similar Jobs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/jobs/{{job_id}}/similar?limit=5",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"{{job_id}}",
+								"similar"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "5"
+								}
+							]
+						},
+						"description": "Get similar jobs based on AI analysis"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Job Statistics",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/jobs/{{job_id}}/stats",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"{{job_id}}",
+								"stats"
+							]
+						},
+						"description": "Get job statistics (views, applications, saves)"
+					},
+					"response": []
+				},
+				{
+					"name": "Increment Job Views",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/jobs/{{job_id}}/view",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"{{job_id}}",
+								"view"
+							]
+						},
+						"description": "Increment job view count"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Jobs by Company",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/jobs/company/{{company_id}}?page=1&limit=10&status=active",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"company",
+								"{{company_id}}"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "status",
+									"value": "active"
+								}
+							]
+						},
+						"description": "Get all jobs from a specific company"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Jobs by Skills",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/jobs/skills?skillIds=64f1a2b3c4d5e6f7a8b9c0d1,64f1a2b3c4d5e6f7a8b9c0d2&page=1&limit=10",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"skills"
+							],
+							"query": [
+								{
+									"key": "skillIds",
+									"value": "64f1a2b3c4d5e6f7a8b9c0d1,64f1a2b3c4d5e6f7a8b9c0d2"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						},
+						"description": "Get jobs that require specific skills"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Recent Jobs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/jobs/recent?limit=10&category=tech",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"recent"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "category",
+									"value": "tech"
+								}
+							]
+						},
+						"description": "Get recently posted jobs"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Popular Jobs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_url}}/jobs/popular?limit=10&period=week",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"jobs",
+								"popular"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "period",
+									"value": "week"
+								}
+							]
+						},
+						"description": "Get popular jobs based on views and applications"
+					},
+					"response": []
+				}
+			],
+			"description": "Enhanced job posting and management endpoints with TopCV-style features, AI integration, and advanced filtering"
+		},
+		{
+			"name": "AI Services",
+			"item": [
+				{
+					"name": "Upload and Analyze CV",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "cv",
+									"type": "file",
+									"src": "path/to/resume.pdf"
+								},
+								{
+									"key": "jobId",
+									"value": "{{job_id}}",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{api_url}}/ai/analyze-cv",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"ai",
+								"analyze-cv"
+							]
+						},
+						"description": "Upload and analyze CV with AI"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Job Recommendations",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"limit\": 10,\n  \"minScore\": 60\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/ai/job-recommendations",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"ai",
+								"job-recommendations"
+							]
+						},
+						"description": "Get AI-powered job recommendations"
+					},
+					"response": []
+				},
+				{
+					"name": "Generate Skill Roadmap",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"targetSkills\": [\"react\", \"node.js\", \"mongodb\"],\n  \"currentLevel\": \"beginner\",\n  \"duration\": 8,\n  \"preferredLearningStyle\": \"hands-on\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/ai/skill-roadmap",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"ai",
+								"skill-roadmap"
+							]
+						},
+						"description": "Generate personalized skill roadmap"
+					},
+					"response": []
+				},
+				{
+					"name": "Analyze Job Posting",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"jobId\": \"{{job_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/ai/analyze-job",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"ai",
+								"analyze-job"
+							]
+						},
+						"description": "Analyze job posting with AI"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Match Score",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"jobId\": \"{{job_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/ai/match-score",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"ai",
+								"match-score"
+							]
+						},
+						"description": "Get AI-calculated match score"
+					},
+					"response": []
+				},
+				{
+					"name": "Get AI Insights",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/ai/insights",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"ai",
+								"insights"
+							]
+						},
+						"description": "Get AI insights and analytics"
+					},
+					"response": []
+				},
+				{
+					"name": "Batch Analyze Applications",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"jobId\": \"{{job_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/ai/batch-analyze",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"ai",
+								"batch-analyze"
+							]
+						},
+						"description": "Batch analyze job applications with AI"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Upload Services",
+			"item": [
+				{
+					"name": "Upload Single Image",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "image",
+									"type": "file",
+									"src": "path/to/image.jpg"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{api_url}}/upload/image",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"upload",
+								"image"
+							]
+						},
+						"description": "Upload a single image"
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Multiple Images",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "images",
+									"type": "file",
+									"src": "path/to/image1.jpg"
+								},
+								{
+									"key": "images",
+									"type": "file",
+									"src": "path/to/image2.jpg"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{api_url}}/upload/images",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"upload",
+								"images"
+							]
+						},
+						"description": "Upload multiple images"
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Avatar",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "avatar",
+									"type": "file",
+									"src": "path/to/avatar.jpg"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{api_url}}/upload/avatar",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"upload",
+								"avatar"
+							]
+						},
+						"description": "Upload user avatar"
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Company Logo",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "logo",
+									"type": "file",
+									"src": "path/to/logo.png"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{api_url}}/upload/company-logo",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"upload",
+								"company-logo"
+							]
+						},
+						"description": "Upload company logo"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Image",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/upload/{{public_id}}",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"upload",
+								"{{public_id}}"
+							]
+						},
+						"description": "Delete uploaded image"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Image Info",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/upload/{{public_id}}/info",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"upload",
+								"{{public_id}}",
+								"info"
+							]
+						},
+						"description": "Get image information"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Notifications",
+			"item": [
+				{
+					"name": "Get User Notifications",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/notifications?page=1&limit=10&isRead=false",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"notifications"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "isRead",
+									"value": "false"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Mark Notification as Read",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/notifications/{{notification_id}}/read",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"notifications",
+								"{{notification_id}}",
+								"read"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Mark All as Read",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/notifications/mark-all-read",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"notifications",
+								"mark-all-read"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Notification",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/notifications/{{notification_id}}",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"notifications",
+								"{{notification_id}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Dashboard & Analytics",
+			"item": [
+				{
+					"name": "Get Dashboard Stats",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/dashboard/stats",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"dashboard",
+								"stats"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get User Analytics",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/analytics/user?period=month",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"analytics",
+								"user"
+							],
+							"query": [
+								{
+									"key": "period",
+									"value": "month"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Platform Analytics",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/analytics/platform?period=week",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"analytics",
+								"platform"
+							],
+							"query": [
+								{
+									"key": "period",
+									"value": "week"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Saved Jobs",
+			"item": [
+				{
+					"name": "Get Saved Jobs",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/saved-jobs?page=1&limit=10&status=saved",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"saved-jobs"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								},
+								{
+									"key": "status",
+									"value": "saved"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Save Job",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"jobId\": \"{{job_id}}\",\n  \"notes\": \"Interesting position, good company culture\",\n  \"tags\": [\"frontend\", \"react\", \"priority\"],\n  \"priority\": \"high\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/saved-jobs",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"saved-jobs"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Saved Job",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"applied\",\n  \"notes\": \"Applied on 2024-01-15\",\n  \"reminder\": {\n    \"date\": \"2024-02-01\",\n    \"message\": \"Follow up on application\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/saved-jobs/{{saved_job_id}}",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"saved-jobs",
+								"{{saved_job_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Saved Job",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/saved-jobs/{{saved_job_id}}",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"saved-jobs",
+								"{{saved_job_id}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Admin",
+			"item": [
+				{
+					"name": "Get All Users (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/admin/users?page=1&limit=20&role=student&status=active",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"admin",
+								"users"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "role",
+									"value": "student"
+								},
+								{
+									"key": "status",
+									"value": "active"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get User (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/admin/users/{{user_id}}",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"admin",
+								"users",
+								"{{user_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create User (Admin)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"admin123\",\n  \"firstName\": \"Admin\",\n  \"lastName\": \"User\",\n  \"role\": \"admin\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/admin/users",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"admin",
+								"users"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update User (Admin)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"role\": \"employer\",\n  \"isActive\": true\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/admin/users/{{user_id}}",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"admin",
+								"users",
+								"{{user_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete User (Admin)",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/admin/users/{{user_id}}",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"admin",
+								"users",
+								"{{user_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update User Status (Admin)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"suspended\",\n  \"reason\": \"Policy violation\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/admin/users/{{user_id}}/status",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"admin",
+								"users",
+								"{{user_id}}",
+								"status"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Dashboard Stats (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/admin/dashboard",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"admin",
+								"dashboard"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get User Analytics (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/admin/analytics/users?period=month",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"admin",
+								"analytics",
+								"users"
+							],
+							"query": [
+								{
+									"key": "period",
+									"value": "month"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Pending Verifications (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/admin/verifications?status=pending&page=1&limit=10",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"admin",
+								"verifications"
+							],
+							"query": [
+								{
+									"key": "status",
+									"value": "pending"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Verify Employer (Admin)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"verified\": true,\n  \"verificationMethod\": \"manual_review\",\n  \"documents\": [\"business_license\", \"tax_certificate\"]\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/admin/verifications/{{verification_id}}",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"admin",
+								"verifications",
+								"{{verification_id}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get System Health (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/admin/system/health",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"admin",
+								"system",
+								"health"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get System Logs (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/admin/system/logs?level=error&limit=100",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"admin",
+								"system",
+								"logs"
+							],
+							"query": [
+								{
+									"key": "level",
+									"value": "error"
+								},
+								{
+									"key": "limit",
+									"value": "100"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "api_url",
+			"value": "http://localhost:3000/api",
+			"type": "string"
+		}
+	]
+}

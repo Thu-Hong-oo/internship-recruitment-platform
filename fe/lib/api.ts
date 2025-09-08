@@ -53,15 +53,31 @@ class ApiClient {
 
   constructor() {
     this.baseURL = API_BASE_URL;
-    this.token =
-      typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    this.token = null; // Initialize as null, will be set when needed
   }
-  // tránh lỗi next js server không có window
+
+  // Method to get token from localStorage
+  private getTokenFromStorage(): string | null {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("token");
+    }
+    return null;
+  }
+
+  // Method to update token from localStorage
+  private updateTokenFromStorage() {
+    if (typeof window !== "undefined") {
+      this.token = localStorage.getItem("token");
+    }
+  }
 
   private async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
+    // Update token from localStorage before each request
+    this.updateTokenFromStorage();
+    
     const url = `${this.baseURL}${endpoint}`;
 
     const config: RequestInit = {
@@ -116,10 +132,12 @@ class ApiClient {
 
     // Store token if registration is successful and token is provided
     if (response.success && response.token) {
-      this.token = response.token;
+      // Store token in localStorage
       if (typeof window !== "undefined") {
         localStorage.setItem("token", response.token);
       }
+      // Update instance token
+      this.token = response.token;
     }
 
     return response;
@@ -132,10 +150,12 @@ class ApiClient {
     });
 
     if (response.success && response.token) {
-      this.token = response.token;
+      // Store token in localStorage
       if (typeof window !== "undefined") {
         localStorage.setItem("token", response.token);
       }
+      // Update instance token
+      this.token = response.token;
     }
 
     return response;
@@ -159,7 +179,17 @@ class ApiClient {
   }
 
   async getCurrentUser(): Promise<User> {
-    return this.request<User>("/users/me");
+    try {
+      const result = await this.request<{ success: boolean; user: User }>("/auth/me");
+      
+      if (result.success && result.user) {
+        return result.user;
+      } else {
+        throw new Error("Invalid response format from getCurrentUser");
+      }
+    } catch (error) {
+      throw error;
+    }
   }
 
   async verifyEmail(email: string, otp: string): Promise<AuthResponse> {
