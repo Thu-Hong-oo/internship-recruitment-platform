@@ -13,12 +13,22 @@ import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { PageLayout } from "@/components/layout";
 import HeroSection from "@/components/layout/hero-section";
+import { useEffect, useState } from "react";
+import { jobsAPI, JobItem } from "@/lib/api";
+import { Row, Col } from "antd";
 interface HomePageProps {
   onSearch?: (keyword: string) => void;
 }
 
 export default function HomePage({ onSearch }: HomePageProps) {
   const router = useRouter();
+  const [jobs, setJobs] = useState<JobItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalJobs, setTotalJobs] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   const handleSearch = (keyword: string) => {
     if (onSearch) {
@@ -27,6 +37,37 @@ export default function HomePage({ onSearch }: HomePageProps) {
       // Use Next.js routing
       router.push("/search");
     }
+  };
+  const fetchJobs = async (page = currentPage, limit = pageSize) => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await jobsAPI.getJobs(page, limit);
+      if (res.success) {
+        setJobs(res.data || []);
+        setTotalJobs(res.pagination?.total || 0);
+        setTotalPages(res.pagination?.pages || 0);
+      } else {
+        setError("Không thể tải danh sách việc làm");
+      }
+    } catch (e: any) {
+      setError(e?.message || "Có lỗi xảy ra");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchJobs();
+  }, []);
+
+  const handlePageChange = (page: number, size?: number) => {
+    setCurrentPage(page);
+    if (size && size !== pageSize) {
+      setPageSize(size);
+      setCurrentPage(1); // Reset to first page when changing page size
+    }
+    fetchJobs(page, size || pageSize);
   };
   return (
     <PageLayout>
@@ -90,7 +131,7 @@ export default function HomePage({ onSearch }: HomePageProps) {
 
           {/* Main Content */}
           <div className="lg:col-span-2">
-            {/* Featured Jobs */}
+            {/* Featured Jobs (from API) */}
             <div className="mb-8">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-foreground">
@@ -102,70 +143,160 @@ export default function HomePage({ onSearch }: HomePageProps) {
                 </div>
               </div>
 
-              <div className="space-y-4">
-                {[
-                  {
-                    title:
-                      "Senior Sales Logistics Executive - Chuyên Viên Kinh Doanh - Thị Nhận Khống Đối Hợp",
-                    company:
-                      "CÔNG TY TNHH GIAO NHẬN VẬN TẢI QUỐC TẾ DỊCH VỤ HÀNG KHÔNG VIỆT NAM",
-                    location: "Hồ Chí Minh",
-                    salary: "15 - 20 triệu",
-                    time: "1 ngày trước",
-                    urgent: true,
-                  },
-                  {
-                    title: "Nhân Viên Chăm Sóc Khách Hàng Bất Động Sản",
-                    company:
-                      "CÔNG TY CỔ PHẦN ĐẦU TƯ VÀ PHÁT TRIỂN BẤT ĐỘNG SẢN THĂNG LONG",
-                    location: "Hà Nội",
-                    salary: "8 - 15 triệu",
-                    time: "2 ngày trước",
-                  },
-                  {
-                    title:
-                      "Nhân Viên Kinh Doanh / Sales / Tư Vấn Bán Hàng Sản Phẩm Công Nghệ",
-                    company:
-                      "CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ QUỐC TẾ GOLDEN BRIDGE",
-                    location: "Hồ Chí Minh",
-                    salary: "10 - 20 triệu",
-                    time: "3 ngày trước",
-                  },
-                ].map((job, index) => (
-                  <Card key={index} className="card-hover border-border">
-                    <CardContent className="p-6">
-                      <div className="flex justify-between items-start mb-3">
-                        <h3 className="font-semibold text-primary hover:text-primary/80 cursor-pointer line-clamp-2 text-lg">
-                          {job.title}
-                        </h3>
-                        {job.urgent && (
-                          <Badge className="bg-destructive text-destructive-foreground text-xs font-medium">
-                            Gấp
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-3 font-medium">
-                        {job.company}
-                      </p>
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <div className="flex items-center space-x-4">
-                          <div className="flex items-center">
-                            <MapPin className="w-4 h-4 mr-1" />
-                            {job.location}
-                          </div>
-                          <div className="flex items-center font-medium text-secondary">
-                            <DollarSign className="w-4 h-4 mr-1" />
-                            {job.salary}
-                          </div>
-                        </div>
-                        <div className="flex items-center">
-                          <Clock className="w-4 h-4 mr-1" />
-                          {job.time}
-                        </div>
-                      </div>
+              <div>
+                {loading && (
+                  <Card className="border-border">
+                    <CardContent className="p-6 text-sm text-muted-foreground">
+                      Đang tải việc làm...
                     </CardContent>
                   </Card>
-                ))}
+                )}
+                {error && !loading && (
+                  <Card className="border-destructive">
+                    <CardContent className="p-6 text-sm text-destructive">
+                      {error}
+                    </CardContent>
+                  </Card>
+                )}
+                {!loading && !error && jobs.length === 0 && (
+                  <Card className="border-border">
+                    <CardContent className="p-6 text-sm text-muted-foreground">
+                      Chưa có việc làm để hiển thị.
+                    </CardContent>
+                  </Card>
+                )}
+                {!loading && !error && jobs.length > 0 && (
+                  <>
+                    <Row gutter={[16, 16]}>
+                      {jobs.map((job) => (
+                        <Col xs={24} sm={12} lg={8} key={job.id}>
+                          <Card className="card-hover border-border h-full shadow-sm hover:shadow-md transition-shadow">
+                            <CardContent className="p-4">
+                              {/* Top section with logo and badges */}
+                              <div className="flex items-start justify-between mb-3">
+                                <div className="relative">
+                                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center overflow-hidden border-2 border-gray-200">
+                                    <img
+                                      src={
+                                        job.companyId?.logo?.url ||
+                                        "/placeholder-logo.png"
+                                      }
+                                      alt={job.companyId?.name || "logo"}
+                                      className="w-full h-full object-contain"
+                                    />
+                                  </div>
+                                  {job.isUrgent && (
+                                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                                      <div className="w-2 h-2 bg-white rounded-full"></div>
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  {job.isFeatured && (
+                                    <Badge className="bg-orange-100 text-orange-600 border-orange-200 text-xs px-2 py-1">
+                                      NỔI BẬT
+                                    </Badge>
+                                  )}
+                                  {job.isUrgent && (
+                                    <Badge className="bg-green-100 text-green-600 border-green-200 text-xs px-2 py-1">
+                                      TOP
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Job title and company */}
+                              <div className="mb-3">
+                                <h3 className="font-semibold text-gray-900 hover:text-primary cursor-pointer line-clamp-2 text-sm mb-1">
+                                  {job.title}
+                                </h3>
+                                <p className="text-xs text-gray-600 line-clamp-1">
+                                  {job.companyId?.name || "Nhà tuyển dụng"}
+                                </p>
+                              </div>
+
+                              {/* Salary and location tags */}
+                              <div className="flex flex-wrap gap-2 mb-3">
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
+                                  {job.salaryRange || "Thỏa thuận"}
+                                </span>
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
+                                  {job.fullLocation || "Đang cập nhật"}
+                                </span>
+                              </div>
+
+                              {/* Bottom section with save button */}
+                              <div className="flex justify-end">
+                                <button className="w-8 h-8 rounded-full bg-green-50 border border-green-200 flex items-center justify-center hover:bg-green-100 transition-colors">
+                                  <svg
+                                    className="w-4 h-4 text-green-600"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+                                    />
+                                  </svg>
+                                </button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </Col>
+                      ))}
+                    </Row>
+
+                    {/* Pagination */}
+                    <div className="mt-8 flex justify-center items-center gap-4">
+                      <button
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <svg
+                          className="w-4 h-4 text-gray-600"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 19l-7-7 7-7"
+                          />
+                        </svg>
+                      </button>
+
+                      <span className="text-sm text-gray-600">
+                        {currentPage} / {totalPages} trang
+                      </span>
+
+                      <button
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage >= totalPages}
+                        className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <svg
+                          className="w-4 h-4 text-gray-600"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9 5l7 7-7 7"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
