@@ -16,7 +16,7 @@ const getAllCompanies = asyncHandler(async (req, res) => {
       size,
       sortBy = 'createdAt',
       sortOrder = 'desc',
-      search
+      search,
     } = req.query;
 
     const query = {};
@@ -26,7 +26,7 @@ const getAllCompanies = asyncHandler(async (req, res) => {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
         { industry: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
+        { description: { $regex: search, $options: 'i' } },
       ];
     }
 
@@ -53,14 +53,14 @@ const getAllCompanies = asyncHandler(async (req, res) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / limit)
-      }
+        pages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     logger.error('Error getting companies:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy danh sách công ty'
+      message: 'Lỗi khi lấy danh sách công ty',
     });
   }
 });
@@ -75,55 +75,67 @@ const getCompany = asyncHandler(async (req, res) => {
     if (!company) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy công ty'
+        message: 'Không tìm thấy công ty',
       });
     }
 
     // Get company's active jobs count
     const activeJobsCount = await Job.countDocuments({
       companyId: company._id,
-      status: 'active'
+      status: 'active',
     });
 
     res.status(200).json({
       success: true,
       data: {
         ...company.toObject(),
-        activeJobsCount
-      }
+        activeJobsCount,
+      },
     });
   } catch (error) {
     logger.error('Error getting company:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy thông tin công ty'
+      message: 'Lỗi khi lấy thông tin công ty',
     });
   }
 });
 
-// @desc    Create new company
+// @desc    Create new company (for employer registration)
 // @route   POST /api/companies
-// @access  Private (Admin)
+// @access  Private (Employer)
 const createCompany = asyncHandler(async (req, res) => {
   try {
-    const company = await Company.create(req.body);
+    const companyData = req.body;
+
+    // Set owner as the user who created the company
+    companyData.owner = req.user.id;
+    // Also set createdBy for model validation and auditing
+    companyData.createdBy = req.user.id;
+
+    // Set default status
+    companyData.status = 'pending'; // Cần admin duyệt
+
+    const company = await Company.create(companyData);
 
     res.status(201).json({
       success: true,
-      data: company
+      data: company,
+      message: 'Tạo thông tin công ty thành công. Vui lòng chờ admin duyệt.',
     });
   } catch (error) {
     logger.error('Error creating company:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi tạo công ty'
+      message: 'Lỗi khi tạo thông tin công ty',
+      error: error.message,
     });
   }
 });
 
-// @desc    Update company
+// @desc    Update company (by owner)
 // @route   PUT /api/companies/:id
-// @access  Private (Admin/Owner)
+// @access  Private (Owner/Admin)
 const updateCompany = asyncHandler(async (req, res) => {
   try {
     const company = await Company.findById(req.params.id);
@@ -131,25 +143,45 @@ const updateCompany = asyncHandler(async (req, res) => {
     if (!company) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy công ty'
+        message: 'Không tìm thấy công ty',
       });
+    }
+
+    // Check ownership or admin
+    if (!company.canManage(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Không có quyền cập nhật thông tin công ty này',
+      });
+    }
+
+    const updateData = req.body;
+
+    // If not admin, set status to pending for review
+    if (req.user.role !== 'admin') {
+      updateData.status = 'pending';
     }
 
     const updatedCompany = await Company.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updateData,
       { new: true, runValidators: true }
     );
 
     res.status(200).json({
       success: true,
-      data: updatedCompany
+      data: updatedCompany,
+      message:
+        req.user.role === 'admin'
+          ? 'Cập nhật thông tin công ty thành công'
+          : 'Cập nhật thông tin công ty thành công. Vui lòng chờ admin duyệt.',
     });
   } catch (error) {
     logger.error('Error updating company:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi cập nhật công ty'
+      message: 'Lỗi khi cập nhật thông tin công ty',
+      error: error.message,
     });
   }
 });
@@ -164,7 +196,7 @@ const deleteCompany = asyncHandler(async (req, res) => {
     if (!company) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy công ty'
+        message: 'Không tìm thấy công ty',
       });
     }
 
@@ -172,13 +204,13 @@ const deleteCompany = asyncHandler(async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Xóa công ty thành công'
+      message: 'Xóa công ty thành công',
     });
   } catch (error) {
     logger.error('Error deleting company:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi xóa công ty'
+      message: 'Lỗi khi xóa công ty',
     });
   }
 });
@@ -193,7 +225,7 @@ const getCompanyJobs = asyncHandler(async (req, res) => {
 
     const jobs = await Job.find({
       companyId: req.params.id,
-      status
+      status,
     })
       .populate('companyId', 'name logo industry')
       .populate('requirements.skills.skillId', 'name category')
@@ -203,7 +235,7 @@ const getCompanyJobs = asyncHandler(async (req, res) => {
 
     const total = await Job.countDocuments({
       companyId: req.params.id,
-      status
+      status,
     });
 
     res.status(200).json({
@@ -213,14 +245,89 @@ const getCompanyJobs = asyncHandler(async (req, res) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / limit)
-      }
+        pages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     logger.error('Error getting company jobs:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy danh sách công việc của công ty'
+      message: 'Lỗi khi lấy danh sách công việc của công ty',
+    });
+  }
+});
+
+// @desc    Get my company (for employer)
+// @route   GET /api/companies/my-company
+// @access  Private (Employer)
+const getMyCompany = asyncHandler(async (req, res) => {
+  try {
+    const company = await Company.findByOwner(req.user.id);
+
+    if (!company) {
+      return res.status(404).json({
+        success: false,
+        message: 'Bạn chưa tạo thông tin công ty',
+      });
+    }
+
+    // Get company's active jobs count
+    const activeJobsCount = await Job.countDocuments({
+      companyId: company._id,
+      status: 'active',
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...company.toObject(),
+        activeJobsCount,
+      },
+    });
+  } catch (error) {
+    logger.error('Error getting my company:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy thông tin công ty của bạn',
+    });
+  }
+});
+
+// @desc    Update my company (for employer)
+// @route   PUT /api/companies/my-company
+// @access  Private (Employer)
+const updateMyCompany = asyncHandler(async (req, res) => {
+  try {
+    const company = await Company.findByOwner(req.user.id);
+
+    if (!company) {
+      return res.status(404).json({
+        success: false,
+        message: 'Bạn chưa tạo thông tin công ty',
+      });
+    }
+
+    const updateData = req.body;
+    updateData.status = 'pending'; // Cần admin duyệt lại
+
+    const updatedCompany = await Company.findByIdAndUpdate(
+      company._id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    res.status(200).json({
+      success: true,
+      data: updatedCompany,
+      message:
+        'Cập nhật thông tin công ty thành công. Vui lòng chờ admin duyệt.',
+    });
+  } catch (error) {
+    logger.error('Error updating my company:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi cập nhật thông tin công ty',
+      error: error.message,
     });
   }
 });
@@ -233,17 +340,22 @@ const getCompanyStats = asyncHandler(async (req, res) => {
     const companyId = req.params.id;
 
     const totalJobs = await Job.countDocuments({ companyId });
-    const activeJobs = await Job.countDocuments({ companyId, status: 'active' });
+    const activeJobs = await Job.countDocuments({
+      companyId,
+      status: 'active',
+    });
     const totalApplications = await Job.aggregate([
       { $match: { companyId: companyId } },
-      { $lookup: {
-        from: 'applications',
-        localField: '_id',
-        foreignField: 'jobId',
-        as: 'applications'
-      }},
+      {
+        $lookup: {
+          from: 'applications',
+          localField: '_id',
+          foreignField: 'jobId',
+          as: 'applications',
+        },
+      },
       { $unwind: '$applications' },
-      { $count: 'total' }
+      { $count: 'total' },
     ]);
 
     const stats = {
@@ -251,19 +363,63 @@ const getCompanyStats = asyncHandler(async (req, res) => {
       activeJobs,
       totalApplications: totalApplications[0]?.total || 0,
       companySize: 'Unknown', // This would come from company data
-      foundedYear: 'Unknown' // This would come from company data
+      foundedYear: 'Unknown', // This would come from company data
     };
 
     res.status(200).json({
       success: true,
-      data: stats
+      data: stats,
     });
   } catch (error) {
     logger.error('Error getting company stats:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy thống kê công ty'
+      message: 'Lỗi khi lấy thống kê công ty',
     });
+  }
+});
+
+// @desc    Update my company logo (attach existing uploaded image)
+// @route   PUT /api/companies/my-company/logo
+// @access  Private (Employer)
+const updateMyCompanyLogo = asyncHandler(async (req, res) => {
+  try {
+    const company = await Company.findByOwner(req.user.id);
+    if (!company) {
+      return res
+        .status(404)
+        .json({ success: false, message: 'Bạn chưa tạo thông tin công ty' });
+    }
+
+    const { url, publicId, filename } = req.body.logo || {};
+    if (!url || (!publicId && !filename)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Thiếu logo.url hoặc publicId/filename',
+      });
+    }
+
+    company.logo = {
+      url,
+      filename: filename || publicId,
+      uploadedAt: new Date(),
+    };
+
+    // Employer cập nhật -> chuyển về pending để admin duyệt
+    company.status = 'pending';
+
+    await company.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Cập nhật logo công ty thành công. Vui lòng chờ admin duyệt.',
+      data: company.logo,
+    });
+  } catch (error) {
+    logger.error('Error updating company logo:', error);
+    res
+      .status(500)
+      .json({ success: false, message: 'Lỗi khi cập nhật logo công ty' });
   }
 });
 
@@ -274,5 +430,8 @@ module.exports = {
   updateCompany,
   deleteCompany,
   getCompanyJobs,
-  getCompanyStats
+  getMyCompany,
+  updateMyCompany,
+  getCompanyStats,
+  updateMyCompanyLogo,
 };

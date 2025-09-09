@@ -493,7 +493,14 @@ const CompanySchema = new mongoose.Schema(
       canonicalUrl: String,
     },
 
-    // Created By
+    // Owner (người sở hữu công ty - employer)
+    owner: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+
+    // Created By (admin tạo hoặc owner tự tạo)
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -518,6 +525,7 @@ CompanySchema.index({ size: 1 });
 CompanySchema.index({ 'location.headquarters.city': 1 });
 CompanySchema.index({ 'verification.isVerified': 1 });
 CompanySchema.index({ status: 1 });
+CompanySchema.index({ owner: 1 });
 CompanySchema.index({ 'rating.overall': -1 });
 CompanySchema.index({ 'stats.totalJobs': -1 });
 CompanySchema.index({ createdAt: -1 });
@@ -546,6 +554,13 @@ CompanySchema.virtual('employers', {
   ref: 'User',
   localField: '_id',
   foreignField: 'employerProfile.company._id',
+});
+
+CompanySchema.virtual('ownerInfo', {
+  ref: 'User',
+  localField: 'owner',
+  foreignField: '_id',
+  justOne: true,
 });
 
 // Virtual for full address
@@ -649,6 +664,16 @@ CompanySchema.methods.calculateRating = async function () {
   return this.save();
 };
 
+// Check if user is owner
+CompanySchema.methods.isOwner = function (userId) {
+  return this.owner.toString() === userId.toString();
+};
+
+// Check if user can manage company
+CompanySchema.methods.canManage = function (user) {
+  return this.isOwner(user.id) || user.role === 'admin';
+};
+
 // Static methods
 CompanySchema.statics.findByIndustry = function (industry) {
   return this.find({
@@ -703,11 +728,35 @@ CompanySchema.statics.searchCompanies = function (query, filters = {}) {
   });
 };
 
+// Find company by owner
+CompanySchema.statics.findByOwner = function (ownerId) {
+  return this.findOne({ owner: ownerId });
+};
+
+// Find companies by owner with pagination
+CompanySchema.statics.findByOwnerPaginated = function (ownerId, options = {}) {
+  const { page = 1, limit = 10, status } = options;
+  const skip = (page - 1) * limit;
+
+  const query = { owner: ownerId };
+  if (status) query.status = status;
+
+  return this.find(query)
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(parseInt(limit));
+};
+
 // Pre-save middleware
 CompanySchema.pre('save', function (next) {
   // Generate slug if not provided
   if (!this.slug) {
     this.slug = this.generateSlug();
+  }
+
+  // Set owner to createdBy if not provided
+  if (!this.owner && this.createdBy) {
+    this.owner = this.createdBy;
   }
 
   // Validate employee count
