@@ -13,6 +13,21 @@ const {
   getDashboardStats,
   getUserAnalytics,
 
+  // Employer Management
+  getEmployers,
+  getEmployer,
+  updateEmployerStatus,
+  getEmployerCompanies,
+  getEmployerJobs,
+
+  // Company Management
+  getCompanies,
+  getCompany,
+  updateCompany,
+  deleteCompany,
+  getCompanyJobs,
+  getCompanyApplications,
+
   // Employer Verification
   getPendingVerifications,
   verifyEmployer,
@@ -327,6 +342,463 @@ router.get('/dashboard', getDashboardStats);
  *         description: Admin access required
  */
 router.get('/analytics/users', getUserAnalytics);
+
+// ========================================
+// EMPLOYER MANAGEMENT
+// ========================================
+
+/**
+ * @swagger
+ * /api/admin/employers:
+ *   get:
+ *     summary: Get all employers
+ *     tags: [Admin - Employer Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of employers per page
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [active, inactive]
+ *         description: Filter by status
+ *       - in: query
+ *         name: verified
+ *         schema:
+ *           type: string
+ *           enum: [true, false]
+ *         description: Filter by email verification status
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by email or name
+ *     responses:
+ *       200:
+ *         description: List of employers retrieved successfully
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Admin access required
+ */
+router.get('/employers', getEmployers);
+
+/**
+ * @swagger
+ * /api/admin/employers/{id}:
+ *   get:
+ *     summary: Get single employer
+ *     tags: [Admin - Employer Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Employer ID
+ *     responses:
+ *       200:
+ *         description: Employer retrieved successfully
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Admin access required
+ *       404:
+ *         description: Employer not found
+ */
+router.get('/employers/:id', getEmployer);
+
+/**
+ * @swagger
+ * /api/admin/employers/{id}/status:
+ *   put:
+ *     summary: Update employer status
+ *     tags: [Admin - Employer Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Employer ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [active, inactive, suspended, banned]
+ *                 description: New status
+ *     responses:
+ *       200:
+ *         description: Employer status updated successfully
+ *       400:
+ *         description: Invalid status
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Admin access required
+ *       404:
+ *         description: Employer not found
+ */
+router.put('/employers/:id/status', updateEmployerStatus);
+
+/**
+ * @swagger
+ * /api/admin/employers/{id}/companies:
+ *   get:
+ *     summary: Get employer's companies
+ *     tags: [Admin - Employer Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Employer ID
+ *     responses:
+ *       200:
+ *         description: Employer's companies retrieved successfully
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Admin access required
+ *       404:
+ *         description: Employer not found
+ */
+router.get('/employers/:id/companies', getEmployerCompanies);
+
+/**
+ * @swagger
+ * /api/admin/employers/{id}/jobs:
+ *   get:
+ *     summary: Get employer's jobs
+ *     tags: [Admin - Employer Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Employer ID
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of jobs per page
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [active, pending, inactive, expired]
+ *         description: Filter by job status
+ *       - in: query
+ *         name: visibility
+ *         schema:
+ *           type: string
+ *           enum: [public, hidden, private]
+ *         description: Filter by job visibility
+ *     responses:
+ *       200:
+ *         description: Employer's jobs retrieved successfully
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Admin access required
+ *       404:
+ *         description: Employer not found
+ */
+router.get('/employers/:id/jobs', getEmployerJobs);
+
+// ========================================
+// COMPANY MANAGEMENT
+// ========================================
+
+/**
+ * @swagger
+ * /api/admin/companies:
+ *   get:
+ *     summary: Get all companies
+ *     tags: [Admin - Company Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of companies per page
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [active, pending, suspended, inactive]
+ *         description: Filter by status
+ *       - in: query
+ *         name: size
+ *         schema:
+ *           type: string
+ *           enum: [startup, small, medium, large, enterprise]
+ *         description: Filter by company size
+ *       - in: query
+ *         name: companyType
+ *         schema:
+ *           type: string
+ *           enum: [private, public, government, nonprofit]
+ *         description: Filter by company type
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search by name or description
+ *     responses:
+ *       200:
+ *         description: List of companies retrieved successfully
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Admin access required
+ */
+router.get('/companies', getCompanies);
+
+/**
+ * @swagger
+ * /api/admin/companies/{id}:
+ *   get:
+ *     summary: Get single company
+ *     tags: [Admin - Company Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Company ID
+ *     responses:
+ *       200:
+ *         description: Company retrieved successfully
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Admin access required
+ *       404:
+ *         description: Company not found
+ */
+router.get('/companies/:id', getCompany);
+
+/**
+ * @swagger
+ * /api/admin/companies/{id}:
+ *   put:
+ *     summary: Update company
+ *     tags: [Admin - Company Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Company ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               shortDescription:
+ *                 type: string
+ *               website:
+ *                 type: string
+ *               size:
+ *                 type: string
+ *                 enum: [startup, small, medium, large, enterprise]
+ *               companyType:
+ *                 type: string
+ *                 enum: [private, public, government, nonprofit]
+ *     responses:
+ *       200:
+ *         description: Company updated successfully
+ *       400:
+ *         description: Invalid data
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Admin access required
+ *       404:
+ *         description: Company not found
+ */
+router.put('/companies/:id', updateCompany);
+
+/**
+ * @swagger
+ * /api/admin/companies/{id}:
+ *   delete:
+ *     summary: Delete company
+ *     tags: [Admin - Company Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Company ID
+ *     responses:
+ *       200:
+ *         description: Company deleted successfully
+ *       400:
+ *         description: Cannot delete company with active jobs
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Admin access required
+ *       404:
+ *         description: Company not found
+ */
+router.delete('/companies/:id', deleteCompany);
+
+/**
+ * @swagger
+ * /api/admin/companies/{id}/jobs:
+ *   get:
+ *     summary: Get company's jobs
+ *     tags: [Admin - Company Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Company ID
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of jobs per page
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [active, pending, inactive, expired]
+ *         description: Filter by job status
+ *       - in: query
+ *         name: visibility
+ *         schema:
+ *           type: string
+ *           enum: [public, hidden, private]
+ *         description: Filter by job visibility
+ *     responses:
+ *       200:
+ *         description: Company's jobs retrieved successfully
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Admin access required
+ *       404:
+ *         description: Company not found
+ */
+router.get('/companies/:id/jobs', getCompanyJobs);
+
+/**
+ * @swagger
+ * /api/admin/companies/{id}/applications:
+ *   get:
+ *     summary: Get company's applications
+ *     tags: [Admin - Company Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Company ID
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of applications per page
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, reviewing, interviewing, accepted, rejected]
+ *         description: Filter by application status
+ *     responses:
+ *       200:
+ *         description: Company's applications retrieved successfully
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Admin access required
+ *       404:
+ *         description: Company not found
+ */
+router.get('/companies/:id/applications', getCompanyApplications);
 
 // ========================================
 // EMPLOYER VERIFICATION
