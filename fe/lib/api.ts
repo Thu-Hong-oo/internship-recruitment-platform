@@ -300,12 +300,8 @@ class ApiClient {
     const formData = new FormData();
     formData.append("avatar", file);
 
-    const response = await this.request<{
-      success: boolean;
-      avatar?: string;
-      error?: string;
-      user?: User;
-    }>("/users/upload-avatar", {
+    // Backend returns: { success, message, data: { avatar: { url, ... }, user: {...} } }
+    const response = await this.request<any>("/users/upload-avatar", {
       method: "POST",
       headers: {
         // Don't set Content-Type for FormData, let browser set it
@@ -313,7 +309,12 @@ class ApiClient {
       body: formData,
     });
 
-    return response;
+    return {
+      success: !!response?.success,
+      avatar: response?.data?.avatar?.url,
+      user: response?.data?.user,
+      error: response?.error,
+    };
   }
 
   async googleAuth(idToken: string): Promise<{
