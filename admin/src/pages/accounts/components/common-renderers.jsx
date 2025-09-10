@@ -30,13 +30,13 @@ export const dropdownAction = [
   {
     id: 1,
     title: "Xem chi tiết",
-    avatar: <img src={getPath("/icons/accounts/ic-eye.png")} className="cursor-pointer w-[22px]" />,
+    avatar: <img src="/icons/accounts/ic-eye.png" className="cursor-pointer w-[22px]" />,
     visible: () => true,
   },
   {
     id: 2,
     title: "Duyệt khoá tài khoản",
-    avatar: <img src={getPath("/icons/accounts/ic-approve.svg")} className="cursor-pointer w-[20px]" />,
+    avatar: <img src="/icons/accounts/ic-approve.svg" className="cursor-pointer w-[20px]" />,
     visible: () => true,
 
     // visible: (status) => ["Pending_Lock_Approval"].includes(status),
@@ -44,7 +44,7 @@ export const dropdownAction = [
   {
     id: 3,
     title: "Khoá tài khoản",
-    avatar: <img src={getPath("/icons/accounts/ic-lock.svg")} className="cursor-pointer w-[20px]" />,
+    avatar: <img src="/icons/accounts/ic-lock.svg" className="cursor-pointer w-[20px]" />,
     visible: () => true,
     // visible: (status) => ["Active"].includes(status),
   },
