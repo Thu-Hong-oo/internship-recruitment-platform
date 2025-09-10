@@ -17,7 +17,7 @@ const hardConfig = [
     code: "Pending_Lock_Approval",
   },
   {
-    title: "Ngừng hoạt động",
+    title: "Chưa hoạt động",
     code: "InActive",
   },
 ];
@@ -45,8 +45,8 @@ export default function Accounts() {
       const res = await usersAPI.getUsers({
         page: formData?.page || 1,
         limit: formData?.pageSize || 10,
-        role: formData?.role || undefined, // 'student' | 'employer' | 'admin'
-        status: formData?.status || undefined, // 'active' | 'inactive'
+        role: formData?.role || undefined, 
+        status: formData?.status || undefined, 
       });
 
       const mapped = (res?.users || []).map((u, idx) => ({
@@ -66,7 +66,7 @@ export default function Accounts() {
         dob: u?.profile?.dateOfBirth
           ? new Date(u.profile.dateOfBirth).toLocaleDateString()
           : "",
-        status: u?.isActive ? "Active" : "Inactive",
+        status: u?.isActive ? "Active" : "InActive",
         reasonForRejection: u?.reasonForRejection || "",
       }));
 
