@@ -4,9 +4,7 @@ const {
   getEmployerProfile,
   createEmployerProfile,
   updateEmployerProfile,
-  updateCompanyInfo,
-  getCompanyInfo,
-  uploadCompanyLogo,
+  getCompanyInfo, // Deprecated - use /api/companies/my-company instead
   getEmployerDashboard,
   getProfileCompletion,
   deleteEmployerProfile
@@ -14,15 +12,22 @@ const {
 
 const router = express.Router();
 
+// ========================================
+// EMPLOYER PROFILE ROUTES
+// ========================================
 // All routes are protected for employers only
+
+// Profile management
 router.get('/', protect, authorize('employer'), getEmployerProfile);
-router.get('/company', protect, authorize('employer'), getCompanyInfo);
-router.get('/dashboard', protect, authorize('employer'), getEmployerDashboard);
-router.get('/completion', protect, authorize('employer'), getProfileCompletion);
 router.post('/', protect, authorize('employer'), createEmployerProfile);
 router.put('/', protect, authorize('employer'), updateEmployerProfile);
-router.put('/company', protect, authorize('employer'), updateCompanyInfo);
-router.post('/company/logo', protect, authorize('employer'), uploadCompanyLogo);
 router.delete('/', protect, authorize('employer'), deleteEmployerProfile);
+
+// Dashboard & analytics
+router.get('/dashboard', protect, authorize('employer'), getEmployerDashboard);
+router.get('/completion', protect, authorize('employer'), getProfileCompletion);
+
+// Company info (DEPRECATED - use /api/companies/my-company instead)
+router.get('/company', protect, authorize('employer'), getCompanyInfo);
 
 module.exports = router;

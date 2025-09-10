@@ -102,40 +102,7 @@ const updateEmployerProfile = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Update company information
-// @route   PUT /api/employer-profile/company
-// @access  Private (Employer)
-const updateCompanyInfo = asyncHandler(async (req, res) => {
-  try {
-    const company = await Company.findById(req.user.companyId);
-
-    if (!company) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy thông tin công ty'
-      });
-    }
-
-    const updatedCompany = await Company.findByIdAndUpdate(
-      req.user.companyId,
-      req.body,
-      { new: true, runValidators: true }
-    );
-
-    res.status(200).json({
-      success: true,
-      data: updatedCompany
-    });
-  } catch (error) {
-    logger.error('Error updating company info:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi cập nhật thông tin công ty'
-    });
-  }
-});
-
-// @desc    Get company information
+// @desc    Get company information (redirect to company controller)
 // @route   GET /api/employer-profile/company
 // @access  Private (Employer)
 const getCompanyInfo = asyncHandler(async (req, res) => {
@@ -151,39 +118,14 @@ const getCompanyInfo = asyncHandler(async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: company
+      data: company,
+      message: 'Sử dụng /api/companies/my-company để quản lý thông tin công ty'
     });
   } catch (error) {
     logger.error('Error getting company info:', error);
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy thông tin công ty'
-    });
-  }
-});
-
-// @desc    Upload company logo
-// @route   POST /api/employer-profile/company/logo
-// @access  Private (Employer)
-const uploadCompanyLogo = asyncHandler(async (req, res) => {
-  try {
-    const { logoUrl } = req.body;
-
-    const company = await Company.findByIdAndUpdate(
-      req.user.companyId,
-      { logo: logoUrl },
-      { new: true }
-    );
-
-    res.status(200).json({
-      success: true,
-      data: company
-    });
-  } catch (error) {
-    logger.error('Error uploading company logo:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi tải lên logo công ty'
     });
   }
 });
@@ -344,9 +286,7 @@ module.exports = {
   getEmployerProfile,
   createEmployerProfile,
   updateEmployerProfile,
-  updateCompanyInfo,
-  getCompanyInfo,
-  uploadCompanyLogo,
+  getCompanyInfo, // Deprecated - use /api/companies/my-company instead
   getEmployerDashboard,
   getProfileCompletion,
   deleteEmployerProfile

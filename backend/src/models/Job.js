@@ -47,7 +47,7 @@ const JobSchema = new mongoose.Schema(
     subCategories: [
       {
         type: String,
-        maxlength: 2,
+        maxlength: [50, 'Ngành nghề phụ không được vượt quá 50 ký tự'],
       },
     ],
 

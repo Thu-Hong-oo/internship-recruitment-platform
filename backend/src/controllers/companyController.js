@@ -114,14 +114,14 @@ const createCompany = asyncHandler(async (req, res) => {
     companyData.createdBy = req.user.id;
 
     // Set default status
-    companyData.status = 'pending'; // Cần admin duyệt
+    companyData.status = 'active'; // Cho phép đăng job ngay
 
     const company = await Company.create(companyData);
 
     res.status(201).json({
       success: true,
       data: company,
-      message: 'Tạo thông tin công ty thành công. Vui lòng chờ admin duyệt.',
+      message: 'Tạo thông tin công ty thành công. Bạn có thể đăng tin tuyển dụng ngay.',
     });
   } catch (error) {
     logger.error('Error creating company:', error);
@@ -157,10 +157,8 @@ const updateCompany = asyncHandler(async (req, res) => {
 
     const updateData = req.body;
 
-    // If not admin, set status to pending for review
-    if (req.user.role !== 'admin') {
-      updateData.status = 'pending';
-    }
+    // If not admin, keep status as active (no need to re-approve)
+    // Admin can still suspend/inactivate if needed
 
     const updatedCompany = await Company.findByIdAndUpdate(
       req.params.id,
@@ -171,10 +169,7 @@ const updateCompany = asyncHandler(async (req, res) => {
     res.status(200).json({
       success: true,
       data: updatedCompany,
-      message:
-        req.user.role === 'admin'
-          ? 'Cập nhật thông tin công ty thành công'
-          : 'Cập nhật thông tin công ty thành công. Vui lòng chờ admin duyệt.',
+      message: 'Cập nhật thông tin công ty thành công',
     });
   } catch (error) {
     logger.error('Error updating company:', error);
@@ -258,7 +253,7 @@ const getCompanyJobs = asyncHandler(async (req, res) => {
 });
 
 // @desc    Get my company (for employer)
-// @route   GET /api/companies/my-company
+// @route   GET /api/companies/me
 // @access  Private (Employer)
 const getMyCompany = asyncHandler(async (req, res) => {
   try {
@@ -294,7 +289,7 @@ const getMyCompany = asyncHandler(async (req, res) => {
 });
 
 // @desc    Update my company (for employer)
-// @route   PUT /api/companies/my-company
+// @route   PUT /api/companies/me
 // @access  Private (Employer)
 const updateMyCompany = asyncHandler(async (req, res) => {
   try {
@@ -308,7 +303,7 @@ const updateMyCompany = asyncHandler(async (req, res) => {
     }
 
     const updateData = req.body;
-    updateData.status = 'pending'; // Cần admin duyệt lại
+    // Keep status as active - no need to re-approve company info
 
     const updatedCompany = await Company.findByIdAndUpdate(
       company._id,
@@ -319,8 +314,7 @@ const updateMyCompany = asyncHandler(async (req, res) => {
     res.status(200).json({
       success: true,
       data: updatedCompany,
-      message:
-        'Cập nhật thông tin công ty thành công. Vui lòng chờ admin duyệt.',
+      message: 'Cập nhật thông tin công ty thành công',
     });
   } catch (error) {
     logger.error('Error updating my company:', error);
@@ -380,7 +374,7 @@ const getCompanyStats = asyncHandler(async (req, res) => {
 });
 
 // @desc    Update my company logo (attach existing uploaded image)
-// @route   PUT /api/companies/my-company/logo
+// @route   PUT /api/companies/me/logo
 // @access  Private (Employer)
 const updateMyCompanyLogo = asyncHandler(async (req, res) => {
   try {
@@ -405,14 +399,13 @@ const updateMyCompanyLogo = asyncHandler(async (req, res) => {
       uploadedAt: new Date(),
     };
 
-    // Employer cập nhật -> chuyển về pending để admin duyệt
-    company.status = 'pending';
+    // Keep status as active - logo update doesn't need approval
 
     await company.save();
 
     res.status(200).json({
       success: true,
-      message: 'Cập nhật logo công ty thành công. Vui lòng chờ admin duyệt.',
+      message: 'Cập nhật logo công ty thành công',
       data: company.logo,
     });
   } catch (error) {

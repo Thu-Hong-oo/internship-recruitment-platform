@@ -15,24 +15,26 @@ const {
 
 const router = express.Router();
 
-// Public routes
-router.get('/', getAllCompanies);
-
-// Protected routes (Employer) — must be before any '/:id' routes to avoid 'me' being treated as an id
+// ========================================
+// EMPLOYER ROUTES (Must be BEFORE /:id routes)
+// ========================================
 router.get('/me', protect, authorize('employer'), getMyCompany);
 router.post('/', protect, authorize('employer'), createCompany);
 router.put('/me', protect, authorize('employer'), updateMyCompany);
 router.put('/me/logo', protect, authorize('employer'), updateMyCompanyLogo);
 
-// Public routes with :id
+// ========================================
+// PUBLIC ROUTES
+// ========================================
+router.get('/', getAllCompanies);
 router.get('/:id', getCompany);
 router.get('/:id/jobs', getCompanyJobs);
 router.get('/:id/stats', getCompanyStats);
 
-// Protected routes (Admin/Owner)
+// ========================================
+// ADMIN/OWNER ROUTES
+// ========================================
 router.put('/:id', protect, updateCompany);
-
-// Protected routes (Admin only)
 router.delete('/:id', protect, authorize('admin'), deleteCompany);
 
 module.exports = router;
