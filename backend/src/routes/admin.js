@@ -35,6 +35,10 @@ const {
   // Company Moderation
   updateCompanyStatus,
 
+  // Job Moderation
+  getJobsAdmin,
+  updateJobStatusAdmin,
+
   // System Management
   getSystemHealth,
   getSystemLogs,
@@ -910,6 +914,85 @@ router.put('/verifications/:id', verifyEmployer);
  *         description: Company not found
  */
 router.put('/companies/:id/status', updateCompanyStatus);
+
+// ========================================
+// JOB MODERATION
+// ========================================
+
+/**
+ * @swagger
+ * /api/admin/jobs:
+ *   get:
+ *     summary: Get jobs for moderation (filter by status/company/employer)
+ *     tags: [Admin - Job Moderation]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [draft, active, closed, filled]
+ *       - in: query
+ *         name: companyId
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: employerId
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: q
+ *         schema:
+ *           type: string
+ *           description: text search
+ *     responses:
+ *       200:
+ *         description: Jobs retrieved
+ */
+router.get('/jobs', getJobsAdmin);
+
+/**
+ * @swagger
+ * /api/admin/jobs/{id}/status:
+ *   put:
+ *     summary: Update job status (approve/reject/publish)
+ *     tags: [Admin - Job Moderation]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [draft, active, closed, filled]
+ *     responses:
+ *       200:
+ *         description: Job status updated
+ */
+router.put('/jobs/:id/status', updateJobStatusAdmin);
 
 // ========================================
 // SYSTEM MANAGEMENT
