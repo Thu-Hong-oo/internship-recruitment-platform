@@ -14,6 +14,7 @@ Hệ thống bao gồm các file sample data sau:
 ## Cấu trúc dữ liệu
 
 ### 1. Skills (15 skills)
+
 - **Programming**: JavaScript, Python, Java
 - **Web**: React, Node.js
 - **Data**: SQL, Data Analysis
@@ -24,11 +25,13 @@ Hệ thống bao gồm các file sample data sau:
 - **Marketing**: Digital Marketing
 
 ### 2. Users (7 users)
+
 - **Students (3)**: Sinh viên các ngành khác nhau
 - **Employers (3)**: HR từ các công ty lớn
 - **Admin (1)**: Quản trị viên hệ thống
 
 ### 3. Companies (5 companies)
+
 - **FPT Software**: Công ty phần mềm hàng đầu
 - **Tiki**: E-commerce platform
 - **VNG Corporation**: Tập đoàn công nghệ
@@ -36,6 +39,7 @@ Hệ thống bao gồm các file sample data sau:
 - **Shopee Vietnam**: E-commerce platform
 
 ### 4. Jobs (6 jobs)
+
 - **Frontend Developer Intern** (FPT)
 - **Backend Developer Intern** (FPT)
 - **Data Analyst Intern** (Tiki)
@@ -44,6 +48,7 @@ Hệ thống bao gồm các file sample data sau:
 - **Marketing Intern** (Shopee)
 
 ### 5. Applications (5 applications)
+
 - **Shortlisted**: Frontend Developer Intern
 - **Pending**: Data Analyst Intern
 - **Interview**: UI/UX Design Intern
@@ -93,6 +98,7 @@ GET /api/applications
 ## Thông tin đăng nhập
 
 ### Students
+
 - Email: `nguyen.van.a@student.hcmut.edu.vn`
 - Password: `password123`
 
@@ -103,6 +109,7 @@ GET /api/applications
 - Password: `password123`
 
 ### Employers
+
 - Email: `hr@fpt.com.vn`
 - Password: `password123`
 
@@ -113,13 +120,16 @@ GET /api/applications
 - Password: `password123`
 
 ### Admin
+
 - Email: `admin@internship-platform.com`
 - Password: `admin123`
 
 ## Tính năng đặc biệt
 
 ### 1. AI Analysis
+
 Tất cả applications đều có AI analysis với:
+
 - Skills matching score
 - Experience matching
 - Education matching
@@ -128,19 +138,23 @@ Tất cả applications đều có AI analysis với:
 - Cultural & technical fit scores
 
 ### 2. Interview Process
+
 Applications bao gồm:
+
 - Interview scheduling
 - Interview feedback
 - Multiple interview rounds
 - Technical & cultural assessments
 
 ### 3. Communication History
+
 - Email communications
 - Timeline tracking
 - Status updates
 - Important notifications
 
 ### 4. Offer Management
+
 - Salary negotiation
 - Benefits package
 - Response tracking
@@ -154,7 +168,7 @@ Sample data được thiết kế dựa trên các website tuyển dụng thực
 - **Indeed**: Job descriptions, requirements, benefits
 - **Glassdoor**: Company ratings, reviews, salary ranges
 - **Internshala**: Internship-specific features
-- **TopCV**: Resume analysis, skill matching
+- **InternBridge**: Resume analysis, skill matching
 
 ## Mở rộng
 
@@ -178,10 +192,12 @@ Sample data được thiết kế dựa trên các website tuyển dụng thực
 ### Lỗi thường gặp
 
 1. **MongoDB connection error**
+
    - Kiểm tra `MONGODB_URI` trong `.env`
    - Đảm bảo MongoDB đang chạy
 
 2. **Duplicate key error**
+
    - Chạy `clearData()` trước khi seed
    - Kiểm tra unique constraints
 

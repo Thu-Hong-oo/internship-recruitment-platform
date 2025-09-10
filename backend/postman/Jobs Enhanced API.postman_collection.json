@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "8342a660-0288-4eec-9188-ac2c9cfb2b64",
     "name": "Jobs Enhanced API",
-    "description": "Enhanced job management endpoints with TopCV-style features, AI integration, and advanced filtering",
+    "description": "Enhanced job management endpoints with InternBridge-style features, AI integration, and advanced filtering",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "38146107",
     "_collection_link": "https://intership-platform.postman.co/workspace/Team-Workspace~96be9a72-219c-4bbc-8714-71a2edb8a68d/collection/38146107-8342a660-0288-4eec-9188-ac2c9cfb2b64?action=share&source=collection_link&creator=38146107"
