@@ -1,24 +1,11 @@
 import { Avatar, Dropdown, Menu, Pagination, Spin, Table } from "antd";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { dropdownAction, StatusWidget } from "./components/common-renderers";
 import MdConfirm from "./components/mdConfirm";
 import MdInputReason from "./components/mdInputReason";
 import Filter from "./components/Filter";
-import { getPath } from "../../utils";
-
-const hardData = [
-  { uid: "ac7b4d8d-a08a-4c64-b28f-400c556003fd", fullName: "Abcccc", phone: "0987654321", email: "a@gmail.com", dob: "01/01/2000", status: "Active" },
-  { uid: "bc7b4d8d-a08a-4c64-b28f-400c556003fd", fullName: "Abcccc", phone: "0987654321", email: "a@gmail.com", dob: "01/01/2000", status: "Active" },
-  { uid: "cc7b4d8d-a08a-4c64-b28f-400c556003fd", fullName: "Abcccc", phone: "0987654321", email: "a@gmail.com", dob: "01/01/2000", status: "Active" },
-  { uid: "dc7b4d8d-a08a-4c64-b28f-400c556003fd", fullName: "Abcccc", phone: "0987654321", email: "a@gmail.com", dob: "01/01/2000", status: "Active" },
-  { uid: "ec7b4d8d-a08a-4c64-b28f-400c556003fd", fullName: "Abcccc", phone: "0987654321", email: "a@gmail.com", dob: "01/01/2000", status: "Active" },
-  { uid: "fc7b4d8d-a08a-4c64-b28f-400c556003fd", fullName: "Abcccc", phone: "0987654321", email: "a@gmail.com", dob: "01/01/2000", status: "Active" },
-  { uid: "gc7b4d8d-a08a-4c64-b28f-400c556003fd", fullName: "Abcccc", phone: "0987654321", email: "a@gmail.com", dob: "01/01/2000", status: "Active" },
-  { uid: "hc7b4d8d-a08a-4c64-b28f-400c556003fd", fullName: "Abcccc", phone: "0987654321", email: "a@gmail.com", dob: "01/01/2000", status: "Active" },
-  { uid: "kc7b4d8d-a08a-4c64-b28f-400c556003fd", fullName: "Abcccc", phone: "0987654321", email: "a@gmail.com", dob: "01/01/2000", status: "Active" },
-  { uid: "mc7b4d8d-a08a-4c64-b28f-400c556003fd", fullName: "Abcccc", phone: "0987654321", email: "a@gmail.com", dob: "01/01/2000", status: "Active" },
-];
+import { usersAPI } from "../../api/users";
 
 const hardConfig = [
   {
@@ -38,48 +25,70 @@ const hardConfig = [
 export default function Accounts() {
   const navigate = useNavigate();
 
-  const [config, setConfig] = useState(hardConfig);
-  const [data, setData] = useState(hardData);
-  const [formData, setFormData] = useState({ page: 1, pageSize: 10 });
+  const [config] = useState(hardConfig);
+  const [data, setData] = useState([]);
+  const [formData, setFormData] = useState({
+    page: 1,
+    pageSize: 10,
+    role: undefined,
+    status: undefined,
+  });
   const [confirmModalVisible, setConfirmModalVisible] = useState({});
   const [reasonModalVisible, setReasonModalVisible] = useState({});
   const [total, setTotal] = useState(0);
   const [loadingPage, setLoadingPage] = useState(false);
+  const [pageLabel, setPageLabel] = useState("1/1");
 
-  //   useEffect(() => {
-  //     const timeoutId = setTimeout(() => {
-  //       getList();
-  //     }, 100);
-  //     return () => clearTimeout(timeoutId);
-  //   }, [formData]);
+  const getUsersList = useCallback(async () => {
+    try {
+      setLoadingPage(true);
+      const res = await usersAPI.getUsers({
+        page: formData?.page || 1,
+        limit: formData?.pageSize || 10,
+        role: formData?.role || undefined, // 'student' | 'employer' | 'admin'
+        status: formData?.status || undefined, // 'active' | 'inactive'
+      });
 
-  //   const getList = async () => {
-  //     setLoading(true);
-  //     const dataForm = {
-  //       ...formData,
-  //       phoneNumber: formData?.phoneNumber || undefined,
-  //       fromDate: formData?.fromDate ? moment(formData?.fromDate).format('YYYY-MM-DD') : undefined,
-  //       toDate: formData?.toDate ? moment(formData?.toDate).format('YYYY-MM-DD') : undefined,
-  //       affProductUid: formData?.affProductUid?.length > 0 ? formData.affProductUid.join(',') : undefined,
-  //       status: formData?.status?.length > 0 ? formData.status.join(',') : undefined,
-  //     }
-  //     await Service.openApiCall("GET", `/v1/crm/affiliate/article/member`, dataForm)
-  //       .then((res) => {
-  //         let data = res?.data;
-  //         if (data.success) {
-  //           setData(data?.data?.results);
-  //           setTotal(data?.data?.total);
-  //         }
-  //       })
-  //       .catch((err) => {
-  //         if (err?.response) {
-  //           message.error(err?.response?.data?.error?.statusCode + '|' + err?.response?.data?.message);
-  //         }
-  //       })
-  //       .finally(() => {
-  //         setLoading(false);
-  //       });
-  //   };
+      const mapped = (res?.users || []).map((u, idx) => ({
+        uid: u?.id || u?._id || String(idx),
+        fullname:
+          u?.fullName ||
+          [u?.profile?.firstName, u?.profile?.lastName]
+            .filter(Boolean)
+            .join(" ") ||
+          "",
+        avatar:
+          u?.profile?.avatar && String(u.profile.avatar).trim() !== ""
+            ? u.profile.avatar
+            : null,
+        phone: u?.profile?.phone || "",
+        email: u?.email || "",
+        dob: u?.profile?.dateOfBirth
+          ? new Date(u.profile.dateOfBirth).toLocaleDateString()
+          : "",
+        status: u?.isActive ? "Active" : "Inactive",
+        reasonForRejection: u?.reasonForRejection || "",
+      }));
+
+      setData(mapped);
+      setTotal(res?.total || 0);
+      setPageLabel(res?.pagination?.label || "1/1");
+    } catch (error) {
+      void error; // noop to satisfy linter
+    } finally {
+      setLoadingPage(false);
+    }
+  }, [formData]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      getUsersList();
+    }, 100);
+    return () => clearTimeout(timeoutId);
+  }, [formData, getUsersList]);
+
+  // Temporary stub until status actions are implemented
+  const OnChangeStatus = () => {};
 
   //   const OnChangeStatus = async (data) => {
   //     setLoading(true);
@@ -131,9 +140,17 @@ export default function Accounts() {
               case 1:
                 return navigate("/accounts/detail?uid=" + dataNote?.uid);
               case 2:
-                return setConfirmModalVisible({ open: true, type: "approve-lock", uid: dataNote?.uid });
+                return setConfirmModalVisible({
+                  open: true,
+                  type: "approve-lock",
+                  uid: dataNote?.uid,
+                });
               case 3:
-                return setReasonModalVisible({ open: true, type: "lock", uid: dataNote?.uid });
+                return setReasonModalVisible({
+                  open: true,
+                  type: "lock",
+                  uid: dataNote?.uid,
+                });
               // case 4:
               //   return setConfirmModalVisible({ open: true, type: "open-lock", uid: dataNote?.uid });
               default:
@@ -151,7 +168,9 @@ export default function Accounts() {
     {
       title: "",
       width: 50,
-      render: (item, record, index) => <div>{index + 1 + (formData?.page - 1) * 10}</div>,
+      render: (item, record, index) => (
+        <div>{index + 1 + (formData?.page - 1) * 10}</div>
+      ),
     },
     {
       title: "Họ & tên",
@@ -160,10 +179,12 @@ export default function Accounts() {
         <div className="flex items-center gap-2 text-left">
           <div className="inline-block rounded-full p-[2px] bg-gradient-to-b from-[#09BAFD] to-[#4285ED]">
             <div className="rounded-full p-[2px] bg-white">
-              <Avatar size={35} src={<img src={data?.avatar || getPath("/images/logo.png")} />} />
+              <Avatar size={35} src={data?.avatar || "/images/noAvatar.png"} />
             </div>
           </div>
-          <span className="text-[#003478] font-semibold">{data?.fullname || "Nguyen Van A"}</span>
+          <span className="text-[#003478] font-semibold">
+            {data?.fullname || "Nguyen Van A"}
+          </span>
         </div>
       ),
     },
@@ -195,7 +216,7 @@ export default function Accounts() {
       render: (_, data) => (
         <Dropdown overlay={Action(data)} trigger={["click"]}>
           <a className="ant-dropdown-link">
-            <img src={getPath("/icons/accounts/ic-dropdown.svg")} />
+            <img src="/icons/accounts/ic-dropdown.svg" />
           </a>
         </Dropdown>
       ),
@@ -217,14 +238,17 @@ export default function Accounts() {
         scroll={{ x: "auto" }}
         showHeader={true}
       />
-      <div className="flex justify-center m-4">
+      <div className="flex justify-between items-center m-4">
+        <div className="text-sm text-[#003478]">
+          Tổng số users: <b>{total}</b> • Trang: <b>{pageLabel}</b>
+        </div>
         <Pagination
-          total={total || 10}
+          total={total || 0}
           pageSize={formData?.pageSize}
+          current={formData?.page}
           onChange={(e) => {
             setFormData({ ...formData, page: e });
           }}
-          defaultCurrent={2}
           size="small"
           showSizeChanger={false}
         />
@@ -236,16 +260,27 @@ export default function Accounts() {
         type={confirmModalVisible?.type}
         handleRefuse={() => {
           setConfirmModalVisible({});
-          setReasonModalVisible({ open: true, type: confirmModalVisible?.type, uid: confirmModalVisible?.uid, status: "Rejected" });
+          setReasonModalVisible({
+            open: true,
+            type: confirmModalVisible?.type,
+            uid: confirmModalVisible?.uid,
+            status: "Rejected",
+          });
         }}
         handleApprove={() => {
           switch (confirmModalVisible?.type) {
             case "approve-active":
-              return OnChangeStatus({ ...confirmModalVisible, status: "Active" });
+              return OnChangeStatus({
+                ...confirmModalVisible,
+                status: "Active",
+              });
             case "lock":
               return OnChangeStatus(confirmModalVisible);
             case "approve-lock":
-              return OnChangeStatus({ ...confirmModalVisible, status: "Locked" });
+              return OnChangeStatus({
+                ...confirmModalVisible,
+                status: "Locked",
+              });
           }
         }}
       />
