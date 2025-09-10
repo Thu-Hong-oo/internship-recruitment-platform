@@ -379,7 +379,7 @@ export default function Header() {
               Cẩm nang nghề nghiệp
             </a>
             <div className="flex items-center space-x-2">
-              <span className="text-foreground">TopCV</span>
+              <span className="text-foreground">InternBridge</span>
               <Badge className="bg-secondary text-secondary-foreground">
                 Pro
               </Badge>
@@ -415,6 +415,7 @@ export default function Header() {
                       <button className="flex items-center space-x-2">
                         <Avatar>
                           <AvatarImage
+
                             src={(session?.user?.image as string | undefined) || (user ? getUserAvatar(user) : undefined) || "/placeholder-user.jpg"}
                             alt="User avatar"
                             referrerPolicy="no-referrer"
@@ -422,6 +423,7 @@ export default function Header() {
                           <AvatarFallback>
                             {(session?.user?.name?.[0] as string | undefined) || user?.firstName?.[0]}
                             {user?.lastName?.[0]}
+
                           </AvatarFallback>
                         </Avatar>
                       </button>
@@ -430,6 +432,7 @@ export default function Header() {
                       <div className="p-4 border-b border-border flex items-center space-x-3">
                         <Avatar>
                           <AvatarImage
+
                             src={(session?.user?.image as string | undefined) || (user ? getUserAvatar(user) : undefined) || "/placeholder-user.jpg"}
                             alt="User avatar"
                             referrerPolicy="no-referrer"
@@ -437,6 +440,7 @@ export default function Header() {
                           <AvatarFallback>
                             {(session?.user?.name?.[0] as string | undefined) || user?.firstName?.[0]}
                             {user?.lastName?.[0]}
+
                           </AvatarFallback>
                         </Avatar>
                         <div>
