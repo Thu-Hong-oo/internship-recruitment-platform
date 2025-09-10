@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { authAPI } from "@/lib/api";
+import { authAPI, apiClient } from "@/lib/api";
 import { useAuth } from "./useAuth";
 
 export const useGoogleAuth = () => {
@@ -21,7 +21,7 @@ export const useGoogleAuth = () => {
 
       // Check if Google Client ID is configured
       const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-      if (!clientId || clientId === "your-google-client-id") {
+      if (!clientId ) {
         throw new Error("Google Client ID chưa được cấu hình. Vui lòng thêm NEXT_PUBLIC_GOOGLE_CLIENT_ID vào .env.local");
       }
 
@@ -39,49 +39,31 @@ export const useGoogleAuth = () => {
         throw new Error("Google Identity Services chưa sẵn sàng. Vui lòng thử lại.");
       }
 
-      // Initialize Google Identity Services
-      window.google.accounts.id.initialize({
-        client_id: clientId,
-        callback: handleGoogleResponse,
-        auto_select: false,
-        cancel_on_tap_outside: true,
-        use_fedcm_for_prompt: true, // Enable FedCM for future compatibility
-      });
-
-      // Show Google One Tap with better error handling
+      // If Google origin is not allowed, fallback to backend redirect flow
       try {
-        window.google.accounts.id.prompt((notification: any) => {
-          console.log("Google One Tap notification:", notification);
-          
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            console.log("One Tap not displayed, using fallback button");
-            // Fallback to popup
-            const buttonElement = document.getElementById("google-signin-button");
-            if (buttonElement) {
-              window.google.accounts.id.renderButton(buttonElement, {
-                theme: "outline",
-                size: "large",
-                width: "100%",
-                text: "signin_with",
-                shape: "rectangular",
-              });
-            }
-          }
+        // Initialize GSI (may fail later due to origin restriction)
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleGoogleResponse,
+          auto_select: false,
+          cancel_on_tap_outside: true,
+          use_fedcm_for_prompt: false,
         });
-      } catch (promptError) {
-        console.error("Google One Tap failed:", promptError);
-        // Direct fallback to button
+
         const buttonElement = document.getElementById("google-signin-button");
         if (buttonElement && window.google?.accounts?.id) {
           window.google.accounts.id.renderButton(buttonElement, {
             theme: "outline",
             size: "large",
-            width: "100%",
             text: "signin_with",
             shape: "rectangular",
           });
         }
+      } catch (_) {
+        // Ignore and rely on redirect flow below
       }
+
+      // No redirect fallback; rely on official GSI popup button rendered above
     } catch (error: any) {
       console.error("Google Auth Error:", error);
       setError(error.message || "Lỗi khi đăng nhập với Google");
@@ -129,10 +111,11 @@ export const useGoogleAuth = () => {
 
       const script = document.createElement("script");
       script.id = "google-identity-script";
+      // Note: do NOT set crossOrigin to avoid triggering CORS checks on some setups
+      // Keep plain script include as recommended by Google
       script.src = "https://accounts.google.com/gsi/client";
       script.async = true;
       script.defer = true;
-      script.crossOrigin = "anonymous";
       
       script.onload = () => {
         console.log("Google Identity Services loaded successfully");
@@ -140,7 +123,9 @@ export const useGoogleAuth = () => {
       };
       script.onerror = (error) => {
         console.error("Failed to load Google Identity Services:", error);
-        reject(new Error("Không thể tải Google Identity Services. Vui lòng kiểm tra kết nối mạng."));
+        // Common local dev issue: CORS shown for <script> loads if crossOrigin was set or extensions interfered
+        // Fallback: instruct caller to use backend OAuth redirect flow
+        reject(new Error("Không thể tải Google Identity Services. Vui lòng thử lại hoặc dùng nút Đăng nhập Google (redirect)."));
       };
 
       document.head.appendChild(script);
