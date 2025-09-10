@@ -19,21 +19,15 @@ const {
   getRecentJobs,
   getJobCompany,
   getJobStats,
+  submitJobForReview,
 } = require('../controllers/jobController');
 
 const router = express.Router();
 
-// Public routes
+// Public routes (consolidated: use /api/jobs with query filters)
 router.get('/', getAllJobs);
 router.get('/search', getAllJobs); // alias to listing with q filter
-router.get('/category/:category', getJobsByCategory);
-router.get('/subcategory/:subCategory', getJobsBySubCategory);
-router.get('/location/:location', getJobsByLocation);
-router.get('/district/:district', getJobsByDistrict);
 router.get('/slug/:slug', getJobBySlug);
-router.get('/recent', getRecentJobs);
-router.get('/company/:companyId', getJobsByCompany);
-router.get('/skills', getJobsBySkills);
 router.get('/:id', getJob);
 router.get('/:id/stats', getJobStats);
 router.get('/:id/company', getJobCompany);
@@ -46,6 +40,7 @@ router.use(protect);
 router.post('/employer', authorize('employer', 'admin'), createJob);
 router.put('/employer/:id', authorize('employer', 'admin'), updateJob);
 router.delete('/employer/:id', authorize('employer', 'admin'), deleteJob);
+router.post('/employer/:id/submit', authorize('employer', 'admin'), submitJobForReview);
 
 // Application management
 router.post('/:id/apply', authorize('student'), applyForJob);

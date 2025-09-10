@@ -700,6 +700,74 @@ const updateCompanyStatus = asyncHandler(async (req, res) => {
   });
 });
 
+// ========================================
+// JOB MODERATION
+// ========================================
+
+// @desc    Get jobs (admin only) with filters (pending/draft etc.)
+// @route   GET /api/admin/jobs
+// @access  Private (Admin only)
+const getJobsAdmin = asyncHandler(async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const startIndex = (page - 1) * limit;
+
+  const filter = {};
+  if (req.query.status) filter.status = req.query.status;
+  if (req.query.companyId) filter.companyId = req.query.companyId;
+  if (req.query.employerId) filter.postedBy = req.query.employerId;
+  if (req.query.q) filter.$text = { $search: req.query.q };
+
+  const total = await Job.countDocuments(filter);
+  const jobs = await Job.find(filter)
+    .populate('companyId', 'name logo')
+    .populate('postedBy', 'email profile.firstName profile.lastName')
+    .sort({ createdAt: -1 })
+    .skip(startIndex)
+    .limit(limit);
+
+  const pagination = {
+    current: page,
+    pages: Math.ceil(total / limit),
+    total,
+    limit,
+  };
+
+  res.status(200).json({ success: true, data: jobs, pagination });
+});
+
+// @desc    Update job status (admin approve/reject/publish)
+// @route   PUT /api/admin/jobs/:id/status
+// @access  Private (Admin only)
+const updateJobStatusAdmin = asyncHandler(async (req, res) => {
+  const { status } = req.body; // 'draft' | 'active' | 'closed' | 'filled'
+
+  const allowed = ['draft', 'active', 'closed', 'filled'];
+  if (!allowed.includes(status)) {
+    return res.status(400).json({ success: false, error: 'Trạng thái job không hợp lệ' });
+  }
+
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ success: false, error: 'Job ID không hợp lệ' });
+  }
+
+  const job = await Job.findByIdAndUpdate(
+    id,
+    { status },
+    { new: true, runValidators: true }
+  )
+    .populate('companyId', 'name logo')
+    .populate('postedBy', 'email profile.firstName profile.lastName');
+
+  if (!job) {
+    return res.status(404).json({ success: false, error: 'Không tìm thấy công việc' });
+  }
+
+  logger.info('Admin updated job status', { adminId: req.user.id, jobId: id, status });
+  res.status(200).json({ success: true, data: job, message: 'Cập nhật trạng thái job thành công' });
+});
+
 // @desc    Verify employer
 // @route   PUT /api/admin/verifications/:id
 // @access  Private (Admin only)
@@ -1019,6 +1087,10 @@ module.exports = {
   getPendingVerifications,
   verifyEmployer,
   updateCompanyStatus,
+
+  // Job Moderation
+  getJobsAdmin,
+  updateJobStatusAdmin,
 
   // System Management
   getSystemHealth,

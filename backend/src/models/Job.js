@@ -2,7 +2,6 @@ const mongoose = require('mongoose');
 
 const JobSchema = new mongoose.Schema(
   {
-    // === THÔNG TIN CƠ BẢN (BỮT BUỘC) ===
     title: {
       type: String,
       required: [true, 'Tiêu đề công việc là bắt buộc'],
@@ -251,7 +250,7 @@ const JobSchema = new mongoose.Schema(
     // === QUẢN LÝ ===
     status: {
       type: String,
-      enum: ['draft', 'active', 'closed', 'filled'],
+      enum: ['draft', 'active', 'closed', 'filled', 'pending'],
       default: 'draft',
     },
 
