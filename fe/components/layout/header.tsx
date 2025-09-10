@@ -417,6 +417,7 @@ export default function Header() {
                           <AvatarImage
                             src={(session?.user?.image as string | undefined) || (user ? getUserAvatar(user) : undefined) || "/placeholder-user.jpg"}
                             alt="User avatar"
+                            referrerPolicy="no-referrer"
                           />
                           <AvatarFallback>
                             {(session?.user?.name?.[0] as string | undefined) || user?.firstName?.[0]}
@@ -431,6 +432,7 @@ export default function Header() {
                           <AvatarImage
                             src={(session?.user?.image as string | undefined) || (user ? getUserAvatar(user) : undefined) || "/placeholder-user.jpg"}
                             alt="User avatar"
+                            referrerPolicy="no-referrer"
                           />
                           <AvatarFallback>
                             {(session?.user?.name?.[0] as string | undefined) || user?.firstName?.[0]}
