@@ -34,8 +34,9 @@ export default function HomePage({ onSearch }: HomePageProps) {
     if (onSearch) {
       onSearch(keyword);
     } else {
-      // Use Next.js routing
-      router.push("/search");
+      const qs = new URLSearchParams();
+      if (keyword) qs.set("q", keyword);
+      router.push(`/search?${qs.toString()}`);
     }
   };
   const fetchJobs = async (page = currentPage, limit = pageSize) => {
@@ -86,12 +87,20 @@ export default function HomePage({ onSearch }: HomePageProps) {
                 </h3>
                 <div className="space-y-3">
                   {[
-                    "Kinh doanh/Bán hàng",
-                    "Marketing/PR/Quảng cáo",
-                    "Chăm sóc khách hàng (Customer Service)/Vận hành",
-                    "Nhân sự/Hành chính/Pháp chế",
-                    "Công nghệ Thông tin",
-                    "Lao động phổ thông",
+                    "Công nghệ (tech)",
+                    "Kinh doanh (business)",
+                    "Marketing",
+                    "Thiết kế (design)",
+                    "Dữ liệu (data)",
+                    "Tài chính (finance)",
+                    "Nhân sự (hr)",
+                    "Bán hàng (sales)",
+                    "Bất động sản (real-estate)",
+                    "Giáo dục (education)",
+                    "Y tế (healthcare)",
+                    "Sản xuất (manufacturing)",
+                    "Bán lẻ (retail)",
+                    "Khác (other)",
                   ].map((category, index) => (
                     <div
                       key={index}
@@ -297,67 +306,6 @@ export default function HomePage({ onSearch }: HomePageProps) {
                     </div>
                   </>
                 )}
-              </div>
-            </div>
-
-            {/* Part-time Jobs */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-foreground">
-                  Việc làm bán thời gian
-                </h2>
-                <div className="flex items-center space-x-2 text-primary hover:text-primary/80 cursor-pointer transition-colors duration-200">
-                  <span className="text-sm font-medium">Xem tất cả</span>
-                  <ChevronRight className="w-4 h-4" />
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                {[
-                  {
-                    title:
-                      "Chuyên Viên Kinh Doanh B2B/B2M FMCG Tại Nghệ An Tỉ Lệ Hoa Hồng Cao",
-                    company: "CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ AN KHANG",
-                    location: "Nghệ An",
-                    salary: "8 - 15 triệu",
-                    time: "1 ngày trước",
-                  },
-                  {
-                    title: "Nhân Viên Kinh Doanh Tỉ Trưởng Thực Phẩm Chay",
-                    company:
-                      "CÔNG TY TNHH SẢN XUẤT VÀ THƯƠNG MẠI THỰC PHẨM VIỆT",
-                    location: "Hồ Chí Minh",
-                    salary: "12 - 18 triệu",
-                    time: "2 ngày trước",
-                  },
-                ].map((job, index) => (
-                  <Card key={index} className="card-hover border-border">
-                    <CardContent className="p-6">
-                      <h3 className="font-semibold text-primary hover:text-primary/80 cursor-pointer mb-3 line-clamp-2 text-lg">
-                        {job.title}
-                      </h3>
-                      <p className="text-sm text-muted-foreground mb-3 font-medium">
-                        {job.company}
-                      </p>
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <div className="flex items-center space-x-4">
-                          <div className="flex items-center">
-                            <MapPin className="w-4 h-4 mr-1" />
-                            {job.location}
-                          </div>
-                          <div className="flex items-center font-medium text-secondary">
-                            <DollarSign className="w-4 h-4 mr-1" />
-                            {job.salary}
-                          </div>
-                        </div>
-                        <div className="flex items-center">
-                          <Clock className="w-4 h-4 mr-1" />
-                          {job.time}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
               </div>
             </div>
           </div>

@@ -20,7 +20,33 @@ interface JobSearchResultsProps {
   onBack: () => void;
 }
 
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { jobsAPI, JobItem } from "@/lib/api";
+
 export default function JobSearchResults({ onBack }: JobSearchResultsProps) {
+  const searchParams = useSearchParams();
+  const [jobs, setJobs] = useState<JobItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const q = searchParams.get("q") || "";
+  const category = searchParams.get("category") || "";
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await jobsAPI.getJobs(1, 10, { q, category });
+        setJobs(res?.data || []);
+      } catch (e: any) {
+        setError(e?.message || "Không thể tải dữ liệu");
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [q, category]);
   const searchBarContent = (
     <div className="flex items-center gap-4 mb-4">
       <div className="flex items-center gap-2 text-sm bg-white/20 px-3 py-1 rounded-full">
@@ -86,10 +112,27 @@ export default function JobSearchResults({ onBack }: JobSearchResultsProps) {
             ))}
           </div>
           <div className="bg-primary/10 text-primary p-4 rounded-lg border border-primary/20">
-            Có <strong>63</strong> việc làm tại <strong>Hồ Chí Minh</strong>.{" "}
-            <span className="text-primary font-semibold cursor-pointer hover:text-primary/80">
-              Xem ngay →
-            </span>
+            {loading && <span>Đang tải kết quả...</span>}
+            {!loading && error && (
+              <span className="text-destructive">{error}</span>
+            )}
+            {!loading && !error && (
+              <>
+                Có <strong>{jobs.length}</strong> việc làm phù hợp
+                {q ? (
+                  <>
+                    {" "}
+                    cho từ khóa <strong>{q}</strong>
+                  </>
+                ) : null}
+                {category ? (
+                  <>
+                    {" "}
+                    trong danh mục <strong>{category}</strong>
+                  </>
+                ) : null}
+              </>
+            )}
           </div>
         </div>
 
@@ -269,101 +312,89 @@ export default function JobSearchResults({ onBack }: JobSearchResultsProps) {
             </div>
 
             <div className="space-y-4">
-              {/* Job Card 1 */}
-              <Card className="card-hover border-border">
-                <CardContent className="p-6">
-                  <div className="flex gap-4">
-                    <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-purple-700 rounded-lg flex items-center justify-center text-white font-bold text-xs">
-                      MOOVTEK
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-semibold text-lg text-primary hover:text-primary/80 cursor-pointer">
-                          Mid-Level Software Developer (Backend Focus) ⚡
-                        </h3>
-                        <div className="flex items-center gap-2">
-                          <Badge className="bg-primary/10 text-primary border-primary/20">
-                            Thỏa thuận
-                          </Badge>
-                          <Heart className="w-5 h-5 text-muted-foreground cursor-pointer hover:text-destructive transition-colors duration-200" />
+              {loading && (
+                <Card className="border-border">
+                  <CardContent className="p-6 text-sm text-muted-foreground">
+                    Đang tải việc làm...
+                  </CardContent>
+                </Card>
+              )}
+              {error && !loading && (
+                <Card className="border-destructive">
+                  <CardContent className="p-6 text-sm text-destructive">
+                    {error}
+                  </CardContent>
+                </Card>
+              )}
+              {!loading && !error && jobs.length === 0 && (
+                <Card className="border-border">
+                  <CardContent className="p-6 text-sm text-muted-foreground">
+                    Không có việc làm phù hợp.
+                  </CardContent>
+                </Card>
+              )}
+              {!loading &&
+                !error &&
+                jobs.map((job) => {
+                  const companyName = job.companyId?.name || "Nhà tuyển dụng";
+                  const logoUrl = (job.companyId as any)?.logo?.url;
+                  const location =
+                    (job as any)?.fullLocation ||
+                    (job as any)?.location?.city ||
+                    "Đang cập nhật";
+                  const salary =
+                    (job as any)?.salaryRange ||
+                    (job as any)?.internship?.salary?.amount
+                      ? `${(
+                          job as any
+                        ).internship.salary.amount.toLocaleString()} ${
+                          (job as any).internship.salary.period || ""
+                        }`
+                      : "Thỏa thuận";
+                  return (
+                    <Card key={job.id} className="card-hover border-border">
+                      <CardContent className="p-6">
+                        <div className="flex gap-4">
+                          <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center overflow-hidden border">
+                            {logoUrl ? (
+                              <img
+                                src={logoUrl}
+                                alt={companyName}
+                                className="w-full h-full object-contain"
+                              />
+                            ) : (
+                              <div className="text-xs text-muted-foreground px-1 text-center">
+                                {companyName.slice(0, 8)}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between mb-2">
+                              <h3 className="font-semibold text-lg text-primary hover:text-primary/80 cursor-pointer">
+                                {job.title}
+                              </h3>
+                              <div className="flex items-center gap-2">
+                                <Badge className="bg-primary/10 text-primary border-primary/20">
+                                  {salary}
+                                </Badge>
+                                <Heart className="w-5 h-5 text-muted-foreground cursor-pointer hover:text-destructive transition-colors duration-200" />
+                              </div>
+                            </div>
+                            <p className="text-muted-foreground mb-2 font-medium">
+                              {companyName}
+                            </p>
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
+                              <div className="flex items-center">
+                                <MapPin className="w-4 h-4 mr-1" />
+                                {location}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <p className="text-muted-foreground mb-2 font-medium">
-                        CÔNG TY CỔ PHẦN THƯƠNG MẠI - DỊCH VỤ MOOV
-                      </p>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                        <div className="flex items-center">
-                          <MapPin className="w-4 h-4 mr-1" />
-                          Hồ Chí Minh
-                        </div>
-                        <div className="flex items-center">
-                          <span>2 năm</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Badge variant="outline" className="border-border">
-                          Software Engineer
-                        </Badge>
-                        <Badge variant="outline" className="border-border">
-                          IT - Phần mềm
-                        </Badge>
-                        <span className="text-muted-foreground ml-auto">
-                          Đăng hôm nay
-                        </span>
-                        <Bookmark className="w-4 h-4 text-muted-foreground cursor-pointer hover:text-primary transition-colors duration-200" />
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Job Card 2 */}
-              <Card className="card-hover border-primary/30">
-                <CardContent className="p-6">
-                  <div className="flex gap-4">
-                    <div className="w-16 h-16 border-2 border-primary rounded-lg flex items-center justify-center">
-                      <div className="text-primary font-bold text-xs">
-                        VIETNIX
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-semibold text-lg text-primary hover:text-primary/80 cursor-pointer">
-                          WordPress Developer _ Tp. Hồ Chí Minh _ Thu Nhập 15 -
-                          20 Triệu ⚡
-                        </h3>
-                        <div className="flex items-center gap-2">
-                          <Badge className="bg-secondary/10 text-secondary border-secondary/20 font-medium">
-                            15 - 20 triệu
-                          </Badge>
-                          <Heart className="w-5 h-5 text-muted-foreground cursor-pointer hover:text-destructive transition-colors duration-200" />
-                        </div>
-                      </div>
-                      <p className="text-muted-foreground mb-2 font-medium">
-                        CÔNG TY CỔ PHẦN GIẢI PHÁP VÀ CÔNG NGHỆ VIETNIX
-                      </p>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                        <div className="flex items-center">
-                          <MapPin className="w-4 h-4 mr-1" />
-                          Hồ Chí Minh
-                        </div>
-                        <div className="flex items-center">
-                          <span>1 năm</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Badge className="bg-primary/10 text-primary border-primary/20">
-                          Dễ xuất cho bạn
-                        </Badge>
-                        <span className="text-muted-foreground ml-auto">
-                          Đăng hôm nay
-                        </span>
-                        <Bookmark className="w-4 h-4 text-muted-foreground cursor-pointer hover:text-primary transition-colors duration-200" />
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
             </div>
           </div>
         </div>
