@@ -1,15 +1,15 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Eye, EyeOff, Mail, Lock } from "lucide-react"
-import Link from "next/link"
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Eye, EyeOff, Mail, Lock } from "lucide-react";
+import Link from "next/link";
 
 export default function LoginPage() {
-  const [showPassword, setShowPassword] = useState(false)
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -20,24 +20,26 @@ export default function LoginPage() {
           <div className="mb-8">
             <div className="flex items-center gap-1">
               <span className="text-2xl font-bold text-slate-800">top</span>
-              <span className="text-2xl font-bold text-green-500">cv</span>
-              <span className="text-green-500 text-sm">®</span>
+              <span className="text-2xl font-bold text-primary">cv</span>
+              <span className="text-primary text-sm">®</span>
             </div>
           </div>
 
           {/* Welcome Message */}
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-slate-800 mb-2">Chào mừng bạn đã quay trở lại</h1>
+            <h1 className="text-2xl font-bold text-slate-800 mb-2">
+              Chào mừng bạn đã quay trở lại
+            </h1>
             <p className="text-slate-600 text-sm leading-relaxed">
-              Cùng tạo dựng lợi thế cho doanh nghiệp bằng trải nghiệm công nghệ tuyển dụng ứng dụng sâu AI & Hiring
-              Funnel
+              Cùng tạo dựng lợi thế cho doanh nghiệp bằng trải nghiệm công nghệ
+              tuyển dụng ứng dụng sâu AI & Hiring Funnel
             </p>
           </div>
 
           {/* Google Login Button */}
           <Button
             variant="outline"
-            className="w-full mb-6 h-12 bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700"
+            className="w-full mb-6 h-12 bg-primary hover:brightness-110 text-white border-primary"
           >
             <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
               <path
@@ -62,55 +64,71 @@ export default function LoginPage() {
 
           {/* Email Input */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Email
+            </label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-500 w-4 h-4" />
+              <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary w-4 h-4" />
               <Input
                 type="email"
                 placeholder="Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="pl-10 h-12 border-gray-300 focus:border-green-500 focus:ring-green-500"
+                className="pl-10 h-12 border-gray-300 focus:border-primary focus:ring-primary"
               />
             </div>
           </div>
 
           {/* Password Input */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-slate-700 mb-2">Mật khẩu</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Mật khẩu
+            </label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-green-500 w-4 h-4" />
+              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-primary w-4 h-4" />
               <Input
                 type={showPassword ? "text" : "password"}
                 placeholder="Mật khẩu"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="pl-10 pr-10 h-12 border-gray-300 focus:border-green-500 focus:ring-green-500"
+                className="pl-10 pr-10 h-12 border-gray-300 focus:border-primary focus:ring-primary"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
               </button>
             </div>
           </div>
 
           {/* Forgot Password */}
           <div className="text-right mb-6">
-            <Link href="/forgot-password" className="text-green-500 hover:text-green-600 text-sm">
+            <Link
+              href="/forgot-password"
+              className="text-primary hover:brightness-110 text-sm"
+            >
               Quên mật khẩu
             </Link>
           </div>
 
           {/* Login Button */}
-          <Button className="w-full h-12 bg-green-500 hover:bg-green-600 text-white font-medium mb-6">Đăng nhập</Button>
+          <Button className="w-full h-12 bg-primary hover:brightness-110 text-white font-medium mb-6">
+            Đăng nhập
+          </Button>
 
           {/* Sign Up Link */}
           <div className="text-center">
             <span className="text-slate-600 text-sm">Chưa có tài khoản? </span>
-            <Link href="/register" className="text-green-500 hover:text-green-600 text-sm font-medium">
+            <Link
+              href="/register"
+              className="text-primary hover:brightness-110 text-sm font-medium"
+            >
               Đăng ký ngay
             </Link>
           </div>
@@ -118,7 +136,9 @@ export default function LoginPage() {
 
         {/* Footer */}
         <div className="mt-16 text-center">
-          <p className="text-green-500 text-sm">©2014-2025 TopCV Vietnam JSC. All rights reserved.</p>
+          <p className="text-primary text-sm">
+            ©2014-2025 InternBridge Vietnam JSC. All rights reserved.
+          </p>
         </div>
       </div>
 
@@ -126,14 +146,14 @@ export default function LoginPage() {
       <div className="hidden lg:flex flex-1 bg-gradient-to-br from-slate-800 to-slate-900 items-center justify-center relative overflow-hidden">
         <div className="text-center z-10">
           <h2 className="text-white text-3xl font-bold mb-4">
-            Track your funnel with <span className="text-green-400">Report</span>
+            Track your funnel with <span className="text-primary">Report</span>
           </h2>
 
           {/* 3D Illustration Placeholder */}
           <div className="relative w-96 h-96 mx-auto">
-            <div className="absolute inset-0 bg-gradient-to-br from-green-400 to-green-600 rounded-3xl transform rotate-12 opacity-20"></div>
-            <div className="absolute inset-4 bg-gradient-to-br from-green-500 to-green-700 rounded-2xl transform -rotate-6 opacity-30"></div>
-            <div className="absolute inset-8 bg-green-500 rounded-xl flex items-center justify-center">
+            <div className="absolute inset-0 bg-primary/30 rounded-3xl transform rotate-12 opacity-20"></div>
+            <div className="absolute inset-4 bg-primary/40 rounded-2xl transform -rotate-6 opacity-30"></div>
+            <div className="absolute inset-8 bg-primary rounded-xl flex items-center justify-center">
               <div className="text-white text-6xl">📊</div>
             </div>
 
@@ -149,28 +169,30 @@ export default function LoginPage() {
 
         {/* Background pattern */}
         <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-20 w-2 h-2 bg-green-400 rounded-full"></div>
-          <div className="absolute top-40 right-32 w-1 h-1 bg-green-300 rounded-full"></div>
-          <div className="absolute bottom-32 left-16 w-3 h-3 bg-green-500 rounded-full"></div>
-          <div className="absolute bottom-20 right-20 w-2 h-2 bg-green-400 rounded-full"></div>
+          <div className="absolute top-20 left-20 w-2 h-2 bg-primary rounded-full"></div>
+          <div className="absolute top-40 right-32 w-1 h-1 bg-primary/80 rounded-full"></div>
+          <div className="absolute bottom-32 left-16 w-3 h-3 bg-primary rounded-full"></div>
+          <div className="absolute bottom-20 right-20 w-2 h-2 bg-primary rounded-full"></div>
         </div>
 
         {/* Bottom logo */}
         <div className="absolute bottom-8 right-8">
           <div className="flex items-center gap-1 text-white">
             <span className="text-xl font-bold">top</span>
-            <span className="text-xl font-bold text-green-400">cv</span>
+            <span className="text-xl font-bold text-primary">cv</span>
           </div>
-          <p className="text-green-400 text-xs mt-1">Tiếp lợi thế, nối thành công</p>
+          <p className="text-primary text-xs mt-1">
+            Tiếp lợi thế, nối thành công
+          </p>
         </div>
 
         {/* Pagination dots */}
         <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 flex gap-2">
-          <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+          <div className="w-2 h-2 bg-primary rounded-full"></div>
           <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
           <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
         </div>
       </div>
     </div>
-  )
+  );
 }
