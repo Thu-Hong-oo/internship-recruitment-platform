@@ -29,9 +29,9 @@ export default function AccountsDetail() {
   return (
     <Spin spinning={loadingPage} delay={500}>
       <div className="flex items-center gap-1">
-        <img src={getPath("/icons/accounts/btn-back.svg")} onClick={() => navigate("/accounts")} className="mr-1 w-[28px] cursor-pointer" />
+        <img src="/icons/accounts/btn-back.svg" onClick={() => navigate("/accounts")} className="mr-1 w-[28px] cursor-pointer" />
         <div className="text-[16px] cursor-pointer ">Quản lý tài khoản</div>
-        <img src={getPath("/icons/accounts/ic-chevron-right.svg")} />
+        <img src="icons/accounts/ic-chevron-right.svg" />
         <div className="text-[16px]">Xem chi tiết</div>
       </div>
 
