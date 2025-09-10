@@ -164,7 +164,7 @@ class ApiClient {
   }
 
   // Auth methods
-  async getGoogleAuthUrl(): Promise<{ success: boolean; authUrl?: string }>{
+  async getGoogleAuthUrl(): Promise<{ success: boolean; authUrl?: string }> {
     try {
       return await this.request<{ success: boolean; authUrl?: string }>(
         "/auth/google",
@@ -273,7 +273,9 @@ class ApiClient {
     return response;
   }
 
-  async getUnverifiedAccount(email: string): Promise<UnverifiedAccountResponse> {
+  async getUnverifiedAccount(
+    email: string
+  ): Promise<UnverifiedAccountResponse> {
     const response = await this.request<UnverifiedAccountResponse>(
       `/auth/unverified-account?email=${encodeURIComponent(email)}`
     );
