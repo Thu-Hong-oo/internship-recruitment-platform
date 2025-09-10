@@ -39,7 +39,13 @@ const getAllCompanies = asyncHandler(async (req, res) => {
     const sortObj = {};
     sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
+    const publicFields =
+      'name description shortDescription size companyType foundedYear website logo ' +
+      'industry employeeCount location contact culture internshipProgram rating stats seo slug ' +
+      'createdAt updatedAt';
+
     const companies = await Company.find(query)
+      .select(publicFields)
       .sort(sortObj)
       .skip(skip)
       .limit(parseInt(limit));
@@ -70,7 +76,12 @@ const getAllCompanies = asyncHandler(async (req, res) => {
 // @access  Public
 const getCompany = asyncHandler(async (req, res) => {
   try {
-    const company = await Company.findById(req.params.id);
+    const publicFields =
+      'name description shortDescription size companyType foundedYear website logo ' +
+      'industry employeeCount location contact culture internshipProgram rating stats seo slug ' +
+      'createdAt updatedAt';
+
+    const company = await Company.findById(req.params.id).select(publicFields);
 
     if (!company) {
       return res.status(404).json({
