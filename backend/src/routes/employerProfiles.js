@@ -4,7 +4,6 @@ const {
   getEmployerProfile,
   createEmployerProfile,
   updateEmployerProfile,
-  getCompanyInfo, // Deprecated - use /api/companies/my-company instead
   getEmployerDashboard,
   getProfileCompletion,
   deleteEmployerProfile
@@ -27,7 +26,6 @@ router.delete('/', protect, authorize('employer'), deleteEmployerProfile);
 router.get('/dashboard', protect, authorize('employer'), getEmployerDashboard);
 router.get('/completion', protect, authorize('employer'), getProfileCompletion);
 
-// Company info (DEPRECATED - use /api/companies/my-company instead)
-router.get('/company', protect, authorize('employer'), getCompanyInfo);
+// Company info route removed. Use /api/companies/me instead.
 
 module.exports = router;
