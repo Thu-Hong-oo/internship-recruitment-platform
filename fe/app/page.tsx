@@ -34,8 +34,9 @@ export default function HomePage({ onSearch }: HomePageProps) {
     if (onSearch) {
       onSearch(keyword);
     } else {
-      // Use Next.js routing
-      router.push("/search");
+      const qs = new URLSearchParams();
+      if (keyword) qs.set("q", keyword);
+      router.push(`/search?${qs.toString()}`);
     }
   };
   const fetchJobs = async (page = currentPage, limit = pageSize) => {
