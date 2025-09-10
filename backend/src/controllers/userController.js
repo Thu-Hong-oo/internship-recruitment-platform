@@ -41,7 +41,7 @@ const uploadAvatar = asyncHandler(async (req, res) => {
 
   try {
     // Upload via core service to standardize response
-    const result = await uploadImage('avatar', req.file.path);
+    const result = await uploadImage('avatar', req.file.buffer);
 
     // Update user avatar in database
     const user = await User.findByIdAndUpdate(

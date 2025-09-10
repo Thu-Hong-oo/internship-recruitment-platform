@@ -102,34 +102,6 @@ const updateEmployerProfile = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Get company information (redirect to company controller)
-// @route   GET /api/employer-profile/company
-// @access  Private (Employer)
-const getCompanyInfo = asyncHandler(async (req, res) => {
-  try {
-    const company = await Company.findById(req.user.companyId);
-
-    if (!company) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy thông tin công ty'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: company,
-      message: 'Sử dụng /api/companies/my-company để quản lý thông tin công ty'
-    });
-  } catch (error) {
-    logger.error('Error getting company info:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi lấy thông tin công ty'
-    });
-  }
-});
-
 // @desc    Get employer dashboard data
 // @route   GET /api/employer-profile/dashboard
 // @access  Private (Employer)
@@ -286,7 +258,6 @@ module.exports = {
   getEmployerProfile,
   createEmployerProfile,
   updateEmployerProfile,
-  getCompanyInfo, // Deprecated - use /api/companies/my-company instead
   getEmployerDashboard,
   getProfileCompletion,
   deleteEmployerProfile
