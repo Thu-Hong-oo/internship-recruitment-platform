@@ -245,6 +245,39 @@ class ApiClient {
     return response;
   }
 
+  async resendEmailVerification(email: string): Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+  }> {
+    const response = await this.request<{
+      success: boolean;
+      message?: string;
+      error?: string;
+    }>("/auth/resend-verification", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+
+    return response;
+  }
+
+  async getUnverifiedAccount(email: string): Promise<UnverifiedAccountResponse> {
+    const response = await this.request<UnverifiedAccountResponse>(
+      `/auth/unverified-account?email=${encodeURIComponent(email)}`
+    );
+
+    return response;
+  }
+
+  async validateEmail(email: string): Promise<EmailValidationResponse> {
+    const response = await this.request<EmailValidationResponse>(
+      `/auth/validate-email?email=${encodeURIComponent(email)}`
+    );
+
+    return response;
+  }
+
   async uploadAvatar(file: File): Promise<{
     success: boolean;
     avatar?: string;
@@ -266,6 +299,37 @@ class ApiClient {
       },
       body: formData,
     });
+
+    return response;
+  }
+
+  async googleAuth(idToken: string): Promise<{
+    success: boolean;
+    token?: string;
+    user?: User;
+    isNew?: boolean;
+    message?: string;
+    error?: string;
+  }> {
+    const response = await this.request<{
+      success: boolean;
+      token?: string;
+      user?: User;
+      isNew?: boolean;
+      message?: string;
+      error?: string;
+    }>("/auth/google", {
+      method: "POST",
+      body: JSON.stringify({ idToken }),
+    });
+
+    // Store token if Google auth is successful
+    if (response.success && response.token) {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("token", response.token);
+      }
+      this.token = response.token;
+    }
 
     return response;
   }
@@ -291,6 +355,7 @@ export const authAPI = {
   getUnverifiedAccount: apiClient.getUnverifiedAccount.bind(apiClient),
   validateEmail: apiClient.validateEmail.bind(apiClient),
   uploadAvatar: apiClient.uploadAvatar.bind(apiClient),
+  googleAuth: apiClient.googleAuth.bind(apiClient),
 };
 
 // ===================== Jobs =====================
