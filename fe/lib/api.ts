@@ -269,6 +269,43 @@ class ApiClient {
 
     return response;
   }
+
+  async resendEmailVerification(email: string): Promise<AuthResponse> {
+    const response = await this.request<AuthResponse>(
+      "/auth/resend-verification",
+      {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }
+    );
+
+    return response;
+  }
+
+  async getUnverifiedAccount(
+    email: string
+  ): Promise<UnverifiedAccountResponse> {
+    const response = await this.request<UnverifiedAccountResponse>(
+      `/auth/unverified-account/${email}`,
+      {
+        method: "GET",
+      }
+    );
+
+    return response;
+  }
+
+  async validateEmail(email: string): Promise<EmailValidationResponse> {
+    const response = await this.request<EmailValidationResponse>(
+      "/auth/validate-email",
+      {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }
+    );
+
+    return response;
+  }
 }
 
 // Helper function to get avatar URL from user object
