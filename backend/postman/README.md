@@ -5,6 +5,7 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
 ## 📁 Cấu trúc Files
 
 ### 1. **01-Authentication.json**
+
 - **Mô tả**: API xác thực người dùng
 - **Endpoints**:
   - `POST /auth/register` - Đăng ký tài khoản
@@ -18,6 +19,7 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
   - `POST /auth/resend-verification` - Gửi lại email xác thực
 
 ### 2. **02-Users.json**
+
 - **Mô tả**: Quản lý người dùng và profile
 - **Endpoints**:
   - `GET /users/profile` - Lấy profile
@@ -33,6 +35,7 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
   - `PUT /users/reactivate` - Kích hoạt lại tài khoản
 
 ### 3. **03-Profiles.json**
+
 - **Mô tả**: Quản lý profile ứng viên và nhà tuyển dụng
 - **Endpoints**:
   - `GET /profiles/candidate` - Lấy profile ứng viên
@@ -41,6 +44,7 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
   - `PUT /profiles/employer` - Cập nhật profile nhà tuyển dụng
 
 ### 4. **04-Companies.json**
+
 - **Mô tả**: Quản lý công ty
 - **Endpoints**:
   - `GET /companies` - Danh sách công ty
@@ -49,6 +53,7 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
   - `POST /companies` - Tạo công ty
 
 ### 5. **05-Skills.json**
+
 - **Mô tả**: Quản lý kỹ năng
 - **Endpoints**:
   - `GET /skills` - Danh sách kỹ năng
@@ -56,6 +61,7 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
   - `POST /skills` - Tạo kỹ năng
 
 ### 6. **06-Applications.json**
+
 - **Mô tả**: Quản lý ứng tuyển
 - **Endpoints**:
   - `GET /applications` - Danh sách ứng tuyển của user
@@ -64,6 +70,7 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
   - `DELETE /applications/{id}` - Xóa ứng tuyển
 
 ### 7. **07-Skill-Roadmaps.json**
+
 - **Mô tả**: Quản lý roadmap kỹ năng
 - **Endpoints**:
   - `GET /roadmaps` - Danh sách roadmap của user
@@ -74,11 +81,14 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
   - `PUT /roadmaps/{id}/progress` - Cập nhật tiến độ
 
 ### 8. **Jobs Enhanced API.postman_collection.json**
-- **Mô tả**: Quản lý việc làm với tính năng nâng cao, AI integration và TopCV-style features
+
+- **Mô tả**: Quản lý việc làm với tính năng nâng cao, AI integration và InternBridge-style features
 - **Phân loại**: Public APIs (không cần token) và Protected APIs (cần token + role)
 
 #### 🔍 **Tìm kiếm & Lọc Jobs (Public)**
+
 - `GET /jobs` - **Lấy danh sách jobs với filtering và pagination**
+
   - **Mục đích**: API chính để browse jobs, hỗ trợ text search + filter
   - **Tính năng**: Pagination, sorting, filtering theo category/location/salary/skills
   - **Sử dụng**: Trang chủ, danh sách jobs, filter sidebar
@@ -91,22 +101,27 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
   - **Parameters**: `q` (required), `skills`, `location`, `category`, `page`, `limit`
 
 #### 🏆 **Jobs Đặc Biệt (Public)**
+
 - `GET /jobs/featured` - **Jobs nổi bật được highlight**
+
   - **Mục đích**: Hiển thị jobs premium, được trả phí để nổi bật
   - **Sử dụng**: Banner trên trang chủ, section "Jobs nổi bật"
   - **Logic**: `isFeatured: true`, sort theo `priority`
 
 - `GET /jobs/urgent` - **Jobs khẩn cấp cần tuyển gấp**
+
   - **Mục đích**: Jobs có deadline gần, cần tuyển ngay
   - **Sử dụng**: Section "Tuyển gấp", notification banner
   - **Logic**: `isUrgent: true`, sort theo `createdAt`
 
 - `GET /jobs/hot` - **Jobs được xem nhiều nhất**
+
   - **Mục đích**: Jobs phổ biến, thu hút nhiều ứng viên
   - **Sử dụng**: Section "Jobs hot", trending jobs
   - **Logic**: Sort theo `stats.views` desc
 
 - `GET /jobs/recent` - **Jobs mới đăng gần đây**
+
   - **Mục đích**: Hiển thị jobs mới nhất để ứng viên không bỏ lỡ
   - **Sử dụng**: Section "Jobs mới", homepage feed
   - **Logic**: Sort theo `createdAt` desc
@@ -117,17 +132,21 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
   - **Logic**: Filter theo `period` (day/week/month), sort theo views/applications
 
 #### 📂 **Jobs Theo Danh Mục (Public)**
+
 - `GET /jobs/category/{category}` - **Jobs theo danh mục cụ thể**
+
   - **Mục đích**: Browse jobs theo lĩnh vực (tech, marketing, sales...)
   - **Sử dụng**: Category pages, navigation menu
   - **Parameters**: `category` (tech, marketing, sales...), `page`, `limit`
 
 - `GET /jobs/location/{location}` - **Jobs theo địa điểm**
+
   - **Mục đích**: Tìm jobs ở thành phố/khu vực cụ thể
   - **Sử dụng**: Location filter, map view
   - **Parameters**: `location` (Ho Chi Minh, Hanoi...), `page`, `limit`
 
 - `GET /jobs/company/{companyId}` - **Jobs của công ty cụ thể**
+
   - **Mục đích**: Xem tất cả jobs của một công ty
   - **Sử dụng**: Company profile page, employer branding
   - **Parameters**: `companyId`, `status`, `page`, `limit`
@@ -138,22 +157,27 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
   - **Parameters**: `skillIds` (comma-separated), `page`, `limit`
 
 #### 📄 **Chi Tiết Job (Public)**
+
 - `GET /jobs/{id}` - **Chi tiết job theo ID**
+
   - **Mục đích**: Xem thông tin đầy đủ của job
   - **Sử dụng**: Job detail page, job cards
   - **Response**: Full job data + company info + skills
 
 - `GET /jobs/slug/{slug}` - **Chi tiết job theo slug**
+
   - **Mục đích**: SEO-friendly URL cho job detail
   - **Sử dụng**: Public job links, sharing
   - **Example**: `/jobs/frontend-developer-intern-tech-solutions`
 
 - `GET /jobs/{id}/similar` - **Jobs tương tự**
+
   - **Mục đích**: Gợi ý jobs có cùng category/skills
   - **Sử dụng**: "Jobs tương tự" section, recommendation
   - **Logic**: Same category, different skills overlap
 
 - `GET /jobs/{id}/stats` - **Thống kê job**
+
   - **Mục đích**: Hiển thị metrics của job (views, applications, saves)
   - **Sử dụng**: Job detail page, analytics
   - **Response**: views, applications, saves, shares, clicks
@@ -164,19 +188,23 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
   - **Logic**: Increment `stats.views`
 
 #### 🤖 **AI Features (Public)**
+
 - `GET /jobs/{id}/recommendations` - **Gợi ý jobs cho user**
+
   - **Mục đích**: AI-powered job recommendations dựa trên profile
   - **Sử dụng**: "Jobs phù hợp với bạn", recommendation engine
   - **Parameters**: `userId`, `limit`
   - **Logic**: Match skills, experience, preferences
 
 - `GET /jobs/{id}/match-score` - **Điểm phù hợp job-user**
+
   - **Mục đích**: Tính toán % match giữa user profile và job requirements
   - **Sử dụng**: Job cards, match indicator, sorting
   - **Parameters**: `userId`
   - **Response**: Match percentage + breakdown
 
 - `GET /jobs/{id}/skill-analysis` - **Phân tích kỹ năng job**
+
   - **Mục đích**: AI phân tích job description để extract skills
   - **Sử dụng**: Job posting, skill tagging, recommendations
   - **Response**: Extracted skills, importance levels
@@ -188,13 +216,16 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
   - **Response**: Structured learning roadmap
 
 #### 👨‍💼 **Quản Lý Jobs (Protected - Employer)**
+
 - `POST /jobs` - **Tạo job mới**
+
   - **Mục đích**: Employer đăng job mới
   - **Access**: Employer role required
   - **Features**: AI analysis, auto-categorization, skill extraction
   - **Body**: Full job data (title, description, requirements, salary...)
 
 - `PUT /jobs/{id}` - **Cập nhật job**
+
   - **Mục đích**: Employer chỉnh sửa job đã đăng
   - **Access**: Job owner only
   - **Features**: Re-analyze với AI nếu description thay đổi
@@ -206,13 +237,16 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
   - **Logic**: Soft delete hoặc hard delete
 
 #### 📝 **Quản Lý Ứng Tuyển (Protected)**
+
 - `POST /jobs/{id}/apply` - **Ứng tuyển job**
+
   - **Mục đích**: Candidate nộp đơn ứng tuyển
   - **Access**: Candidate role required
   - **Features**: Cover letter, resume, portfolio, custom questions
   - **Validation**: Check deadline, duplicate application
 
 - `GET /jobs/{id}/applications` - **Danh sách ứng tuyển**
+
   - **Mục đích**: Employer xem danh sách ứng viên
   - **Access**: Job owner only
   - **Features**: Filter by status, pagination, candidate info
@@ -225,6 +259,7 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
   - **Body**: `status`, `feedback`
 
 #### 📊 **Analytics & Insights (Protected - Employer)**
+
 - `GET /jobs/{id}/analytics` - **Thống kê chi tiết job**
   - **Mục đích**: Employer xem analytics của job
   - **Access**: Job owner only
@@ -232,6 +267,7 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
   - **Response**: Comprehensive analytics data
 
 ### 9. **09-AI-Services.json**
+
 - **Mô tả**: Các dịch vụ AI
 - **Endpoints**:
   - `POST /ai/analyze-cv` - Phân tích CV
@@ -243,6 +279,7 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
   - `POST /ai/batch-analyze` - Phân tích hàng loạt ứng tuyển
 
 ### 10. **10-Upload-Services.json**
+
 - **Mô tả**: Dịch vụ upload file
 - **Endpoints**:
   - `POST /upload/image` - Upload 1 ảnh
@@ -253,6 +290,7 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
   - `GET /upload/{public_id}/info` - Thông tin ảnh
 
 ### 11. **11-Notifications.json**
+
 - **Mô tả**: Quản lý thông báo
 - **Endpoints**:
   - `GET /notifications` - Danh sách thông báo
@@ -261,6 +299,7 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
   - `DELETE /notifications/{id}` - Xóa thông báo
 
 ### 12. **12-Dashboard-Analytics.json**
+
 - **Mô tả**: Dashboard và phân tích
 - **Endpoints**:
   - `GET /dashboard/stats` - Thống kê dashboard
@@ -268,6 +307,7 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
   - `GET /analytics/platform` - Thống kê platform
 
 ### 13. **13-Saved-Jobs.json**
+
 - **Mô tả**: Quản lý jobs đã lưu
 - **Endpoints**:
   - `GET /saved-jobs` - Danh sách jobs đã lưu
@@ -276,6 +316,7 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
   - `DELETE /saved-jobs/{id}` - Xóa saved job
 
 ### 14. **14-Admin.json**
+
 - **Mô tả**: API quản trị hệ thống
 - **Endpoints**:
   - `GET /admin/users` - Danh sách users (admin)
@@ -294,13 +335,16 @@ Thư mục này chứa các Postman collection được tách riêng theo từng
 ## 🚀 Cách sử dụng
 
 ### 1. Import vào Postman
+
 1. Mở Postman
 2. Click **Import**
 3. Chọn từng file JSON hoặc chọn tất cả files
 4. Import vào workspace
 
 ### 2. Thiết lập Environment Variables
+
 Tạo environment với các biến:
+
 ```json
 {
   "base_url": "http://localhost:3000",
@@ -322,6 +366,7 @@ Tạo environment với các biến:
 ```
 
 ### 3. Test Flow
+
 1. **Authentication**: Đăng ký → Đăng nhập → Lấy token
 2. **Users**: Cập nhật profile → Upload avatar
 3. **Jobs**: Tạo job → Tìm kiếm → Ứng tuyển
@@ -340,6 +385,7 @@ Tạo environment với các biến:
 ## 🔧 Cấu hình Backend
 
 Đảm bảo backend đang chạy trên:
+
 - **URL**: `http://localhost:3000`
 - **API Base**: `/api`
 - **Database**: MongoDB
@@ -349,6 +395,7 @@ Tạo environment với các biến:
 ## 📊 Test Scripts
 
 Một số endpoints có test scripts tự động:
+
 - **Login**: Tự động lưu token và user_id
 - **Get Job**: Tự động lưu job_id và job_slug
 - **Apply Job**: Tự động lưu application_id
@@ -356,12 +403,14 @@ Một số endpoints có test scripts tự động:
 ## 🐛 Troubleshooting
 
 ### Lỗi thường gặp:
+
 1. **401 Unauthorized**: Kiểm tra token
 2. **403 Forbidden**: Kiểm tra role/permissions
 3. **404 Not Found**: Kiểm tra endpoint URL
 4. **500 Internal Error**: Kiểm tra backend logs
 
 ### Debug:
+
 1. Kiểm tra Console logs
 2. Xem Response body
 3. Kiểm tra Environment variables
@@ -370,6 +419,7 @@ Một số endpoints có test scripts tự động:
 ## 📋 Tổ chức Collections
 
 ### **Cấu trúc theo thứ tự ưu tiên:**
+
 1. **01-Authentication**: Đăng ký, đăng nhập, xác thực
 2. **02-Users**: Profile, avatar, preferences
 3. **03-Profiles**: Profile ứng viên và nhà tuyển dụng
@@ -386,6 +436,7 @@ Một số endpoints có test scripts tự động:
 14. **14-Admin**: Quản trị hệ thống
 
 ### **Workflow Test:**
+
 1. **Authentication** → **Users** → **Profiles**
 2. **Companies** → **Skills** → **Jobs-Enhanced**
 3. **Applications** → **Skill-Roadmaps** → **AI-Services**
@@ -397,6 +448,7 @@ Một số endpoints có test scripts tự động:
 ### **📋 Test Flow cho Jobs API:**
 
 #### **1. Browse Jobs (Public - Không cần token)**
+
 ```bash
 # Lấy danh sách jobs với filter
 GET /api/jobs?page=1&limit=10&category=tech&location=Ho Chi Minh
@@ -417,6 +469,7 @@ GET /api/jobs/company/{{company_id}}?page=1&limit=10
 ```
 
 #### **2. AI Search (Public - Không cần token)**
+
 ```bash
 # AI Semantic Search
 GET /api/jobs/search?q=frontend developer&skills=react,javascript&location=Ho Chi Minh&page=1&limit=10
@@ -435,6 +488,7 @@ GET /api/jobs/{{job_id}}/roadmap?userId={{user_id}}&duration=8
 ```
 
 #### **3. Job Management (Protected - Cần token + Employer role)**
+
 ```bash
 # Tạo job mới
 POST /api/jobs
@@ -458,6 +512,7 @@ Authorization: Bearer {{token}}
 ```
 
 #### **4. Application Management (Protected)**
+
 ```bash
 # Ứng tuyển job (Candidate)
 POST /api/jobs/{{job_id}}/apply
@@ -482,6 +537,7 @@ Authorization: Bearer {{token}}
 ```
 
 #### **5. Analytics (Protected - Employer)**
+
 ```bash
 # Thống kê job
 GET /api/jobs/{{job_id}}/analytics
@@ -492,6 +548,7 @@ GET /api/jobs/{{job_id}}/stats
 ```
 
 ### **🔧 Environment Variables cần thiết:**
+
 ```json
 {
   "api_url": "http://localhost:3000/api",
@@ -507,6 +564,7 @@ GET /api/jobs/{{job_id}}/stats
 ### **📊 Response Format:**
 
 #### **1. Endpoints có Pagination (getAllJobs, searchJobs, getJobsByCategory, etc.):**
+
 ```json
 {
   "success": true,
@@ -526,6 +584,7 @@ GET /api/jobs/{{job_id}}/stats
 ```
 
 #### **2. Endpoints không có Pagination (featured, urgent, hot, recent, popular, similar):**
+
 ```json
 {
   "success": true,
@@ -537,6 +596,7 @@ GET /api/jobs/{{job_id}}/stats
 ```
 
 #### **3. Single Job Endpoint:**
+
 ```json
 {
   "success": true,
@@ -551,6 +611,7 @@ GET /api/jobs/{{job_id}}/stats
 ```
 
 #### **4. Job Stats Endpoint:**
+
 ```json
 {
   "success": true,
@@ -565,6 +626,7 @@ GET /api/jobs/{{job_id}}/stats
 ```
 
 ### **⚠️ Lưu ý quan trọng:**
+
 1. **Public APIs**: Không cần token, ai cũng có thể gọi
 2. **Protected APIs**: Cần token từ login, check role (employer/candidate)
 3. **AI Features**: Cần cấu hình AI service, có thể fallback về text search

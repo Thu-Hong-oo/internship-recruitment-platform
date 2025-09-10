@@ -99,7 +99,7 @@ import HeroSection from "@/components/layout/hero-section";
 
 ### Header
 
-- Logo TopCV
+- Logo InternBridge
 - Navigation menu với dropdown
 - User actions (notifications, profile)
 - Responsive design

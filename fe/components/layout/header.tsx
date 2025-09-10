@@ -376,7 +376,7 @@ export default function Header() {
               Cẩm nang nghề nghiệp
             </a>
             <div className="flex items-center space-x-2">
-              <span className="text-foreground">TopCV</span>
+              <span className="text-foreground">InternBridge</span>
               <Badge className="bg-secondary text-secondary-foreground">
                 Pro
               </Badge>
@@ -409,31 +409,31 @@ export default function Header() {
                 <div className="flex items-center">
                   <HoverCard openDelay={100} closeDelay={150}>
                     <HoverCardTrigger asChild>
-                                                           <button className="flex items-center space-x-2">
-                     <Avatar>
-                       <AvatarImage
-                         src={getUserAvatar(user) || "/placeholder-user.jpg"}
-                         alt="User avatar"
-                       />
-                       <AvatarFallback>
-                         {user.firstName?.[0]}
-                         {user.lastName?.[0]}
-                       </AvatarFallback>
-                     </Avatar>
-                   </button>
+                      <button className="flex items-center space-x-2">
+                        <Avatar>
+                          <AvatarImage
+                            src={getUserAvatar(user) || "/placeholder-user.jpg"}
+                            alt="User avatar"
+                          />
+                          <AvatarFallback>
+                            {user.firstName?.[0]}
+                            {user.lastName?.[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                      </button>
                     </HoverCardTrigger>
                     <HoverCardContent className="w-[360px] p-0 overflow-hidden">
                       <div className="p-4 border-b border-border flex items-center space-x-3">
-                                                 <Avatar>
-                           <AvatarImage
-                             src={getUserAvatar(user) || "/placeholder-user.jpg"}
-                             alt="User avatar"
-                           />
-                           <AvatarFallback>
-                             {user.firstName?.[0]}
-                             {user.lastName?.[0]}
-                           </AvatarFallback>
-                         </Avatar>
+                        <Avatar>
+                          <AvatarImage
+                            src={getUserAvatar(user) || "/placeholder-user.jpg"}
+                            alt="User avatar"
+                          />
+                          <AvatarFallback>
+                            {user.firstName?.[0]}
+                            {user.lastName?.[0]}
+                          </AvatarFallback>
+                        </Avatar>
                         <div>
                           <div className="font-semibold text-foreground">
                             {user.fullName ||

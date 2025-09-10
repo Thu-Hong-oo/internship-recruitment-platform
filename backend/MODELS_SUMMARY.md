@@ -2,22 +2,25 @@
 
 ## 📋 **Tổng quan hệ thống**
 
-Hệ thống đã được thiết kế với các model chính để hỗ trợ nền tảng tuyển dụng thực tập sinh tích hợp AI, với đầy đủ tính năng như TopCV.
+Hệ thống đã được thiết kế với các model chính để hỗ trợ nền tảng tuyển dụng thực tập sinh tích hợp AI, với đầy đủ tính năng như InternBridge.
 
 ---
 
 ## 🎯 **Core Models**
 
 ### **1. User Model** 👤
+
 **File**: `backend/src/models/User.js`
 
 #### **Chức năng chính**
+
 - Quản lý authentication (local + Google OAuth)
 - Role-based access control (student, employer, admin)
 - Email verification system
 - Profile management
 
 #### **Tính năng nổi bật**
+
 ```javascript
 // Authentication
 authMethod: ['local', 'google', 'hybrid']
@@ -40,15 +43,18 @@ employerProfile: ObjectId
 ---
 
 ### **2. Job Model** 💼
+
 **File**: `backend/src/models/Job.js`
 
 #### **Chức năng chính**
+
 - Quản lý thông tin công việc thực tập
 - Tìm kiếm và lọc nâng cao
 - AI integration cho matching
 - SEO và URL friendly
 
 #### **Tính năng nổi bật**
+
 ```javascript
 // Job Information
 jobType: ['internship', 'part-time', 'full-time', 'contract', 'freelance']
@@ -92,29 +98,33 @@ priority: Number // 1-10
 ```
 
 #### **Search & Filter Methods**
+
 ```javascript
-Job.findActive()
-Job.findByLocation(city)
-Job.findBySkills(skillIds)
-Job.findByCategory(category)
-Job.findFeatured()
-Job.findUrgent()
-Job.findHot()
-Job.searchJobs(query, filters)
+Job.findActive();
+Job.findByLocation(city);
+Job.findBySkills(skillIds);
+Job.findByCategory(category);
+Job.findFeatured();
+Job.findUrgent();
+Job.findHot();
+Job.searchJobs(query, filters);
 ```
 
 ---
 
 ### **3. Company Model** 🏢
+
 **File**: `backend/src/models/Company.js`
 
 #### **Chức năng chính**
+
 - Quản lý thông tin công ty
 - Verification system
 - Rating và review system
 - Internship program management
 
 #### **Tính năng nổi bật**
+
 ```javascript
 // Company Information
 industry: {
@@ -180,27 +190,31 @@ rating: {
 ```
 
 #### **Search & Analytics Methods**
+
 ```javascript
-Company.findByIndustry(industry)
-Company.findByLocation(city)
-Company.findTopRated(limit)
-Company.searchCompanies(query, filters)
-company.updateStats()
-company.calculateRating()
+Company.findByIndustry(industry);
+Company.findByLocation(city);
+Company.findTopRated(limit);
+Company.searchCompanies(query, filters);
+company.updateStats();
+company.calculateRating();
 ```
 
 ---
 
 ### **4. CandidateProfile Model** 👨‍🎓
+
 **File**: `backend/src/models/CandidateProfile.js`
 
 #### **Chức năng chính**
+
 - Quản lý hồ sơ ứng viên
 - Skills và experience tracking
 - AI analysis cho skill gaps
 - Career transition support
 
 #### **Tính năng nổi bật**
+
 ```javascript
 // Education (Broad Definition)
 education: {
@@ -262,15 +276,18 @@ careerTransition: {
 ---
 
 ### **5. EmployerProfile Model** 👔
+
 **File**: `backend/src/models/EmployerProfile.js`
 
 #### **Chức năng chính**
+
 - Quản lý hồ sơ nhà tuyển dụng
 - Company verification
 - Hiring preferences
 - Hiring statistics
 
 #### **Tính năng nổi bật**
+
 ```javascript
 // Company Information
 company: {
@@ -326,15 +343,18 @@ verification: {
 ---
 
 ### **6. Application Model** 📝
+
 **File**: `backend/src/models/Application.js`
 
 #### **Chức năng chính**
+
 - Quản lý đơn ứng tuyển
 - AI analysis cho matching
 - Interview management
 - Feedback system
 
 #### **Tính năng nổi bật**
+
 ```javascript
 // Application Status
 status: ['pending', 'reviewing', 'shortlisted', 'interview', 'offered', 'accepted', 'rejected', 'withdrawn']
@@ -386,15 +406,18 @@ offer: {
 ---
 
 ### **7. SavedJob Model** 🔖
+
 **File**: `backend/src/models/SavedJob.js`
 
 #### **Chức năng chính**
+
 - Bookmark system cho jobs
 - Status tracking
 - Reminder system
 - Organization với tags
 
 #### **Tính năng nổi bật**
+
 ```javascript
 // Bookmark Information
 userId: ObjectId
@@ -416,27 +439,31 @@ reminder: {
 ```
 
 #### **Methods**
+
 ```javascript
-savedJob.updateStatus('applied')
-savedJob.addTag('tech')
-savedJob.setReminder(date, message)
-SavedJob.findByUser(userId, options)
-SavedJob.getUserStats(userId)
-SavedJob.getPopularJobs(limit)
+savedJob.updateStatus('applied');
+savedJob.addTag('tech');
+savedJob.setReminder(date, message);
+SavedJob.findByUser(userId, options);
+SavedJob.getUserStats(userId);
+SavedJob.getPopularJobs(limit);
 ```
 
 ---
 
 ### **8. SkillRoadmap Model** 🗺️
+
 **File**: `backend/src/models/SkillRoadmap.js`
 
 #### **Chức năng chính**
+
 - AI-generated skill development roadmaps
 - Progress tracking
 - Personalized learning paths
 - Milestone management
 
 #### **Tính năng nổi bật**
+
 ```javascript
 // Roadmap Information
 userId: ObjectId
@@ -486,15 +513,18 @@ metadata: {
 ---
 
 ### **9. Skill Model** 🎯
+
 **File**: `backend/src/models/Skill.js`
 
 #### **Chức năng chính**
+
 - Skill catalog management
 - Skill levels và learning paths
 - Popularity và demand tracking
 - AI integration cho semantic search
 
 #### **Tính năng nổi bật**
+
 ```javascript
 // Skill Information
 name: String
@@ -536,6 +566,7 @@ metadata: {
 ## 🔧 **Performance Optimizations**
 
 ### **1. Index Strategy**
+
 - **Text Search**: Full-text search trên title, description, skills
 - **Compound Indexes**: Tối ưu cho complex queries
 - **Status-based**: Phân loại theo trạng thái
@@ -543,6 +574,7 @@ metadata: {
 - **Category-based**: Phân loại theo ngành nghề
 
 ### **2. Query Optimization**
+
 ```javascript
 // Efficient pagination với populate
 const jobs = await Job.find(query)
@@ -554,6 +586,7 @@ const jobs = await Job.find(query)
 ```
 
 ### **3. Virtual Properties**
+
 - **Computed fields**: fullLocation, salaryRange, deadlineText
 - **Relationship populate**: company, skills, applications
 - **Dynamic calculations**: age, employeeRange
@@ -563,6 +596,7 @@ const jobs = await Job.find(query)
 ## 🚀 **AI Integration Points**
 
 ### **1. Job Matching**
+
 ```javascript
 // AI Analysis trong Job model
 aiAnalysis: {
@@ -575,6 +609,7 @@ aiAnalysis: {
 ```
 
 ### **2. Skill Gap Analysis**
+
 ```javascript
 // AI Analysis trong CandidateProfile
 aiAnalysis: {
@@ -590,6 +625,7 @@ aiAnalysis: {
 ```
 
 ### **3. Roadmap Generation**
+
 ```javascript
 // AI-generated roadmaps
 aiGenerated: Boolean
@@ -605,6 +641,7 @@ metadata: {
 ## 📊 **Data Relationships**
 
 ### **1. User Relationships**
+
 ```
 User (1) → (1) CandidateProfile
 User (1) → (1) EmployerProfile
@@ -614,6 +651,7 @@ User (1) → (N) SkillRoadmap
 ```
 
 ### **2. Job Relationships**
+
 ```
 Job (N) → (1) Company
 Job (N) → (1) User (postedBy)
@@ -623,6 +661,7 @@ Job (N) → (N) Skill (through requirements.skills)
 ```
 
 ### **3. Company Relationships**
+
 ```
 Company (1) → (N) Job
 Company (1) → (N) User (employers)
@@ -634,24 +673,28 @@ Company (1) → (N) Review
 ## 🎯 **Benefits của Model Design**
 
 ### **1. Scalability**
+
 - ✅ **Efficient indexing**: Compound indexes cho complex queries
 - ✅ **Modular design**: Tách biệt concerns
 - ✅ **Performance optimization**: Virtual properties và methods
 - ✅ **Caching ready**: Structure ready for Redis caching
 
 ### **2. User Experience**
+
 - ✅ **Flexible search**: Multiple filter options
 - ✅ **Personalization**: AI-powered recommendations
 - ✅ **Progress tracking**: Skill roadmap progress
 - ✅ **Bookmark system**: Saved jobs management
 
 ### **3. Business Features**
+
 - ✅ **Analytics**: Comprehensive statistics tracking
 - ✅ **Verification**: Company và user verification
 - ✅ **Rating system**: Company và job ratings
 - ✅ **Interview management**: Complete interview workflow
 
 ### **4. AI Integration**
+
 - ✅ **Vector search**: Embedding support
 - ✅ **Skill matching**: Advanced skill requirements
 - ✅ **Matching score**: AI-powered job matching
@@ -662,6 +705,7 @@ Company (1) → (N) Review
 ## 📋 **Migration Checklist**
 
 ### **Database Changes**
+
 - [x] Update Job schema với new fields
 - [x] Enhance Company model
 - [x] Create SavedJob model
@@ -669,12 +713,14 @@ Company (1) → (N) Review
 - [x] Add new indexes cho performance
 
 ### **API Updates**
+
 - [x] Update job controller với new methods
 - [x] Add search endpoints
 - [x] Add saved jobs endpoints
 - [x] Update response structure
 
 ### **Frontend Integration**
+
 - [ ] Update job listing components
 - [ ] Add advanced search filters
 - [ ] Implement saved jobs feature
