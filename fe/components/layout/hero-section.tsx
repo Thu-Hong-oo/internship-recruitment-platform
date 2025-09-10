@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Search, MapPin, ChevronDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ interface HeroSectionProps {
 }
 
 export default function HeroSection({ onSearch }: HeroSectionProps) {
+  const router = useRouter();
   const [searchKeyword, setSearchKeyword] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("Tất cả địa điểm");
   const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
@@ -36,6 +38,10 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
   const handleSearch = () => {
     if (onSearch) {
       onSearch(searchKeyword);
+    } else {
+      const qs = new URLSearchParams();
+      if (searchKeyword) qs.set("q", searchKeyword);
+      router.push(`/search?${qs.toString()}`);
     }
   };
 
@@ -62,12 +68,19 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
                 <div className="flex-[3] relative group">
                   {/* cách cạnh trên 50% */}
                   <Search className="w-6 h-6 absolute left-5 top-1/2 transform -translate-y-1/2 text-primary" />
-                  <Input
-                    placeholder="Nhập vị trí tuyển dụng, tên công ty..."
-                    value={searchKeyword}
-                    onChange={(e) => setSearchKeyword(e.target.value)}
-                    className="search-input pl-14 pr-6 placeholder:text-muted-foreground/60 text-foreground font-medium"
-                  />
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleSearch();
+                    }}
+                  >
+                    <Input
+                      placeholder="Nhập vị trí tuyển dụng, tên công ty..."
+                      value={searchKeyword}
+                      onChange={(e) => setSearchKeyword(e.target.value)}
+                      className="search-input pl-14 pr-6 placeholder:text-muted-foreground/60 text-foreground font-medium"
+                    />
+                  </form>
                 </div>
 
                 {/* Job category dropdown */}
@@ -118,7 +131,19 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
                                   <Checkbox className="mr-3" />
                                   <span className="text-sm">{c.label}</span>
                                 </div>
-                                <ChevronDown className="w-4 h-4 text-gray-400" />
+                                <button
+                                  className="text-primary text-xs ml-2 hover:underline"
+                                  onClick={() => {
+                                    setShowJobCategoryModal(false);
+                                    router.push(
+                                      `/search?category=${encodeURIComponent(
+                                        c.value
+                                      )}`
+                                    );
+                                  }}
+                                >
+                                  Xem
+                                </button>
                               </label>
                             ))}
                           </div>
@@ -212,6 +237,7 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
                 {/* Search button */}
                 <Button
                   onClick={handleSearch}
+                  type="button"
                   className="search-button flex-shrink-0 min-w-[140px]"
                 >
                   <Search className="w-5 h-5 mr-2" />

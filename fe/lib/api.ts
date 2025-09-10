@@ -402,8 +402,18 @@ export interface JobsResponse {
 }
 
 class JobsApi {
-  async getJobs(page = 1, limit = 10): Promise<JobsResponse> {
-    return apiClient.get<JobsResponse>(`/jobs?page=${page}&limit=${limit}`);
+  async getJobs(
+    page = 1,
+    limit = 10,
+    params?: { q?: string; category?: string }
+  ): Promise<JobsResponse> {
+    const query = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+    });
+    if (params?.q) query.set("q", params.q);
+    if (params?.category) query.set("category", params.category);
+    return apiClient.get<JobsResponse>(`/jobs?${query.toString()}`);
   }
 }
 
