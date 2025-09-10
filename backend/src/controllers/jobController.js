@@ -164,117 +164,6 @@ const getAllJobs = async (req, res) => {
   }
 };
 
-// @desc    Search jobs with text search
-// @route   GET /api/jobs/search
-// @access  Public
-const searchJobs = async (req, res) => {
-  try {
-    const {
-      q, // Required search query
-      page = 1,
-      limit = 10,
-      // Additional filters
-      skills,
-      location,
-      district,
-      category,
-      subCategory,
-      internshipType,
-      salaryMin,
-      salaryMax,
-      yearOfStudy,
-      majors,
-      isPaid,
-      workEnvironment,
-      genderRequirement,
-      level,
-      hiringCount,
-    } = req.query;
-
-    if (!q) {
-      return res.status(400).json({
-        success: false,
-        message: 'Vui lòng cung cấp từ khóa tìm kiếm (q)',
-      });
-    }
-
-    const query = { status: 'active' };
-
-    // Enhanced text search
-    query.$or = [
-      { title: { $regex: q, $options: 'i' } },
-      { description: { $regex: q, $options: 'i' } },
-      { responsibilities: { $in: [new RegExp(q, 'i')] } },
-      { 'requirements.skills': { $in: [new RegExp(q, 'i')] } },
-    ];
-
-    // Apply filters
-    if (skills) {
-      const skillArray = skills.split(',').map(skill => skill.trim());
-      query['requirements.skills'] = { $in: skillArray };
-    }
-    if (location) query['location.city'] = { $regex: location, $options: 'i' };
-    if (district)
-      query['location.district'] = { $regex: district, $options: 'i' };
-    if (category) query['category'] = category;
-    if (subCategory) query['subCategories'] = { $in: subCategory.split(',') };
-    if (internshipType) query['internship.type'] = internshipType;
-    if (isPaid !== undefined) query['internship.isPaid'] = isPaid === 'true';
-    if (workEnvironment) query['workEnvironment'] = workEnvironment;
-    if (genderRequirement)
-      query['requirements.genderRequirement'] = genderRequirement;
-    if (level) query['requirements.level'] = level;
-    if (hiringCount) query['hiringCount'] = { $gte: parseInt(hiringCount) };
-    if (yearOfStudy) {
-      const years = yearOfStudy.split(',').map(year => year.trim());
-      query['requirements.yearOfStudy'] = { $in: years };
-    }
-    if (majors) {
-      const majorArray = majors.split(',').map(major => major.trim());
-      query['requirements.majors'] = { $in: majorArray };
-    }
-
-    // Salary range
-    if (salaryMin || salaryMax) {
-      query['internship.salary.amount'] = {};
-      if (salaryMin)
-        query['internship.salary.amount']['$gte'] = parseInt(salaryMin);
-      if (salaryMax)
-        query['internship.salary.amount']['$lte'] = parseInt(salaryMax);
-    }
-
-    const skip = (page - 1) * limit;
-    const jobs = await Job.find(query)
-      .populate('companyId', 'name logo industry description')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const total = await Job.countDocuments(query);
-
-    res.status(200).json({
-      success: true,
-      data: jobs,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit),
-      },
-      search: {
-        query: q,
-        method: 'text',
-        totalResults: total,
-      },
-    });
-  } catch (error) {
-    logger.error('Error searching jobs:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi tìm kiếm công việc',
-    });
-  }
-};
 
 // @desc    Get single job
 // @route   GET /api/jobs/:id
@@ -1046,7 +935,6 @@ module.exports = {
   createJob,
   updateJob,
   deleteJob,
-  searchJobs,
   applyForJob,
   getJobApplications,
   getJobBySlug,

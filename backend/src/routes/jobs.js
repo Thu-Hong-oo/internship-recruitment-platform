@@ -6,7 +6,6 @@ const {
   createJob,
   updateJob,
   deleteJob,
-  searchJobs,
   applyForJob,
   getJobApplications,
   getJobBySlug,
@@ -26,7 +25,7 @@ const router = express.Router();
 
 // Public routes
 router.get('/', getAllJobs);
-router.get('/search', searchJobs);
+router.get('/search', getAllJobs); // alias to listing with q filter
 router.get('/category/:category', getJobsByCategory);
 router.get('/subcategory/:subCategory', getJobsBySubCategory);
 router.get('/location/:location', getJobsByLocation);
