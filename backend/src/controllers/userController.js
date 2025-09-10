@@ -45,7 +45,7 @@ const uploadAvatar = asyncHandler(async (req, res) => {
 
     // Update user avatar in database
     const user = await User.findByIdAndUpdate(
-      req.user.id,
+      req.file.buffer,
       { 'profile.avatar': result.url },
       { new: true }
     );
