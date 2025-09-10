@@ -7,9 +7,12 @@ const googleAuthService = require('../services/googleAuth');
 const {
   sendEmailVerification,
   sendPasswordResetEmail,
+  createTransporter,
+  checkEmailBounceStatus,
 } = require('../services/emailService');
 const OTPService = require('../services/otpService');
 const OTPCooldownService = require('../services/otpCooldownService');
+const EmailIssueService = require('../services/emailIssueService');
 
 // Initialize OTP service with Redis client
 let otpService = null;
@@ -39,9 +42,74 @@ const register = asyncHandler(async (req, res) => {
   // Check if user already exists
   const existingUser = await User.findOne({ email }); //SELECT * FROM users WHERE email = 'user@example.com' LIMIT 1
   if (existingUser) {
+    // If user exists but email is not verified and verification has expired
+    if (!existingUser.isEmailVerified && existingUser.emailVerificationExpire && 
+        existingUser.emailVerificationExpire < Date.now()) {
+      
+      logger.info('Deleting unverified user with expired verification', {
+        email: email,
+        userId: existingUser._id,
+        expiredAt: existingUser.emailVerificationExpire,
+        timestamp: new Date().toISOString(),
+      });
+      
+      // Delete the unverified user to allow re-registration
+      await User.findByIdAndDelete(existingUser._id);
+    } else if (existingUser.isEmailVerified) {
+      // User exists and email is verified
+      return res.status(400).json({
+        success: false,
+        error: 'Email này đã được sử dụng bởi tài khoản khác',
+      });
+    } else {
+      // User exists but email verification is still valid (not expired)
+      return res.status(400).json({
+        success: false,
+        error: 'Email này đã được đăng ký nhưng chưa xác thực. Vui lòng kiểm tra email để xác thực hoặc đợi hết hạn để đăng ký lại.',
+        errorType: 'EMAIL_NOT_VERIFIED'
+      });
+    }
+  }
+
+  // Simple email format validation only
+  // Note: We don't check bounce status here to avoid blocking legitimate emails
+
+  // Additional email validation: Check for suspicious patterns
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailPattern.test(email)) {
     return res.status(400).json({
       success: false,
-      error: 'Email này đã được sử dụng bởi tài khoản khác',
+      error: 'Địa chỉ email không hợp lệ.',
+      errorType: 'INVALID_EMAIL_FORMAT'
+    });
+  }
+
+  // Check for suspicious email patterns (random strings, etc.)
+  const suspiciousPatterns = [
+    /^[a-z0-9]{20,}@gmail\.com$/i, // Random long strings
+    /^[a-z]{10,}[0-9]{10,}@gmail\.com$/i, // Mixed long strings and numbers
+    /^[a-z0-9]{15,}[a-z0-9]{15,}@gmail\.com$/i, // Very long random strings
+  ];
+
+  const isSuspicious = suspiciousPatterns.some(pattern => pattern.test(email));
+  if (isSuspicious) {
+    logger.warn('Suspicious email pattern detected', {
+      email: email,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Log the issue (without userId since user doesn't exist yet)
+    await EmailIssueService.logIssue({
+      email: email,
+      issueType: 'INVALID_EMAIL_ADDRESS',
+      errorMessage: 'Suspicious email pattern detected',
+      operation: 'REGISTER',
+    });
+
+    return res.status(400).json({
+      success: false,
+      error: 'Email có vẻ không hợp lệ. Vui lòng sử dụng địa chỉ email thực tế.',
+      errorType: 'INVALID_EMAIL_ADDRESS'
     });
   }
 
@@ -145,22 +213,110 @@ const register = asyncHandler(async (req, res) => {
 
   await user.save({ validateBeforeSave: false });
 
-  // Send verification email
+  // Send verification email (email already validated above)
+  let emailSent = false;
+  let emailError = null;
+  let emailStatus = 'unknown';
+  
   try {
     await sendEmailVerification(user, verificationToken);
+    emailSent = true;
+    emailStatus = 'unknown'; // Will be updated by webhook
   } catch (error) {
     logger.error('Failed to send verification email', {
       error: error.message,
       userId: user._id,
+      email: user.email,
     });
+    
+    emailError = error.message;
+    
+    // Check if it's a bounce-back or invalid email error
+    if (error.message.includes('550') || error.message.includes('5.1.1') || 
+        error.message.includes('NoSuchUser') || error.message.includes('Address not found') ||
+        error.message.includes('The email account that you tried to reach does not exist')) {
+      logger.warn('Email address appears to be invalid or non-existent', {
+        email: user.email,
+        userId: user._id,
+        error: error.message,
+        errorType: 'INVALID_EMAIL_ADDRESS',
+        timestamp: new Date().toISOString(),
+      });
 
-    // Don't fail registration if email fails, just log it
+      // Log to email issues database
+      try {
+        await EmailIssueService.logIssue({
+          userId: user._id,
+          email: user.email,
+          issueType: 'INVALID_EMAIL_ADDRESS',
+          errorMessage: error.message,
+          errorCode: error.code,
+          responseCode: error.responseCode,
+          operation: 'REGISTER',
+        });
+      } catch (logError) {
+        logger.error('Failed to log email issue to database', {
+          error: logError.message,
+          userId: user._id,
+          email: user.email,
+        });
+      }
+    } else {
+      logger.warn('Email sending failed for other reasons', {
+        email: user.email,
+        userId: user._id,
+        error: error.message,
+        errorType: 'EMAIL_SEND_FAILED',
+        timestamp: new Date().toISOString(),
+      });
+
+      // Log to email issues database
+      try {
+        await EmailIssueService.logIssue({
+          userId: user._id,
+          email: user.email,
+          issueType: 'EMAIL_SEND_FAILED',
+          errorMessage: error.message,
+          errorCode: error.code,
+          responseCode: error.responseCode,
+          operation: 'REGISTER',
+        });
+      } catch (logError) {
+        logger.error('Failed to log email issue to database', {
+          error: logError.message,
+          userId: user._id,
+          email: user.email,
+        });
+      }
+    }
   }
 
+  // Update user email status
+  user.emailStatus = emailStatus;
+  await user.save();
+
+  // Log registration with email status
   logger.info(`New user registered with local auth: ${user.email}`, {
     userId: user._id,
     role: user.role,
+    emailSent: emailSent,
+    emailError: emailError || null,
+    emailStatus: user.emailStatus,
+    timestamp: new Date().toISOString(),
   });
+
+  // Prepare response message based on email status
+  let message = 'Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản.';
+  let warning = null;
+  
+  if (!emailSent) {
+    if (emailError && (emailError.includes('550') || emailError.includes('5.1.1') || 
+        emailError.includes('NoSuchUser') || emailError.includes('Address not found'))) {
+      warning = 'Email không tồn tại hoặc không thể nhận thư. Vui lòng kiểm tra lại địa chỉ email.';
+    } else {
+      warning = 'Không thể gửi email xác thực. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.';
+    }
+  }
 
   res.status(201).json({
     success: true,
@@ -179,8 +335,11 @@ const register = asyncHandler(async (req, res) => {
         avatar: user.profile.avatar,
       },
     },
-    message:
-      'Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản.',
+    message,
+    warning,
+    emailSent,
+    emailStatus: user.emailStatus,
+    emailError: emailError,
   });
 });
 
@@ -773,19 +932,133 @@ const resendEmailVerification = asyncHandler(async (req, res) => {
     if (otpCooldownService) {
       await otpCooldownService.setCooldown('resend_verification', user.email);
     }
+    
     res.status(200).json({
       success: true,
       message: 'Email xác thực đã được gửi thành công',
+      emailSent: true,
     });
   } catch (error) {
     logger.error('Failed to resend verification email', {
       error: error.message,
       userId: user._id,
+      email: user.email,
     });
 
-    res
-      .status(500)
-      .json({ success: false, error: 'Không thể gửi email xác thực' });
+    // Check if it's a bounce-back or invalid email error
+    let errorMessage = 'Không thể gửi email xác thực';
+    let errorType = 'EMAIL_SEND_FAILED';
+    
+    if (error.message.includes('550') || error.message.includes('5.1.1') || 
+        error.message.includes('NoSuchUser') || error.message.includes('Address not found')) {
+      errorMessage = 'Email không tồn tại hoặc không thể nhận thư. Vui lòng kiểm tra lại địa chỉ email.';
+      errorType = 'INVALID_EMAIL_ADDRESS';
+      
+      logger.warn('Email address appears to be invalid or non-existent during resend', {
+        email: user.email,
+        userId: user._id,
+        error: error.message,
+      });
+    }
+
+    res.status(500).json({ 
+      success: false, 
+      error: errorMessage,
+      errorType,
+      emailSent: false,
+    });
+  }
+});
+
+// @desc    Validate email address
+// @route   POST /api/auth/validate-email
+// @access  Public
+const validateEmail = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({
+      success: false,
+      error: 'Email là bắt buộc',
+    });
+  }
+
+  // Basic email format validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Định dạng email không hợp lệ',
+      errorType: 'INVALID_EMAIL_FORMAT',
+    });
+  }
+
+  // Check if email already exists
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    return res.status(400).json({
+      success: false,
+      error: 'Email này đã được sử dụng',
+      errorType: 'EMAIL_ALREADY_EXISTS',
+    });
+  }
+
+  // Try to send a test email to validate if the address exists
+  try {
+    const transporter = createTransporter();
+    
+    // Send a test email (this will bounce if email doesn't exist)
+    const testMailOptions = {
+      from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
+      to: email,
+      subject: 'Test Email - Internship Recruitment Platform',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background-color: #4F46E5; color: white; padding: 20px; text-align: center;">
+            <h1>Test Email</h1>
+          </div>
+          <div style="padding: 20px; background-color: #f9f9f9;">
+            <p>Đây là email test để kiểm tra tính hợp lệ của địa chỉ email.</p>
+            <p>Nếu bạn nhận được email này, địa chỉ email của bạn là hợp lệ.</p>
+            <p>Bạn có thể bỏ qua email này.</p>
+          </div>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(testMailOptions);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Email hợp lệ và có thể nhận thư',
+      emailValid: true,
+    });
+  } catch (error) {
+    logger.error('Email validation failed', {
+      error: error.message,
+      email: email,
+      errorCode: error.code,
+      responseCode: error.responseCode,
+    });
+
+    // Check if it's a bounce-back or invalid email error
+    if (error.message.includes('550') || error.message.includes('5.1.1') || 
+        error.message.includes('NoSuchUser') || error.message.includes('Address not found')) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email không tồn tại hoặc không thể nhận thư',
+        errorType: 'EMAIL_NOT_EXISTS',
+        emailValid: false,
+      });
+    }
+
+    // For other errors, we can't determine if email is valid
+    res.status(200).json({
+      success: true,
+      message: 'Không thể kiểm tra email, nhưng định dạng hợp lệ',
+      emailValid: null, // Unknown
+      warning: 'Có thể có vấn đề với dịch vụ email',
+    });
   }
 });
 
@@ -830,6 +1103,70 @@ const getMe = asyncHandler(async (req, res) => {
   });
 });
 
+// Get unverified account info
+const getUnverifiedAccount = asyncHandler(async (req, res) => {
+  const { email } = req.query;
+
+  if (!email) {
+    return res.status(400).json({
+      success: false,
+      error: 'Email is required'
+    });
+  }
+
+  try {
+    // Find user by email
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'Không tìm thấy tài khoản với email này'
+      });
+    }
+
+    // Check if user is already verified
+    if (user.isEmailVerified) {
+      return res.status(400).json({
+        success: false,
+        error: 'Tài khoản đã được xác thực'
+      });
+    }
+
+    // Check if verification has expired
+    const now = new Date();
+    const verificationExpiry = new Date(user.createdAt.getTime() + 24 * 60 * 60 * 1000); // 24 hours
+
+    if (now > verificationExpiry) {
+      return res.status(400).json({
+        success: false,
+        error: 'Mã xác thực đã hết hạn. Vui lòng đăng ký lại.',
+        expired: true
+      });
+    }
+
+    // Return unverified account info
+    res.json({
+      success: true,
+      data: {
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        createdAt: user.createdAt,
+        verificationExpiry: verificationExpiry,
+        timeRemaining: Math.max(0, verificationExpiry.getTime() - now.getTime())
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error getting unverified account:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Lỗi server khi lấy thông tin tài khoản'
+    });
+  }
+});
+
 module.exports = {
   register,
   login,
@@ -840,5 +1177,7 @@ module.exports = {
   googleAuth,
   verifyEmail,
   resendEmailVerification,
+  validateEmail,
+  getUnverifiedAccount,
   initializeOTPService,
 };

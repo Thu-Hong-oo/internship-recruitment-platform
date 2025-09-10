@@ -14,9 +14,44 @@ const createTransporter = () => {
   });
 };
 
+// Check if email has been flagged as invalid due to bounce-back
+const checkEmailBounceStatus = async (email) => {
+  try {
+    const EmailIssue = require('../models/EmailIssue');
+    const recentIssue = await EmailIssue.findOne({
+      email: email.toLowerCase(),
+      issueType: 'INVALID_EMAIL_ADDRESS',
+      createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Last 24 hours
+    }).sort({ createdAt: -1 });
+    
+    if (recentIssue) {
+      logger.warn('Email previously flagged as invalid due to bounce-back', {
+        email: email,
+        issueId: recentIssue._id,
+        createdAt: recentIssue.createdAt
+      });
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    logger.error('Failed to check email bounce status', {
+      error: error.message,
+      email: email
+    });
+    return true; // Default to allowing if check fails
+  }
+};
+
 // Send email verification with OTP
 const sendEmailVerification = async (user, verificationToken) => {
   try {
+    // Check if email has been flagged as invalid due to bounce-back
+    const isEmailValid = await checkEmailBounceStatus(user.email);
+    if (!isEmailValid) {
+      throw new Error('Email address has been flagged as invalid due to previous bounce-back');
+    }
+    
     const transporter = createTransporter();
     
     // Generate 6-digit OTP from the token
@@ -66,15 +101,26 @@ const sendEmailVerification = async (user, verificationToken) => {
   } catch (error) {
     logger.error('Failed to send email verification', { 
       error: error.message, 
-      userId: user._id 
+      userId: user._id,
+      email: user.email,
+      errorCode: error.code,
+      responseCode: error.responseCode,
     });
-    throw new Error('Failed to send verification email');
+    
+    // Preserve original error message for better error handling
+    throw error;
   }
 };
 
 // Send password reset email
 const sendPasswordResetEmail = async (user, resetToken) => {
   try {
+    // Check if email has been flagged as invalid due to bounce-back
+    const isEmailValid = await checkEmailBounceStatus(user.email);
+    if (!isEmailValid) {
+      throw new Error('Email address has been flagged as invalid due to previous bounce-back');
+    }
+    
     const transporter = createTransporter();
     
     // Generate 6-digit OTP from the token
@@ -132,5 +178,7 @@ const sendPasswordResetEmail = async (user, resetToken) => {
 
 module.exports = {
   sendEmailVerification,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  createTransporter,
+  checkEmailBounceStatus
 };

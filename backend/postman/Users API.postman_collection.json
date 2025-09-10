@@ -494,6 +494,645 @@
 					"body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"68be3577ba6d60a6c2751f51\",\n    \"email\": \"john@example.com\",\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"role\": \"student\",\n    \"fullName\": \"John Doe\",\n    \"authMethod\": \"local\",\n    \"isEmailVerified\": true,\n    \"profile\": {\n      \"firstName\": \"John\",\n      \"lastName\": \"Doe\",\n      \"avatar\": \"https://res.cloudinary.com/...\"\n    }\n  }\n}"
 				}
 			]
+		},
+		{
+			"name": "Search Users",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{api_url}}/users/search?q=john&role=student&page=1&limit=10",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"users",
+						"search"
+					],
+					"query": [
+						{
+							"key": "q",
+							"value": "john"
+						},
+						{
+							"key": "role",
+							"value": "student"
+						},
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "limit",
+							"value": "10"
+						}
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Success Response",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/users/search?q=john&role=student&page=1&limit=10",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"users",
+								"search"
+							],
+							"query": [
+								{
+									"key": "q",
+									"value": "john"
+								},
+								{
+									"key": "role",
+									"value": "student"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"id\": \"68be3577ba6d60a6c2751f51\",\n      \"email\": \"john@example.com\",\n      \"firstName\": \"John\",\n      \"lastName\": \"Doe\",\n      \"role\": \"student\",\n      \"fullName\": \"John Doe\",\n      \"authMethod\": \"local\",\n      \"isEmailVerified\": true,\n      \"profile\": {\n        \"firstName\": \"John\",\n        \"lastName\": \"Doe\",\n        \"avatar\": \"https://res.cloudinary.com/...\"\n      }\n    }\n  ],\n  \"pagination\": {\n    \"current\": 1,\n    \"pages\": 1,\n    \"total\": 1,\n    \"hasNext\": false,\n    \"hasPrev\": false\n  }\n}"
+				}
+			]
+		},
+		{
+			"name": "Get User Statistics",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{api_url}}/users/stats",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"users",
+						"stats"
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Success Response",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/users/stats",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"users",
+								"stats"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"success\": true,\n  \"data\": {\n    \"applicationCount\": 5,\n    \"savedJobsCount\": 12,\n    \"profileCompletion\": 85,\n    \"lastActive\": \"2024-01-15T10:30:00.000Z\"\n  }\n}"
+				}
+			]
+		},
+		{
+			"name": "Update User Preferences",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"notifications\": {\n    \"email\": true,\n    \"push\": true,\n    \"sms\": false\n  },\n  \"privacy\": {\n    \"profileVisibility\": \"public\",\n    \"showEmail\": false\n  },\n  \"language\": \"vi\",\n  \"timezone\": \"Asia/Ho_Chi_Minh\"\n}"
+				},
+				"url": {
+					"raw": "{{api_url}}/users/preferences",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"users",
+						"preferences"
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Success Response",
+					"originalRequest": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"notifications\": {\n    \"email\": true,\n    \"push\": true,\n    \"sms\": false\n  },\n  \"privacy\": {\n    \"profileVisibility\": \"public\",\n    \"showEmail\": false\n  },\n  \"language\": \"vi\",\n  \"timezone\": \"Asia/Ho_Chi_Minh\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/users/preferences",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"users",
+								"preferences"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"success\": true,\n  \"data\": {\n    \"notifications\": {\n      \"email\": true,\n      \"push\": true,\n      \"sms\": false\n    },\n    \"privacy\": {\n      \"profileVisibility\": \"public\",\n      \"showEmail\": false\n    },\n    \"language\": \"vi\",\n    \"timezone\": \"Asia/Ho_Chi_Minh\"\n  }\n}"
+				}
+			]
+		},
+		{
+			"name": "Get User Notifications",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{api_url}}/users/notifications?page=1&limit=20&unreadOnly=false",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"users",
+						"notifications"
+					],
+					"query": [
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "limit",
+							"value": "20"
+						},
+						{
+							"key": "unreadOnly",
+							"value": "false"
+						}
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Success Response",
+					"originalRequest": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/users/notifications?page=1&limit=20&unreadOnly=false",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"users",
+								"notifications"
+							],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "unreadOnly",
+									"value": "false"
+								}
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"id\": \"68be3577ba6d60a6c2751f52\",\n      \"title\": \"New Job Match\",\n      \"message\": \"We found 3 new jobs that match your profile\",\n      \"type\": \"job_match\",\n      \"isRead\": false,\n      \"createdAt\": \"2024-01-15T10:30:00.000Z\"\n    }\n  ],\n  \"pagination\": {\n    \"current\": 1,\n    \"pages\": 1,\n    \"total\": 1,\n    \"hasNext\": false,\n    \"hasPrev\": false\n  }\n}"
+				}
+			]
+		},
+		{
+			"name": "Mark Notification as Read",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{api_url}}/users/notifications/{{notification_id}}/read",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"users",
+						"notifications",
+						"{{notification_id}}",
+						"read"
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Success Response",
+					"originalRequest": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/users/notifications/{{notification_id}}/read",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"users",
+								"notifications",
+								"{{notification_id}}",
+								"read"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"68be3577ba6d60a6c2751f52\",\n    \"title\": \"New Job Match\",\n    \"message\": \"We found 3 new jobs that match your profile\",\n    \"type\": \"job_match\",\n    \"isRead\": true,\n    \"createdAt\": \"2024-01-15T10:30:00.000Z\"\n  }\n}"
+				}
+			]
+		},
+		{
+			"name": "Mark All Notifications as Read",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{api_url}}/users/notifications/read-all",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"users",
+						"notifications",
+						"read-all"
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Success Response",
+					"originalRequest": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/users/notifications/read-all",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"users",
+								"notifications",
+								"read-all"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"success\": true,\n  \"message\": \"Đã đánh dấu tất cả thông báo là đã đọc\"\n}"
+				}
+			]
+		},
+		{
+			"name": "Delete Notification",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{api_url}}/users/notifications/{{notification_id}}",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"users",
+						"notifications",
+						"{{notification_id}}"
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Success Response",
+					"originalRequest": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/users/notifications/{{notification_id}}",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"users",
+								"notifications",
+								"{{notification_id}}"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"success\": true,\n  \"message\": \"Đã xóa thông báo\"\n}"
+				}
+			]
+		},
+		{
+			"name": "Deactivate Account",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"reason\": \"Taking a break from job searching\"\n}"
+				},
+				"url": {
+					"raw": "{{api_url}}/users/deactivate",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"users",
+						"deactivate"
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Success Response",
+					"originalRequest": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"reason\": \"Taking a break from job searching\"\n}"
+						},
+						"url": {
+							"raw": "{{api_url}}/users/deactivate",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"users",
+								"deactivate"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"success\": true,\n  \"message\": \"Tài khoản đã được tạm ngưng\"\n}"
+				}
+			]
+		},
+		{
+			"name": "Reactivate Account",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{api_url}}/users/reactivate",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"users",
+						"reactivate"
+					]
+				}
+			},
+			"response": [
+				{
+					"name": "Success Response",
+					"originalRequest": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "{{api_url}}/users/reactivate",
+							"host": [
+								"{{api_url}}"
+							],
+							"path": [
+								"users",
+								"reactivate"
+							]
+						}
+					},
+					"status": "OK",
+					"code": 200,
+					"_postman_previewlanguage": "json",
+					"header": [
+						{
+							"key": "Content-Type",
+							"value": "application/json"
+						}
+					],
+					"cookie": [],
+					"body": "{\n  \"success\": true,\n  \"message\": \"Tài khoản đã được kích hoạt lại\"\n}"
+				}
+			]
 		}
 	]
 }

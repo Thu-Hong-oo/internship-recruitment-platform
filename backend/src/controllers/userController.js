@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const asyncHandler = require('express-async-handler');
 const { logger } = require('../utils/logger');
+const { uploadImage } = require('../services/imageUploadService');
 const googleAuthService = require('../services/googleAuth');
 const CandidateProfile = require('../models/CandidateProfile');
 const EmployerProfile = require('../models/EmployerProfile');
@@ -39,38 +40,47 @@ const uploadAvatar = asyncHandler(async (req, res) => {
   }
 
   try {
-    // Get Cloudinary URL from uploaded file
-    const avatarUrl = req.file.path; // Cloudinary returns the URL in req.file.path
+    // Upload via core service to standardize response
+    const result = await uploadImage('avatar', req.file.path);
 
     // Update user avatar in database
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      { 'profile.avatar': avatarUrl },
+      { 'profile.avatar': result.url },
       { new: true }
     );
 
-    logger.info(`Avatar uploaded to Cloudinary for user: ${user.email}`, {
+    logger.info(`Avatar uploaded for user: ${user.email}`, {
       userId: user._id,
-      avatarUrl: avatarUrl,
+      publicId: result.publicId,
+      url: result.url,
     });
 
     res.status(200).json({
       success: true,
       message: 'Upload avatar thành công',
-      avatar: avatarUrl,
-      user: {
-        id: user._id,
-        email: user.email,
-        firstName: user.profile.firstName,
-        lastName: user.profile.lastName,
-        role: user.role,
-        fullName: user.fullName,
-        isEmailVerified: user.isEmailVerified,
-        authMethod: user.authMethod,
-        profile: {
+      data: {
+        avatar: {
+          publicId: result.publicId,
+          url: result.url,
+          size: result.bytes,
+          format: result.format,
+          dimensions: { width: result.width, height: result.height },
+        },
+        user: {
+          id: user._id,
+          email: user.email,
           firstName: user.profile.firstName,
           lastName: user.profile.lastName,
-          avatar: user.profile.avatar,
+          role: user.role,
+          fullName: user.fullName,
+          isEmailVerified: user.isEmailVerified,
+          authMethod: user.authMethod,
+          profile: {
+            firstName: user.profile.firstName,
+            lastName: user.profile.lastName,
+            avatar: user.profile.avatar,
+          },
         },
       },
     });
@@ -316,384 +326,6 @@ const unlinkGoogleAccount = asyncHandler(async (req, res) => {
   }
 });
 
-// ========================================
-// CANDIDATE PROFILE MANAGEMENT
-// ========================================
-
-// @desc    Get candidate profile
-// @route   GET /api/users/candidate/profile
-// @access  Private (Student only)
-const getCandidateProfile = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user.id).populate('candidateProfile');
-
-  if (!user.candidateProfile) {
-    return res.status(404).json({
-      success: false,
-      error: 'Chưa có profile ứng viên',
-    });
-  }
-
-  res.status(200).json({
-    success: true,
-    data: user.candidateProfile,
-  });
-});
-
-// @desc    Create candidate profile
-// @route   POST /api/users/candidate/profile
-// @access  Private (Student only)
-const createCandidateProfile = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user.id);
-
-  if (user.candidateProfile) {
-    return res.status(400).json({
-      success: false,
-      error: 'Profile ứng viên đã tồn tại',
-    });
-  }
-
-  // Create candidate profile
-  const candidateProfile = await CandidateProfile.create({
-    userId: user._id,
-    ...req.body,
-  });
-
-  // Link to user
-  user.candidateProfile = candidateProfile._id;
-  await user.save();
-
-  logger.info(`Candidate profile created for user: ${user.email}`, {
-    userId: user._id,
-  });
-
-  res.status(201).json({
-    success: true,
-    data: candidateProfile,
-  });
-});
-
-// @desc    Update candidate profile
-// @route   PUT /api/users/candidate/profile
-// @access  Private (Student only)
-const updateCandidateProfile = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user.id).populate('candidateProfile');
-
-  if (!user.candidateProfile) {
-    return res.status(404).json({
-      success: false,
-      error: 'Chưa có profile ứng viên',
-    });
-  }
-
-  const updatedProfile = await CandidateProfile.findByIdAndUpdate(
-    user.candidateProfile._id,
-    req.body,
-    { new: true, runValidators: true }
-  );
-
-  logger.info(`Candidate profile updated for user: ${user.email}`, {
-    userId: user._id,
-  });
-
-  res.status(200).json({
-    success: true,
-    data: updatedProfile,
-  });
-});
-
-// @desc    Upload candidate resume
-// @route   POST /api/users/candidate/resume
-// @access  Private (Student only)
-const uploadCandidateResume = asyncHandler(async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({
-      success: false,
-      error: 'Vui lòng chọn file CV/Resume để upload',
-    });
-  }
-
-  const user = await User.findById(req.user.id).populate('candidateProfile');
-
-  if (!user.candidateProfile) {
-    return res.status(404).json({
-      success: false,
-      error: 'Chưa có profile ứng viên',
-    });
-  }
-
-  const resumeUrl = req.file.path;
-
-  const updatedProfile = await CandidateProfile.findByIdAndUpdate(
-    user.candidateProfile._id,
-    {
-      resume: {
-        url: resumeUrl,
-        filename: req.file.originalname,
-        uploadedAt: new Date(),
-        lastUpdated: new Date(),
-      },
-    },
-    { new: true }
-  );
-
-  logger.info(`Resume uploaded for candidate: ${user.email}`, {
-    userId: user._id,
-    resumeUrl: resumeUrl,
-  });
-
-  res.status(200).json({
-    success: true,
-    message: 'Upload CV/Resume thành công',
-    data: updatedProfile,
-  });
-});
-
-// @desc    Delete candidate resume
-// @route   DELETE /api/users/candidate/resume
-// @access  Private (Student only)
-const deleteCandidateResume = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user.id).populate('candidateProfile');
-
-  if (!user.candidateProfile) {
-    return res.status(404).json({
-      success: false,
-      error: 'Chưa có profile ứng viên',
-    });
-  }
-
-  const updatedProfile = await CandidateProfile.findByIdAndUpdate(
-    user.candidateProfile._id,
-    { $unset: { resume: 1 } },
-    { new: true }
-  );
-
-  logger.info(`Resume deleted for candidate: ${user.email}`, {
-    userId: user._id,
-  });
-
-  res.status(200).json({
-    success: true,
-    message: 'Xóa CV/Resume thành công',
-    data: updatedProfile,
-  });
-});
-
-// @desc    Get candidate skills
-// @route   GET /api/users/candidate/skills
-// @access  Private (Student only)
-const getCandidateSkills = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user.id).populate('candidateProfile');
-
-  if (!user.candidateProfile) {
-    return res.status(404).json({
-      success: false,
-      error: 'Chưa có profile ứng viên',
-    });
-  }
-
-  res.status(200).json({
-    success: true,
-    data: user.candidateProfile.skills || [],
-  });
-});
-
-// @desc    Add candidate skills
-// @route   POST /api/users/candidate/skills
-// @access  Private (Student only)
-const addCandidateSkills = asyncHandler(async (req, res) => {
-  const { skills } = req.body;
-
-  if (!Array.isArray(skills)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Skills phải là một mảng',
-    });
-  }
-
-  const user = await User.findById(req.user.id).populate('candidateProfile');
-
-  if (!user.candidateProfile) {
-    return res.status(404).json({
-      success: false,
-      error: 'Chưa có profile ứng viên',
-    });
-  }
-
-  const updatedProfile = await CandidateProfile.findByIdAndUpdate(
-    user.candidateProfile._id,
-    { $push: { skills: { $each: skills } } },
-    { new: true }
-  );
-
-  logger.info(`Skills added for candidate: ${user.email}`, {
-    userId: user._id,
-    skillsCount: skills.length,
-  });
-
-  res.status(200).json({
-    success: true,
-    data: updatedProfile.skills,
-  });
-});
-
-// @desc    Update candidate skill level
-// @route   PUT /api/users/candidate/skills/:skillId
-// @access  Private (Student only)
-const updateCandidateSkill = asyncHandler(async (req, res) => {
-  const { skillId } = req.params;
-  const { level, experience } = req.body;
-
-  const user = await User.findById(req.user.id).populate('candidateProfile');
-
-  if (!user.candidateProfile) {
-    return res.status(404).json({
-      success: false,
-      error: 'Chưa có profile ứng viên',
-    });
-  }
-
-  const updatedProfile = await CandidateProfile.findByIdAndUpdate(
-    user.candidateProfile._id,
-    {
-      $set: {
-        'skills.$[skill].level': level,
-        'skills.$[skill].experience': experience,
-      },
-    },
-    {
-      new: true,
-      arrayFilters: [{ 'skill.skillId': skillId }],
-    }
-  );
-
-  logger.info(`Skill updated for candidate: ${user.email}`, {
-    userId: user._id,
-    skillId: skillId,
-  });
-
-  res.status(200).json({
-    success: true,
-    data: updatedProfile,
-  });
-});
-
-// @desc    Delete candidate skill
-// @route   DELETE /api/users/candidate/skills/:skillId
-// @access  Private (Student only)
-const deleteCandidateSkill = asyncHandler(async (req, res) => {
-  const { skillId } = req.params;
-
-  const user = await User.findById(req.user.id).populate('candidateProfile');
-
-  if (!user.candidateProfile) {
-    return res.status(404).json({
-      success: false,
-      error: 'Chưa có profile ứng viên',
-    });
-  }
-
-  const updatedProfile = await CandidateProfile.findByIdAndUpdate(
-    user.candidateProfile._id,
-    { $pull: { skills: { skillId: skillId } } },
-    { new: true }
-  );
-
-  logger.info(`Skill deleted for candidate: ${user.email}`, {
-    userId: user._id,
-    skillId: skillId,
-  });
-
-  res.status(200).json({
-    success: true,
-    data: updatedProfile.skills,
-  });
-});
-
-// ========================================
-// EMPLOYER PROFILE MANAGEMENT
-// ========================================
-
-// @desc    Get employer profile
-// @route   GET /api/users/employer/profile
-// @access  Private (Employer only)
-const getEmployerProfile = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user.id).populate('employerProfile');
-
-  if (!user.employerProfile) {
-    return res.status(404).json({
-      success: false,
-      error: 'Chưa có profile nhà tuyển dụng',
-    });
-  }
-
-  res.status(200).json({
-    success: true,
-    data: user.employerProfile,
-  });
-});
-
-// @desc    Create employer profile
-// @route   POST /api/users/employer/profile
-// @access  Private (Employer only)
-const createEmployerProfile = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user.id);
-
-  if (user.employerProfile) {
-    return res.status(400).json({
-      success: false,
-      error: 'Profile nhà tuyển dụng đã tồn tại',
-    });
-  }
-
-  // Create employer profile
-  const employerProfile = await EmployerProfile.create({
-    userId: user._id,
-    ...req.body,
-  });
-
-  // Link to user
-  user.employerProfile = employerProfile._id;
-  await user.save();
-
-  logger.info(`Employer profile created for user: ${user.email}`, {
-    userId: user._id,
-  });
-
-  res.status(201).json({
-    success: true,
-    data: employerProfile,
-  });
-});
-
-// @desc    Update employer profile
-// @route   PUT /api/users/employer/profile
-// @access  Private (Employer only)
-const updateEmployerProfile = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user.id).populate('employerProfile');
-
-  if (!user.employerProfile) {
-    return res.status(404).json({
-      success: false,
-      error: 'Chưa có profile nhà tuyển dụng',
-    });
-  }
-
-  const updatedProfile = await EmployerProfile.findByIdAndUpdate(
-    user.employerProfile._id,
-    req.body,
-    { new: true, runValidators: true }
-  );
-
-  logger.info(`Employer profile updated for user: ${user.email}`, {
-    userId: user._id,
-  });
-
-  res.status(200).json({
-    success: true,
-    data: updatedProfile,
-  });
-});
-
 // @desc    Get user profile
 // @route   GET /api/users/profile
 // @access  Private
@@ -702,7 +334,7 @@ const getUserProfile = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    data: user,
+    user: user,
   });
 });
 
@@ -981,20 +613,6 @@ module.exports = {
   changePassword,
   linkGoogleAccount,
   unlinkGoogleAccount,
-  // Candidate profile management
-  getCandidateProfile,
-  createCandidateProfile,
-  updateCandidateProfile,
-  uploadCandidateResume,
-  deleteCandidateResume,
-  getCandidateSkills,
-  addCandidateSkills,
-  updateCandidateSkill,
-  deleteCandidateSkill,
-  // Employer profile management
-  getEmployerProfile,
-  createEmployerProfile,
-  updateEmployerProfile,
   getUserProfile,
   searchUsers,
   getUserStats,

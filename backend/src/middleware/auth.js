@@ -21,7 +21,7 @@ const protect = asyncHandler(async (req, res, next) => {
   if (!token) {
     return res.status(401).json({
       success: false,
-      error: 'Not authorized to access this route'
+      error: 'Không có quyền truy cập vào route này'
     });
   }
 
@@ -34,14 +34,14 @@ const protect = asyncHandler(async (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({
         success: false,
-        error: 'User not found'
+        error: 'Không tìm thấy người dùng'
       });
     }
 
     if (!req.user.isActive) {
       return res.status(401).json({
         success: false,
-        error: 'User account is deactivated'
+        error: 'Tài khoản người dùng đã bị vô hiệu hóa'
       });
     }
 
@@ -49,7 +49,7 @@ const protect = asyncHandler(async (req, res, next) => {
   } catch (err) {
     return res.status(401).json({
       success: false,
-      error: 'Not authorized to access this route'
+      error: 'Không có quyền truy cập vào route này'
     });
   }
 });
@@ -60,7 +60,7 @@ const authorize = (...roles) => {
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        error: `User role ${req.user.role} is not authorized to access this route`
+        error: `Người dùng với vai trò ${req.user.role} không có quyền truy cập vào route này`
       });
     }
     next();

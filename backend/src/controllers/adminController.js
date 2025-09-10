@@ -6,6 +6,7 @@ const Company = require('../models/Company');
 const Application = require('../models/Application');
 const asyncHandler = require('express-async-handler');
 const { logger } = require('../utils/logger');
+const mongoose = require('mongoose');
 
 // ========================================
 // USER MANAGEMENT
@@ -370,6 +371,54 @@ const getPendingVerifications = asyncHandler(async (req, res) => {
   });
 });
 
+// ========================================
+// COMPANY MODERATION
+// ========================================
+
+// @desc    Update company status (admin only)
+// @route   PUT /api/admin/companies/:id/status
+// @access  Private (Admin only)
+const updateCompanyStatus = asyncHandler(async (req, res) => {
+  const { status } = req.body; // 'active' | 'pending' | 'suspended' | 'inactive'
+
+  const allowed = ['active', 'pending', 'suspended', 'inactive'];
+  if (!allowed.includes(status)) {
+    return res
+      .status(400)
+      .json({ success: false, error: 'Trạng thái công ty không hợp lệ' });
+  }
+
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res
+      .status(400)
+      .json({ success: false, error: 'Company ID không hợp lệ' });
+  }
+
+  const company = await Company.findByIdAndUpdate(
+    id,
+    { status },
+    { new: true, runValidators: true }
+  );
+
+  if (!company) {
+    return res
+      .status(404)
+      .json({ success: false, error: 'Không tìm thấy công ty' });
+  }
+
+  logger.info('Admin updated company status', {
+    adminId: req.user.id,
+    companyId: id,
+    status,
+  });
+  res.status(200).json({
+    success: true,
+    data: company,
+    message: 'Cập nhật trạng thái công ty thành công',
+  });
+});
+
 // @desc    Verify employer
 // @route   PUT /api/admin/verifications/:id
 // @access  Private (Admin only)
@@ -490,6 +539,7 @@ module.exports = {
   // Employer Verification
   getPendingVerifications,
   verifyEmployer,
+  updateCompanyStatus,
 
   // System Management
   getSystemHealth,

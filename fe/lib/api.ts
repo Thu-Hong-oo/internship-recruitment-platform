@@ -46,6 +46,33 @@ export interface AuthResponse {
   requiresEmailVerification?: boolean; // For login when email not verified
 }
 
+export interface EmailValidationResponse {
+  success: boolean;
+  data?: {
+    email: string;
+    userId: string;
+    emailStatus: string;
+    recentIssues: number;
+    lastIssue: string | null;
+    isEmailValid: boolean;
+  };
+  error?: string;
+}
+
+export interface UnverifiedAccountResponse {
+  success: boolean;
+  data?: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    createdAt: string;
+    verificationExpiry: string;
+    timeRemaining: number;
+  };
+  error?: string;
+  expired?: boolean;
+}
+
 // API Client
 class ApiClient {
   private baseURL: string;
@@ -260,6 +287,9 @@ export const authAPI = {
   logout: apiClient.logout.bind(apiClient),
   getCurrentUser: apiClient.getCurrentUser.bind(apiClient),
   verifyEmail: apiClient.verifyEmail.bind(apiClient),
+  resendEmailVerification: apiClient.resendEmailVerification.bind(apiClient),
+  getUnverifiedAccount: apiClient.getUnverifiedAccount.bind(apiClient),
+  validateEmail: apiClient.validateEmail.bind(apiClient),
   uploadAvatar: apiClient.uploadAvatar.bind(apiClient),
 };
 
