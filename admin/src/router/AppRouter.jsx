@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import ProtectedRoute from "../components/ProtectedRoute";
+import AuthGuard from "../components/AuthGuard";
 import menuConfig from "../config/menuConfig";
 import adminMenuConfig from "../config/adminMenuConfig";
 import companyMenuConfig from "../config/companyMenuConfig";
@@ -13,20 +14,20 @@ import AccountsDetail from "../pages/accounts/detail";
 
 // Component để điều hướng dựa trên role
 const RoleBasedRedirect = () => {
-  const userRole = localStorage.getItem('userRole') || sessionStorage.getItem('userRole');
-  
+  const userRole =
+    localStorage.getItem("userRole") || sessionStorage.getItem("userRole");
+
   switch (userRole) {
-    case 'admin':
+    case "admin":
       return <Navigate to="/admin/dashboard" replace />;
-    case 'company':
+    case "company":
       return <Navigate to="/company/dashboard" replace />;
-    case 'candidate':
+    case "candidate":
       return <Navigate to="/candidate/dashboard" replace />;
     default:
       return <Navigate to="/admin/dashboard" replace />;
   }
 };
-
 
 function flattenRoutes(menus) {
   const result = [];
@@ -51,20 +52,27 @@ const allRoutes = [...adminRoutes, ...companyRoutes, ...candidateRoutes];
 export default function AppRouter() {
   return (
     <Routes>
-
       <Route element={<AuthLayout />}>
-        <Route path="/login" element={<Login />} />
+        <Route
+          path="/login"
+          element={
+            <AuthGuard>
+              <Login />
+            </AuthGuard>
+          }
+        />
       </Route>
-      <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+      <Route
+        element={
+          <ProtectedRoute>
+            <MainLayout />
+          </ProtectedRoute>
+        }
+      >
         <Route path="/" element={<RoleBasedRedirect />} />
         {allRoutes.map((route) => (
           <Route key={route.path} path={route.path} element={route.element} />
         ))}
-        
-
-
-        
-
       </Route>
       <Route path="*" element={<NotFoundPage />} />
     </Routes>

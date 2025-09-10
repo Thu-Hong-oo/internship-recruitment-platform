@@ -104,7 +104,7 @@ class ApiClient {
   ): Promise<T> {
     // Update token from localStorage before each request
     this.updateTokenFromStorage();
-    
+
     const url = `${this.baseURL}${endpoint}`;
 
     const config: RequestInit = {
@@ -148,6 +148,19 @@ class ApiClient {
       console.error("API request failed:", error);
       throw error;
     }
+  }
+
+  // Basic helpers
+  public async get<T>(endpoint: string): Promise<T> {
+    return this.request<T>(endpoint, { method: "GET" });
+  }
+
+  public async post<T>(endpoint: string, body?: unknown): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: "POST",
+      body:
+        body instanceof FormData ? (body as any) : JSON.stringify(body ?? {}),
+    });
   }
 
   // Auth methods
@@ -207,8 +220,10 @@ class ApiClient {
 
   async getCurrentUser(): Promise<User> {
     try {
-      const result = await this.request<{ success: boolean; user: User }>("/auth/me");
-      
+      const result = await this.request<{ success: boolean; user: User }>(
+        "/auth/me"
+      );
+
       if (result.success && result.user) {
         return result.user;
       } else {
@@ -230,37 +245,21 @@ class ApiClient {
     return response;
   }
 
-  async resendEmailVerification(email: string): Promise<AuthResponse> {
-    const response = await this.request<AuthResponse>("/auth/resend-verification", {
-      method: "POST",
-      body: JSON.stringify({ email }),
-    });
-
-    return response;
-  }
-
-  async getUnverifiedAccount(email: string): Promise<UnverifiedAccountResponse> {
-    const response = await this.request<UnverifiedAccountResponse>(`/auth/unverified-account?email=${encodeURIComponent(email)}`, {
-      method: "GET",
-    });
-
-    return response;
-  }
-
-  async validateEmail(email: string): Promise<EmailValidationResponse> {
-    const response = await this.request<EmailValidationResponse>("/webhooks/validate-email", {
-      method: "POST",
-      body: JSON.stringify({ email }),
-    });
-
-    return response;
-  }
-
-  async uploadAvatar(file: File): Promise<{ success: boolean; avatar?: string; error?: string; user?: User }> {
+  async uploadAvatar(file: File): Promise<{
+    success: boolean;
+    avatar?: string;
+    error?: string;
+    user?: User;
+  }> {
     const formData = new FormData();
-    formData.append('avatar', file);
+    formData.append("avatar", file);
 
-    const response = await this.request<{ success: boolean; avatar?: string; error?: string; user?: User }>("/users/upload-avatar", {
+    const response = await this.request<{
+      success: boolean;
+      avatar?: string;
+      error?: string;
+      user?: User;
+    }>("/users/upload-avatar", {
       method: "POST",
       headers: {
         // Don't set Content-Type for FormData, let browser set it
@@ -293,3 +292,41 @@ export const authAPI = {
   validateEmail: apiClient.validateEmail.bind(apiClient),
   uploadAvatar: apiClient.uploadAvatar.bind(apiClient),
 };
+
+// ===================== Jobs =====================
+export interface CompanyLite {
+  name: string;
+  logo?: { url?: string } | null;
+}
+
+export interface JobItem {
+  id: string;
+  _id?: string;
+  title: string;
+  companyId?: CompanyLite | null;
+  fullLocation?: string;
+  salaryRange?: string;
+  isUrgent?: boolean;
+  isFeatured?: boolean;
+  createdAt?: string;
+  slug?: string;
+}
+
+export interface JobsResponse {
+  success: boolean;
+  data: JobItem[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+class JobsApi {
+  async getJobs(page = 1, limit = 10): Promise<JobsResponse> {
+    return apiClient.get<JobsResponse>(`/jobs?page=${page}&limit=${limit}`);
+  }
+}
+
+export const jobsAPI = new JobsApi();
