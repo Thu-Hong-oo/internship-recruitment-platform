@@ -1,18 +1,18 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Eye, EyeOff, Mail, Lock, CheckCircle, AlertCircle, AlertTriangle, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
-import { useGoogleAuth } from "@/hooks/useGoogleAuth";
+import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
-  const { signInWithGoogle, loading: googleLoading, error: googleError } = useGoogleAuth();
+  
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
@@ -23,6 +23,8 @@ export default function LoginPage() {
   const [warning, setWarning] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // No Google script/init needed with NextAuth
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({
@@ -122,12 +124,12 @@ export default function LoginPage() {
             )}
             
             {/* Error Message */}
-            {(error || googleError) && (
+            {error && (
               <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-4">
                 <div className="flex items-start space-x-2">
                   <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
                   <div className="flex-1">
-                    <div className="font-medium">{error || googleError}</div>
+                    <div className="font-medium">{error}</div>
                     {warning && (
                       <div className="mt-1 text-red-500">{warning}</div>
                     )}
@@ -156,13 +158,10 @@ export default function LoginPage() {
                         <Button
                           variant="outline"
                           className="h-10 bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
-                          onClick={signInWithGoogle}
-                          disabled={googleLoading}
+                          onClick={() => signIn("google", { callbackUrl: "/" })}
                         >
                           <span className="font-bold text-lg">G</span>
-                          <span className="ml-2">
-                            {googleLoading ? "Đang đăng nhập..." : "Đăng nhập bằng Google"}
-                          </span>
+                          <span className="ml-2">Đăng nhập bằng Google</span>
                         </Button>
                       </div>
                     )}
@@ -281,19 +280,14 @@ export default function LoginPage() {
             </div>
 
             <div className="grid grid-cols-3 gap-3">
-              <div id="google-signin-button">
-                <Button
-                  variant="outline"
-                  className="h-12 bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
-                  onClick={signInWithGoogle}
-                  disabled={googleLoading}
-                >
-                  <span className="font-bold text-lg">G</span>
-                  <span className="ml-2">
-                    {googleLoading ? "Đang đăng nhập..." : "Google"}
-                  </span>
-                </Button>
-              </div>
+              <Button
+                variant="outline"
+                className="h-12 bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
+                onClick={() => signIn("google", { callbackUrl: "/" })}
+              >
+                <span className="font-bold text-lg">G</span>
+                <span className="ml-2">Google</span>
+              </Button>
               <Button
                 variant="outline"
                 className="h-12 bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700"

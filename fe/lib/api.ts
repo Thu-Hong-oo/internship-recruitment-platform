@@ -164,6 +164,17 @@ class ApiClient {
   }
 
   // Auth methods
+  async getGoogleAuthUrl(): Promise<{ success: boolean; authUrl?: string }>{
+    try {
+      return await this.request<{ success: boolean; authUrl?: string }>(
+        "/auth/google",
+        { method: "GET" }
+      );
+    } catch (e) {
+      // Fallback shape
+      return { success: false };
+    }
+  }
   async register(data: RegisterRequest): Promise<AuthResponse> {
     const response = await this.request<AuthResponse>("/auth/register", {
       method: "POST",
