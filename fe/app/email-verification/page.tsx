@@ -49,8 +49,15 @@ export default function EmailVerificationPage() {
         // Tài khoản chưa xác thực tồn tại
         setEmailStatus('valid');
         
-        // Hiển thị thông tin tài khoản
-        setSuccess(`Tìm thấy tài khoản chưa xác thực cho ${data.data.firstName} ${data.data.lastName}`);
+        // // Hiển thị thông tin tài khoản với fallback tên
+        // const displayName = (
+        //   (data.data.firstName || data.data.lastName)
+        //     ? `${data.data.firstName || ''} ${data.data.lastName || ''}`.trim()
+        //     : (data.data.profile?.firstName || data.data.profile?.lastName)
+        //       ? `${data.data.profile?.firstName || ''} ${data.data.profile?.lastName || ''}`.trim()
+        //       : (email ? email.split('@')[0] : 'bạn')
+        // );
+        // setSuccess(`Tìm thấy tài khoản chưa xác thực cho ${displayName}`);
       } else if (data.expired) {
         // Mã xác thực đã hết hạn
         setEmailStatus('invalid');
