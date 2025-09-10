@@ -11,28 +11,23 @@ const {
 const { uploadRateLimit } = require('../middleware/globalRateLimit');
 const {
   getUser,
+  getUserProfile,
   uploadAvatar,
   updateProfile,
   changePassword,
   linkGoogleAccount,
   unlinkGoogleAccount,
-  // Candidate profile management
-  getCandidateProfile,
-  createCandidateProfile,
-  updateCandidateProfile,
-  uploadCandidateResume,
-  deleteCandidateResume,
-  getCandidateSkills,
-  addCandidateSkills,
-  updateCandidateSkill,
-  deleteCandidateSkill,
-  // Employer profile management
-  getEmployerProfile,
-  createEmployerProfile,
-  updateEmployerProfile,
+  // Additional user functions
+  searchUsers,
+  getUserStats,
+  updateUserPreferences,
+  getUserNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  deleteNotification,
+  deactivateAccount,
+  reactivateAccount,
 } = require('../controllers/userController');
-
-const { getMe } = require('../controllers/authController');
 
 
 const router = express.Router();
@@ -233,384 +228,6 @@ router.post('/link-google', requireEmailVerification, linkGoogleAccount);
  */
 router.delete('/unlink-google', requireEmailVerification, unlinkGoogleAccount);
 
-// ========================================
-// CANDIDATE PROFILE ROUTES
-// ========================================
-
-/**
- * @swagger
- * /api/users/candidate/profile:
- *   get:
- *     summary: Get candidate profile
- *     tags: [Candidate Profile]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Candidate profile retrieved successfully
- *       401:
- *         description: Not authorized
- *       403:
- *         description: Student access required
- *       404:
- *         description: Candidate profile not found
- */
-router.get('/candidate/profile', authorize('student'), getCandidateProfile);
-
-/**
- * @swagger
- * /api/users/candidate/profile:
- *   post:
- *     summary: Create candidate profile
- *     tags: [Candidate Profile]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               education:
- *                 type: object
- *               experience:
- *                 type: array
- *               skills:
- *                 type: array
- *               preferences:
- *                 type: object
- *     responses:
- *       201:
- *         description: Candidate profile created successfully
- *       400:
- *         description: Profile already exists
- *       401:
- *         description: Not authorized
- *       403:
- *         description: Student access required
- */
-router.post('/candidate/profile', authorize('student'), createCandidateProfile);
-
-/**
- * @swagger
- * /api/users/candidate/profile:
- *   put:
- *     summary: Update candidate profile
- *     tags: [Candidate Profile]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               education:
- *                 type: object
- *               experience:
- *                 type: array
- *               skills:
- *                 type: array
- *               preferences:
- *                 type: object
- *     responses:
- *       200:
- *         description: Candidate profile updated successfully
- *       401:
- *         description: Not authorized
- *       403:
- *         description: Student access required
- *       404:
- *         description: Candidate profile not found
- */
-router.put('/candidate/profile', authorize('student'), updateCandidateProfile);
-
-/**
- * @swagger
- * /api/users/candidate/resume:
- *   post:
- *     summary: Upload candidate resume
- *     tags: [Candidate Profile]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             required:
- *               - resume
- *             properties:
- *               resume:
- *                 type: string
- *                 format: binary
- *                 description: Resume file (pdf, doc, docx, max 10MB)
- *     responses:
- *       200:
- *         description: Resume uploaded successfully
- *       400:
- *         description: No file selected or invalid file type
- *       401:
- *         description: Not authorized
- *       403:
- *         description: Student access required
- *       404:
- *         description: Candidate profile not found
- */
-router.post(
-  '/candidate/resume',
-  authorize('student'),
-  uploadRateLimit,
-  uploadAvatarMiddleware,
-  handleUploadError,
-  uploadCandidateResume
-);
-
-/**
- * @swagger
- * /api/users/candidate/resume:
- *   delete:
- *     summary: Delete candidate resume
- *     tags: [Candidate Profile]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Resume deleted successfully
- *       401:
- *         description: Not authorized
- *       403:
- *         description: Student access required
- *       404:
- *         description: Candidate profile not found
- */
-router.delete('/candidate/resume', authorize('student'), deleteCandidateResume);
-
-/**
- * @swagger
- * /api/users/candidate/skills:
- *   get:
- *     summary: Get candidate skills
- *     tags: [Candidate Profile]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Candidate skills retrieved successfully
- *       401:
- *         description: Not authorized
- *       403:
- *         description: Student access required
- *       404:
- *         description: Candidate profile not found
- */
-router.get('/candidate/skills', authorize('student'), getCandidateSkills);
-
-/**
- * @swagger
- * /api/users/candidate/skills:
- *   post:
- *     summary: Add candidate skills
- *     tags: [Candidate Profile]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - skills
- *             properties:
- *               skills:
- *                 type: array
- *                 items:
- *                   type: object
- *     responses:
- *       200:
- *         description: Skills added successfully
- *       400:
- *         description: Skills must be an array
- *       401:
- *         description: Not authorized
- *       403:
- *         description: Student access required
- *       404:
- *         description: Candidate profile not found
- */
-router.post('/candidate/skills', authorize('student'), addCandidateSkills);
-
-/**
- * @swagger
- * /api/users/candidate/skills/{skillId}:
- *   put:
- *     summary: Update candidate skill level
- *     tags: [Candidate Profile]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: skillId
- *         required: true
- *         schema:
- *           type: string
- *         description: Skill ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               level:
- *                 type: string
- *                 enum: [beginner, intermediate, advanced, expert]
- *               experience:
- *                 type: number
- *     responses:
- *       200:
- *         description: Skill updated successfully
- *       401:
- *         description: Not authorized
- *       403:
- *         description: Student access required
- *       404:
- *         description: Candidate profile or skill not found
- */
-router.put(
-  '/candidate/skills/:skillId',
-  authorize('student'),
-  updateCandidateSkill
-);
-
-/**
- * @swagger
- * /api/users/candidate/skills/{skillId}:
- *   delete:
- *     summary: Delete candidate skill
- *     tags: [Candidate Profile]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: skillId
- *         required: true
- *         schema:
- *           type: string
- *         description: Skill ID
- *     responses:
- *       200:
- *         description: Skill deleted successfully
- *       401:
- *         description: Not authorized
- *       403:
- *         description: Student access required
- *       404:
- *         description: Candidate profile not found
- */
-router.delete(
-  '/candidate/skills/:skillId',
-  authorize('student'),
-  deleteCandidateSkill
-);
-
-// ========================================
-// EMPLOYER PROFILE ROUTES
-// ========================================
-
-/**
- * @swagger
- * /api/users/employer/profile:
- *   get:
- *     summary: Get employer profile
- *     tags: [Employer Profile]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Employer profile retrieved successfully
- *       401:
- *         description: Not authorized
- *       403:
- *         description: Employer access required
- *       404:
- *         description: Employer profile not found
- */
-router.get('/employer/profile', authorize('employer'), getEmployerProfile);
-
-/**
- * @swagger
- * /api/users/employer/profile:
- *   post:
- *     summary: Create employer profile
- *     tags: [Employer Profile]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               company:
- *                 type: object
- *               position:
- *                 type: object
- *               contact:
- *                 type: object
- *               preferences:
- *                 type: object
- *     responses:
- *       201:
- *         description: Employer profile created successfully
- *       400:
- *         description: Profile already exists
- *       401:
- *         description: Not authorized
- *       403:
- *         description: Employer access required
- */
-router.post('/employer/profile', authorize('employer'), createEmployerProfile);
-
-/**
- * @swagger
- * /api/users/employer/profile:
- *   put:
- *     summary: Update employer profile
- *     tags: [Employer Profile]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               company:
- *                 type: object
- *               position:
- *                 type: object
- *               contact:
- *                 type: object
- *               preferences:
- *                 type: object
- *     responses:
- *       200:
- *         description: Employer profile updated successfully
- *       401:
- *         description: Not authorized
- *       403:
- *         description: Employer access required
- *       404:
- *         description: Employer profile not found
- */
-router.put('/employer/profile', authorize('employer'), updateEmployerProfile);
 
 // ========================================
 // GENERAL USER ROUTES (must be last to avoid conflicts)
@@ -639,7 +256,7 @@ router.put('/employer/profile', authorize('employer'), updateEmployerProfile);
  *       401:
  *         description: Not authorized
  */
-router.get('/profile', getMe);
+router.get('/profile', getUserProfile);
 
 /**
  * @swagger
@@ -674,5 +291,238 @@ router.get('/profile', getMe);
  *         description: User not found
  */
 router.get('/:id', getUser);
+
+// ========================================
+// ADDITIONAL USER ROUTES
+// ========================================
+
+/**
+ * @swagger
+ * /api/users/search:
+ *   get:
+ *     summary: Search users
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         schema:
+ *           type: string
+ *         description: Search query
+ *       - in: query
+ *         name: role
+ *         schema:
+ *           type: string
+ *         description: Filter by role
+ *       - in: query
+ *         name: location
+ *         schema:
+ *           type: string
+ *         description: Filter by location
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Items per page
+ *     responses:
+ *       200:
+ *         description: Users retrieved successfully
+ *       401:
+ *         description: Not authorized
+ */
+router.get('/search', searchUsers);
+
+/**
+ * @swagger
+ * /api/users/stats:
+ *   get:
+ *     summary: Get user statistics
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User statistics retrieved successfully
+ *       401:
+ *         description: Not authorized
+ */
+router.get('/stats', getUserStats);
+
+/**
+ * @swagger
+ * /api/users/preferences:
+ *   put:
+ *     summary: Update user preferences
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               notifications:
+ *                 type: object
+ *               privacy:
+ *                 type: object
+ *               language:
+ *                 type: string
+ *               timezone:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: User preferences updated successfully
+ *       401:
+ *         description: Not authorized
+ */
+router.put('/preferences', updateUserPreferences);
+
+/**
+ * @swagger
+ * /api/users/notifications:
+ *   get:
+ *     summary: Get user notifications
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Items per page
+ *       - in: query
+ *         name: unreadOnly
+ *         schema:
+ *           type: boolean
+ *         description: Show only unread notifications
+ *     responses:
+ *       200:
+ *         description: Notifications retrieved successfully
+ *       401:
+ *         description: Not authorized
+ */
+router.get('/notifications', getUserNotifications);
+
+/**
+ * @swagger
+ * /api/users/notifications/{id}/read:
+ *   put:
+ *     summary: Mark notification as read
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Notification ID
+ *     responses:
+ *       200:
+ *         description: Notification marked as read
+ *       401:
+ *         description: Not authorized
+ *       404:
+ *         description: Notification not found
+ */
+router.put('/notifications/:id/read', markNotificationAsRead);
+
+/**
+ * @swagger
+ * /api/users/notifications/read-all:
+ *   put:
+ *     summary: Mark all notifications as read
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: All notifications marked as read
+ *       401:
+ *         description: Not authorized
+ */
+router.put('/notifications/read-all', markAllNotificationsAsRead);
+
+/**
+ * @swagger
+ * /api/users/notifications/{id}:
+ *   delete:
+ *     summary: Delete notification
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Notification ID
+ *     responses:
+ *       200:
+ *         description: Notification deleted successfully
+ *       401:
+ *         description: Not authorized
+ *       404:
+ *         description: Notification not found
+ */
+router.delete('/notifications/:id', deleteNotification);
+
+/**
+ * @swagger
+ * /api/users/deactivate:
+ *   put:
+ *     summary: Deactivate user account
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 description: Reason for deactivation
+ *     responses:
+ *       200:
+ *         description: Account deactivated successfully
+ *       401:
+ *         description: Not authorized
+ */
+router.put('/deactivate', deactivateAccount);
+
+/**
+ * @swagger
+ * /api/users/reactivate:
+ *   put:
+ *     summary: Reactivate user account
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Account reactivated successfully
+ *       401:
+ *         description: Not authorized
+ */
+router.put('/reactivate', reactivateAccount);
 
 module.exports = router;

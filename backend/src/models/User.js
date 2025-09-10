@@ -147,6 +147,16 @@ const UserSchema = new mongoose.Schema(
       default: false,
     },
     emailVerificationToken: String,
+    
+    // Email delivery tracking
+    emailStatus: {
+      type: String,
+      enum: ['unknown', 'delivered', 'bounced', 'invalid'],
+      default: 'unknown',
+    },
+    emailDeliveredAt: Date,
+    emailBounceAt: Date,
+    emailBounceReason: String,
     emailVerificationOtp: String,
     emailVerificationExpire: Date,
     resetPasswordToken: String,

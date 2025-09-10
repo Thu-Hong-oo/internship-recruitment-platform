@@ -6,28 +6,20 @@ const {
   createJob,
   updateJob,
   deleteJob,
-  getJobRecommendations,
-  getJobMatchScore,
-  generateSkillRoadmap,
-  analyzeJobSkills,
   searchJobs,
-  getJobAnalytics,
   applyForJob,
   getJobApplications,
-  updateApplicationStatus,
-  getFeaturedJobs,
-  getUrgentJobs,
-  getHotJobs,
-  getJobsByCategory,
-  getJobsByLocation,
   getJobBySlug,
-  getSimilarJobs,
-  getJobStats,
+  getJobsByCategory,
+  getJobsBySubCategory,
+  getJobsByLocation,
+  getJobsByDistrict,
   incrementJobViews,
   getJobsByCompany,
   getJobsBySkills,
   getRecentJobs,
-  getPopularJobs
+  getJobCompany,
+  getJobStats,
 } = require('../controllers/jobController');
 
 const router = express.Router();
@@ -35,40 +27,33 @@ const router = express.Router();
 // Public routes
 router.get('/', getAllJobs);
 router.get('/search', searchJobs);
-router.get('/featured', getFeaturedJobs);
-router.get('/urgent', getUrgentJobs);
-router.get('/hot', getHotJobs);
 router.get('/category/:category', getJobsByCategory);
+router.get('/subcategory/:subCategory', getJobsBySubCategory);
 router.get('/location/:location', getJobsByLocation);
+router.get('/district/:district', getJobsByDistrict);
 router.get('/slug/:slug', getJobBySlug);
 router.get('/recent', getRecentJobs);
-router.get('/popular', getPopularJobs);
 router.get('/company/:companyId', getJobsByCompany);
 router.get('/skills', getJobsBySkills);
 router.get('/:id', getJob);
-router.get('/:id/recommendations', getJobRecommendations);
-router.get('/:id/match-score', getJobMatchScore);
-router.get('/:id/skill-analysis', analyzeJobSkills);
-router.get('/:id/roadmap', generateSkillRoadmap);
-router.get('/:id/similar', getSimilarJobs);
 router.get('/:id/stats', getJobStats);
+router.get('/:id/company', getJobCompany);
 router.post('/:id/view', incrementJobViews);
 
 // Protected routes
 router.use(protect);
 
-// Job management (employer only)
-router.post('/', authorize('employer', 'admin'), createJob);
-router.put('/:id', authorize('employer', 'admin'), updateJob);
-router.delete('/:id', authorize('employer', 'admin'), deleteJob);
+// Employer namespace: clearer semantics
+router.post('/employer', authorize('employer', 'admin'), createJob);
+router.put('/employer/:id', authorize('employer', 'admin'), updateJob);
+router.delete('/employer/:id', authorize('employer', 'admin'), deleteJob);
 
 // Application management
-router.post('/:id/apply', authorize('candidate'), applyForJob);
-router.get('/:id/applications', authorize('employer', 'admin'), getJobApplications);
-router.put('/:id/applications/:applicationId', authorize('employer', 'admin'), updateApplicationStatus);
-
-// Analytics (admin/employer only)
-router.get('/:id/analytics', authorize('employer', 'admin'), getJobAnalytics);
+router.post('/:id/apply', authorize('student'), applyForJob);
+router.get(
+  '/employer/:id/applications',
+  authorize('employer', 'admin'),
+  getJobApplications
+);
 
 module.exports = router;
-

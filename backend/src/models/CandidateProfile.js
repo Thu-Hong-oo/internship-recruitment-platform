@@ -94,12 +94,14 @@ const CandidateProfileSchema = new mongoose.Schema(
         technologies: [String],
       },
     ],
-    // Kỹ năng
-    skills: [
+    // Kỹ năng đơn giản - để matching với Job
+    skills: [String], // ["JavaScript", "React", "Communication"]
+
+    // Kỹ năng chi tiết - để hiển thị hồ sơ
+    detailedSkills: [
       {
-        skillId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: 'Skill',
+        name: {
+          type: String,
           required: true,
         },
         level: {
@@ -159,9 +161,9 @@ const CandidateProfileSchema = new mongoose.Schema(
     aiAnalysis: {
       skillGaps: [
         {
-          skillId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'Skill',
+          skillName: {
+            type: String,
+            required: true,
           },
           gapLevel: {
             type: String,
@@ -212,7 +214,8 @@ CandidateProfileSchema.index({ userId: 1 });
 CandidateProfileSchema.index({ 'education.currentStatus': 1 });
 CandidateProfileSchema.index({ 'education.university': 1 });
 CandidateProfileSchema.index({ 'education.major': 1 });
-CandidateProfileSchema.index({ 'skills.skillId': 1 });
+CandidateProfileSchema.index({ skills: 1 }); // Index cho skills đơn giản
+CandidateProfileSchema.index({ 'detailedSkills.name': 1 }); // Index cho detailedSkills
 CandidateProfileSchema.index({ 'preferences.location': 1 });
 CandidateProfileSchema.index({ 'aiAnalysis.matchingScore': -1 });
 CandidateProfileSchema.index({ 'careerTransition.fromIndustry': 1 });
@@ -231,6 +234,10 @@ CandidateProfileSchema.virtual('skillCount').get(function () {
   return this.skills.length;
 });
 
+CandidateProfileSchema.virtual('detailedSkillCount').get(function () {
+  return this.detailedSkills.length;
+});
+
 CandidateProfileSchema.virtual('isStudent').get(function () {
   return this.education.currentStatus === 'student';
 });
@@ -240,21 +247,28 @@ CandidateProfileSchema.virtual('isCareerChanger').get(function () {
 });
 
 // Methods
-CandidateProfileSchema.methods.getSkillLevel = function (skillId) {
-  const skill = this.skills.find(
-    s => s.skillId.toString() === skillId.toString()
+CandidateProfileSchema.methods.getSkillLevel = function (skillName) {
+  const skill = this.detailedSkills.find(
+    s => s.name.toLowerCase() === skillName.toLowerCase()
   );
   return skill ? skill.level : null;
 };
 
-CandidateProfileSchema.methods.addSkill = function (
-  skillId,
+CandidateProfileSchema.methods.addSkill = function (skillName) {
+  if (!this.skills.includes(skillName)) {
+    this.skills.push(skillName);
+  }
+  return this.save();
+};
+
+CandidateProfileSchema.methods.addDetailedSkill = function (
+  skillName,
   level = 'beginner',
   experience = 0,
   isTransferSkill = false
 ) {
-  const existingSkill = this.skills.find(
-    s => s.skillId.toString() === skillId.toString()
+  const existingSkill = this.detailedSkills.find(
+    s => s.name.toLowerCase() === skillName.toLowerCase()
   );
 
   if (existingSkill) {
@@ -262,8 +276,8 @@ CandidateProfileSchema.methods.addSkill = function (
     existingSkill.experience = experience;
     existingSkill.isTransferSkill = isTransferSkill;
   } else {
-    this.skills.push({
-      skillId,
+    this.detailedSkills.push({
+      name: skillName,
       level,
       experience,
       isTransferSkill,
@@ -271,13 +285,26 @@ CandidateProfileSchema.methods.addSkill = function (
     });
   }
 
+  // Đồng bộ với skills đơn giản
+  this.addSkill(skillName);
   return this.save();
 };
 
-CandidateProfileSchema.methods.removeSkill = function (skillId) {
-  this.skills = this.skills.filter(
-    s => s.skillId.toString() !== skillId.toString()
+CandidateProfileSchema.methods.removeSkill = function (skillName) {
+  // Xóa khỏi skills đơn giản
+  this.skills = this.skills.filter(s => s !== skillName);
+
+  // Xóa khỏi detailedSkills
+  this.detailedSkills = this.detailedSkills.filter(
+    s => s.name.toLowerCase() !== skillName.toLowerCase()
   );
+
+  return this.save();
+};
+
+CandidateProfileSchema.methods.syncSkills = function () {
+  // Đồng bộ skills đơn giản từ detailedSkills
+  this.skills = this.detailedSkills.map(skill => skill.name);
   return this.save();
 };
 
@@ -294,8 +321,12 @@ CandidateProfileSchema.methods.updateCareerTransition = function (
 };
 
 // Statics
-CandidateProfileSchema.statics.findBySkill = function (skillId) {
-  return this.find({ 'skills.skillId': skillId });
+CandidateProfileSchema.statics.findBySkill = function (skillName) {
+  return this.find({ skills: skillName });
+};
+
+CandidateProfileSchema.statics.findByDetailedSkill = function (skillName) {
+  return this.find({ 'detailedSkills.name': skillName });
 };
 
 CandidateProfileSchema.statics.findByLocation = function (location) {

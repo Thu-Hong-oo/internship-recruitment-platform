@@ -1,890 +1,741 @@
 {
-	"info": {
-		"_postman_id": "8342a660-0288-4eec-9188-ac2c9cfb2b64",
-		"name": "Jobs Enhanced API",
-		"description": "Enhanced job management endpoints with TopCV-style features, AI integration, and advanced filtering",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "38146107",
-		"_collection_link": "https://intership-platform.postman.co/workspace/Team-Workspace~96be9a72-219c-4bbc-8714-71a2edb8a68d/collection/38146107-8342a660-0288-4eec-9188-ac2c9cfb2b64?action=share&source=collection_link&creator=38146107"
-	},
-	"item": [
-		{
-			"name": "Get All Jobs (with optional search)",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{api_url}}/jobs?page=1&limit=10&q=react developer&category=tech&location=Ho Chi Minh&jobType=internship&isRemote=true&isUrgent=true&isFeatured=true&salaryMin=5000000&salaryMax=15000000&experienceLevel=beginner&educationLevel=Bachelor&sortBy=createdAt&sortOrder=desc",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs"
-					],
-					"query": [
-						{
-							"key": "page",
-							"value": "1"
-						},
-						{
-							"key": "limit",
-							"value": "10"
-						},
-						{
-							"key": "q",
-							"value": "react developer",
-							"description": "Optional text search query"
-						},
-						{
-							"key": "category",
-							"value": "tech"
-						},
-						{
-							"key": "location",
-							"value": "Ho Chi Minh"
-						},
-						{
-							"key": "jobType",
-							"value": "internship"
-						},
-						{
-							"key": "isRemote",
-							"value": "true"
-						},
-						{
-							"key": "isUrgent",
-							"value": "true"
-						},
-						{
-							"key": "isFeatured",
-							"value": "true"
-						},
-						{
-							"key": "salaryMin",
-							"value": "5000000"
-						},
-						{
-							"key": "salaryMax",
-							"value": "15000000"
-						},
-						{
-							"key": "experienceLevel",
-							"value": "beginner"
-						},
-						{
-							"key": "educationLevel",
-							"value": "Bachelor"
-						},
-						{
-							"key": "sortBy",
-							"value": "createdAt"
-						},
-						{
-							"key": "sortOrder",
-							"value": "desc"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Advanced AI Search Jobs",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{api_url}}/jobs/search?q=react developer&page=1&limit=10&skills=64f1a2b3c4d5e6f7a8b9c0d1,64f1a2b3c4d5e6f7a8b9c0d2&location=Ho Chi Minh&category=tech&jobType=internship&salaryMin=5000000&salaryMax=15000000&experienceLevel=beginner&educationLevel=Bachelor&isRemote=false&isUrgent=true&isFeatured=true",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"search"
-					],
-					"query": [
-						{
-							"key": "q",
-							"value": "react developer",
-							"description": "Required search query for AI semantic search"
-						},
-						{
-							"key": "page",
-							"value": "1"
-						},
-						{
-							"key": "limit",
-							"value": "10"
-						},
-						{
-							"key": "skills",
-							"value": "64f1a2b3c4d5e6f7a8b9c0d1,64f1a2b3c4d5e6f7a8b9c0d2"
-						},
-						{
-							"key": "location",
-							"value": "Ho Chi Minh"
-						},
-						{
-							"key": "category",
-							"value": "tech"
-						},
-						{
-							"key": "jobType",
-							"value": "internship"
-						},
-						{
-							"key": "salaryMin",
-							"value": "5000000"
-						},
-						{
-							"key": "salaryMax",
-							"value": "15000000"
-						},
-						{
-							"key": "experienceLevel",
-							"value": "beginner"
-						},
-						{
-							"key": "educationLevel",
-							"value": "Bachelor"
-						},
-						{
-							"key": "isRemote",
-							"value": "false"
-						},
-						{
-							"key": "isUrgent",
-							"value": "true"
-						},
-						{
-							"key": "isFeatured",
-							"value": "true"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Get Featured Jobs",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{api_url}}/jobs/featured?limit=10",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"featured"
-					],
-					"query": [
-						{
-							"key": "limit",
-							"value": "10"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Get Urgent Jobs",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{api_url}}/jobs/urgent?limit=10",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"urgent"
-					],
-					"query": [
-						{
-							"key": "limit",
-							"value": "10"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Get Hot Jobs",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{api_url}}/jobs/hot?limit=10",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"hot"
-					],
-					"query": [
-						{
-							"key": "limit",
-							"value": "10"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Get Jobs by Category",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{api_url}}/jobs/category/tech?page=1&limit=10",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"category",
-						"tech"
-					],
-					"query": [
-						{
-							"key": "page",
-							"value": "1"
-						},
-						{
-							"key": "limit",
-							"value": "10"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Get Jobs by Location",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{api_url}}/jobs/location/Ho Chi Minh?page=1&limit=10",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"location",
-						"Ho Chi Minh"
-					],
-					"query": [
-						{
-							"key": "page",
-							"value": "1"
-						},
-						{
-							"key": "limit",
-							"value": "10"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Get Job by ID",
-			"event": [
-				{
-					"listen": "test",
-					"script": {
-						"exec": [
-							"pm.test(\"Get job successful\", function () {",
-							"    pm.response.to.have.status(200);",
-							"    var jsonData = pm.response.json();",
-							"    if (jsonData.success) {",
-							"        pm.environment.set(\"job_id\", jsonData.data._id);",
-							"        pm.environment.set(\"job_slug\", jsonData.data.slug);",
-							"    }",
-							"});"
-						],
-						"type": "text/javascript"
-					}
-				}
-			],
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{api_url}}/jobs/{{job_id}}",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"{{job_id}}"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Get Job by Slug",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{api_url}}/jobs/slug/{{job_slug}}",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"slug",
-						"{{job_slug}}"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Get Job Recommendations",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{api_url}}/jobs/{{job_id}}/recommendations?userId={{user_id}}&limit=5",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"{{job_id}}",
-						"recommendations"
-					],
-					"query": [
-						{
-							"key": "userId",
-							"value": "{{user_id}}"
-						},
-						{
-							"key": "limit",
-							"value": "5"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Get Job Match Score",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{api_url}}/jobs/{{job_id}}/match-score?userId={{user_id}}",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"{{job_id}}",
-						"match-score"
-					],
-					"query": [
-						{
-							"key": "userId",
-							"value": "{{user_id}}"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Analyze Job Skills",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{api_url}}/jobs/{{job_id}}/skill-analysis",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"{{job_id}}",
-						"skill-analysis"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Generate Skill Roadmap",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{api_url}}/jobs/{{job_id}}/roadmap?userId={{user_id}}&duration=8",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"{{job_id}}",
-						"roadmap"
-					],
-					"query": [
-						{
-							"key": "userId",
-							"value": "{{user_id}}"
-						},
-						{
-							"key": "duration",
-							"value": "8"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Create Job",
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json"
-					},
-					{
-						"key": "Authorization",
-						"value": "Bearer {{token}}"
-					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n  \"title\": \"Frontend Developer Intern\",\n  \"jobType\": \"internship\",\n  \"category\": \"tech\",\n  \"subCategory\": \"web-development\",\n  \"companyId\": \"{{company_id}}\",\n  \"internship\": {\n    \"type\": \"summer\",\n    \"duration\": 3,\n    \"startDate\": \"2024-06-01\",\n    \"endDate\": \"2024-09-01\",\n    \"isPaid\": true,\n    \"stipend\": {\n      \"amount\": 8000000,\n      \"currency\": \"VND\",\n      \"period\": \"month\",\n      \"isNegotiable\": true\n    },\n    \"academicCredit\": true,\n    \"remoteOption\": true,\n    \"flexibleHours\": true\n  },\n  \"requirements\": {\n    \"education\": {\n      \"level\": \"Bachelor\",\n      \"majors\": [\"Computer Science\", \"Information Technology\"],\n      \"minGpa\": 3.0,\n      \"year\": [2, 3, 4]\n    },\n    \"skills\": [\n      {\n        \"skillId\": \"{{skill_id}}\",\n        \"level\": \"required\",\n        \"importance\": 9\n      },\n      {\n        \"skillId\": \"{{skill_id_2}}\",\n        \"level\": \"preferred\",\n        \"importance\": 7\n      }\n    ],\n    \"experience\": {\n      \"minMonths\": 0,\n      \"projectBased\": true,\n      \"experienceLevel\": \"beginner\"\n    },\n    \"languages\": [\n      {\n        \"language\": \"English\",\n        \"level\": \"intermediate\"\n      }\n    ]\n  },\n  \"description\": \"We are looking for a talented Frontend Developer Intern to join our team. You will work on modern web applications using React and JavaScript.\",\n  \"responsibilities\": [\n    \"Develop user interfaces using React\",\n    \"Collaborate with design team\",\n    \"Write clean, maintainable code\",\n    \"Participate in code reviews\"\n  ],\n  \"requirements\": [\n    \"Knowledge of JavaScript, HTML, CSS\",\n    \"Basic understanding of React\",\n    \"Good problem-solving skills\",\n    \"Team player\"\n  ],\n  \"benefits\": [\n    \"Flexible working hours\",\n    \"Remote work options\",\n    \"Learning opportunities\",\n    \"Certificate upon completion\"\n  ],\n  \"learningOutcomes\": [\n    \"Master React development\",\n    \"Learn modern web development practices\",\n    \"Gain real-world project experience\",\n    \"Develop problem-solving skills\"\n  ],\n  \"location\": {\n    \"type\": \"hybrid\",\n    \"city\": \"Ho Chi Minh\",\n    \"district\": \"District 1\",\n    \"address\": \"123 ABC Street\",\n    \"country\": \"VN\",\n    \"coordinates\": {\n      \"latitude\": 10.762622,\n      \"longitude\": 106.660172\n    },\n    \"remote\": true,\n    \"hybrid\": true\n  },\n  \"salary\": {\n    \"type\": \"range\",\n    \"min\": 5000000,\n    \"max\": 15000000,\n    \"currency\": \"VND\",\n    \"period\": \"month\",\n    \"isNegotiable\": true,\n    \"benefits\": [\n      \"transportation\",\n      \"meals\",\n      \"learning\",\n      \"mentorship\",\n      \"networking\",\n      \"employment-opportunity\"\n    ]\n  },\n  \"applicationSettings\": {\n    \"requireCoverLetter\": true,\n    \"requireResume\": true,\n    \"requirePortfolio\": false,\n    \"requireReferences\": false,\n    \"maxApplications\": 100,\n    \"deadline\": \"2024-05-31\",\n    \"rollingBasis\": false,\n    \"questions\": [\n      {\n        \"question\": \"Why are you interested in this internship?\",\n        \"required\": true,\n        \"type\": \"textarea\"\n      },\n      {\n        \"question\": \"What is your experience with React?\",\n        \"required\": true,\n        \"type\": \"text\"\n      }\n    ]\n  },\n  \"status\": \"active\",\n  \"isFeatured\": true,\n  \"isUrgent\": false,\n  \"isHot\": false,\n  \"priority\": 8,\n  \"contact\": {\n    \"name\": \"HR Manager\",\n    \"email\": \"hr@techsolutions.com\",\n    \"phone\": \"0123456789\",\n    \"linkedin\": \"https://linkedin.com/in/hrmanager\"\n  },\n  \"seo\": {\n    \"keywords\": [\"react\", \"frontend\", \"internship\", \"developer\"],\n    \"metaDescription\": \"Frontend Developer Internship opportunity at Tech Solutions Inc. Learn React and modern web development.\"\n  }\n}"
-				},
-				"url": {
-					"raw": "{{api_url}}/jobs",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Update Job",
-			"request": {
-				"method": "PUT",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json"
-					},
-					{
-						"key": "Authorization",
-						"value": "Bearer {{token}}"
-					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n  \"title\": \"Updated Frontend Developer Intern\",\n  \"description\": \"Updated job description with new requirements\",\n  \"salary\": {\n    \"min\": 6000000,\n    \"max\": 18000000\n  },\n  \"isUrgent\": true,\n  \"priority\": 9,\n  \"status\": \"active\"\n}"
-				},
-				"url": {
-					"raw": "{{api_url}}/jobs/{{job_id}}",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"{{job_id}}"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Delete Job",
-			"request": {
-				"method": "DELETE",
-				"header": [
-					{
-						"key": "Authorization",
-						"value": "Bearer {{token}}"
-					}
-				],
-				"url": {
-					"raw": "{{api_url}}/jobs/{{job_id}}",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"{{job_id}}"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Apply for Job",
-			"event": [
-				{
-					"listen": "test",
-					"script": {
-						"exec": [
-							"pm.test(\"Application submitted\", function () {",
-							"    pm.response.to.have.status(201);",
-							"    var jsonData = pm.response.json();",
-							"    if (jsonData.success) {",
-							"        pm.environment.set(\"application_id\", jsonData.data._id);",
-							"    }",
-							"});"
-						],
-						"type": "text/javascript"
-					}
-				}
-			],
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json"
-					},
-					{
-						"key": "Authorization",
-						"value": "Bearer {{token}}"
-					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n  \"coverLetter\": \"Dear Hiring Manager,\\n\\nI am excited to apply for the Frontend Developer Intern position at Tech Solutions Inc. I am a Computer Science student with strong skills in JavaScript and React, and I believe I would be a great fit for your team.\\n\\nI have completed several projects using React and have a good understanding of modern web development practices. I am eager to learn and contribute to your company's success.\\n\\nThank you for considering my application.\\n\\nBest regards,\\nNguyen Van A\",\n  \"resumeUrl\": \"https://example.com/resume.pdf\",\n  \"portfolioUrl\": \"https://github.com/example/portfolio\",\n  \"additionalInfo\": {\n    \"availableStartDate\": \"2024-06-01\",\n    \"expectedSalary\": {\n      \"amount\": 8000000,\n      \"currency\": \"VND\"\n    },\n    \"workPreference\": \"hybrid\",\n    \"motivationLetter\": \"I am passionate about web development and eager to learn from experienced developers.\"\n  },\n  \"questions\": [\n    {\n      \"question\": \"Why are you interested in this internship?\",\n      \"answer\": \"I want to gain real-world experience in React development and learn from industry professionals.\"\n    },\n    {\n      \"question\": \"What is your experience with React?\",\n      \"answer\": \"I have been using React for 1 year and have built several projects including an e-commerce website.\"\n    }\n  ]\n}"
-				},
-				"url": {
-					"raw": "{{api_url}}/jobs/{{job_id}}/apply",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"{{job_id}}",
-						"apply"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Get Job Applications",
-			"request": {
-				"method": "GET",
-				"header": [
-					{
-						"key": "Authorization",
-						"value": "Bearer {{token}}"
-					}
-				],
-				"url": {
-					"raw": "{{api_url}}/jobs/{{job_id}}/applications?status=pending&page=1&limit=10",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"{{job_id}}",
-						"applications"
-					],
-					"query": [
-						{
-							"key": "status",
-							"value": "pending"
-						},
-						{
-							"key": "page",
-							"value": "1"
-						},
-						{
-							"key": "limit",
-							"value": "10"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Update Application Status",
-			"request": {
-				"method": "PUT",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json"
-					},
-					{
-						"key": "Authorization",
-						"value": "Bearer {{token}}"
-					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n  \"status\": \"shortlisted\",\n  \"feedback\": {\n    \"fromEmployer\": {\n      \"rating\": 4,\n      \"comments\": \"Strong technical skills and good communication.\",\n      \"strengths\": [\"Technical skills\", \"Problem solving\"],\n      \"areas\": [\"More experience needed\"]\n    }\n  }\n}"
-				},
-				"url": {
-					"raw": "{{api_url}}/jobs/{{job_id}}/applications/{{application_id}}",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"{{job_id}}",
-						"applications",
-						"{{application_id}}"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Get Job Analytics",
-			"request": {
-				"method": "GET",
-				"header": [
-					{
-						"key": "Authorization",
-						"value": "Bearer {{token}}"
-					}
-				],
-				"url": {
-					"raw": "{{api_url}}/jobs/{{job_id}}/analytics",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"{{job_id}}",
-						"analytics"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Get Similar Jobs",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{api_url}}/jobs/{{job_id}}/similar?limit=5",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"{{job_id}}",
-						"similar"
-					],
-					"query": [
-						{
-							"key": "limit",
-							"value": "5"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Get Job Statistics",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{api_url}}/jobs/{{job_id}}/stats",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"{{job_id}}",
-						"stats"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Increment Job Views",
-			"request": {
-				"method": "POST",
-				"header": [],
-				"url": {
-					"raw": "{{api_url}}/jobs/{{job_id}}/view",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"{{job_id}}",
-						"view"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Get Jobs by Company",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{api_url}}/jobs/company/{{company_id}}?page=1&limit=10&status=active",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"company",
-						"{{company_id}}"
-					],
-					"query": [
-						{
-							"key": "page",
-							"value": "1"
-						},
-						{
-							"key": "limit",
-							"value": "10"
-						},
-						{
-							"key": "status",
-							"value": "active"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Get Jobs by Skills",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{api_url}}/jobs/skills?skillIds=64f1a2b3c4d5e6f7a8b9c0d1,64f1a2b3c4d5e6f7a8b9c0d2&page=1&limit=10",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"skills"
-					],
-					"query": [
-						{
-							"key": "skillIds",
-							"value": "64f1a2b3c4d5e6f7a8b9c0d1,64f1a2b3c4d5e6f7a8b9c0d2"
-						},
-						{
-							"key": "page",
-							"value": "1"
-						},
-						{
-							"key": "limit",
-							"value": "10"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Get Recent Jobs",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{api_url}}/jobs/recent?limit=10&category=tech",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"recent"
-					],
-					"query": [
-						{
-							"key": "limit",
-							"value": "10"
-						},
-						{
-							"key": "category",
-							"value": "tech"
-						}
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "Get Popular Jobs",
-			"request": {
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "{{api_url}}/jobs/popular?limit=10&period=week",
-					"host": [
-						"{{api_url}}"
-					],
-					"path": [
-						"jobs",
-						"popular"
-					],
-					"query": [
-						{
-							"key": "limit",
-							"value": "10"
-						},
-						{
-							"key": "period",
-							"value": "week"
-						}
-					]
-				}
-			},
-			"response": []
-		}
-	],
-	"auth": {
-		"type": "bearer",
-		"bearer": [
-			{
-				"key": "token",
-				"value": "{{token}}",
-				"type": "string"
-			}
-		]
-	},
-	"variable": [
-		{
-			"key": "base_url",
-			"value": "http://localhost:3000",
-			"type": "string"
-		},
-		{
-			"key": "api_url",
-			"value": "http://localhost:3000/api",
-			"type": "string"
-		}
-	]
+  "info": {
+    "_postman_id": "8342a660-0288-4eec-9188-ac2c9cfb2b64",
+    "name": "Jobs Enhanced API",
+    "description": "Enhanced job management endpoints with TopCV-style features, AI integration, and advanced filtering",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "38146107",
+    "_collection_link": "https://intership-platform.postman.co/workspace/Team-Workspace~96be9a72-219c-4bbc-8714-71a2edb8a68d/collection/38146107-8342a660-0288-4eec-9188-ac2c9cfb2b64?action=share&source=collection_link&creator=38146107"
+  },
+  "item": [
+    {
+      "name": "Get All Jobs (with optional search)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/jobs?page=1&limit=10&q=react developer&category=tech&location=Ho Chi Minh&jobType=internship&isRemote=true&isUrgent=true&isFeatured=true&salaryMin=5000000&salaryMax=15000000&experienceLevel=beginner&educationLevel=Bachelor&sortBy=createdAt&sortOrder=desc",
+          "host": ["{{api_url}}"],
+          "path": ["jobs"],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "10"
+            },
+            {
+              "key": "q",
+              "value": "react developer",
+              "description": "Optional text search query"
+            },
+            {
+              "key": "category",
+              "value": "tech"
+            },
+            {
+              "key": "location",
+              "value": "Ho Chi Minh"
+            },
+            {
+              "key": "jobType",
+              "value": "internship"
+            },
+            {
+              "key": "isRemote",
+              "value": "true"
+            },
+            {
+              "key": "isUrgent",
+              "value": "true"
+            },
+            {
+              "key": "isFeatured",
+              "value": "true"
+            },
+            {
+              "key": "salaryMin",
+              "value": "5000000"
+            },
+            {
+              "key": "salaryMax",
+              "value": "15000000"
+            },
+            {
+              "key": "experienceLevel",
+              "value": "beginner"
+            },
+            {
+              "key": "educationLevel",
+              "value": "Bachelor"
+            },
+            {
+              "key": "sortBy",
+              "value": "createdAt"
+            },
+            {
+              "key": "sortOrder",
+              "value": "desc"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Advanced AI Search Jobs",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/jobs/search?q=react developer&page=1&limit=10&skills=64f1a2b3c4d5e6f7a8b9c0d1,64f1a2b3c4d5e6f7a8b9c0d2&location=Ho Chi Minh&category=tech&jobType=internship&salaryMin=5000000&salaryMax=15000000&experienceLevel=beginner&educationLevel=Bachelor&isRemote=false&isUrgent=true&isFeatured=true",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "search"],
+          "query": [
+            {
+              "key": "q",
+              "value": "react developer",
+              "description": "Required search query for AI semantic search"
+            },
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "10"
+            },
+            {
+              "key": "skills",
+              "value": "64f1a2b3c4d5e6f7a8b9c0d1,64f1a2b3c4d5e6f7a8b9c0d2"
+            },
+            {
+              "key": "location",
+              "value": "Ho Chi Minh"
+            },
+            {
+              "key": "category",
+              "value": "tech"
+            },
+            {
+              "key": "jobType",
+              "value": "internship"
+            },
+            {
+              "key": "salaryMin",
+              "value": "5000000"
+            },
+            {
+              "key": "salaryMax",
+              "value": "15000000"
+            },
+            {
+              "key": "experienceLevel",
+              "value": "beginner"
+            },
+            {
+              "key": "educationLevel",
+              "value": "Bachelor"
+            },
+            {
+              "key": "isRemote",
+              "value": "false"
+            },
+            {
+              "key": "isUrgent",
+              "value": "true"
+            },
+            {
+              "key": "isFeatured",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Featured Jobs",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/jobs/featured?limit=10",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "featured"],
+          "query": [
+            {
+              "key": "limit",
+              "value": "10"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Urgent Jobs",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/jobs/urgent?limit=10",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "urgent"],
+          "query": [
+            {
+              "key": "limit",
+              "value": "10"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Hot Jobs",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/jobs/hot?limit=10",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "hot"],
+          "query": [
+            {
+              "key": "limit",
+              "value": "10"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Jobs by Category",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/jobs/category/tech?page=1&limit=10",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "category", "tech"],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "10"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Jobs by Location",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/jobs/location/Ho Chi Minh?page=1&limit=10",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "location", "Ho Chi Minh"],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "10"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Job by ID",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Get job successful\", function () {",
+              "    pm.response.to.have.status(200);",
+              "    var jsonData = pm.response.json();",
+              "    if (jsonData.success) {",
+              "        pm.environment.set(\"job_id\", jsonData.data._id);",
+              "        pm.environment.set(\"job_slug\", jsonData.data.slug);",
+              "    }",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/jobs/{{job_id}}",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "{{job_id}}"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Job by Slug",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/jobs/slug/{{job_slug}}",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "slug", "{{job_slug}}"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Job Recommendations",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/jobs/{{job_id}}/recommendations?userId={{user_id}}&limit=5",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "{{job_id}}", "recommendations"],
+          "query": [
+            {
+              "key": "userId",
+              "value": "{{user_id}}"
+            },
+            {
+              "key": "limit",
+              "value": "5"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Job Match Score",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/jobs/{{job_id}}/match-score?userId={{user_id}}",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "{{job_id}}", "match-score"],
+          "query": [
+            {
+              "key": "userId",
+              "value": "{{user_id}}"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Analyze Job Skills",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/jobs/{{job_id}}/skill-analysis",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "{{job_id}}", "skill-analysis"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Generate Skill Roadmap",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/jobs/{{job_id}}/roadmap?userId={{user_id}}&duration=8",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "{{job_id}}", "roadmap"],
+          "query": [
+            {
+              "key": "userId",
+              "value": "{{user_id}}"
+            },
+            {
+              "key": "duration",
+              "value": "8"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Create Job",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Frontend Developer Intern\",\n  \"jobType\": \"internship\",\n  \"category\": \"tech\",\n  \"subCategories\": [\"web-development\"],\n  \"internship\": {\n    \"type\": \"summer\",\n    \"duration\": 3,\n    \"startDate\": \"2024-06-01\",\n    \"endDate\": \"2024-09-01\",\n    \"isPaid\": true,\n    \"stipend\": { \"amount\": 8000000, \"currency\": \"VND\", \"period\": \"month\" }\n  },\n  \"requirements\": {\n    \"education\": { \"level\": \"Bachelor\", \"majors\": [\"Computer Science\"], \"year\": [2,3,4] },\n    \"skills\": [ { \"skillId\": \"{{skill_id}}\", \"level\": \"required\" }, { \"skillId\": \"{{skill_id_2}}\", \"level\": \"preferred\" } ],\n    \"experience\": { \"minMonths\": 0, \"experienceLevel\": \"beginner\" }\n  },\n  \"description\": \"We are looking for a talented Frontend Developer Intern...\",\n  \"responsibilities\": [\"Develop UI using React\", \"Collaborate with design\"],\n  \"benefits\": [\"Flexible working hours\", \"Remote options\"],\n  \"location\": { \"type\": \"hybrid\", \"city\": \"Ho Chi Minh\", \"district\": \"District 1\", \"country\": \"VN\" },\n  \"status\": \"active\"\n}"
+        },
+        "url": {
+          "raw": "{{api_url}}/jobs",
+          "host": ["{{api_url}}"],
+          "path": ["jobs"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Update Job",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"title\": \"Updated Frontend Developer Intern\",\n  \"description\": \"Updated job description with new requirements\",\n  \"salary\": {\n    \"min\": 6000000,\n    \"max\": 18000000\n  },\n  \"isUrgent\": true,\n  \"priority\": 9,\n  \"status\": \"active\"\n}"
+        },
+        "url": {
+          "raw": "{{api_url}}/jobs/{{job_id}}",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "{{job_id}}"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Job",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{api_url}}/jobs/{{job_id}}",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "{{job_id}}"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Apply for Job",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Application submitted\", function () {",
+              "    pm.response.to.have.status(201);",
+              "    var jsonData = pm.response.json();",
+              "    if (jsonData.success) {",
+              "        pm.environment.set(\"application_id\", jsonData.data._id);",
+              "    }",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"coverLetter\": \"Dear Hiring Manager,\\n\\nI am excited to apply for the Frontend Developer Intern position at Tech Solutions Inc. I am a Computer Science student with strong skills in JavaScript and React, and I believe I would be a great fit for your team.\\n\\nI have completed several projects using React and have a good understanding of modern web development practices. I am eager to learn and contribute to your company's success.\\n\\nThank you for considering my application.\\n\\nBest regards,\\nNguyen Van A\",\n  \"resumeUrl\": \"https://example.com/resume.pdf\",\n  \"portfolioUrl\": \"https://github.com/example/portfolio\",\n  \"additionalInfo\": {\n    \"availableStartDate\": \"2024-06-01\",\n    \"expectedSalary\": {\n      \"amount\": 8000000,\n      \"currency\": \"VND\"\n    },\n    \"workPreference\": \"hybrid\",\n    \"motivationLetter\": \"I am passionate about web development and eager to learn from experienced developers.\"\n  },\n  \"questions\": [\n    {\n      \"question\": \"Why are you interested in this internship?\",\n      \"answer\": \"I want to gain real-world experience in React development and learn from industry professionals.\"\n    },\n    {\n      \"question\": \"What is your experience with React?\",\n      \"answer\": \"I have been using React for 1 year and have built several projects including an e-commerce website.\"\n    }\n  ]\n}"
+        },
+        "url": {
+          "raw": "{{api_url}}/jobs/{{job_id}}/apply",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "{{job_id}}", "apply"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Job Applications",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{api_url}}/jobs/{{job_id}}/applications?status=pending&page=1&limit=10",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "{{job_id}}", "applications"],
+          "query": [
+            {
+              "key": "status",
+              "value": "pending"
+            },
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "10"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Update Application Status",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"shortlisted\",\n  \"feedback\": {\n    \"fromEmployer\": {\n      \"rating\": 4,\n      \"comments\": \"Strong technical skills and good communication.\",\n      \"strengths\": [\"Technical skills\", \"Problem solving\"],\n      \"areas\": [\"More experience needed\"]\n    }\n  }\n}"
+        },
+        "url": {
+          "raw": "{{api_url}}/jobs/{{job_id}}/applications/{{application_id}}",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "{{job_id}}", "applications", "{{application_id}}"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Job Analytics",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{api_url}}/jobs/{{job_id}}/analytics",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "{{job_id}}", "analytics"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Similar Jobs",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/jobs/{{job_id}}/similar?limit=5",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "{{job_id}}", "similar"],
+          "query": [
+            {
+              "key": "limit",
+              "value": "5"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Job Statistics",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/jobs/{{job_id}}/stats",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "{{job_id}}", "stats"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Increment Job Views",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/jobs/{{job_id}}/view",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "{{job_id}}", "view"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Jobs by Company",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/jobs/company/{{company_id}}?page=1&limit=10&status=active",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "company", "{{company_id}}"],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "10"
+            },
+            {
+              "key": "status",
+              "value": "active"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Jobs by Skills",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/jobs/skills?skillIds=64f1a2b3c4d5e6f7a8b9c0d1,64f1a2b3c4d5e6f7a8b9c0d2&page=1&limit=10",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "skills"],
+          "query": [
+            {
+              "key": "skillIds",
+              "value": "64f1a2b3c4d5e6f7a8b9c0d1,64f1a2b3c4d5e6f7a8b9c0d2"
+            },
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "10"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Recent Jobs",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/jobs/recent?limit=10&category=tech",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "recent"],
+          "query": [
+            {
+              "key": "limit",
+              "value": "10"
+            },
+            {
+              "key": "category",
+              "value": "tech"
+            }
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Popular Jobs",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{api_url}}/jobs/popular?limit=10&period=week",
+          "host": ["{{api_url}}"],
+          "path": ["jobs", "popular"],
+          "query": [
+            {
+              "key": "limit",
+              "value": "10"
+            },
+            {
+              "key": "period",
+              "value": "week"
+            }
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "api_url",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    }
+  ]
 }

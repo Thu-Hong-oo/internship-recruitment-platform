@@ -2,12 +2,18 @@ const express = require('express');
 const { protect, authorize } = require('../middleware/auth');
 const { uploadRateLimit } = require('../middleware/globalRateLimit');
 const {
+  uploadLogo,
+  handleUploadError,
+  uploadImage,
+  uploadImages,
+} = require('../middleware/upload');
+const {
   uploadSingleImage,
   uploadMultipleImages,
   uploadAvatar,
   uploadCompanyLogo,
   deleteImage,
-  getImageInfo
+  getImageInfo,
 } = require('../controllers/uploadController');
 
 const router = express.Router();
@@ -73,7 +79,14 @@ const router = express.Router();
  *       429:
  *         description: Too many upload requests
  */
-router.post('/single', protect, uploadRateLimit, uploadSingleImage);
+router.post(
+  '/single',
+  protect,
+  uploadRateLimit,
+  uploadImage,
+  handleUploadError,
+  uploadSingleImage
+);
 
 /**
  * @swagger
@@ -119,7 +132,14 @@ router.post('/single', protect, uploadRateLimit, uploadSingleImage);
  *       429:
  *         description: Too many upload requests
  */
-router.post('/multiple', protect, uploadRateLimit, uploadMultipleImages);
+router.post(
+  '/multiple',
+  protect,
+  uploadRateLimit,
+  uploadImages,
+  handleUploadError,
+  uploadMultipleImages
+);
 
 /**
  * @swagger
@@ -189,7 +209,15 @@ router.post('/avatar', protect, uploadRateLimit, uploadAvatar);
  *       429:
  *         description: Too many upload requests
  */
-router.post('/logo', protect, authorize('employer', 'admin'), uploadRateLimit, uploadCompanyLogo);
+router.post(
+  '/logo',
+  protect,
+  authorize('employer', 'admin'),
+  uploadRateLimit,
+  uploadLogo,
+  handleUploadError,
+  uploadCompanyLogo
+);
 
 /**
  * @swagger

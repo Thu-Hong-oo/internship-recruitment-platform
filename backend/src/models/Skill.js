@@ -10,29 +10,7 @@ const SkillSchema = new mongoose.Schema(
       maxlength: [100, 'Tên kỹ năng không được vượt quá 100 ký tự'],
     },
     category: {
-      type: String,
-      enum: [
-        'programming',
-        'design',
-        'business',
-        'soft-skills',
-        'marketing',
-        'data',
-        'devops',
-        'mobile',
-        'web',
-        'finance',
-        'hr',
-        'sales',
-        'content',
-        'analytics',
-        'security',
-        'cloud',
-        'ai-ml',
-        'blockchain',
-        'gaming',
-        'other',
-      ],
+      type: String, // Using slug instead of ObjectId
       required: [true, 'Danh mục kỹ năng là bắt buộc'],
     },
     aliases: [
@@ -132,7 +110,7 @@ const SkillSchema = new mongoose.Schema(
 );
 
 // Indexes
-SkillSchema.index({ category: 1 });
+SkillSchema.index({ category: 1 }); // category is now slug (string)
 SkillSchema.index({ popularity: -1 });
 SkillSchema.index({ isActive: 1 });
 SkillSchema.index({ name: 'text', description: 'text' });
@@ -168,7 +146,7 @@ SkillSchema.methods.getRelatedSkills = function () {
 SkillSchema.methods.getSkillsByCategory = function () {
   return this.model('Skill')
     .find({
-      category: this.category,
+      category: this.category, // category is now slug
       isActive: true,
       _id: { $ne: this._id },
     })
@@ -262,9 +240,9 @@ SkillSchema.methods.getValueScore = function () {
 };
 
 // Static method để tìm skills theo category
-SkillSchema.statics.findByCategory = function (category) {
+SkillSchema.statics.findByCategory = function (categorySlug) {
   return this.find({
-    category: category,
+    category: categorySlug, // category is now slug
     isActive: true,
   }).sort({ popularity: -1 });
 };

@@ -17,6 +17,9 @@ const {
   getPendingVerifications,
   verifyEmployer,
 
+  // Company Moderation
+  updateCompanyStatus,
+
   // System Management
   getSystemHealth,
   getSystemLogs,
@@ -390,6 +393,51 @@ router.get('/verifications', getPendingVerifications);
  *         description: Employer profile not found
  */
 router.put('/verifications/:id', verifyEmployer);
+
+// ========================================
+// COMPANY MODERATION
+// ========================================
+
+/**
+ * @swagger
+ * /api/admin/companies/{id}/status:
+ *   put:
+ *     summary: Update company status (admin only)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Company ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [active, pending, suspended, inactive]
+ *     responses:
+ *       200:
+ *         description: Company status updated successfully
+ *       400:
+ *         description: Invalid status or company id
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Admin access required
+ *       404:
+ *         description: Company not found
+ */
+router.put('/companies/:id/status', updateCompanyStatus);
 
 // ========================================
 // SYSTEM MANAGEMENT

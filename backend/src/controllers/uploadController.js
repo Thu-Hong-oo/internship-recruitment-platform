@@ -1,5 +1,6 @@
 const asyncHandler = require('express-async-handler');
 const { cloudinary } = require('../services/cloudinaryService');
+const { uploadImage } = require('../services/imageUploadService');
 const { logger } = require('../utils/logger');
 const Company = require('../models/Company');
 
@@ -8,47 +9,28 @@ const Company = require('../models/Company');
 // @access  Private
 const uploadSingleImage = asyncHandler(async (req, res) => {
   try {
-    //1. validation
     if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        error: 'Không có file nào được upload',
-      });
+      return res
+        .status(400)
+        .json({ success: false, error: 'Không có file nào được upload' });
     }
-    //2 cấu hình options
+
     const options = {
       folder: req.body.folder || 'internbridge',
-      optimize: req.body.optimize !== 'false',
-      createThumbnail: req.body.createThumbnail !== 'false',
       optimization: {
         quality: parseInt(req.body.quality) || 80,
         maxWidth: parseInt(req.body.maxWidth) || 1920,
         maxHeight: parseInt(req.body.maxHeight) || 1080,
       },
-      thumbnail: {
-        width: parseInt(req.body.thumbWidth) || 300,
-        height: parseInt(req.body.thumbHeight) || 300,
-        quality: parseInt(req.body.thumbQuality) || 70,
-      },
     };
-    //2. upload lên cloundinary với transformation
-    const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: options.folder || 'internbridge',
-      transformation: [
-        {
-          width: options.optimization?.maxWidth || 1920,
-          height: options.optimization?.maxHeight || 1080,
-          crop: 'limit',
-        },
-        { quality: options.optimization?.quality || 100, fetch_format: 'auto' },
-      ],
-    });
+
+    const result = await uploadImage('image', req.file.buffer, options);
 
     logger.info('Single image upload successful', {
       userId: req.user?.id,
       originalName: req.file.originalname,
       size: req.file.size,
-      result: result.main.publicId,
+      publicId: result.publicId,
     });
 
     res.status(200).json({
@@ -57,14 +39,11 @@ const uploadSingleImage = asyncHandler(async (req, res) => {
       data: {
         originalName: req.file.originalname,
         originalSize: req.file.size,
-        publicId: result.public_id,
-        url: result.secure_url,
+        publicId: result.publicId,
+        url: result.url,
         size: result.bytes,
         format: result.format,
-        dimensions: {
-          width: result.width,
-          height: result.height,
-        },
+        dimensions: { width: result.width, height: result.height },
       },
     });
   } catch (error) {
@@ -183,40 +162,17 @@ const uploadMultipleImages = asyncHandler(async (req, res) => {
 const uploadAvatar = asyncHandler(async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        error: 'Không có file nào được upload',
-      });
+      return res
+        .status(400)
+        .json({ success: false, error: 'Không có file nào được upload' });
     }
 
-    const options = {
-      folder: 'internbridge/avatars',
-      optimize: true,
-      createThumbnail: true,
-      optimization: {
-        quality: 85,
-        maxWidth: 800,
-        maxHeight: 800,
-      },
-      thumbnail: {
-        width: 200,
-        height: 200,
-        quality: 80,
-      },
-    };
-
-    const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: 'internbridge/avatars',
-      transformation: [
-        { width: 800, height: 800, crop: 'fill', gravity: 'face' },
-        { quality: 85, fetch_format: 'auto' },
-      ],
-    });
+    const result = await uploadImage('avatar', req.file.buffer);
 
     logger.info('Avatar upload successful', {
       userId: req.user.id,
       originalName: req.file.originalname,
-      publicId: result.public_id,
+      publicId: result.publicId,
     });
 
     res.status(200).json({
@@ -224,14 +180,11 @@ const uploadAvatar = asyncHandler(async (req, res) => {
       message: 'Upload avatar thành công',
       data: {
         avatar: {
-          publicId: result.public_id,
-          url: result.secure_url,
+          publicId: result.publicId,
+          url: result.url,
           size: result.bytes,
           format: result.format,
-          dimensions: {
-            width: result.width,
-            height: result.height,
-          },
+          dimensions: { width: result.width, height: result.height },
         },
       },
     });
@@ -260,51 +213,58 @@ const uploadCompanyLogo = asyncHandler(async (req, res) => {
       });
     }
 
-    const options = {
-      folder: 'internbridge/logos',
-      optimize: true,
-      createThumbnail: true,
-      optimization: {
-        quality: 90,
-        maxWidth: 1200,
-        maxHeight: 600,
-      },
-      thumbnail: {
-        width: 300,
-        height: 150,
-        quality: 85,
-      },
-    };
+    const options = {};
 
-    const result = await cloudinary.uploader.upload(req.file.path, {
-      folder: 'internbridge/logos',
-      transformation: [
-        { width: 1200, height: 600, crop: 'limit' },
-        { quality: 90, fetch_format: 'auto' },
-      ],
-    });
+    const result = await uploadImage('logo', req.file.buffer);
 
     logger.info('Company logo upload successful', {
       userId: req.user.id,
       originalName: req.file.originalname,
-      publicId: result.main.publicId,
+      publicId: result.publicId,
     });
+
+    // Optionally attach the uploaded logo to the employer's company automatically
+    // Default: attach = true (can be disabled with ?attach=false)
+    let attached = false;
+    let companyId = null;
+    try {
+      const shouldAttach = (req.query.attach ?? 'true') !== 'false';
+      if (shouldAttach) {
+        const company = await Company.findByOwner(req.user.id);
+        if (company) {
+          company.logo = {
+            url: result.url,
+            filename: result.publicId,
+            uploadedAt: new Date(),
+          };
+          await company.save();
+          attached = true;
+          companyId = company._id;
+        }
+      }
+    } catch (attachError) {
+      logger.warn('Auto-attach company logo skipped:', {
+        error: attachError.message,
+        userId: req.user.id,
+      });
+    }
 
     res.status(200).json({
       success: true,
       message: 'Upload logo công ty thành công',
       data: {
         logo: {
-          publicId: result.main.publicId,
-          url: result.main.url,
-          thumbnailUrl: result.main.thumbnailUrl,
-          size: result.main.size,
-          format: result.main.format,
+          publicId: result.publicId,
+          url: result.url,
+          size: result.bytes,
+          format: result.format,
           dimensions: {
-            width: result.main.width,
-            height: result.main.height,
+            width: result.width,
+            height: result.height,
           },
         },
+        attached,
+        companyId,
       },
     });
   } catch (error) {

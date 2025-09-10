@@ -8,7 +8,8 @@ const {
   resetPassword,
   googleAuth,
   verifyEmail,
-  resendEmailVerification
+  resendEmailVerification,
+  getUnverifiedAccount
 } = require('../controllers/authController');
 
 const { protect } = require('../middleware/auth');
@@ -472,5 +473,53 @@ router.post('/verify-email', otpVerificationRateLimit, verifyEmail);
  *                   type: string
  */
 router.post('/resend-verification', resendVerificationRateLimit, resendEmailVerification);
+
+/**
+ * @swagger
+ * /api/auth/unverified-account:
+ *   get:
+ *     summary: Get unverified account information
+ *     tags: [Authentication]
+ *     parameters:
+ *       - in: query
+ *         name: email
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: email
+ *         description: Email address to check for unverified account
+ *     responses:
+ *       200:
+ *         description: Unverified account found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     email:
+ *                       type: string
+ *                     firstName:
+ *                       type: string
+ *                     lastName:
+ *                       type: string
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                     verificationExpiry:
+ *                       type: string
+ *                       format: date-time
+ *                     timeRemaining:
+ *                       type: number
+ *       400:
+ *         description: Account already verified or verification expired
+ *       404:
+ *         description: No unverified account found
+ */
+router.get('/unverified-account', getUnverifiedAccount);
 
 module.exports = router;
