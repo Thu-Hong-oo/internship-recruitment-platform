@@ -1,7 +1,5 @@
 class EmailTemplate {
-  static verificationEmail(user, token) {
-    const verificationUrl = `${process.env.FRONTEND_URL}/verify-email/${token}`;
-    
+  static verificationEmail(user, otp) {
     return {
       from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
       to: user.email,
@@ -13,24 +11,21 @@ class EmailTemplate {
           </div>
           <div style="padding: 20px; background-color: #f9f9f9;">
             <p>Xin chào ${user.fullName},</p>
-            <p>Cảm ơn bạn đã đăng ký tài khoản. Để hoàn tất quá trình đăng ký, vui lòng xác thực email của bạn:</p>
+            <p>Cảm ơn bạn đã đăng ký tài khoản. Để hoàn tất quá trình đăng ký, vui lòng nhập mã OTP sau:</p>
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${verificationUrl}" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px;">
-                Xác thực Email
-              </a>
+              <p style="font-size: 32px; font-weight: bold; color: #4F46E5; letter-spacing: 5px; background-color: #f0f0f0; padding: 20px; border-radius: 10px; display: inline-block;">
+                ${otp}
+              </p>
             </div>
-            <p>Hoặc nhập mã OTP sau: <strong>${user.emailVerificationOtp || ''}</strong></p>
-            <p>Mã OTP này sẽ hết hạn sau 10 phút.</p>
-            <p>Nếu bạn không đăng ký tài khoản này, vui lòng bỏ qua email này.</p>
+            <p style="text-align: center; color: #666; font-size: 14px;">Mã OTP này sẽ hết hạn sau 10 phút.</p>
+            <p style="text-align: center; color: #666; font-size: 14px;">Nếu bạn không đăng ký tài khoản này, vui lòng bỏ qua email này.</p>
           </div>
         </div>
-      `
+      `,
     };
   }
 
-  static passwordResetEmail(user, token) {
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${token}`;
-    
+  static passwordResetEmail(user, otp) {
     return {
       from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
       to: user.email,
@@ -44,13 +39,13 @@ class EmailTemplate {
             <p>Xin chào ${user.fullName},</p>
             <p>Bạn đã yêu cầu đặt lại mật khẩu. Vui lòng sử dụng mã OTP sau để đặt lại mật khẩu:</p>
             <div style="text-align: center; margin: 30px 0;">
-              <p style="font-size: 24px; font-weight: bold;">${user.resetPasswordOtp || ''}</p>
+              <p style="font-size: 32px; font-weight: bold; color: #4F46E5; letter-spacing: 5px; background-color: #f0f0f0; padding: 20px; border-radius: 10px; display: inline-block;">${otp}</p>
             </div>
             <p>Mã OTP này sẽ hết hạn sau 10 phút.</p>
             <p>Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.</p>
           </div>
         </div>
-      `
+      `,
     };
   }
 
@@ -74,7 +69,7 @@ class EmailTemplate {
             <p>Nếu bạn không yêu cầu đăng nhập, vui lòng bỏ qua email này.</p>
           </div>
         </div>
-      `
+      `,
     };
   }
 
@@ -94,7 +89,7 @@ class EmailTemplate {
             <p>Bạn có thể bỏ qua email này.</p>
           </div>
         </div>
-      `
+      `,
     };
   }
 }

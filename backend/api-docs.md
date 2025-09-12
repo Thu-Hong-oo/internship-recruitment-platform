@@ -17,7 +17,7 @@
 - `POST /refresh-token` - Làm mới access token
 - `POST /logout` - Đăng xuất
 - `GET /me` - Lấy thông tin người dùng hiện tại //Thường dùng để kiểm tra trạng thái đăng nhập
-  Data: id, email, role, auth status, etc.
+  Data: id, email, role, auth status, etc. -`GET /unverified-account`:
 
 ## User Management
 
@@ -29,7 +29,7 @@
 - `POST /avatar` - Upload avatar
 - `PUT /preferences` - Cập nhật tùy chọn người dùng
 
-### Intern Routes (`/api/interns`)
+### Candidate Routes (`/api/candidate`)
 
 - `POST /cv` - Upload CV
 - `GET /cv/:id` - Xem CV

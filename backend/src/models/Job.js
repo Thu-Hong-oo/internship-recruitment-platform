@@ -152,7 +152,7 @@ const JobSchema = new mongoose.Schema(
         {
           internId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'InternProfile',
+            ref: 'CandidateProfile',
           },
           score: Number,
           matchingSkills: [String],
@@ -197,7 +197,7 @@ JobSchema.methods.updateStatistics = async function () {
     },
   ]);
 
-  stats.forEach((stat) => {
+  stats.forEach(stat => {
     this.statistics.applications[stat._id] = stat.count;
   });
 

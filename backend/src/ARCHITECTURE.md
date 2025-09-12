@@ -18,7 +18,6 @@ src/
 │   ├── cloudinaryService.js    # Upload file với Cloudinary
 │   ├── imageUploadService.js   # Xử lý upload hình ảnh
 │   ├── aiService.js            # AI features
-│   ├── notificationService.js  # Notifications
 │   └── README.md               # Tài liệu services
 │
 ├── controllers/            # API endpoints
@@ -54,7 +53,6 @@ src/
 - ❌ `chatbot.js` (không sử dụng)
 - ❌ `aiFilter.js` (không sử dụng)
 - ❌ `jobRecommendation.js` (không sử dụng)
-- ❌ `notificationServide.js` (lỗi chính tả → `notificationService.js`)
 
 ### Middleware:
 
