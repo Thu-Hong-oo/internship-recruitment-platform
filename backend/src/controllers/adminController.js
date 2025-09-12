@@ -1,5 +1,5 @@
 const User = require('../models/User');
-const CandidateProfile = require('../models/CandidateProfile');
+const InternProfile = require('../models/InternProfile');
 const EmployerProfile = require('../models/EmployerProfile');
 const Job = require('../models/Job');
 const Company = require('../models/Company');
@@ -49,7 +49,7 @@ const getUsers = asyncHandler(async (req, res) => {
   const total = await User.countDocuments(filter);
   const users = await User.find(filter)
     .select('-password')
-    .populate('candidateProfile', 'education experience skills')
+    .populate('internProfile', 'education experience skills')
     .populate('employerProfile', 'company position verification')
     .sort({ createdAt: -1 })
     .limit(limit)
@@ -86,7 +86,7 @@ const getUsers = asyncHandler(async (req, res) => {
 const getUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id)
     .select('-password')
-    .populate('candidateProfile')
+    .populate('internProfile')
     .populate('employerProfile');
 
   if (!user) {
@@ -241,7 +241,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     activeJobs,
   ] = await Promise.all([
     User.countDocuments(),
-    User.countDocuments({ role: 'student' }),
+    User.countDocuments({ role: 'intern' }),
     User.countDocuments({ role: 'employer' }),
     Job.countDocuments(),
     Application.countDocuments(),

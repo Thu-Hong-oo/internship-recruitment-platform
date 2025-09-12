@@ -23,20 +23,18 @@ const SkillSchema = new mongoose.Schema(
       type: String,
       maxlength: [500, 'Mô tả không được vượt quá 500 ký tự'],
     },
-    level: {
-      beginner: {
+    levels: [{
+      name: {
         type: String,
-        default: 'Cơ bản',
+        enum: ['beginner', 'intermediate', 'advanced']
       },
-      intermediate: {
+      description: String,
+      criteria: [String],
+      assessment: {
         type: String,
-        default: 'Trung bình',
-      },
-      advanced: {
-        type: String,
-        default: 'Nâng cao',
-      },
-    },
+        enum: ['self', 'test', 'project', 'interview']
+      }
+    }],
     relatedSkills: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -57,49 +55,55 @@ const SkillSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
-    metadata: {
-      difficulty: {
-        type: String,
-        enum: ['easy', 'medium', 'hard'],
-        default: 'medium',
-      },
-      learningTime: {
-        type: Number, // hours
-        min: 0,
-      },
-      resources: [
-        {
-          type: String,
-          enum: [
-            'course',
-            'video',
-            'book',
-            'project',
-            'tutorial',
-            'bootcamp',
-            'certification',
-          ],
-          default: 'course',
+    learningPath: {
+      prerequisites: [{
+        skillId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Skill'
         },
-      ],
-      // Thêm thông tin về skill
-      prerequisites: [String], // Kỹ năng cần có trước
-      careerPaths: [String], // Các nghề nghiệp sử dụng skill này
-      industryDemand: {
-        type: String,
-        enum: ['low', 'medium', 'high', 'critical'],
-        default: 'medium',
+        level: String,
+        required: Boolean
+      }],
+      resources: [{
+        type: {
+          type: String,
+          enum: ['video', 'article', 'exercise', 'project', 'quiz']
+        },
+        title: String,
+        url: String,
+        duration: Number,
+        difficulty: String
+      }],
+      milestones: [{
+        name: String,
+        description: String,
+        tasks: [String],
+        evaluation: String
+      }]
+    },
+    relevance: {
+      forInternship: {
+        demand: {
+          type: String,
+          enum: ['low', 'medium', 'high'],
+          default: 'medium'
+        },
+        positions: [String],
+        importance: {
+          type: Number,
+          min: 1,
+          max: 5
+        }
       },
-      salaryImpact: {
-        type: Number, // % tăng lương khi có skill này
-        min: 0,
-        max: 100,
-      },
-      futureTrend: {
-        type: String,
-        enum: ['declining', 'stable', 'growing', 'emerging'],
-        default: 'stable',
-      },
+      marketData: {
+        trend: {
+          type: String,
+          enum: ['declining', 'stable', 'growing'],
+          default: 'stable'
+        },
+        jobCount: Number,
+        avgSalaryImpact: Number
+      }
     },
   },
   {

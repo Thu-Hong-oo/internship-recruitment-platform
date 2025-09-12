@@ -2,12 +2,43 @@ const mongoose = require('mongoose');
 
 const EmployerProfileSchema = new mongoose.Schema(
   {
-    userId: {
+    mainUserId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
       unique: true,
     },
+    companyMembers: [{
+      userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      role: {
+        type: String,
+        enum: ['owner', 'admin', 'recruiter', 'interviewer'],
+        default: 'recruiter'
+      },
+      permissions: {
+        canPostJobs: Boolean,
+        canViewApplications: Boolean,
+        canEditProfile: Boolean,
+        canManageTeam: Boolean,
+        canVerifyDocuments: Boolean
+      },
+      addedAt: {
+        type: Date,
+        default: Date.now
+      },
+      addedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      status: {
+        type: String,
+        enum: ['active', 'inactive'],
+        default: 'active'
+      }
+    }],
     company: {
       name: {
         type: String,
@@ -55,6 +86,10 @@ const EmployerProfileSchema = new mongoose.Schema(
       },
     },
     contact: {
+      name: {
+        type: String,
+        trim: true,
+      },
       phone: String,
       linkedin: String,
       workEmail: String,
@@ -212,6 +247,38 @@ EmployerProfileSchema.methods.updateHiringStats = function (
   this.hiring.activePositions = activePositions;
   this.hiring.successRate = successRate;
   return this.save();
+};
+
+// Methods for team management
+EmployerProfileSchema.methods.addTeamMember = function(userId, role, permissions) {
+  const member = {
+    userId,
+    role,
+    permissions,
+    addedBy: this.mainUserId,
+    addedAt: new Date()
+  };
+  this.companyMembers.push(member);
+  return this.save();
+};
+
+EmployerProfileSchema.methods.updateMemberPermissions = function(userId, newPermissions) {
+  const member = this.companyMembers.find(m => m.userId.equals(userId));
+  if (member) {
+    member.permissions = {...member.permissions, ...newPermissions};
+    return this.save();
+  }
+  throw new Error('Member not found');
+};
+
+EmployerProfileSchema.methods.removeMember = function(userId) {
+  this.companyMembers = this.companyMembers.filter(m => !m.userId.equals(userId));
+  return this.save();
+};
+
+EmployerProfileSchema.methods.getMemberRole = function(userId) {
+  const member = this.companyMembers.find(m => m.userId.equals(userId));
+  return member ? member.role : null;
 };
 
 // Statics

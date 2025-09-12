@@ -2,342 +2,216 @@ const mongoose = require('mongoose');
 
 const JobSchema = new mongoose.Schema(
   {
-    title: {
-      type: String,
-      required: [true, 'Tiêu đề công việc là bắt buộc'],
-      trim: true,
-      maxlength: [200, 'Tiêu đề không được vượt quá 200 ký tự'],
+    employer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'EmployerProfile',
+      required: true,
     },
 
-    companyId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Company',
-      required: [true, 'Công ty là bắt buộc'],
+    title: {
+      type: String,
+      required: [true, 'Vui lòng nhập tiêu đề công việc'],
+      trim: true,
+      maxlength: [100, 'Tiêu đề không được vượt quá 100 ký tự'],
     },
 
     description: {
       type: String,
-      required: [true, 'Mô tả công việc là bắt buộc'],
-      maxlength: [3000, 'Mô tả không được vượt quá 3000 ký tự'],
+      required: [true, 'Vui lòng nhập mô tả công việc'],
+      maxlength: [5000, 'Mô tả không được vượt quá 5000 ký tự'],
     },
 
-    category: {
-      type: String,
-      enum: [
-        'tech',
-        'business',
-        'marketing',
-        'design',
-        'data',
-        'finance',
-        'hr',
-        'sales',
-        'real-estate',
-        'education',
-        'healthcare',
-        'manufacturing',
-        'retail',
-        'other',
-      ],
-      required: [true, 'Danh mục là bắt buộc'],
-    },
-
-    // Ngành nghề phụ (tối đa 2)
-    subCategories: [
-      {
-        type: String,
-        maxlength: [50, 'Ngành nghề phụ không được vượt quá 50 ký tự'],
-      },
-    ],
-
-    // Số lượng tuyển
-    hiringCount: {
-      type: Number,
-      min: 1,
-      default: 1,
-    },
-
-    location: {
-      city: {
-        type: String,
-        required: [true, 'Thành phố là bắt buộc'],
-      },
-      district: String, // Quận/Huyện
-      address: String, // Địa chỉ cụ thể
-      type: {
-        type: String,
-        enum: ['onsite', 'remote', 'hybrid'],
-        default: 'onsite',
-      },
-    },
-
-    // Nhiều địa điểm làm việc
-    multipleLocations: [
-      {
-        city: String,
-        district: String,
-        address: String,
-        type: {
-          type: String,
-          enum: ['onsite', 'remote', 'hybrid'],
-          default: 'onsite',
-        },
-      },
-    ],
-
-    // === THÔNG TIN THỰC TẬP (CÓ MẶC ĐỊNH HỢP LÝ) ===
-    internship: {
-      duration: {
-        type: Number,
-        min: 1,
-        max: 12,
-        default: 3, // Mặc định 3 tháng
-      },
-
-      startDate: {
-        type: Date,
-        default: () => {
-          const date = new Date();
-          date.setMonth(date.getMonth() + 1); // Bắt đầu tháng sau
-          return date;
-        },
-      },
-
-      type: {
-        type: String,
-        enum: ['summer', 'semester', 'full-time', 'part-time'],
-        default: 'semester',
-      },
-
-      // Compensation đơn giản hóa
-      isPaid: {
-        type: Boolean,
-        default: false,
-      },
-
-      salary: {
-        amount: {
-          type: Number,
-          min: 0,
-        },
-        period: {
-          type: String,
-          enum: ['month', 'week', 'project'],
-          default: 'month',
-        },
-      },
-    },
-
-    // === YÊU CẦU CƠ BẢN (ĐƠN GIẢN HÓA) ===
     requirements: {
-      // Học vấn
-      yearOfStudy: {
-        type: [String],
-        enum: [
-          '1st-year',
-          '2nd-year',
-          '3rd-year',
-          '4th-year',
-          'graduate',
-          'any',
-        ],
-        default: ['any'],
-      },
-
-      majors: [String], // ["Công nghệ thông tin", "Khoa học máy tính"]
-
-      // Kỹ năng - đơn giản hóa
-      skills: [String], // ["JavaScript", "React", "Communication"]
-
-      // Kinh nghiệm
-      experienceRequired: {
-        type: Boolean,
-        default: false,
-      },
-
-      // Yêu cầu giới tính
-      genderRequirement: {
-        type: String,
-        enum: ['male', 'female', 'any'],
-        default: 'any',
-      },
-
-      // Cấp bậc
-      level: {
-        type: String,
-        enum: [
-          'intern',
-          'junior',
-          'mid-level',
-          'senior',
-          'lead',
-          'manager',
-          'any',
-        ],
-        default: 'intern',
-      },
-
-      minGPA: {
-        type: Number,
-        min: 0,
-        max: 4,
-      },
-
-      // Ngôn ngữ
-      languages: [
+      skills: [
         {
           name: String,
-          level: {
-            type: String,
-            enum: ['basic', 'intermediate', 'advanced'],
-            default: 'intermediate',
+          level: String,
+          required: Boolean,
+          weight: {
+            type: Number,
+            default: 1,
           },
         },
       ],
+      education: {
+        level: String,
+        majors: [String],
+        required: Boolean,
+      },
+      experience: {
+        years: Number,
+        description: String,
+      },
+      languages: [
+        {
+          name: String,
+          level: String,
+        },
+      ],
+      other: [String],
     },
 
-    // === THÔNG TIN BỔ SUNG (TÙY CHỌN) ===
-    responsibilities: [String], // Mảng trách nhiệm
-
-    learningOpportunities: [String], // Sẽ học được gì
-
-    // Quyền lợi ứng viên (rich text)
     benefits: {
-      type: String, // Rich text content
-      maxlength: 5000,
+      salary: {
+        min: Number,
+        max: Number,
+        currency: {
+          type: String,
+          default: 'VND',
+        },
+        negotiable: Boolean,
+      },
+      perks: [String],
+      training: String,
+      opportunities: [String],
     },
 
-    // Lý do nên ứng tuyển (tối đa 3 lý do)
-    reasonsToApply: [
-      {
+    details: {
+      type: {
         type: String,
-        maxlength: 3,
+        enum: ['full-time', 'part-time', 'remote', 'hybrid'],
+        required: true,
       },
-    ],
-
-    workEnvironment: {
-      type: String,
-      enum: ['startup', 'corporate', 'agency', 'remote-first'],
+      duration: {
+        value: Number,
+        unit: {
+          type: String,
+          enum: ['days', 'weeks', 'months'],
+          default: 'months',
+        },
+      },
+      startDate: Date,
+      locations: [
+        {
+          city: String,
+          district: String,
+          address: String,
+        },
+      ],
+      positions: Number,
+      applicationDeadline: Date,
     },
 
-    // === CÀI ĐẶT ỨNG TUYỂN ===
-    application: {
-      deadline: Date,
-
-      maxApplications: {
-        type: Number,
-        default: 50,
-      },
-
-      requireCoverLetter: {
-        type: Boolean,
-        default: false,
-      },
-
-      requirePortfolio: {
-        type: Boolean,
-        default: false,
-      },
-
-      // Thông tin người nhận CV
-      contactInfo: {
-        fullName: String,
-        phone: String,
-        email: String,
-      },
-    },
-
-    // === QUẢN LÝ ===
     status: {
       type: String,
-      enum: ['draft', 'active', 'closed', 'filled', 'pending'],
+      enum: ['draft', 'active', 'paused', 'closed', 'expired'],
       default: 'draft',
     },
 
-    postedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
+    statistics: {
+      views: {
+        type: Number,
+        default: 0,
+      },
+      applications: {
+        total: {
+          type: Number,
+          default: 0,
+        },
+        pending: {
+          type: Number,
+          default: 0,
+        },
+        reviewing: {
+          type: Number,
+          default: 0,
+        },
+        shortlisted: {
+          type: Number,
+          default: 0,
+        },
+        interviewed: {
+          type: Number,
+          default: 0,
+        },
+        offered: {
+          type: Number,
+          default: 0,
+        },
+        accepted: {
+          type: Number,
+          default: 0,
+        },
+        rejected: {
+          type: Number,
+          default: 0,
+        },
+      },
     },
 
-    // === THỐNG KÊ ===
-    stats: {
-      views: { type: Number, default: 0 },
-      applications: { type: Number, default: 0 },
-    },
-
-    // === TAGS & METADATA ===
-    tags: [String], // ["urgent", "remote-ok", "flexible-hours"]
-
-    slug: {
-      type: String,
-      unique: true,
+    nlpAnalysis: {
+      keywords: [String],
+      requiredSkills: [
+        {
+          name: String,
+          confidence: Number,
+          context: String,
+        },
+      ],
+      suggestedCandidates: [
+        {
+          internId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'InternProfile',
+          },
+          score: Number,
+          matchingSkills: [String],
+        },
+      ],
+      analyzedAt: Date,
     },
   },
   {
     timestamps: true,
-    toJSON: { virtuals: true },
   }
 );
 
-// === INDEXES ===
+// Indexes
 JobSchema.index({ title: 'text', description: 'text' });
-JobSchema.index({ status: 1, createdAt: -1 });
-JobSchema.index({ category: 1, 'location.city': 1 });
-JobSchema.index({ 'internship.isPaid': 1, status: 1 });
-JobSchema.index({ tags: 1 });
+JobSchema.index({ employer: 1 });
+JobSchema.index({ status: 1 });
+JobSchema.index({ 'details.locations.city': 1 });
+JobSchema.index({ 'requirements.skills.name': 1 });
+JobSchema.index({ createdAt: -1 });
 
-// === VIRTUALS ===
-JobSchema.virtual('isExpired').get(function () {
-  return this.application.deadline && new Date() > this.application.deadline;
+// Virtual field for remaining days until deadline
+JobSchema.virtual('remainingDays').get(function () {
+  if (!this.details.applicationDeadline) return null;
+  const now = new Date();
+  const deadline = new Date(this.details.applicationDeadline);
+  const diffTime = deadline - now;
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 });
 
-JobSchema.virtual('daysLeft').get(function () {
-  if (!this.application.deadline) return null;
-  const diff = this.application.deadline - new Date();
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
-});
+// Methods
+JobSchema.methods.updateStatistics = async function () {
+  const Application = mongoose.model('Application');
 
-// === METHODS ===
-JobSchema.methods.generateSlug = function () {
-  const slug = this.title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-');
-  return `${slug}-${Date.now().toString().slice(-6)}`;
-};
+  const stats = await Application.aggregate([
+    { $match: { jobId: this._id } },
+    {
+      $group: {
+        _id: '$status',
+        count: { $sum: 1 },
+      },
+    },
+  ]);
 
-// Pre-save middleware
-JobSchema.pre('save', function (next) {
-  if (!this.slug) {
-    this.slug = this.generateSlug();
-  }
-  next();
-});
-
-// === STATIC METHODS ===
-JobSchema.statics.findActive = function () {
-  return this.find({
-    status: 'active',
-    $or: [
-      { 'application.deadline': { $gt: new Date() } },
-      { 'application.deadline': null },
-    ],
+  stats.forEach((stat) => {
+    this.statistics.applications[stat._id] = stat.count;
   });
+
+  this.statistics.applications.total = stats.reduce(
+    (acc, curr) => acc + curr.count,
+    0
+  );
+
+  return this.save();
 };
 
-JobSchema.statics.searchJobs = function (query, filters = {}) {
-  const searchQuery = { status: 'active' };
-
-  if (query) searchQuery.$text = { $search: query };
-  if (filters.category) searchQuery.category = filters.category;
-  if (filters.city) searchQuery['location.city'] = filters.city;
-  if (filters.isPaid !== undefined)
-    searchQuery['internship.isPaid'] = filters.isPaid;
-  if (filters.remote)
-    searchQuery['location.type'] = { $in: ['remote', 'hybrid'] };
-
-  return this.find(searchQuery).sort({ createdAt: -1 });
+JobSchema.methods.incrementViews = async function () {
+  this.statistics.views += 1;
+  return this.save();
 };
 
 module.exports = mongoose.model('Job', JobSchema);

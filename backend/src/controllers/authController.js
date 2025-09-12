@@ -1,346 +1,169 @@
 const User = require('../models/User');
-const asyncHandler = require('express-async-handler'); //wrapper giúp xử lý lỗi async (không cần try/catch ở mỗi route); khi có lỗi nó gọi next(err) cho Express.
-const jwt = require('jsonwebtoken');
+const asyncHandler = require('express-async-handler');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const { logger } = require('../utils/logger');
 const googleAuthService = require('../services/googleAuth');
+const EmailService = require('../services/emailService');
 const {
-  sendEmailVerification,
-  sendPasswordResetEmail,
-  createTransporter,
-  checkEmailBounceStatus,
-} = require('../services/emailService');
-const OTPService = require('../services/otpService');
-const OTPCooldownService = require('../services/otpCooldownService');
-const EmailIssueService = require('../services/emailIssueService');
+  OTP,
+  VALIDATION,
+  ERRORS,
+  SUCCESS,
+  ERROR_CODES,
+} = require('../constants/auth.constants');
+const {
+  getOTPService,
+  getOTPCooldownService,
+} = require('../config/initializeServices');
 
-// Initialize OTP service with Redis client
-let otpService = null;
-let otpCooldownService = null;
-
-// Function to initialize OTP service
-const initializeOTPService = redisClient => {
-  if (redisClient) {
-    otpService = new OTPService(redisClient);
-    otpCooldownService = new OTPCooldownService(redisClient);
-    logger.info('OTP Service and Cooldown Service initialized with Redis');
-  } else {
-    logger.warn(
-      'OTP Service initialized without Redis - falling back to database'
-    );
-  }
-};
-
-// Export initialization function - will be added to final exports
+const baseUserResponse = user => ({
+  id: user._id,
+  email: user.email,
+  fullName: user.fullName,
+  role: user.role,
+  authMethod: user.authMethod,
+  isEmailVerified: user.isEmailVerified,
+  isActive: user.isActive,
+  avatar: user.avatar,
+  googleProfile: user.googleProfile,
+  preferences: user.preferences,
+  lastLogin: user.lastLogin,
+  createdAt: user.createdAt,
+  updatedAt: user.updatedAt,
+  candidateProfile: user.candidateProfile,
+  employerProfile: user.employerProfile,
+});
 
 // @desc    Register user
 // @route   POST /api/auth/register
 // @access  Public
 const register = asyncHandler(async (req, res) => {
-  const { email, password, firstName, lastName, role } = req.body;
+  const { email, password, fullName, role } = req.body;
+  const otpService = getOTPService();
 
-  // Check if user already exists
-  const existingUser = await User.findOne({ email }); //SELECT * FROM users WHERE email = 'user@example.com' LIMIT 1
-  if (existingUser) {
-    // If user exists but email is not verified and verification has expired
-    if (!existingUser.isEmailVerified && existingUser.emailVerificationExpire && 
-        existingUser.emailVerificationExpire < Date.now()) {
-      
-      logger.info('Deleting unverified user with expired verification', {
-        email: email,
-        userId: existingUser._id,
-        expiredAt: existingUser.emailVerificationExpire,
-        timestamp: new Date().toISOString(),
-      });
-      
-      // Delete the unverified user to allow re-registration
-      await User.findByIdAndDelete(existingUser._id);
-    } else if (existingUser.isEmailVerified) {
-      // User exists and email is verified
-      return res.status(400).json({
-        success: false,
-        error: 'Email này đã được sử dụng bởi tài khoản khác',
-      });
-    } else {
-      // User exists but email verification is still valid (not expired)
-      return res.status(400).json({
-        success: false,
-        error: 'Email này đã được đăng ký nhưng chưa xác thực. Vui lòng kiểm tra email để xác thực hoặc đợi hết hạn để đăng ký lại.',
-        errorType: 'EMAIL_NOT_VERIFIED'
-      });
-    }
-  }
-
-  // Simple email format validation only
-  // Note: We don't check bounce status here to avoid blocking legitimate emails
-
-  // Additional email validation: Check for suspicious patterns
-  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailPattern.test(email)) {
-    return res.status(400).json({
+  if (!otpService) {
+    return res.status(500).json({
       success: false,
-      error: 'Địa chỉ email không hợp lệ.',
-      errorType: 'INVALID_EMAIL_FORMAT'
+      error: 'Dịch vụ xác thực tạm thời không khả dụng. Vui lòng thử lại sau.',
     });
   }
 
-  // Check for suspicious email patterns (random strings, etc.)
-  const suspiciousPatterns = [
-    /^[a-z0-9]{20,}@gmail\.com$/i, // Random long strings
-    /^[a-z]{10,}[0-9]{10,}@gmail\.com$/i, // Mixed long strings and numbers
-    /^[a-z0-9]{15,}[a-z0-9]{15,}@gmail\.com$/i, // Very long random strings
-  ];
-
-  const isSuspicious = suspiciousPatterns.some(pattern => pattern.test(email));
-  if (isSuspicious) {
-    logger.warn('Suspicious email pattern detected', {
-      email: email,
-      timestamp: new Date().toISOString(),
-    });
-
-    // Log the issue (without userId since user doesn't exist yet)
-    await EmailIssueService.logIssue({
-      email: email,
-      issueType: 'INVALID_EMAIL_ADDRESS',
-      errorMessage: 'Suspicious email pattern detected',
-      operation: 'REGISTER',
-    });
-
-    return res.status(400).json({
-      success: false,
-      error: 'Email có vẻ không hợp lệ. Vui lòng sử dụng địa chỉ email thực tế.',
-      errorType: 'INVALID_EMAIL_ADDRESS'
-    });
-  }
-
-  // Check cooldown for email verification (registration)
-  if (otpCooldownService) {
-    const inCooldown = await otpCooldownService.isInCooldown(
-      'email_verification',
-      email
-    );
-    if (inCooldown) {
-      const remainingTime = await otpCooldownService.getRemainingCooldown(
-        'email_verification',
-        email
-      );
-      return res.status(429).json({
-        success: false,
-        error: `Vui lòng đợi ${Math.ceil(
-          remainingTime / 60
-        )} phút trước khi thử đăng ký lại.`,
-        retryAfter: remainingTime,
-      });
-    }
-  }
-  // Validate password for local registration
-  if (!password) {
-    return res.status(400).json({
-      success: false,
-      error: 'Mật khẩu là bắt buộc khi đăng ký tài khoản',
-    });
-  }
-
-  // Validate firstName and lastName
-  if (!firstName || firstName.trim() === '') {
-    return res.status(400).json({
-      success: false,
-      error: 'Tên là bắt buộc khi đăng ký tài khoản',
-    });
-  }
-
-  if (!lastName || lastName.trim() === '') {
-    return res.status(400).json({
-      success: false,
-      error: 'Họ là bắt buộc khi đăng ký tài khoản',
-    });
-  }
-
-  // Create user with local authentication
-  const user = await User.create({
-    email,
-    password,
-    profile: {
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-    },
-    role: role || 'student',
-    authMethod: 'local',
-    isEmailVerified: false,
-  });
-
-  // Generate email verification token and OTP
-  const verificationToken = crypto.randomBytes(20).toString('hex');
-  const verificationOtp = verificationToken.substring(0, 6).toUpperCase();
-
-  // Store OTP in Redis if available, otherwise fallback to database
-  if (otpService) {
-    try {
-      await otpService.storeOTP(
-        'email_verification',
-        user.email,
-        verificationOtp
-      );
-      // Only store hashed token in database for security
-      user.emailVerificationToken = crypto
-        .createHash('sha256')
-        .update(verificationToken)
-        .digest('hex');
-      user.emailVerificationOtp = undefined; // Clear OTP from database
-      user.emailVerificationExpire = undefined; // Clear expiry from database
-    } catch (error) {
-      logger.error('Failed to store OTP in Redis, falling back to database', {
-        error: error.message,
-        userId: user._id,
-      });
-      // Fallback to database storage
-      user.emailVerificationToken = crypto
-        .createHash('sha256')
-        .update(verificationToken)
-        .digest('hex');
-      user.emailVerificationOtp = verificationOtp;
-      user.emailVerificationExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
-    }
-  } else {
-    // Fallback to database storage
-    user.emailVerificationToken = crypto
-      .createHash('sha256')
-      .update(verificationToken)
-      .digest('hex');
-    user.emailVerificationOtp = verificationOtp;
-    user.emailVerificationExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
-  }
-
-  await user.save({ validateBeforeSave: false });
-
-  // Send verification email (email already validated above)
-  let emailSent = false;
-  let emailError = null;
-  let emailStatus = 'unknown';
-  
   try {
-    await sendEmailVerification(user, verificationToken);
-    emailSent = true;
-    emailStatus = 'unknown'; // Will be updated by webhook
-  } catch (error) {
-    logger.error('Failed to send verification email', {
-      error: error.message,
-      userId: user._id,
-      email: user.email,
-    });
-    
-    emailError = error.message;
-    
-    // Check if it's a bounce-back or invalid email error
-    if (error.message.includes('550') || error.message.includes('5.1.1') || 
-        error.message.includes('NoSuchUser') || error.message.includes('Address not found') ||
-        error.message.includes('The email account that you tried to reach does not exist')) {
-      logger.warn('Email address appears to be invalid or non-existent', {
-        email: user.email,
-        userId: user._id,
-        error: error.message,
-        errorType: 'INVALID_EMAIL_ADDRESS',
-        timestamp: new Date().toISOString(),
+    // Check if user already exists in database
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        error: ERRORS.EMAIL_EXISTS,
+      });
+    }
+
+    // Check if email is already in registration process (Redis)
+    const existingRegistration = await otpService.get(
+      `user_registration:${email}`
+    );
+    if (existingRegistration) {
+      return res.status(400).json({
+        success: false,
+        error:
+          'Email này đang trong quá trình đăng ký. Vui lòng kiểm tra email để xác thực hoặc đợi 24 giờ để đăng ký lại.',
+      });
+    }
+
+    // Generate verification token and OTP
+    const verificationToken = crypto.randomBytes(20).toString('hex');
+    const verificationOtp = verificationToken.substring(0, 6).toUpperCase();
+
+    // Store user data in Redis
+    const userData = {
+      email,
+      password,
+      fullName,
+      role,
+      verificationToken: crypto
+        .createHash('sha256')
+        .update(verificationToken)
+        .digest('hex'),
+    };
+
+    await otpService.setWithExpiry(
+      `user_registration:${email}`,
+      JSON.stringify(userData),
+      24 * 60 * 60 // 24 hours expiry
+    );
+
+    // Store OTP
+    await otpService.storeOTP('email_verification', email, verificationOtp);
+
+    // Send verification email
+    try {
+      await EmailService.sendVerificationEmail(
+        { email, fullName },
+        verificationToken
+      );
+
+      res.status(201).json({
+        success: true,
+        message: SUCCESS.REGISTER,
+        email,
+        emailSent: true,
+      });
+    } catch (emailError) {
+      logger.error('Failed to send verification email during registration', {
+        error: emailError.message,
+        email,
       });
 
-      // Log to email issues database
-      try {
-        await EmailIssueService.logIssue({
-          userId: user._id,
-          email: user.email,
-          issueType: 'INVALID_EMAIL_ADDRESS',
-          errorMessage: error.message,
-          errorCode: error.code,
-          responseCode: error.responseCode,
-          operation: 'REGISTER',
-        });
-      } catch (logError) {
-        logger.error('Failed to log email issue to database', {
-          error: logError.message,
-          userId: user._id,
-          email: user.email,
+      // Cleanup stored data if email sending fails
+      await otpService.delete(`user_registration:${email}`);
+      await otpService.deleteOTP('email_verification', email);
+
+      // Check if it's an invalid email error
+      if (
+        emailError.message.includes('550') ||
+        emailError.message.includes('5.1.1') ||
+        emailError.message.includes('NoSuchUser') ||
+        emailError.message.includes('Address not found')
+      ) {
+        return res.status(400).json({
+          success: false,
+          error:
+            'Email không tồn tại hoặc không thể nhận thư. Vui lòng kiểm tra lại địa chỉ email.',
+          errorType: 'INVALID_EMAIL_ADDRESS',
         });
       }
-    } else {
-      logger.warn('Email sending failed for other reasons', {
-        email: user.email,
-        userId: user._id,
-        error: error.message,
+
+      return res.status(500).json({
+        success: false,
+        error: 'Không thể gửi email xác thực. Vui lòng thử lại sau.',
         errorType: 'EMAIL_SEND_FAILED',
-        timestamp: new Date().toISOString(),
       });
-
-      // Log to email issues database
-      try {
-        await EmailIssueService.logIssue({
-          userId: user._id,
-          email: user.email,
-          issueType: 'EMAIL_SEND_FAILED',
-          errorMessage: error.message,
-          errorCode: error.code,
-          responseCode: error.responseCode,
-          operation: 'REGISTER',
-        });
-      } catch (logError) {
-        logger.error('Failed to log email issue to database', {
-          error: logError.message,
-          userId: user._id,
-          email: user.email,
-        });
-      }
     }
-  }
+  } catch (error) {
+    logger.error('Registration failed', {
+      error: error.message,
+      email,
+    });
 
-  // Update user email status
-  user.emailStatus = emailStatus;
-  await user.save();
-
-  // Log registration with email status
-  logger.info(`New user registered with local auth: ${user.email}`, {
-    userId: user._id,
-    role: user.role,
-    emailSent: emailSent,
-    emailError: emailError || null,
-    emailStatus: user.emailStatus,
-    timestamp: new Date().toISOString(),
-  });
-
-  // Prepare response message based on email status
-  let message = 'Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản.';
-  let warning = null;
-  
-  if (!emailSent) {
-    if (emailError && (emailError.includes('550') || emailError.includes('5.1.1') || 
-        emailError.includes('NoSuchUser') || emailError.includes('Address not found'))) {
-      warning = 'Email không tồn tại hoặc không thể nhận thư. Vui lòng kiểm tra lại địa chỉ email.';
-    } else {
-      warning = 'Không thể gửi email xác thực. Vui lòng thử lại sau hoặc liên hệ hỗ trợ.';
+    // Cleanup any stored data
+    try {
+      await otpService.delete(`user_registration:${email}`);
+      await otpService.deleteOTP('email_verification', email);
+    } catch (cleanupError) {
+      logger.error('Cleanup after registration failure failed', {
+        error: cleanupError.message,
+        email,
+      });
     }
-  }
 
-  res.status(201).json({
-    success: true,
-    user: {
-      id: user._id,
-      email: user.email,
-      firstName: user.profile.firstName,
-      lastName: user.profile.lastName,
-      role: user.role,
-      fullName: user.fullName,
-      authMethod: user.authMethod,
-      isEmailVerified: user.isEmailVerified,
-      profile: {
-        firstName: user.profile.firstName,
-        lastName: user.profile.lastName,
-        avatar: user.profile.avatar,
-      },
-    },
-    message,
-    warning,
-    emailSent,
-    emailStatus: user.emailStatus,
-    emailError: emailError,
-  });
+    return res.status(500).json({
+      success: false,
+      error: 'Không thể xử lý đăng ký. Vui lòng thử lại sau.',
+      details:
+        process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
 });
 
 // @desc    Login user
@@ -353,9 +176,10 @@ const login = asyncHandler(async (req, res) => {
 
   // Validate email & password
   if (!email || !password) {
-    return res
-      .status(400)
-      .json({ success: false, error: 'Vui lòng cung cấp email và mật khẩu' });
+    return res.status(400).json({
+      success: false,
+      error: `${VALIDATION.EMAIL_REQUIRED} và ${VALIDATION.PASSWORD_REQUIRED}`,
+    });
   }
 
   // Check for user
@@ -364,8 +188,8 @@ const login = asyncHandler(async (req, res) => {
   if (!user) {
     return res.status(401).json({
       success: false,
-      error: 'Email này chưa được đăng ký trong hệ thống',
-      errorType: 'EMAIL_NOT_REGISTERED',
+      error: ERRORS.EMAIL_NOT_REGISTERED,
+      errorType: ERROR_CODES.EMAIL_NOT_REGISTERED,
     });
   }
 
@@ -373,9 +197,8 @@ const login = asyncHandler(async (req, res) => {
   if (!user.canUsePassword()) {
     return res.status(401).json({
       success: false,
-      error:
-        'Tài khoản này sử dụng Google OAuth. Vui lòng đăng nhập bằng Google.',
-      errorType: 'GOOGLE_OAUTH_REQUIRED',
+      error: ERRORS.GOOGLE_OAUTH_REQUIRED,
+      errorType: ERROR_CODES.GOOGLE_OAUTH_REQUIRED,
     });
   }
 
@@ -385,8 +208,8 @@ const login = asyncHandler(async (req, res) => {
   if (!isMatch) {
     return res.status(401).json({
       success: false,
-      error: 'Mật khẩu không chính xác',
-      errorType: 'INVALID_PASSWORD',
+      error: ERRORS.INVALID_PASSWORD,
+      errorType: ERROR_CODES.INVALID_PASSWORD,
     });
   }
 
@@ -394,25 +217,10 @@ const login = asyncHandler(async (req, res) => {
   if (!user.isEmailVerified) {
     return res.status(401).json({
       success: false,
-      error:
-        'Email chưa được xác thực. Vui lòng kiểm tra email và xác thực tài khoản trước khi đăng nhập.',
+      error: ERRORS.VERIFY_EMAIL_FIRST,
       errorType: 'EMAIL_NOT_VERIFIED',
       requiresEmailVerification: true,
-      user: {
-        id: user._id,
-        email: user.email,
-        firstName: user.profile.firstName,
-        lastName: user.profile.lastName,
-        role: user.role,
-        fullName: user.fullName,
-        isEmailVerified: user.isEmailVerified,
-        authMethod: user.authMethod,
-        profile: {
-          firstName: user.profile.firstName,
-          lastName: user.profile.lastName,
-          avatar: user.profile.avatar,
-        },
-      },
+      user: baseUserResponse(user),
     });
   }
 
@@ -420,14 +228,14 @@ const login = asyncHandler(async (req, res) => {
   if (!user.isActive) {
     return res.status(401).json({
       success: false,
-      error: 'Tài khoản đã bị vô hiệu hóa',
-      errorType: 'ACCOUNT_DISABLED',
+      error: ERRORS.ACCOUNT_DISABLED,
+      errorType: ERROR_CODES.ACCOUNT_DISABLED,
     });
   }
 
   // Update last login
   user.lastLogin = new Date();
-  await user.save();
+  await user.save({ validateBeforeSave: false });
 
   // Create token
   const token = user.getSignedJwtToken();
@@ -439,21 +247,7 @@ const login = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     token,
-    user: {
-      id: user._id,
-      email: user.email,
-      firstName: user.profile.firstName,
-      lastName: user.profile.lastName,
-      role: user.role,
-      fullName: user.fullName,
-      isEmailVerified: user.isEmailVerified,
-      authMethod: user.authMethod,
-      profile: {
-        firstName: user.profile.firstName,
-        lastName: user.profile.lastName,
-        avatar: user.profile.avatar,
-      },
-    },
+    user: baseUserResponse(user),
   });
 });
 
@@ -479,13 +273,15 @@ const logout = asyncHandler(async (req, res) => {
     res.clearCookie('token');
   }
 
-  res.status(200).json({ success: true, message: 'Đăng xuất thành công' });
+  res.status(200).json({ success: true, message: SUCCESS.LOGOUT });
 });
 
 // @desc    Forgot password
 // @route   POST /api/auth/forgotpassword
 // @access  Public
 const forgotPassword = asyncHandler(async (req, res) => {
+  const otpService = getOTPService();
+  const otpCooldownService = getOTPCooldownService();
   const user = await User.findOne({ email: req.body.email });
 
   if (!user) {
@@ -558,7 +354,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
   // Send password reset email
   try {
-    await sendPasswordResetEmail(user, resetToken);
+    await EmailService.sendPasswordResetEmail(user, resetToken);
 
     logger.info(`Password reset email sent to: ${user.email}`, {
       userId: user._id,
@@ -571,7 +367,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Email đặt lại mật khẩu đã được gửi thành công',
+      message: SUCCESS.PASSWORD_RESET_SENT,
     });
   } catch (error) {
     logger.error('Failed to send password reset email', {
@@ -612,6 +408,9 @@ const resetPassword = asyncHandler(async (req, res) => {
 
   // Verify OTP from Redis or database
   let otpValid = false;
+
+  const otpService = getOTPService();
+  const otpCooldownService = getOTPCooldownService();
 
   if (otpService) {
     try {
@@ -656,9 +455,7 @@ const resetPassword = asyncHandler(async (req, res) => {
   }
 
   if (!otpValid) {
-    return res
-      .status(400)
-      .json({ success: false, error: 'Mã OTP không chính xác' });
+    return res.status(400).json({ success: false, error: ERRORS.INVALID_OTP });
   }
 
   // Set new password
@@ -681,15 +478,15 @@ const resetPassword = asyncHandler(async (req, res) => {
 });
 
 // @desc    Google OAuth login/register
-// @route   POST /api/auth/google
+// @route   POST /api/auth/login/google
 // @access  Public
-const googleAuth = asyncHandler(async (req, res) => {
+const loginWithGoogle = asyncHandler(async (req, res) => {
   const { idToken } = req.body;
 
   if (!idToken) {
     return res
       .status(400)
-      .json({ success: false, error: 'Google ID token là bắt buộc' });
+      .json({ success: false, error: MESSAGES.GOOGLE_TOKEN_REQUIRED });
   }
 
   try {
@@ -713,123 +510,94 @@ const googleAuth = asyncHandler(async (req, res) => {
 // @access  Public
 const verifyEmail = asyncHandler(async (req, res) => {
   const { email, otp } = req.body;
+  const otpService = getOTPService();
 
   if (!email || !otp) {
-    return res
-      .status(400)
-      .json({ success: false, error: 'Email và mã OTP là bắt buộc' });
-  }
-
-  // Find user by email
-  const user = await User.findOne({ email });
-
-  if (!user) {
-    return res.status(404).json({
+    return res.status(400).json({
       success: false,
-      error: 'Không tìm thấy tài khoản với email này',
+      error: VALIDATION.EMAIL_OTP_REQUIRED,
     });
   }
 
-  if (user.isEmailVerified) {
-    return res
-      .status(400)
-      .json({ success: false, error: 'Email đã được xác thực trước đó' });
-  }
-
-  // Verify OTP from Redis or database
+  // Verify OTP
   let otpValid = false;
-
-  if (otpService) {
-    try {
-      otpValid = await otpService.verifyAndDeleteOTP(
-        'email_verification',
-        email,
-        otp
-      );
-    } catch (error) {
-      logger.error(
-        'Failed to verify OTP from Redis, falling back to database',
-        {
-          error: error.message,
-          userId: user._id,
-        }
-      );
-      // Fallback to database verification
-      const expectedOtp = user.emailVerificationOtp;
-      if (expectedOtp && expectedOtp === otp.toUpperCase()) {
-        if (
-          user.emailVerificationExpire &&
-          user.emailVerificationExpire < Date.now()
-        ) {
-          return res.status(400).json({
-            success: false,
-            error: 'Mã OTP đã hết hạn. Vui lòng yêu cầu gửi lại mã mới',
-          });
-        }
-        otpValid = true;
-      }
-    }
-  } else {
-    // Fallback to database verification
-    const expectedOtp = user.emailVerificationOtp;
-    if (expectedOtp && expectedOtp === otp.toUpperCase()) {
-      if (
-        user.emailVerificationExpire &&
-        user.emailVerificationExpire < Date.now()
-      ) {
-        return res.status(400).json({
-          success: false,
-          error: 'Mã OTP đã hết hạn. Vui lòng yêu cầu gửi lại mã mới',
-        });
-      }
-      otpValid = true;
-    }
-  }
-  if (!otpValid) {
-    logger.error('OTP verification failed', {
-      userId: user._id,
-      email: user.email,
-      providedOtp: otp.toUpperCase(),
+  try {
+    otpValid = await otpService.verifyAndDeleteOTP(
+      'email_verification',
+      email,
+      otp
+    );
+  } catch (error) {
+    logger.error('Failed to verify OTP', {
+      error: error.message,
+      email,
     });
-    return res
-      .status(400)
-      .json({ success: false, error: 'Mã OTP không chính xác' });
+    return res.status(400).json({
+      success: false,
+      error: 'Không thể xác thực mã OTP',
+    });
   }
 
-  // Set email as verified
-  user.isEmailVerified = true;
-  user.emailVerificationToken = undefined;
-  user.emailVerificationOtp = undefined;
-  user.emailVerificationExpire = undefined;
-  await user.save();
+  if (!otpValid) {
+    return res.status(400).json({
+      success: false,
+      error: 'Mã OTP không chính xác',
+    });
+  }
 
-  // Create new token after email verification
-  const token = user.getSignedJwtToken();
+  // Get stored user data from Redis
+  let userData;
+  try {
+    const userDataString = await otpService.get(`user_registration:${email}`);
+    if (!userDataString) {
+      return res.status(400).json({
+        success: false,
+        error: 'Thông tin đăng ký đã hết hạn. Vui lòng đăng ký lại.',
+      });
+    }
+    userData = JSON.parse(userDataString);
+  } catch (error) {
+    logger.error('Failed to get user data from Redis', {
+      error: error.message,
+      email,
+    });
+    return res.status(500).json({
+      success: false,
+      error: 'Không thể lấy thông tin đăng ký',
+    });
+  }
 
-  logger.info(`Email verified with OTP for user: ${user.email}`, {
-    userId: user._id,
-  });
+  // Create verified user in MongoDB
+  try {
+    const user = await User.create({
+      ...userData,
+      isEmailVerified: true,
+    });
 
-  res.status(200).json({
-    success: true,
-    token,
-    message: 'Xác thực email thành công',
-    user: {
-      id: user._id,
-      email: user.email,
-      firstName: user.profile.firstName,
-      lastName: user.profile.lastName,
-      role: user.role,
-      fullName: user.fullName,
-      isEmailVerified: user.isEmailVerified,
-      authMethod: user.authMethod,
-      profile: {
-        firstName: user.profile.firstName,
-        lastName: user.profile.lastName,
-        avatar: user.profile.avatar,
-      },
-    },
-  });
+    // Clean up Redis data
+    await otpService.delete(`user_registration:${email}`);
+
+    // Generate token
+    const token = user.getSignedJwtToken();
+
+    logger.info(`New user registered and verified: ${email}`);
+
+    res.status(200).json({
+      success: true,
+      token,
+      message: SUCCESS.EMAIL_VERIFIED,
+      user: baseUserResponse(user),
+    });
+  } catch (error) {
+    logger.error('Failed to create verified user', {
+      error: error.message,
+      email,
+    });
+    return res.status(500).json({
+      success: false,
+      error: 'Không thể tạo tài khoản. Vui lòng thử lại.',
+    });
+  }
 });
 
 // @desc    Resend email verification
@@ -837,6 +605,8 @@ const verifyEmail = asyncHandler(async (req, res) => {
 // @access  Public
 const resendEmailVerification = asyncHandler(async (req, res) => {
   const { email } = req.body;
+  const otpService = getOTPService();
+  const otpCooldownService = getOTPCooldownService();
 
   if (!email) {
     return res.status(400).json({
@@ -923,7 +693,7 @@ const resendEmailVerification = asyncHandler(async (req, res) => {
   await user.save({ validateBeforeSave: false });
   // Send verification email
   try {
-    await sendEmailVerification(user, verificationToken);
+    await EmailService.sendVerificationEmail(user, verificationToken);
     logger.info(`Email verification resent to: ${user.email}`, {
       userId: user._id,
     });
@@ -932,10 +702,10 @@ const resendEmailVerification = asyncHandler(async (req, res) => {
     if (otpCooldownService) {
       await otpCooldownService.setCooldown('resend_verification', user.email);
     }
-    
+
     res.status(200).json({
       success: true,
-      message: 'Email xác thực đã được gửi thành công',
+      message: SUCCESS.OTP_SENT,
       emailSent: true,
     });
   } catch (error) {
@@ -948,116 +718,32 @@ const resendEmailVerification = asyncHandler(async (req, res) => {
     // Check if it's a bounce-back or invalid email error
     let errorMessage = 'Không thể gửi email xác thực';
     let errorType = 'EMAIL_SEND_FAILED';
-    
-    if (error.message.includes('550') || error.message.includes('5.1.1') || 
-        error.message.includes('NoSuchUser') || error.message.includes('Address not found')) {
-      errorMessage = 'Email không tồn tại hoặc không thể nhận thư. Vui lòng kiểm tra lại địa chỉ email.';
+
+    if (
+      error.message.includes('550') ||
+      error.message.includes('5.1.1') ||
+      error.message.includes('NoSuchUser') ||
+      error.message.includes('Address not found')
+    ) {
+      errorMessage =
+        'Email không tồn tại hoặc không thể nhận thư. Vui lòng kiểm tra lại địa chỉ email.';
       errorType = 'INVALID_EMAIL_ADDRESS';
-      
-      logger.warn('Email address appears to be invalid or non-existent during resend', {
-        email: user.email,
-        userId: user._id,
-        error: error.message,
-      });
+
+      logger.warn(
+        'Email address appears to be invalid or non-existent during resend',
+        {
+          email: user.email,
+          userId: user._id,
+          error: error.message,
+        }
+      );
     }
 
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: errorMessage,
       errorType,
       emailSent: false,
-    });
-  }
-});
-
-// @desc    Validate email address
-// @route   POST /api/auth/validate-email
-// @access  Public
-const validateEmail = asyncHandler(async (req, res) => {
-  const { email } = req.body;
-
-  if (!email) {
-    return res.status(400).json({
-      success: false,
-      error: 'Email là bắt buộc',
-    });
-  }
-
-  // Basic email format validation
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    return res.status(400).json({
-      success: false,
-      error: 'Định dạng email không hợp lệ',
-      errorType: 'INVALID_EMAIL_FORMAT',
-    });
-  }
-
-  // Check if email already exists
-  const existingUser = await User.findOne({ email });
-  if (existingUser) {
-    return res.status(400).json({
-      success: false,
-      error: 'Email này đã được sử dụng',
-      errorType: 'EMAIL_ALREADY_EXISTS',
-    });
-  }
-
-  // Try to send a test email to validate if the address exists
-  try {
-    const transporter = createTransporter();
-    
-    // Send a test email (this will bounce if email doesn't exist)
-    const testMailOptions = {
-      from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
-      to: email,
-      subject: 'Test Email - Internship Recruitment Platform',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background-color: #4F46E5; color: white; padding: 20px; text-align: center;">
-            <h1>Test Email</h1>
-          </div>
-          <div style="padding: 20px; background-color: #f9f9f9;">
-            <p>Đây là email test để kiểm tra tính hợp lệ của địa chỉ email.</p>
-            <p>Nếu bạn nhận được email này, địa chỉ email của bạn là hợp lệ.</p>
-            <p>Bạn có thể bỏ qua email này.</p>
-          </div>
-        </div>
-      `
-    };
-
-    await transporter.sendMail(testMailOptions);
-    
-    res.status(200).json({
-      success: true,
-      message: 'Email hợp lệ và có thể nhận thư',
-      emailValid: true,
-    });
-  } catch (error) {
-    logger.error('Email validation failed', {
-      error: error.message,
-      email: email,
-      errorCode: error.code,
-      responseCode: error.responseCode,
-    });
-
-    // Check if it's a bounce-back or invalid email error
-    if (error.message.includes('550') || error.message.includes('5.1.1') || 
-        error.message.includes('NoSuchUser') || error.message.includes('Address not found')) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email không tồn tại hoặc không thể nhận thư',
-        errorType: 'EMAIL_NOT_EXISTS',
-        emailValid: false,
-      });
-    }
-
-    // For other errors, we can't determine if email is valid
-    res.status(200).json({
-      success: true,
-      message: 'Không thể kiểm tra email, nhưng định dạng hợp lệ',
-      emailValid: null, // Unknown
-      warning: 'Có thể có vấn đề với dịch vụ email',
     });
   }
 });
@@ -1073,33 +759,7 @@ const getMe = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    user: {
-      id: user._id,
-      email: user.email,
-      firstName: user.profile?.firstName,
-      lastName: user.profile?.lastName,
-      role: user.role,
-      fullName: user.fullName,
-      authMethod: user.authMethod,
-      isEmailVerified: user.isEmailVerified,
-      isActive: user.isActive,
-      lastLogin: user.lastLogin,
-      candidateProfile: user.candidateProfile,
-      employerProfile: user.employerProfile,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-      profile: {
-        firstName: user.profile?.firstName,
-        lastName: user.profile?.lastName,
-        phone: user.profile?.phone,
-        avatar: user.profile?.avatar,
-        bio: user.profile?.bio,
-        location: user.profile?.location,
-        dateOfBirth: user.profile?.dateOfBirth,
-        gender: user.profile?.gender,
-      },
-      preferences: user.preferences,
-    },
+    user: baseUserResponse(user),
   });
 });
 
@@ -1110,7 +770,7 @@ const getUnverifiedAccount = asyncHandler(async (req, res) => {
   if (!email) {
     return res.status(400).json({
       success: false,
-      error: 'Email is required'
+      error: 'Email is required',
     });
   }
 
@@ -1121,7 +781,7 @@ const getUnverifiedAccount = asyncHandler(async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        error: 'Không tìm thấy tài khoản với email này'
+        error: 'Không tìm thấy tài khoản với email này',
       });
     }
 
@@ -1129,19 +789,21 @@ const getUnverifiedAccount = asyncHandler(async (req, res) => {
     if (user.isEmailVerified) {
       return res.status(400).json({
         success: false,
-        error: 'Tài khoản đã được xác thực'
+        error: 'Tài khoản đã được xác thực',
       });
     }
 
     // Check if verification has expired
     const now = new Date();
-    const verificationExpiry = new Date(user.createdAt.getTime() + 24 * 60 * 60 * 1000); // 24 hours
+    const verificationExpiry = new Date(
+      user.createdAt.getTime() + 24 * 60 * 60 * 1000
+    ); // 24 hours
 
     if (now > verificationExpiry) {
       return res.status(400).json({
         success: false,
         error: 'Mã xác thực đã hết hạn. Vui lòng đăng ký lại.',
-        expired: true
+        expired: true,
       });
     }
 
@@ -1150,34 +812,279 @@ const getUnverifiedAccount = asyncHandler(async (req, res) => {
       success: true,
       data: {
         email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        fullName: user.fullName,
         createdAt: user.createdAt,
         verificationExpiry: verificationExpiry,
-        timeRemaining: Math.max(0, verificationExpiry.getTime() - now.getTime())
-      }
+        timeRemaining: Math.max(
+          0,
+          verificationExpiry.getTime() - now.getTime()
+        ),
+      },
     });
-
   } catch (error) {
     logger.error('Error getting unverified account:', error);
     res.status(500).json({
       success: false,
-      error: 'Lỗi server khi lấy thông tin tài khoản'
+      error: 'Lỗi server khi lấy thông tin tài khoản',
     });
   }
 });
 
+// @desc    Refresh access token
+// @route   POST /api/auth/refresh-token
+// @access  Public
+const refreshToken = asyncHandler(async (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    return res.status(400).json({
+      success: false,
+      error: 'Refresh token là bắt buộc',
+    });
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    const user = await User.findById(decoded.id);
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Token không hợp lệ',
+      });
+    }
+
+    // Generate new tokens
+    const newAccessToken = user.getSignedJwtToken();
+    const newRefreshToken = user.getSignedRefreshToken();
+
+    res.status(200).json({
+      success: true,
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+    });
+  } catch (error) {
+    res.status(401).json({
+      success: false,
+      error: 'Token không hợp lệ hoặc đã hết hạn',
+    });
+  }
+});
+
+// @desc    Request login OTP
+// @route   POST /api/auth/request-otp
+// @access  Public
+const requestLoginOTP = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  const otpService = getOTPService();
+  const otpCooldownService = getOTPCooldownService();
+
+  const user = await User.findOne({ email });
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      error: 'Email chưa được đăng ký',
+    });
+  }
+
+  // Check cooldown
+  if (otpCooldownService) {
+    const inCooldown = await otpCooldownService.isInCooldown('login', email);
+    if (inCooldown) {
+      const remainingTime = await otpCooldownService.getRemainingCooldown(
+        'login',
+        email
+      );
+      return res.status(429).json({
+        success: false,
+        error: `Vui lòng đợi ${Math.ceil(
+          remainingTime
+        )} giây trước khi yêu cầu OTP mới`,
+        retryAfter: remainingTime,
+      });
+    }
+  }
+
+  // Generate OTP
+  const loginToken = crypto.randomBytes(20).toString('hex');
+  const loginOtp = loginToken.substring(0, 6).toUpperCase();
+
+  try {
+    if (otpService) {
+      await otpService.storeOTP('login', email, loginOtp);
+    } else {
+      user.loginOtp = loginOtp;
+      user.loginOtpExpire = Date.now() + 5 * 60 * 1000; // 5 minutes
+      await user.save();
+    }
+
+    // Send OTP email
+    await EmailService.sendLoginOTPEmail(user, loginOtp);
+
+    if (otpCooldownService) {
+      await otpCooldownService.setCooldown('login', email);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: SUCCESS.OTP_SENT,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Không thể gửi mã OTP',
+    });
+  }
+});
+
+// @desc    Verify email with token link
+// @route   GET /api/auth/verify-email/:token
+// @access  Public
+const verifyEmailToken = asyncHandler(async (req, res) => {
+  // Get hashed token
+  const verificationToken = crypto
+    .createHash('sha256')
+    .update(req.params.token)
+    .digest('hex');
+
+  const user = await User.findOne({
+    emailVerificationToken: verificationToken,
+    emailVerificationExpire: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    return res.status(400).json({
+      success: false,
+      error: MESSAGES.INVALID_VERIFICATION_LINK,
+    });
+  }
+
+  // Set email as verified
+  user.isEmailVerified = true;
+  user.emailVerificationToken = undefined;
+  user.emailVerificationOtp = undefined;
+  user.emailVerificationExpire = undefined;
+
+  await user.save();
+
+  // Create token
+  const token = user.getSignedJwtToken();
+
+  logger.info(`Email verified with token link for user: ${user.email}`, {
+    userId: user._id,
+  });
+
+  res.status(200).json({
+    success: true,
+    token,
+    message: SUCCESS.EMAIL_VERIFIED,
+    user: baseUserResponse(user),
+  });
+});
+
+// @desc    Verify login OTP
+// @route   POST /api/auth/verify-otp
+// @access  Public
+const verifyLoginOTP = asyncHandler(async (req, res) => {
+  const { email, otp } = req.body;
+  const otpService = getOTPService();
+  const otpCooldownService = getOTPCooldownService();
+
+  if (!email || !otp) {
+    return res.status(400).json({
+      success: false,
+      error: 'Email và mã OTP là bắt buộc',
+    });
+  }
+
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      error: 'Không tìm thấy tài khoản với email này',
+    });
+  }
+
+  // Verify OTP from Redis or database
+  let otpValid = false;
+
+  if (otpService) {
+    try {
+      otpValid = await otpService.verifyAndDeleteOTP('login', email, otp);
+    } catch (error) {
+      logger.error(
+        'Failed to verify OTP from Redis, falling back to database',
+        {
+          error: error.message,
+          userId: user._id,
+        }
+      );
+
+      if (user.loginOtp && user.loginOtp === otp.toUpperCase()) {
+        if (user.loginOtpExpire && user.loginOtpExpire < Date.now()) {
+          return res.status(400).json({
+            success: false,
+            error: 'Mã OTP đã hết hạn. Vui lòng yêu cầu gửi lại mã mới',
+          });
+        }
+        otpValid = true;
+      }
+    }
+  } else {
+    if (user.loginOtp && user.loginOtp === otp.toUpperCase()) {
+      if (user.loginOtpExpire && user.loginOtpExpire < Date.now()) {
+        return res.status(400).json({
+          success: false,
+          error: 'Mã OTP đã hết hạn. Vui lòng yêu cầu gửi lại mã mới',
+        });
+      }
+      otpValid = true;
+    }
+  }
+
+  if (!otpValid) {
+    return res.status(400).json({
+      success: false,
+      error: 'Mã OTP không chính xác',
+    });
+  }
+
+  // Clear OTP data
+  user.loginOtp = undefined;
+  user.loginOtpExpire = undefined;
+
+  // Update last login
+  user.lastLogin = new Date();
+  await user.save({ validateBeforeSave: false });
+
+  // Generate token
+  const token = user.getSignedJwtToken();
+
+  logger.info(`User logged in with OTP: ${user.email}`, {
+    userId: user._id,
+  });
+
+  res.status(200).json({
+    success: true,
+    token,
+    user: baseUserResponse(user),
+  });
+});
+
 module.exports = {
-  register,
-  login,
-  logout,
-  getMe,
-  forgotPassword,
-  resetPassword,
-  googleAuth,
-  verifyEmail,
-  resendEmailVerification,
-  validateEmail,
-  getUnverifiedAccount,
-  initializeOTPService,
+  register, // POST /register
+  login, // POST /login
+  loginWithGoogle, // POST /login/google
+  requestLoginOTP, // POST /request-otp
+  verifyLoginOTP, // POST /verify-otp
+  forgotPassword, // POST /forgot-password
+  resetPassword, // POST /reset-password
+  verifyEmail, // POST /verify-email
+  verifyEmailToken, // GET /verify-email/:token
+  resendEmailVerification, // POST /resend-verification
+  refreshToken, // POST /refresh-token
+  logout, // POST /logout
+  getMe, // GET /me
+  getUnverifiedAccount, // GET /unverified-account
 };
