@@ -1,13 +1,18 @@
+// Models
 const User = require('../models/User');
+const Job = require('../models/Job');
+const InternProfile = require('../models/InternProfile');
+const EmployerProfile = require('../models/EmployerProfile');
+const Application = require('../models/Application');
+const SkillRoadmap = require('../models/SkillRoadmap');
+const AIAnalysis = require('../models/AIAnalysis');
+const Notification = require('../models/Notification');
+
 const asyncHandler = require('express-async-handler');
 const { logger } = require('../utils/logger');
 const { uploadImage } = require('../services/imageUploadService');
+const { getIO } = require('../config/socket');
 const googleAuthService = require('../services/googleAuth');
-const CandidateProfile = require('../models/CandidateProfile');
-const EmployerProfile = require('../models/EmployerProfile');
-const Application = require('../models/Application');
-const SavedJob = require('../models/SavedJob');
-const Notification = require('../models/Notification');
 
 // @desc    Get single user
 // @route   GET /api/users/:id
@@ -101,23 +106,49 @@ const uploadAvatar = asyncHandler(async (req, res) => {
 // @route   PUT /api/users/profile
 // @access  Private
 const updateProfile = asyncHandler(async (req, res) => {
+  let user = await User.findById(req.user.id);
+
+  // Basic profile fields
   const fieldsToUpdate = {
     'profile.firstName': req.body.firstName,
     'profile.lastName': req.body.lastName,
-    email: req.body.email,
     'profile.phone': req.body.phone,
-    'profile.dateOfBirth': req.body.dateOfBirth,
-    'profile.gender': req.body.gender,
-    'profile.address': req.body.address,
-    'profile.education': req.body.education,
+    'profile.avatar': req.body.avatar,
+    email: req.body.email
   };
+
+  // Role-specific profile updates
+  if (user.role === 'intern') {
+    await InternProfile.findOneAndUpdate(
+      { userId: user._id },
+      {
+        'education.university': req.body.university,
+        'education.major': req.body.major,
+        'education.graduationYear': req.body.graduationYear,
+        'preferences.locations': req.body.preferredLocations,
+        'preferences.internshipTypes': req.body.preferredTypes
+      },
+      { new: true }
+    );
+  } else if (user.role === 'employer') {
+    await EmployerProfile.findOneAndUpdate(
+      { userId: user._id },
+      {
+        'company.name': req.body.companyName,
+        'company.industry': req.body.industry,
+        'position.title': req.body.jobTitle,
+        'contact.workEmail': req.body.workEmail
+      },
+      { new: true }
+    );
+  }
 
   // Remove undefined fields
   Object.keys(fieldsToUpdate).forEach(
     key => fieldsToUpdate[key] === undefined && delete fieldsToUpdate[key]
   );
 
-  const user = await User.findByIdAndUpdate(req.user.id, fieldsToUpdate, {
+  user = await User.findByIdAndUpdate(req.user.id, fieldsToUpdate, {
     new: true,
     runValidators: true,
   });
@@ -332,9 +363,34 @@ const unlinkGoogleAccount = asyncHandler(async (req, res) => {
 const getUserProfile = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user.id).select('-password');
 
+  let profileData = {};
+  if (user.role === 'intern') {
+    const internProfile = await InternProfile.findOne({ userId: user._id });
+    if (internProfile) {
+      profileData = {
+        education: internProfile.education,
+        skills: internProfile.skills,
+        preferences: internProfile.preferences,
+        resume: internProfile.resume
+      };
+    }
+  } else if (user.role === 'employer') {
+    const employerProfile = await EmployerProfile.findOne({ userId: user._id });
+    if (employerProfile) {
+      profileData = {
+        company: employerProfile.company,
+        position: employerProfile.position,
+        contact: employerProfile.contact
+      };
+    }
+  }
+
   res.status(200).json({
     success: true,
-    user: user,
+    data: {
+      user,
+      profile: profileData
+    }
   });
 });
 
@@ -396,39 +452,67 @@ const searchUsers = asyncHandler(async (req, res) => {
 // @access  Private
 const getUserStats = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-
-  // Get user's application count
-  const applicationCount = await Application.countDocuments({ user: userId });
-
-  // Get user's saved jobs count
-  const savedJobsCount = await SavedJob.countDocuments({ user: userId });
-
-  // Get user's profile completion percentage
   const user = await User.findById(userId);
-  let profileCompletion = 0;
 
-  if (user) {
-    const profileFields = [
-      user.profile?.firstName,
-      user.profile?.lastName,
-      user.profile?.phone,
-      user.profile?.location,
-    ];
+  let stats = {
+    profileCompletion: 0,
+    lastActive: user?.lastActive || user?.createdAt
+  };
 
-    const completedFields = profileFields.filter(field => field).length;
-    profileCompletion = Math.round(
-      (completedFields / profileFields.length) * 100
-    );
+  if (user.role === 'intern') {
+    // Intern stats
+    const internProfile = await InternProfile.findOne({ userId });
+    const applications = await Application.find({ internId: internProfile._id });
+    const currentRoadmap = await SkillRoadmap.findOne({ internId: internProfile._id, status: 'in_progress' });
+
+    stats = {
+      ...stats,
+      applications: {
+        total: applications.length,
+        pending: applications.filter(app => app.status === 'pending').length,
+        interviewing: applications.filter(app => app.status === 'interview').length,
+        accepted: applications.filter(app => app.status === 'accepted').length
+      },
+      skills: {
+        verified: internProfile.skills.technical.filter(s => s.verified).length,
+        total: internProfile.skills.technical.length
+      },
+      roadmap: currentRoadmap ? {
+        progress: currentRoadmap.progress.overallProgress,
+        completedMilestones: currentRoadmap.progress.completedMilestones,
+        totalMilestones: currentRoadmap.progress.totalMilestones
+      } : null
+    };
+  } else if (user.role === 'employer') {
+    // Employer stats
+    const employerProfile = await EmployerProfile.findOne({ userId });
+    const totalApplications = await Application.countDocuments({ 
+      'job.employer': employerProfile._id 
+    });
+
+    stats = {
+      ...stats,
+      jobPostings: {
+        active: await Job.countDocuments({ employer: employerProfile._id, status: 'active' }),
+        total: await Job.countDocuments({ employer: employerProfile._id })
+      },
+      applications: {
+        total: totalApplications,
+        pending: await Application.countDocuments({ 
+          'job.employer': employerProfile._id,
+          status: 'pending'
+        }),
+        interviewing: await Application.countDocuments({
+          'job.employer': employerProfile._id,
+          status: 'interview'
+        })
+      }
+    };
   }
 
   res.status(200).json({
     success: true,
-    data: {
-      applicationCount,
-      savedJobsCount,
-      profileCompletion,
-      lastActive: user?.lastActive || user?.createdAt,
-    },
+    data: stats
   });
 });
 
@@ -501,10 +585,20 @@ const getUserNotifications = asyncHandler(async (req, res) => {
 // @access  Private
 const markNotificationAsRead = asyncHandler(async (req, res) => {
   const notification = await Notification.findOneAndUpdate(
-    { _id: req.params.id, user: req.user.id },
-    { isRead: true },
+    { _id: req.params.id, recipient: req.user.id },
+    { 
+      isRead: true,
+      readAt: new Date()
+    },
     { new: true }
   );
+
+  // Emit socket event to update UI in real-time
+  const io = getIO();
+  io.to(req.user.id.toString()).emit('notification_read', {
+    notificationId: notification._id,
+    readAt: notification.readAt
+  });
 
   if (!notification) {
     return res.status(404).json({

@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const { USER_ROLES } = require('../constants/common.constants');
 
 const UserSchema = new mongoose.Schema(
   {
@@ -42,47 +43,22 @@ const UserSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['student', 'employer', 'admin'],
-      default: 'student',
+      enum: {
+        values: Object.values(USER_ROLES),
+        message: 'Vai trò không hợp lệ',
+      },
+      default: USER_ROLES.CANDIDATE,
     },
 
-    // Basic profile information
-    profile: {
-      firstName: {
-        type: String,
-        trim: true,
-        maxlength: [50, 'Tên không được vượt quá 50 ký tự'],
-      },
-      lastName: {
-        type: String,
-        trim: true,
-        maxlength: [50, 'Họ không được vượt quá 50 ký tự'],
-      },
-      phone: {
-        type: String,
-        match: [/^[\+]?[1-9][\d]{0,15}$/, 'Vui lòng nhập số điện thoại hợp lệ'],
-      },
-      avatar: {
-        type: String,
-        default: '',
-      },
-      bio: {
-        type: String,
-        maxlength: [500, 'Giới thiệu không được vượt quá 500 ký tự'],
-      },
-      location: {
-        city: String,
-        district: String,
-        country: {
-          type: String,
-          default: 'VN',
-        },
-      },
-      dateOfBirth: Date,
-      gender: {
-        type: String,
-        enum: ['male', 'female', 'other'],
-      },
+    fullName: {
+      type: String,
+      required: [true, 'Vui lòng nhập họ tên'],
+      trim: true,
+      maxlength: [100, 'Họ tên không được vượt quá 100 ký tự'],
+    },
+    avatar: {
+      type: String,
+      default: 'default-avatar.png',
     },
 
     // Profile references
@@ -147,7 +123,7 @@ const UserSchema = new mongoose.Schema(
       default: false,
     },
     emailVerificationToken: String,
-    
+
     // Email delivery tracking
     emailStatus: {
       type: String,
@@ -175,17 +151,40 @@ const UserSchema = new mongoose.Schema(
   }
 );
 
-// Virtual cho tên đầy đủ
-UserSchema.virtual('fullName').get(function () {
-  const firstName = this.profile?.firstName || '';
-  const lastName = this.profile?.lastName || '';
-  return `${firstName} ${lastName}`.trim() || 'Chưa cập nhật';
+// Virtual cho hiển thị tên đầy đủ từ các nguồn khác nhau
+UserSchema.virtual('displayFullName').get(function () {
+  // Ưu tiên lấy từ fullName
+  if (this.fullName) return this.fullName;
+
+  // Nếu không có displayName, lấy từ profile tương ứng
+  if (
+    this.populated &&
+    this.populated('candidateProfile') &&
+    this.candidateProfile
+  ) {
+    const pi = this.candidateProfile.personalInfo || {};
+    return (
+      (
+        pi.fullName || `${pi.givenName || ''} ${pi.familyName || ''}`.trim()
+      ).trim() || 'Chưa cập nhật'
+    );
+  }
+  if (
+    this.populated &&
+    this.populated('employerProfile') &&
+    this.employerProfile
+  ) {
+    const company = this.employerProfile.company || {};
+    const contact = this.employerProfile.contact || {};
+    return (contact.name || company.name || '').trim() || 'Chưa cập nhật';
+  }
+
+  return 'Chưa cập nhật';
 });
 
 // Tạo chỉ mục text cho tìm kiếm
 UserSchema.index({
-  'profile.firstName': 'text',
-  'profile.lastName': 'text',
+  fullName: 'text',
   email: 'text',
 });
 
