@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/auth');
+const { protect, authorize } = require('../middleware/auth');
 const {
   getUser,
   getUserProfile,
+  getPublicUserProfile,
   updateProfile,
   uploadAvatar,
   changePassword,
@@ -20,17 +21,14 @@ const {
   reactivateAccount,
 } = require('../controllers/userController');
 
-const { uploadMiddleware } = require('../middleware/upload');
+const {
+  uploadAvatar: uploadAvatarMiddleware,
+} = require('../middleware/upload');
 
 // Profile routes
 router.get('/profile', protect, getUserProfile);
 router.put('/profile', protect, updateProfile);
-// router.post(
-//   '/upload-avatar',
-//   protect,
-//   uploadMiddleware.single('avatar'),
-//   uploadAvatar
-// );
+router.post('/avatar', protect, uploadAvatarMiddleware, uploadAvatar);
 router.put('/password', protect, changePassword);
 
 // Account management
@@ -44,6 +42,12 @@ router.put('/reactivate', protect, reactivateAccount);
 router.get('/search', searchUsers);
 router.get('/stats', protect, getUserStats);
 router.get('/:id', protect, getUser);
+router.get(
+  '/:id/public-profile',
+  protect,
+  authorize('employer'),
+  getPublicUserProfile
+);
 
 // Notifications
 router.get('/notifications', protect, getUserNotifications);

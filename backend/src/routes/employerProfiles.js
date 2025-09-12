@@ -1,5 +1,6 @@
 const express = require('express');
 const { protect, authorize } = require('../middleware/auth');
+const { uploadLogo } = require('../middleware/upload');
 const {
   getProfile,
   updateProfile,
@@ -13,7 +14,8 @@ const {
   respondToReview,
   getDashboardStats,
   updatePreferences,
-  getRecommendedCandidates
+  getRecommendedCandidates,
+  uploadCompanyLogo,
 } = require('../controllers/employerProfileController');
 
 const router = express.Router();
@@ -26,18 +28,45 @@ const router = express.Router();
 // Profile & Verification
 router.get('/profile', protect, authorize('employer'), getProfile);
 router.put('/profile', protect, authorize('employer'), updateProfile);
+router.post(
+  '/upload-logo',
+  protect,
+  authorize('employer'),
+  uploadLogo,
+  uploadCompanyLogo
+);
 router.post('/verify', protect, authorize('employer'), submitVerification);
-router.get('/verification-status', protect, authorize('employer'), getVerificationStatus);
+router.get(
+  '/verification-status',
+  protect,
+  authorize('employer'),
+  getVerificationStatus
+);
 
 // Jobs & Applications
 router.get('/jobs', protect, authorize('employer'), getPostedJobs);
 router.get('/applications', protect, authorize('employer'), getApplications);
-router.get('/recommended-candidates', protect, authorize('employer'), getRecommendedCandidates);
+router.get(
+  '/recommended-candidates',
+  protect,
+  authorize('employer'),
+  getRecommendedCandidates
+);
 
 // Company Management
 router.put('/company', protect, authorize('employer'), updateCompanyInfo);
-router.get('/company/reviews', protect, authorize('employer'), getCompanyReviews);
-router.post('/company/reviews/:reviewId/respond', protect, authorize('employer'), respondToReview);
+router.get(
+  '/company/reviews',
+  protect,
+  authorize('employer'),
+  getCompanyReviews
+);
+router.post(
+  '/company/reviews/:reviewId/respond',
+  protect,
+  authorize('employer'),
+  respondToReview
+);
 
 // Analytics & Dashboard
 router.get('/analytics', protect, authorize('employer'), getAnalytics);

@@ -14,8 +14,8 @@ class EmailService {
       secure: process.env.SMTP_SECURE === 'true', // Sử dụng biến môi trường
       auth: {
         user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      }
+        pass: process.env.SMTP_PASS,
+      },
     });
   }
 
@@ -26,35 +26,44 @@ class EmailService {
     } catch (error) {
       logger.error('Email sending failed', {
         error: error.message,
-        to: options.to
+        to: options.to,
       });
       throw error;
     }
   }
 
-  async sendVerificationEmail(user, token) {
+  async sendVerificationEmail(user, otp) {
     // Đảm bảo truyền fullName cho template
-    const mailOptions = EmailTemplate.verificationEmail({
-      email: user.email,
-      fullName: user.fullName,
-      // ...các trường khác nếu cần
-    }, token);
+    const mailOptions = EmailTemplate.verificationEmail(
+      {
+        email: user.email,
+        fullName: user.fullName,
+        // ...các trường khác nếu cần
+      },
+      otp
+    );
     return this.sendMail(mailOptions);
   }
 
-  async sendPasswordResetEmail(user, token) {
-    const mailOptions = EmailTemplate.passwordResetEmail({
-      email: user.email,
-      fullName: user.fullName,
-    }, token);
-    return this.sendMail(mailOptions);  
+  async sendPasswordResetEmail(user, otp) {
+    const mailOptions = EmailTemplate.passwordResetEmail(
+      {
+        email: user.email,
+        fullName: user.fullName,
+      },
+      otp
+    );
+    return this.sendMail(mailOptions);
   }
 
   async sendLoginOTPEmail(user, otp) {
-    const mailOptions = EmailTemplate.loginOTPEmail({
-      email: user.email,
-      fullName: user.fullName,
-    }, otp);
+    const mailOptions = EmailTemplate.loginOTPEmail(
+      {
+        email: user.email,
+        fullName: user.fullName,
+      },
+      otp
+    );
     return this.sendMail(mailOptions);
   }
 

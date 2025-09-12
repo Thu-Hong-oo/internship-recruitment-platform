@@ -25,10 +25,6 @@ const upload = multer({
 
 // Middleware for single avatar upload
 const uploadAvatar = upload.single('avatar');
-// Middleware for generic single image (field: image)
-const uploadImage = upload.single('image');
-// Middleware for multiple images (field: images)
-const uploadImages = upload.array('images');
 // Middleware for company logo (field: logo)
 const uploadLogo = upload.single('logo');
 
@@ -60,8 +56,6 @@ const handleUploadError = (error, req, res, next) => {
 
 module.exports = {
   uploadAvatar,
-  uploadImage,
-  uploadImages,
   uploadLogo,
   handleUploadError,
 };

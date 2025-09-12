@@ -2,6 +2,7 @@ const EmployerProfile = require('../models/EmployerProfile');
 const Company = require('../models/Company');
 const User = require('../models/User');
 const { logger } = require('../utils/logger');
+const { uploadImage } = require('../services/imageUploadService');
 const asyncHandler = require('express-async-handler');
 
 // @desc    Get employer profile
@@ -9,25 +10,26 @@ const asyncHandler = require('express-async-handler');
 // @access  Private (Employer)
 const getEmployerProfile = asyncHandler(async (req, res) => {
   try {
-    const profile = await EmployerProfile.findOne({ userId: req.user.id })
-      .populate('companyId', 'name logo industry description location size');
+    const profile = await EmployerProfile.findOne({
+      userId: req.user.id,
+    }).populate('companyId', 'name logo industry description location size');
 
     if (!profile) {
       return res.status(404).json({
         success: false,
-        message: 'Chưa có hồ sơ nhà tuyển dụng'
+        message: 'Chưa có hồ sơ nhà tuyển dụng',
       });
     }
 
     res.status(200).json({
       success: true,
-      data: profile
+      data: profile,
     });
   } catch (error) {
     logger.error('Error getting employer profile:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy hồ sơ nhà tuyển dụng'
+      message: 'Lỗi khi lấy hồ sơ nhà tuyển dụng',
     });
   }
 });
@@ -38,33 +40,38 @@ const getEmployerProfile = asyncHandler(async (req, res) => {
 const createEmployerProfile = asyncHandler(async (req, res) => {
   try {
     // Check if profile already exists
-    const existingProfile = await EmployerProfile.findOne({ userId: req.user.id });
+    const existingProfile = await EmployerProfile.findOne({
+      userId: req.user.id,
+    });
     if (existingProfile) {
       return res.status(400).json({
         success: false,
-        message: 'Hồ sơ nhà tuyển dụng đã tồn tại'
+        message: 'Hồ sơ nhà tuyển dụng đã tồn tại',
       });
     }
 
     const profileData = {
       ...req.body,
       userId: req.user.id,
-      companyId: req.user.companyId
+      companyId: req.user.companyId,
     };
 
     const profile = await EmployerProfile.create(profileData);
 
-    await profile.populate('companyId', 'name logo industry description location size');
+    await profile.populate(
+      'companyId',
+      'name logo industry description location size'
+    );
 
     res.status(201).json({
       success: true,
-      data: profile
+      data: profile,
     });
   } catch (error) {
     logger.error('Error creating employer profile:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi tạo hồ sơ nhà tuyển dụng'
+      message: 'Lỗi khi tạo hồ sơ nhà tuyển dụng',
     });
   }
 });
@@ -79,7 +86,7 @@ const updateEmployerProfile = asyncHandler(async (req, res) => {
     if (!profile) {
       return res.status(404).json({
         success: false,
-        message: 'Chưa có hồ sơ nhà tuyển dụng'
+        message: 'Chưa có hồ sơ nhà tuyển dụng',
       });
     }
 
@@ -91,13 +98,13 @@ const updateEmployerProfile = asyncHandler(async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: updatedProfile
+      data: updatedProfile,
     });
   } catch (error) {
     logger.error('Error updating employer profile:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi cập nhật hồ sơ nhà tuyển dụng'
+      message: 'Lỗi khi cập nhật hồ sơ nhà tuyển dụng',
     });
   }
 });
@@ -111,23 +118,25 @@ const getEmployerDashboard = asyncHandler(async (req, res) => {
     const Application = require('../models/Application');
 
     // Get company's jobs
-    const totalJobs = await Job.countDocuments({ companyId: req.user.companyId });
-    const activeJobs = await Job.countDocuments({ 
-      companyId: req.user.companyId, 
-      status: 'active' 
+    const totalJobs = await Job.countDocuments({
+      companyId: req.user.companyId,
+    });
+    const activeJobs = await Job.countDocuments({
+      companyId: req.user.companyId,
+      status: 'active',
     });
 
     // Get total applications
     const jobs = await Job.find({ companyId: req.user.companyId });
     const jobIds = jobs.map(job => job._id);
-    
+
     const totalApplications = await Application.countDocuments({
-      jobId: { $in: jobIds }
+      jobId: { $in: jobIds },
     });
 
     // Get recent applications
     const recentApplications = await Application.find({
-      jobId: { $in: jobIds }
+      jobId: { $in: jobIds },
     })
       .populate('jobId', 'title')
       .populate('jobseekerId', 'firstName lastName email')
@@ -137,7 +146,7 @@ const getEmployerDashboard = asyncHandler(async (req, res) => {
     // Get applications by status
     const applicationsByStatus = await Application.aggregate([
       { $match: { jobId: { $in: jobIds } } },
-      { $group: { _id: '$status', count: { $sum: 1 } } }
+      { $group: { _id: '$status', count: { $sum: 1 } } },
     ]);
 
     const dashboardData = {
@@ -148,18 +157,18 @@ const getEmployerDashboard = asyncHandler(async (req, res) => {
       applicationsByStatus: applicationsByStatus.reduce((acc, item) => {
         acc[item._id] = item.count;
         return acc;
-      }, {})
+      }, {}),
     };
 
     res.status(200).json({
       success: true,
-      data: dashboardData
+      data: dashboardData,
     });
   } catch (error) {
     logger.error('Error getting employer dashboard:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy dữ liệu dashboard'
+      message: 'Lỗi khi lấy dữ liệu dashboard',
     });
   }
 });
@@ -182,9 +191,9 @@ const getProfileCompletion = asyncHandler(async (req, res) => {
             'personalInfo',
             'companyInfo',
             'companyLogo',
-            'companyDescription'
-          ]
-        }
+            'companyDescription',
+          ],
+        },
       });
     }
 
@@ -204,23 +213,21 @@ const getProfileCompletion = asyncHandler(async (req, res) => {
     if (company?.description) completedFields.push('companyDescription');
     else missingFields.push('companyDescription');
 
-    const completionPercentage = Math.round(
-      (completedFields.length / 4) * 100
-    );
+    const completionPercentage = Math.round((completedFields.length / 4) * 100);
 
     res.status(200).json({
       success: true,
       data: {
         completionPercentage,
         completedFields,
-        missingFields
-      }
+        missingFields,
+      },
     });
   } catch (error) {
     logger.error('Error getting profile completion:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy trạng thái hoàn thành hồ sơ'
+      message: 'Lỗi khi lấy trạng thái hoàn thành hồ sơ',
     });
   }
 });
@@ -235,7 +242,7 @@ const deleteEmployerProfile = asyncHandler(async (req, res) => {
     if (!profile) {
       return res.status(404).json({
         success: false,
-        message: 'Chưa có hồ sơ nhà tuyển dụng'
+        message: 'Chưa có hồ sơ nhà tuyển dụng',
       });
     }
 
@@ -243,13 +250,13 @@ const deleteEmployerProfile = asyncHandler(async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Xóa hồ sơ nhà tuyển dụng thành công'
+      message: 'Xóa hồ sơ nhà tuyển dụng thành công',
     });
   } catch (error) {
     logger.error('Error deleting employer profile:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi xóa hồ sơ nhà tuyển dụng'
+      message: 'Lỗi khi xóa hồ sơ nhà tuyển dụng',
     });
   }
 });
@@ -260,5 +267,68 @@ module.exports = {
   updateEmployerProfile,
   getEmployerDashboard,
   getProfileCompletion,
-  deleteEmployerProfile
+  deleteEmployerProfile,
+  uploadCompanyLogo,
 };
+
+// @desc    Upload company logo
+// @route   POST /api/employer-profile/upload-logo
+// @access  Private (Employer)
+const uploadCompanyLogo = asyncHandler(async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'Không có file nào được upload',
+      });
+    }
+
+    const result = await uploadImage('logo', req.file.buffer);
+
+    // Tìm company của employer
+    const company = await Company.findByOwner(req.user.id);
+    if (company) {
+      company.logo = {
+        url: result.url,
+        filename: result.publicId,
+        uploadedAt: new Date(),
+      };
+      await company.save();
+    }
+
+    logger.info('Company logo upload successful', {
+      userId: req.user.id,
+      originalName: req.file.originalname,
+      publicId: result.publicId,
+      companyId: company?._id,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Upload logo công ty thành công',
+      data: {
+        logo: {
+          publicId: result.publicId,
+          url: result.url,
+          size: result.bytes,
+          format: result.format,
+          dimensions: {
+            width: result.width,
+            height: result.height,
+          },
+        },
+        companyId: company?._id,
+      },
+    });
+  } catch (error) {
+    logger.error('Company logo upload failed:', {
+      error: error.message,
+      userId: req.user?.id,
+    });
+
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Upload logo công ty thất bại',
+    });
+  }
+});

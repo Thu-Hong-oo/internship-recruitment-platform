@@ -17,15 +17,25 @@ const {
   getOTPCooldownService,
 } = require('../config/initializeServices');
 
+const { getAvatarUrl } = require('../utils/avatarUtils');
+
+const resolveFullName = user => {
+  if (user?.fullName && user.fullName.trim().length > 0) return user.fullName;
+  if (user?.displayFullName && String(user.displayFullName).trim().length > 0)
+    return String(user.displayFullName).trim();
+  if (user?.email) return user.email.split('@')[0];
+  return 'User';
+};
+
 const baseUserResponse = user => ({
   id: user._id,
   email: user.email,
-  fullName: user.fullName,
+  fullName: resolveFullName(user),
   role: user.role,
   authMethod: user.authMethod,
   isEmailVerified: user.isEmailVerified,
   isActive: user.isActive,
-  avatar: user.avatar,
+  avatar: getAvatarUrl(user),
   googleProfile: user.googleProfile,
   preferences: user.preferences,
   lastLogin: user.lastLogin,
@@ -100,7 +110,7 @@ const register = asyncHandler(async (req, res) => {
     try {
       await EmailService.sendVerificationEmail(
         { email, fullName },
-        verificationToken
+        verificationOtp
       );
 
       res.status(201).json({
@@ -352,9 +362,9 @@ const forgotPassword = asyncHandler(async (req, res) => {
 
   await user.save({ validateBeforeSave: false });
 
-  // Send password reset email
+  // Send password reset email with OTP text
   try {
-    await EmailService.sendPasswordResetEmail(user, resetToken);
+    await EmailService.sendPasswordResetEmail(user, resetOtp);
 
     logger.info(`Password reset email sent to: ${user.email}`, {
       userId: user._id,
@@ -469,11 +479,10 @@ const resetPassword = asyncHandler(async (req, res) => {
     userId: user._id,
   });
 
-  const token = user.getSignedJwtToken();
-
   res.status(200).json({
     success: true,
-    token,
+    message: SUCCESS.PASSWORD_RESET,
+    requireLogin: true,
   });
 });
 
@@ -519,9 +528,28 @@ const verifyEmail = asyncHandler(async (req, res) => {
     });
   }
 
-  // Verify OTP
+  // Verify OTP with explicit expired vs mismatch handling
   let otpValid = false;
   try {
+    // Check existence first to distinguish expiration
+    const existingOtp = await otpService.getOTP('email_verification', email);
+    if (!existingOtp) {
+      return res.status(400).json({
+        success: false,
+        error: 'Mã OTP đã hết hạn. Vui lòng yêu cầu gửi lại mã mới',
+        expired: true,
+      });
+    }
+
+    if (existingOtp !== otp.toUpperCase()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Mã OTP không chính xác',
+        expired: false,
+      });
+    }
+
+    // Now consume OTP (delete)
     otpValid = await otpService.verifyAndDeleteOTP(
       'email_verification',
       email,
@@ -577,16 +605,13 @@ const verifyEmail = asyncHandler(async (req, res) => {
     // Clean up Redis data
     await otpService.delete(`user_registration:${email}`);
 
-    // Generate token
-    const token = user.getSignedJwtToken();
-
     logger.info(`New user registered and verified: ${email}`);
 
     res.status(200).json({
       success: true,
-      token,
       message: SUCCESS.EMAIL_VERIFIED,
-      user: baseUserResponse(user),
+      email: user.email,
+      isEmailVerified: true,
     });
   } catch (error) {
     logger.error('Failed to create verified user', {
@@ -616,27 +641,41 @@ const resendEmailVerification = asyncHandler(async (req, res) => {
   }
 
   const user = await User.findOne({ email });
-  if (!user) {
+  // Case A: User exists in DB
+  if (user) {
+    if (user.isEmailVerified) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'Email đã được xác thực' });
+    }
+    // proceed to generate OTP for existing unverified user (handled below)
+  }
+  // Case B: User is pending in Redis (pre-registration)
+  let pendingRegistration = null;
+  if (!user && otpService) {
+    try {
+      const pending = await otpService.get(`user_registration:${email}`);
+      if (pending) pendingRegistration = JSON.parse(pending);
+    } catch (e) {
+      // ignore parse errors, will fallthrough to 404
+    }
+  }
+  if (!user && !pendingRegistration) {
     return res.status(404).json({
       success: false,
       error: 'Không tìm thấy tài khoản với email này',
     });
   }
-  if (user.isEmailVerified) {
-    return res
-      .status(400)
-      .json({ success: false, error: 'Email đã được xác thực' });
-  }
   // Check cooldown for resend verification
   if (otpCooldownService) {
     const inCooldown = await otpCooldownService.isInCooldown(
       'resend_verification',
-      user.email
+      email
     );
     if (inCooldown) {
       const remainingTime = await otpCooldownService.getRemainingCooldown(
         'resend_verification',
-        user.email
+        email
       );
       return res.status(429).json({
         success: false,
@@ -652,55 +691,88 @@ const resendEmailVerification = asyncHandler(async (req, res) => {
   const verificationToken = crypto.randomBytes(20).toString('hex');
   const verificationOtp = verificationToken.substring(0, 6).toUpperCase();
 
-  // Store OTP in Redis if available, otherwise fallback to database
+  // Store OTP
   if (otpService) {
+    const targetEmail = user
+      ? user.email
+      : pendingRegistration && pendingRegistration.email
+      ? pendingRegistration.email
+      : email;
     try {
       await otpService.storeOTP(
         'email_verification',
-        user.email,
+        targetEmail,
         verificationOtp
       );
-      // Only store hashed token in database for security
-      user.emailVerificationToken = crypto
-        .createHash('sha256')
-        .update(verificationToken)
-        .digest('hex');
-      user.emailVerificationOtp = undefined; // Clear OTP from database
-      user.emailVerificationExpire = undefined; // Clear expiry from database
+      if (user) {
+        // For existing user, keep hashed token in DB for traceability
+        user.emailVerificationToken = crypto
+          .createHash('sha256')
+          .update(verificationToken)
+          .digest('hex');
+        user.emailVerificationOtp = undefined;
+        user.emailVerificationExpire = undefined;
+      } else if (pendingRegistration) {
+        // For Redis-only user, update stored registration snapshot with new hashed token
+        const updatedPending = {
+          ...pendingRegistration,
+          verificationToken: crypto
+            .createHash('sha256')
+            .update(verificationToken)
+            .digest('hex'),
+        };
+        await otpService.setWithExpiry(
+          `user_registration:${targetEmail}`,
+          JSON.stringify(updatedPending),
+          24 * 60 * 60
+        );
+      }
     } catch (error) {
       logger.error('Failed to store OTP in Redis, falling back to database', {
         error: error.message,
-        userId: user._id,
+        email,
       });
-      // Fallback to database storage
-      user.emailVerificationToken = crypto
-        .createHash('sha256')
-        .update(verificationToken)
-        .digest('hex');
-      user.emailVerificationOtp = verificationOtp;
-      user.emailVerificationExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+      if (user) {
+        user.emailVerificationToken = crypto
+          .createHash('sha256')
+          .update(verificationToken)
+          .digest('hex');
+        user.emailVerificationOtp = verificationOtp;
+        user.emailVerificationExpire = Date.now() + 10 * 60 * 1000;
+      }
     }
-  } else {
-    // Fallback to database storage
+  } else if (user) {
+    // No Redis, only support DB user
     user.emailVerificationToken = crypto
       .createHash('sha256')
       .update(verificationToken)
       .digest('hex');
     user.emailVerificationOtp = verificationOtp;
-    user.emailVerificationExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+    user.emailVerificationExpire = Date.now() + 10 * 60 * 1000;
   }
 
-  await user.save({ validateBeforeSave: false });
+  if (user) {
+    await user.save({ validateBeforeSave: false });
+  }
   // Send verification email
   try {
-    await EmailService.sendVerificationEmail(user, verificationToken);
-    logger.info(`Email verification resent to: ${user.email}`, {
-      userId: user._id,
+    if (user) {
+      await EmailService.sendVerificationEmail(user, verificationOtp);
+    } else if (pendingRegistration) {
+      await EmailService.sendVerificationEmail(
+        { email, fullName: pendingRegistration.fullName },
+        verificationOtp
+      );
+    }
+    logger.info('Email verification resent', {
+      email,
+      userId: user ? user._id : undefined,
+      context: user ? 'db_user' : 'redis_pending',
     });
 
     // Set cooldown after successful email send
     if (otpCooldownService) {
-      await otpCooldownService.setCooldown('resend_verification', user.email);
+      await otpCooldownService.setCooldown('resend_verification', email);
     }
 
     res.status(200).json({
@@ -711,8 +783,8 @@ const resendEmailVerification = asyncHandler(async (req, res) => {
   } catch (error) {
     logger.error('Failed to resend verification email', {
       error: error.message,
-      userId: user._id,
-      email: user.email,
+      userId: user ? user._id : undefined,
+      email,
     });
 
     // Check if it's a bounce-back or invalid email error
@@ -729,14 +801,11 @@ const resendEmailVerification = asyncHandler(async (req, res) => {
         'Email không tồn tại hoặc không thể nhận thư. Vui lòng kiểm tra lại địa chỉ email.';
       errorType = 'INVALID_EMAIL_ADDRESS';
 
-      logger.warn(
-        'Email address appears to be invalid or non-existent during resend',
-        {
-          email: user.email,
-          userId: user._id,
-          error: error.message,
-        }
-      );
+      logger.warn('Email appears invalid during resend', {
+        email,
+        userId: user ? user._id : undefined,
+        error: error.message,
+      });
     }
 
     res.status(500).json({
@@ -763,14 +832,14 @@ const getMe = asyncHandler(async (req, res) => {
   });
 });
 
-// Get unverified account info
+// Get account verification status
 const getUnverifiedAccount = asyncHandler(async (req, res) => {
   const { email } = req.query;
 
   if (!email) {
     return res.status(400).json({
       success: false,
-      error: 'Email is required',
+      error: VALIDATION.EMAIL_REQUIRED,
     });
   }
 
@@ -779,17 +848,27 @@ const getUnverifiedAccount = asyncHandler(async (req, res) => {
     const user = await User.findOne({ email: email.toLowerCase() });
 
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        error: 'Không tìm thấy tài khoản với email này',
+      return res.status(200).json({
+        success: true,
+        data: {
+          email: email,
+          status: 'not_found',
+          message: 'Tài khoản chưa được đăng ký',
+        },
       });
     }
 
     // Check if user is already verified
     if (user.isEmailVerified) {
-      return res.status(400).json({
-        success: false,
-        error: 'Tài khoản đã được xác thực',
+      return res.status(200).json({
+        success: true,
+        data: {
+          email: user.email,
+          fullName: user.fullName,
+          status: 'verified',
+          message: 'Tài khoản đã được xác thực',
+          verifiedAt: user.updatedAt,
+        },
       });
     }
 
@@ -800,19 +879,27 @@ const getUnverifiedAccount = asyncHandler(async (req, res) => {
     ); // 24 hours
 
     if (now > verificationExpiry) {
-      return res.status(400).json({
-        success: false,
-        error: 'Mã xác thực đã hết hạn. Vui lòng đăng ký lại.',
-        expired: true,
+      return res.status(200).json({
+        success: true,
+        data: {
+          email: user.email,
+          fullName: user.fullName,
+          status: 'expired',
+          message: 'Mã xác thực đã hết hạn. Vui lòng đăng ký lại.',
+          createdAt: user.createdAt,
+          verificationExpiry: verificationExpiry,
+        },
       });
     }
 
     // Return unverified account info
-    res.json({
+    res.status(200).json({
       success: true,
       data: {
         email: user.email,
         fullName: user.fullName,
+        status: 'pending',
+        message: 'Tài khoản chưa được xác thực',
         createdAt: user.createdAt,
         verificationExpiry: verificationExpiry,
         timeRemaining: Math.max(
@@ -822,7 +909,7 @@ const getUnverifiedAccount = asyncHandler(async (req, res) => {
       },
     });
   } catch (error) {
-    logger.error('Error getting unverified account:', error);
+    logger.error('Error getting account verification status:', error);
     res.status(500).json({
       success: false,
       error: 'Lỗi server khi lấy thông tin tài khoản',
@@ -937,51 +1024,6 @@ const requestLoginOTP = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Verify email with token link
-// @route   GET /api/auth/verify-email/:token
-// @access  Public
-const verifyEmailToken = asyncHandler(async (req, res) => {
-  // Get hashed token
-  const verificationToken = crypto
-    .createHash('sha256')
-    .update(req.params.token)
-    .digest('hex');
-
-  const user = await User.findOne({
-    emailVerificationToken: verificationToken,
-    emailVerificationExpire: { $gt: Date.now() },
-  });
-
-  if (!user) {
-    return res.status(400).json({
-      success: false,
-      error: MESSAGES.INVALID_VERIFICATION_LINK,
-    });
-  }
-
-  // Set email as verified
-  user.isEmailVerified = true;
-  user.emailVerificationToken = undefined;
-  user.emailVerificationOtp = undefined;
-  user.emailVerificationExpire = undefined;
-
-  await user.save();
-
-  // Create token
-  const token = user.getSignedJwtToken();
-
-  logger.info(`Email verified with token link for user: ${user.email}`, {
-    userId: user._id,
-  });
-
-  res.status(200).json({
-    success: true,
-    token,
-    message: SUCCESS.EMAIL_VERIFIED,
-    user: baseUserResponse(user),
-  });
-});
-
 // @desc    Verify login OTP
 // @route   POST /api/auth/verify-otp
 // @access  Public
@@ -1081,7 +1123,6 @@ module.exports = {
   forgotPassword, // POST /forgot-password
   resetPassword, // POST /reset-password
   verifyEmail, // POST /verify-email
-  verifyEmailToken, // GET /verify-email/:token
   resendEmailVerification, // POST /resend-verification
   refreshToken, // POST /refresh-token
   logout, // POST /logout

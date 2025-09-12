@@ -15,7 +15,7 @@ const {
   refreshToken,
   logout,
   getMe,
-  getUnverifiedAccount
+  getUnverifiedAccount,
 } = require('../controllers/authController');
 
 /**
@@ -425,7 +425,6 @@ router.post('/reset-password', resetPassword);
  *       400:
  *         description: Invalid or expired token
  */
-router.get('/verify-email/:token', verifyEmailToken);
 
 /**
  * @swagger

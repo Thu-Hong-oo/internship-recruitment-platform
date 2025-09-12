@@ -1,5 +1,5 @@
 const User = require('../models/User');
-const InternProfile = require('../models/InternProfile');
+const CandidateProfile = require('../models/CandidateProfile');
 const EmployerProfile = require('../models/EmployerProfile');
 const Job = require('../models/Job');
 const Company = require('../models/Company');
@@ -467,11 +467,10 @@ const getCompany = asyncHandler(async (req, res) => {
 // @route   PUT /api/admin/companies/:id
 // @access  Private (Admin only)
 const updateCompany = asyncHandler(async (req, res) => {
-  const company = await Company.findByIdAndUpdate(
-    req.params.id,
-    req.body,
-    { new: true, runValidators: true }
-  );
+  const company = await Company.findByIdAndUpdate(req.params.id, req.body, {
+    new: true,
+    runValidators: true,
+  });
 
   if (!company) {
     return res.status(404).json({
@@ -744,12 +743,16 @@ const updateJobStatusAdmin = asyncHandler(async (req, res) => {
 
   const allowed = ['draft', 'active', 'closed', 'filled'];
   if (!allowed.includes(status)) {
-    return res.status(400).json({ success: false, error: 'Trạng thái job không hợp lệ' });
+    return res
+      .status(400)
+      .json({ success: false, error: 'Trạng thái job không hợp lệ' });
   }
 
   const { id } = req.params;
   if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ success: false, error: 'Job ID không hợp lệ' });
+    return res
+      .status(400)
+      .json({ success: false, error: 'Job ID không hợp lệ' });
   }
 
   const job = await Job.findByIdAndUpdate(
@@ -761,11 +764,23 @@ const updateJobStatusAdmin = asyncHandler(async (req, res) => {
     .populate('postedBy', 'email profile.firstName profile.lastName');
 
   if (!job) {
-    return res.status(404).json({ success: false, error: 'Không tìm thấy công việc' });
+    return res
+      .status(404)
+      .json({ success: false, error: 'Không tìm thấy công việc' });
   }
 
-  logger.info('Admin updated job status', { adminId: req.user.id, jobId: id, status });
-  res.status(200).json({ success: true, data: job, message: 'Cập nhật trạng thái job thành công' });
+  logger.info('Admin updated job status', {
+    adminId: req.user.id,
+    jobId: id,
+    status,
+  });
+  res
+    .status(200)
+    .json({
+      success: true,
+      data: job,
+      message: 'Cập nhật trạng thái job thành công',
+    });
 });
 
 // @desc    Verify employer
@@ -884,7 +899,8 @@ const getEmployers = asyncHandler(async (req, res) => {
   const filter = { role: 'employer' };
   if (req.query.status) filter.status = req.query.status;
   if (req.query.verified !== undefined) {
-    filter['employerProfile.verification.isVerified'] = req.query.verified === 'true';
+    filter['employerProfile.verification.isVerified'] =
+      req.query.verified === 'true';
   }
 
   // Build search
@@ -1053,7 +1069,6 @@ const getEmployerJobs = asyncHandler(async (req, res) => {
     pagination,
   });
 });
-
 
 module.exports = {
   // User Management

@@ -1,7 +1,7 @@
 // Models
 const User = require('../models/User');
 const Job = require('../models/Job');
-const InternProfile = require('../models/InternProfile');
+const CandidateProfile = require('../models/CandidateProfile');
 const EmployerProfile = require('../models/EmployerProfile');
 const Application = require('../models/Application');
 const SkillRoadmap = require('../models/SkillRoadmap');
@@ -11,8 +11,54 @@ const Notification = require('../models/Notification');
 const asyncHandler = require('express-async-handler');
 const { logger } = require('../utils/logger');
 const { uploadImage } = require('../services/imageUploadService');
+const { getAvatarUrl } = require('../utils/avatarUtils');
 const { getIO } = require('../config/socket');
 const googleAuthService = require('../services/googleAuth');
+
+// Resolve display name consistently
+const resolveFullName = user => {
+  if (user?.fullName && user.fullName.trim().length > 0) return user.fullName;
+  if (user?.displayFullName && String(user.displayFullName).trim().length > 0)
+    return String(user.displayFullName).trim();
+  if (user?.email) return user.email.split('@')[0];
+  return 'User';
+};
+
+// Base user response utility
+const baseUserResponse = user => ({
+  id: user._id,
+  email: user.email,
+  fullName: resolveFullName(user),
+  role: user.role,
+  authMethod: user.authMethod,
+  isEmailVerified: user.isEmailVerified,
+  isActive: user.isActive,
+  avatar: getAvatarUrl(user),
+  googleProfile: user.googleProfile,
+  preferences: user.preferences,
+  lastLogin: user.lastLogin,
+  createdAt: user.createdAt,
+  updatedAt: user.updatedAt,
+  candidateProfile: user.candidateProfile,
+  employerProfile: user.employerProfile,
+});
+
+// Public user response utility (for search and public viewing)
+const getPublicUserData = user => ({
+  id: user._id,
+  fullName: user.fullName,
+  role: user.role,
+  avatar: getAvatarUrl(user),
+  isActive: user.isActive,
+  createdAt: user.createdAt,
+  // Add role-specific public data
+  ...(user.role === 'candidate' && {
+    candidateProfile: user.candidateProfile,
+  }),
+  ...(user.role === 'employer' && {
+    employerProfile: user.employerProfile,
+  }),
+});
 
 // @desc    Get single user
 // @route   GET /api/users/:id
@@ -29,12 +75,12 @@ const getUser = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    data: user,
+    data: baseUserResponse(user),
   });
 });
 
 // @desc    Upload user avatar
-// @route   POST /api/users/upload-avatar
+// @route   POST /api/users/avatar
 // @access  Private
 const uploadAvatar = asyncHandler(async (req, res) => {
   if (!req.file) {
@@ -51,7 +97,7 @@ const uploadAvatar = asyncHandler(async (req, res) => {
     // Update user avatar in database
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      { 'profile.avatar': result.url },
+      { avatar: result.publicId }, // Lưu publicId thay vì URL
       { new: true }
     );
 
@@ -72,21 +118,7 @@ const uploadAvatar = asyncHandler(async (req, res) => {
           format: result.format,
           dimensions: { width: result.width, height: result.height },
         },
-        user: {
-          id: user._id,
-          email: user.email,
-          firstName: user.profile.firstName,
-          lastName: user.profile.lastName,
-          role: user.role,
-          fullName: user.fullName,
-          isEmailVerified: user.isEmailVerified,
-          authMethod: user.authMethod,
-          profile: {
-            firstName: user.profile.firstName,
-            lastName: user.profile.lastName,
-            avatar: user.profile.avatar,
-          },
-        },
+        user: baseUserResponse(user),
       },
     });
   } catch (error) {
@@ -110,23 +142,20 @@ const updateProfile = asyncHandler(async (req, res) => {
 
   // Basic profile fields
   const fieldsToUpdate = {
-    'profile.firstName': req.body.firstName,
-    'profile.lastName': req.body.lastName,
-    'profile.phone': req.body.phone,
-    'profile.avatar': req.body.avatar,
-    email: req.body.email
+    fullName: req.body.fullName,
+    email: req.body.email,
   };
 
   // Role-specific profile updates
-  if (user.role === 'intern') {
-    await InternProfile.findOneAndUpdate(
+  if (user.role === 'candidate') {
+    await CandidateProfile.findOneAndUpdate(
       { userId: user._id },
       {
         'education.university': req.body.university,
         'education.major': req.body.major,
         'education.graduationYear': req.body.graduationYear,
         'preferences.locations': req.body.preferredLocations,
-        'preferences.internshipTypes': req.body.preferredTypes
+        'preferences.internshipTypes': req.body.preferredTypes,
       },
       { new: true }
     );
@@ -137,7 +166,7 @@ const updateProfile = asyncHandler(async (req, res) => {
         'company.name': req.body.companyName,
         'company.industry': req.body.industry,
         'position.title': req.body.jobTitle,
-        'contact.workEmail': req.body.workEmail
+        'contact.workEmail': req.body.workEmail,
       },
       { new: true }
     );
@@ -157,7 +186,7 @@ const updateProfile = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    user,
+    data: baseUserResponse(user),
   });
 });
 
@@ -253,21 +282,7 @@ const linkGoogleAccount = asyncHandler(async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Liên kết tài khoản Google thành công',
-      user: {
-        id: user._id,
-        email: user.email,
-        firstName: user.profile.firstName,
-        lastName: user.profile.lastName,
-        role: user.role,
-        fullName: user.fullName,
-        isEmailVerified: user.isEmailVerified,
-        authMethod: user.authMethod,
-        profile: {
-          firstName: user.profile.firstName,
-          lastName: user.profile.lastName,
-          avatar: user.profile.avatar || user.googleProfile?.picture,
-        },
-      },
+      user: baseUserResponse(user),
     });
   } catch (error) {
     logger.error('Failed to link Google account', {
@@ -328,21 +343,7 @@ const unlinkGoogleAccount = asyncHandler(async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Hủy liên kết tài khoản Google thành công',
-      user: {
-        id: user._id,
-        email: user.email,
-        firstName: user.profile.firstName,
-        lastName: user.profile.lastName,
-        role: user.role,
-        fullName: user.fullName,
-        isEmailVerified: user.isEmailVerified,
-        authMethod: user.authMethod,
-        profile: {
-          firstName: user.profile.firstName,
-          lastName: user.profile.lastName,
-          avatar: user.profile.avatar,
-        },
-      },
+      user: baseUserResponse(user),
     });
   } catch (error) {
     logger.error('Failed to unlink Google account', {
@@ -364,33 +365,65 @@ const getUserProfile = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user.id).select('-password');
 
   let profileData = {};
-  if (user.role === 'intern') {
-    const internProfile = await InternProfile.findOne({ userId: user._id });
-    if (internProfile) {
-      profileData = {
-        education: internProfile.education,
-        skills: internProfile.skills,
-        preferences: internProfile.preferences,
-        resume: internProfile.resume
-      };
+  if (user.role === 'candidate') {
+    let candidate = await CandidateProfile.findOne({ userId: user._id });
+    if (!candidate) {
+      candidate = await CandidateProfile.create({ userId: user._id });
     }
+    profileData = {
+      education: candidate.education,
+      skills: candidate.skills,
+      preferences: candidate.preferences,
+      resume: candidate.resume,
+    };
   } else if (user.role === 'employer') {
-    const employerProfile = await EmployerProfile.findOne({ userId: user._id });
-    if (employerProfile) {
-      profileData = {
-        company: employerProfile.company,
-        position: employerProfile.position,
-        contact: employerProfile.contact
-      };
+    let employerProfile = await EmployerProfile.findOne({ userId: user._id });
+    if (!employerProfile) {
+      employerProfile = await EmployerProfile.create({ userId: user._id });
     }
+    profileData = {
+      company: employerProfile.company,
+      position: employerProfile.position,
+      contact: employerProfile.contact,
+    };
   }
 
   res.status(200).json({
     success: true,
     data: {
-      user,
-      profile: profileData
-    }
+      user: baseUserResponse(user),
+      profile: profileData,
+    },
+  });
+});
+
+// @desc    Get public user profile (for employers to view candidates)
+// @route   GET /api/users/:id/public-profile
+// @access  Private (Employer only)
+const getPublicUserProfile = asyncHandler(async (req, res) => {
+  // Only employers can view public profiles
+  if (req.user.role !== 'employer') {
+    return res.status(403).json({
+      success: false,
+      error: 'Chỉ nhà tuyển dụng mới có quyền xem thông tin ứng viên',
+    });
+  }
+
+  const user = await User.findById(req.params.id).select('-password');
+
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      error: 'Không tìm thấy người dùng',
+    });
+  }
+
+  // Only show public information
+  const publicUserData = getPublicUserData(user);
+
+  res.status(200).json({
+    success: true,
+    data: publicUserData,
   });
 });
 
@@ -405,8 +438,7 @@ const searchUsers = asyncHandler(async (req, res) => {
   // Search by name or email
   if (q) {
     query.$or = [
-      { 'profile.firstName': { $regex: q, $options: 'i' } },
-      { 'profile.lastName': { $regex: q, $options: 'i' } },
+      { fullName: { $regex: q, $options: 'i' } },
       { email: { $regex: q, $options: 'i' } },
     ];
   }
@@ -442,7 +474,7 @@ const searchUsers = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    data: users,
+    data: users.map(user => getPublicUserData(user)),
     pagination,
   });
 });
@@ -456,63 +488,74 @@ const getUserStats = asyncHandler(async (req, res) => {
 
   let stats = {
     profileCompletion: 0,
-    lastActive: user?.lastActive || user?.createdAt
+    lastActive: user?.lastActive || user?.createdAt,
   };
 
-  if (user.role === 'intern') {
+  if (user.role === 'candidate') {
     // Intern stats
-    const internProfile = await InternProfile.findOne({ userId });
-    const applications = await Application.find({ internId: internProfile._id });
-    const currentRoadmap = await SkillRoadmap.findOne({ internId: internProfile._id, status: 'in_progress' });
+    const internProfile = await CandidateProfile.findOne({ userId });
+    const applications = await Application.find({
+      internId: internProfile._id,
+    });
+    const currentRoadmap = await SkillRoadmap.findOne({
+      internId: internProfile._id,
+      status: 'in_progress',
+    });
 
     stats = {
       ...stats,
       applications: {
         total: applications.length,
         pending: applications.filter(app => app.status === 'pending').length,
-        interviewing: applications.filter(app => app.status === 'interview').length,
-        accepted: applications.filter(app => app.status === 'accepted').length
+        interviewing: applications.filter(app => app.status === 'interview')
+          .length,
+        accepted: applications.filter(app => app.status === 'accepted').length,
       },
       skills: {
         verified: internProfile.skills.technical.filter(s => s.verified).length,
-        total: internProfile.skills.technical.length
+        total: internProfile.skills.technical.length,
       },
-      roadmap: currentRoadmap ? {
-        progress: currentRoadmap.progress.overallProgress,
-        completedMilestones: currentRoadmap.progress.completedMilestones,
-        totalMilestones: currentRoadmap.progress.totalMilestones
-      } : null
+      roadmap: currentRoadmap
+        ? {
+            progress: currentRoadmap.progress.overallProgress,
+            completedMilestones: currentRoadmap.progress.completedMilestones,
+            totalMilestones: currentRoadmap.progress.totalMilestones,
+          }
+        : null,
     };
   } else if (user.role === 'employer') {
     // Employer stats
     const employerProfile = await EmployerProfile.findOne({ userId });
-    const totalApplications = await Application.countDocuments({ 
-      'job.employer': employerProfile._id 
+    const totalApplications = await Application.countDocuments({
+      'job.employer': employerProfile._id,
     });
 
     stats = {
       ...stats,
       jobPostings: {
-        active: await Job.countDocuments({ employer: employerProfile._id, status: 'active' }),
-        total: await Job.countDocuments({ employer: employerProfile._id })
+        active: await Job.countDocuments({
+          employer: employerProfile._id,
+          status: 'active',
+        }),
+        total: await Job.countDocuments({ employer: employerProfile._id }),
       },
       applications: {
         total: totalApplications,
-        pending: await Application.countDocuments({ 
+        pending: await Application.countDocuments({
           'job.employer': employerProfile._id,
-          status: 'pending'
+          status: 'pending',
         }),
         interviewing: await Application.countDocuments({
           'job.employer': employerProfile._id,
-          status: 'interview'
-        })
-      }
+          status: 'interview',
+        }),
+      },
     };
   }
 
   res.status(200).json({
     success: true,
-    data: stats
+    data: stats,
   });
 });
 
@@ -586,9 +629,9 @@ const getUserNotifications = asyncHandler(async (req, res) => {
 const markNotificationAsRead = asyncHandler(async (req, res) => {
   const notification = await Notification.findOneAndUpdate(
     { _id: req.params.id, recipient: req.user.id },
-    { 
+    {
       isRead: true,
-      readAt: new Date()
+      readAt: new Date(),
     },
     { new: true }
   );
@@ -597,7 +640,7 @@ const markNotificationAsRead = asyncHandler(async (req, res) => {
   const io = getIO();
   io.to(req.user.id.toString()).emit('notification_read', {
     notificationId: notification._id,
-    readAt: notification.readAt
+    readAt: notification.readAt,
   });
 
   if (!notification) {
@@ -708,6 +751,7 @@ module.exports = {
   linkGoogleAccount,
   unlinkGoogleAccount,
   getUserProfile,
+  getPublicUserProfile,
   searchUsers,
   getUserStats,
   updateUserPreferences,
