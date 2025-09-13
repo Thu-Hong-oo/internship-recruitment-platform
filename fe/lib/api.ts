@@ -164,6 +164,17 @@ class ApiClient {
   }
 
   // Auth methods
+  async getGoogleAuthUrl(): Promise<{ success: boolean; authUrl?: string }> {
+    try {
+      return await this.request<{ success: boolean; authUrl?: string }>(
+        "/auth/google",
+        { method: "GET" }
+      );
+    } catch (e) {
+      // Fallback shape
+      return { success: false };
+    }
+  }
   async register(data: RegisterRequest): Promise<AuthResponse> {
     const response = await this.request<AuthResponse>("/auth/register", {
       method: "POST",
@@ -245,6 +256,41 @@ class ApiClient {
     return response;
   }
 
+  async resendEmailVerification(email: string): Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+  }> {
+    const response = await this.request<{
+      success: boolean;
+      message?: string;
+      error?: string;
+    }>("/auth/resend-verification", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+
+    return response;
+  }
+
+  async getUnverifiedAccount(
+    email: string
+  ): Promise<UnverifiedAccountResponse> {
+    const response = await this.request<UnverifiedAccountResponse>(
+      `/auth/unverified-account?email=${encodeURIComponent(email)}`
+    );
+
+    return response;
+  }
+
+  async validateEmail(email: string): Promise<EmailValidationResponse> {
+    const response = await this.request<EmailValidationResponse>(
+      `/auth/validate-email?email=${encodeURIComponent(email)}`
+    );
+
+    return response;
+  }
+
   async uploadAvatar(file: File): Promise<{
     success: boolean;
     avatar?: string;
@@ -269,40 +315,33 @@ class ApiClient {
 
     return response;
   }
+  async googleAuth(idToken: string): Promise<{
+    success: boolean;
+    token?: string;
+    user?: User;
+    isNew?: boolean;
+    message?: string;
+    error?: string;
+  }> {
+    const response = await this.request<{
+      success: boolean;
+      token?: string;
+      user?: User;
+      isNew?: boolean;
+      message?: string;
+      error?: string;
+    }>("/auth/google", {
+      method: "POST",
+      body: JSON.stringify({ idToken }),
+    });
 
-  async resendEmailVerification(email: string): Promise<AuthResponse> {
-    const response = await this.request<AuthResponse>(
-      "/auth/resend-verification",
-      {
-        method: "POST",
-        body: JSON.stringify({ email }),
+    // Store token if Google auth is successful
+    if (response.success && response.token) {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("token", response.token);
       }
-    );
-
-    return response;
-  }
-
-  async getUnverifiedAccount(
-    email: string
-  ): Promise<UnverifiedAccountResponse> {
-    const response = await this.request<UnverifiedAccountResponse>(
-      `/auth/unverified-account/${email}`,
-      {
-        method: "GET",
-      }
-    );
-
-    return response;
-  }
-
-  async validateEmail(email: string): Promise<EmailValidationResponse> {
-    const response = await this.request<EmailValidationResponse>(
-      "/auth/validate-email",
-      {
-        method: "POST",
-        body: JSON.stringify({ email }),
-      }
-    );
+      this.token = response.token;
+    }
 
     return response;
   }
@@ -328,6 +367,7 @@ export const authAPI = {
   getUnverifiedAccount: apiClient.getUnverifiedAccount.bind(apiClient),
   validateEmail: apiClient.validateEmail.bind(apiClient),
   uploadAvatar: apiClient.uploadAvatar.bind(apiClient),
+  googleAuth: apiClient.googleAuth.bind(apiClient),
 };
 
 // ===================== Jobs =====================
@@ -361,8 +401,18 @@ export interface JobsResponse {
 }
 
 class JobsApi {
-  async getJobs(page = 1, limit = 10): Promise<JobsResponse> {
-    return apiClient.get<JobsResponse>(`/jobs?page=${page}&limit=${limit}`);
+  async getJobs(
+    page = 1,
+    limit = 10,
+    params?: { q?: string; category?: string }
+  ): Promise<JobsResponse> {
+    const query = new URLSearchParams({
+      page: String(page),
+      limit: String(limit),
+    });
+    if (params?.q) query.set("q", params.q);
+    if (params?.category) query.set("category", params.category);
+    return apiClient.get<JobsResponse>(`/jobs?${query.toString()}`);
   }
 }
 

@@ -60,7 +60,7 @@ export default function Footer() {
                 Quản lý CV của bạn
               </div>
               <div className="hover:text-primary cursor-pointer transition-colors duration-200">
-                TopCV Profile
+                InternBridge Profile
               </div>
               <div className="hover:text-primary cursor-pointer transition-colors duration-200">
                 Hướng dẫn viết CV

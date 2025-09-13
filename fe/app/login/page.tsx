@@ -1,16 +1,18 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Eye, EyeOff, Mail, Lock, CheckCircle, AlertCircle, AlertTriangle, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
+import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
+  
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
@@ -21,6 +23,8 @@ export default function LoginPage() {
   const [warning, setWarning] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // No Google script/init needed with NextAuth
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({
@@ -154,6 +158,7 @@ export default function LoginPage() {
                         <Button
                           variant="outline"
                           className="h-10 bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
+                          onClick={() => signIn("google", { callbackUrl: "/" })}
                         >
                           <span className="font-bold text-lg">G</span>
                           <span className="ml-2">Đăng nhập bằng Google</span>
@@ -278,6 +283,7 @@ export default function LoginPage() {
               <Button
                 variant="outline"
                 className="h-12 bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
+                onClick={() => signIn("google", { callbackUrl: "/" })}
               >
                 <span className="font-bold text-lg">G</span>
                 <span className="ml-2">Google</span>
