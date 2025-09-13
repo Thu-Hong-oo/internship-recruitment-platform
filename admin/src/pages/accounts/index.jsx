@@ -66,7 +66,7 @@ export default function Accounts() {
         dob: u?.profile?.dateOfBirth
           ? new Date(u.profile.dateOfBirth).toLocaleDateString()
           : "",
-        status: u?.isActive ? "Active" : "Inactive",
+        status: u?.isActive ? "Active" : "InActive",
         reasonForRejection: u?.reasonForRejection || "",
       }));
 
