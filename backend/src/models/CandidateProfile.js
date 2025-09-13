@@ -1,4 +1,9 @@
 const mongoose = require('mongoose');
+const {
+  SKILL_LEVELS,
+  INTERNSHIP_TYPES,
+  DURATION_UNITS,
+} = require('../constants/common.constants');
 
 const CandidateProfileSchema = new mongoose.Schema(
   {
@@ -34,10 +39,7 @@ const CandidateProfileSchema = new mongoose.Schema(
       technical: [
         {
           name: String,
-          level: {
-            type: String,
-            enum: ['beginner', 'intermediate', 'advanced'],
-          },
+          level: { type: String, enum: Object.values(SKILL_LEVELS) },
           verified: {
             type: Boolean,
             default: false,
@@ -103,7 +105,7 @@ const CandidateProfileSchema = new mongoose.Schema(
       internshipTypes: [
         {
           type: String,
-          enum: ['full-time', 'part-time', 'remote', 'hybrid'],
+          enum: Object.values(INTERNSHIP_TYPES),
         },
       ],
       industries: [String],
@@ -112,10 +114,7 @@ const CandidateProfileSchema = new mongoose.Schema(
       duration: {
         min: Number,
         max: Number,
-        unit: {
-          type: String,
-          enum: ['weeks', 'months'],
-        },
+        unit: { type: String, enum: Object.values(DURATION_UNITS) },
       },
     },
 

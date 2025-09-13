@@ -112,8 +112,10 @@ const SkillRoadmapSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ['planning', 'in_progress', 'completed', 'paused'],
-      default: 'planning',
+      enum: Object.values(
+        require('../constants/common.constants').ROADMAP_STATUS
+      ),
+      default: require('../constants/common.constants').ROADMAP_STATUS.PLANNING,
     },
   },
   {

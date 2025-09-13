@@ -140,53 +140,134 @@ const uploadAvatar = asyncHandler(async (req, res) => {
 const updateProfile = asyncHandler(async (req, res) => {
   let user = await User.findById(req.user.id);
 
-  // Basic profile fields
+  // Basic profile fields on User
   const fieldsToUpdate = {
     fullName: req.body.fullName,
     email: req.body.email,
   };
-
-  // Role-specific profile updates
-  if (user.role === 'candidate') {
-    await CandidateProfile.findOneAndUpdate(
-      { userId: user._id },
-      {
-        'education.university': req.body.university,
-        'education.major': req.body.major,
-        'education.graduationYear': req.body.graduationYear,
-        'preferences.locations': req.body.preferredLocations,
-        'preferences.internshipTypes': req.body.preferredTypes,
-      },
-      { new: true }
-    );
-  } else if (user.role === 'employer') {
-    await EmployerProfile.findOneAndUpdate(
-      { userId: user._id },
-      {
-        'company.name': req.body.companyName,
-        'company.industry': req.body.industry,
-        'position.title': req.body.jobTitle,
-        'contact.workEmail': req.body.workEmail,
-      },
-      { new: true }
-    );
-  }
-
-  // Remove undefined fields
+  //nêu trường nào không có trong request thì xóa khỏi object
   Object.keys(fieldsToUpdate).forEach(
     key => fieldsToUpdate[key] === undefined && delete fieldsToUpdate[key]
   );
+  if (Object.keys(fieldsToUpdate).length > 0) {
+    user = await User.findByIdAndUpdate(req.user.id, fieldsToUpdate, {
+      new: true,
+      runValidators: true,
+    });
+  }
 
-  user = await User.findByIdAndUpdate(req.user.id, fieldsToUpdate, {
-    new: true,
-    runValidators: true,
+  // Normalize dot-path updates for profile documents
+  const normalizeProfileUpdate = (body, role) => {
+    const update = {};
+    const changed = [];
+    for (const [key, value] of Object.entries(body)) {
+      if (value === undefined) continue;
+      const isCandidateKey =
+        key.startsWith('education.') ||
+        key.startsWith('skills.') ||
+        key.startsWith('preferences.') ||
+        key.startsWith('resume.');
+      const isEmployerKey =
+        key.startsWith('company.') ||
+        key.startsWith('position.') ||
+        key.startsWith('contact.');
+
+      if (
+        (role === 'candidate' && isCandidateKey) ||
+        (role === 'employer' && isEmployerKey)
+      ) {
+        update[key] = value;
+        changed.push(key);
+      }
+    }
+    return { update, changed };
+  };
+
+  let profileDoc = null;
+  let changedFields = [];
+
+  if (user.role === 'candidate') {
+    const { update, changed } = normalizeProfileUpdate(req.body, 'candidate');
+    changedFields = changed;
+
+    // Ensure legacy shape compatibility: university may be stored as string
+    let existing = await CandidateProfile.findOne({ userId: user._id });
+    if (!existing) {
+      existing = await CandidateProfile.create({ userId: user._id });
+    }
+
+    // If we are updating nested fields under education.university and current value is a string
+    const hasUniversityNested = Object.keys(update).some(k =>
+      k.startsWith('education.university.')
+    );
+    if (
+      hasUniversityNested &&
+      existing.education &&
+      typeof existing.education.university === 'string'
+    ) {
+      const currentName = existing.education.university;
+      existing.education.university = { name: currentName };
+      await existing.save();
+    }
+
+    // Consolidate any dot fields under education.university into one object to avoid Mongo error
+    if (hasUniversityNested) {
+      const consolidated = { ...(existing.education?.university || {}) };
+      for (const [k, v] of Object.entries(update)) {
+        if (k.startsWith('education.university.')) {
+          const subKey = k.substring('education.university.'.length);
+          consolidated[subKey] = v;
+          delete update[k];
+        }
+      }
+      update['education.university'] = consolidated;
+    }
+
+    profileDoc = await CandidateProfile.findOneAndUpdate(
+      { userId: user._id },
+      Object.keys(update).length ? { $set: update } : {},
+      { new: true }
+    );
+  } else if (user.role === 'employer') {
+    const { update, changed } = normalizeProfileUpdate(req.body, 'employer');
+    changedFields = changed;
+    profileDoc = await EmployerProfile.findOneAndUpdate(
+      { userId: user._id },
+      Object.keys(update).length ? { $set: update } : {},
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+  }
+
+  logger.info(`User profile updated: ${user.email}`, {
+    userId: user._id,
+    changedFields,
   });
 
-  logger.info(`User profile updated: ${user.email}`, { userId: user._id });
+  // Build profile data for response
+  let profileData = {};
+  if (user.role === 'candidate' && profileDoc) {
+    profileData = {
+      education: profileDoc.education,
+      skills: profileDoc.skills,
+      preferences: profileDoc.preferences,
+      resume: profileDoc.resume,
+    };
+  } else if (user.role === 'employer' && profileDoc) {
+    profileData = {
+      company: profileDoc.company,
+      position: profileDoc.position,
+      contact: profileDoc.contact,
+    };
+  }
 
   res.status(200).json({
     success: true,
-    data: baseUserResponse(user),
+    message: 'Cập nhật hồ sơ thành công',
+    updated: { fields: changedFields, count: changedFields.length },
+    data: {
+      user: baseUserResponse(user),
+      profile: profileData,
+    },
   });
 });
 
@@ -402,10 +483,10 @@ const getUserProfile = asyncHandler(async (req, res) => {
 // @access  Private (Employer only)
 const getPublicUserProfile = asyncHandler(async (req, res) => {
   // Only employers can view public profiles
-  if (req.user.role !== 'employer') {
+  if (req.user.role !== 'employer' && req.user.role !== 'admin') {
     return res.status(403).json({
       success: false,
-      error: 'Chỉ nhà tuyển dụng mới có quyền xem thông tin ứng viên',
+      error: 'Chỉ nhà tuyển dụng/admin mới có quyền xem thông tin ứng viên',
     });
   }
 
@@ -418,8 +499,86 @@ const getPublicUserProfile = asyncHandler(async (req, res) => {
     });
   }
 
-  // Only show public information
-  const publicUserData = getPublicUserData(user);
+  // Resolve privacy settings (defaults)
+  const privacy = user?.preferences?.privacySettings || {
+    profileVisibility: 'public',
+    showEmail: false,
+    showPhone: false,
+  };
+
+  // Relationship-based visibility: check if employer has relationship with candidate
+  let hasRecruitingRelationship = false;
+  if (user.role === 'candidate') {
+    const candidate = await CandidateProfile.findOne({ userId: user._id });
+    // Employer has active job OR candidate applied to an employer job
+    const employerProfile = await EmployerProfile.findOne({
+      mainUserId: req.user.id,
+    });
+    if (employerProfile) {
+      const Application = require('../models/Application');
+      const Job = require('../models/Job');
+      const appliedToEmployer = await Application.exists({
+        internId: candidate?._id,
+        jobId: {
+          $in: await Job.find({ employer: employerProfile._id }).distinct(
+            '_id'
+          ),
+        },
+      });
+      hasRecruitingRelationship = !!appliedToEmployer;
+    }
+  }
+
+  // Employer verification status
+  const viewerEmployer = await EmployerProfile.findOne({
+    mainUserId: req.user.id,
+  });
+  const isVerifiedEmployer = !!viewerEmployer?.verification?.isVerified;
+
+  // Build public data with privacy filters
+  const base = getPublicUserData(user);
+
+  // Enrich for candidate target
+  if (user.role === 'candidate') {
+    const candidate = await CandidateProfile.findOne({ userId: user._id });
+    const publicCandidate = {
+      education: {
+        university: { name: candidate?.education?.university?.name },
+        degree: candidate?.education?.university?.degree,
+        graduationYear: candidate?.education?.university?.graduationYear,
+      },
+      skills: {
+        technical: (candidate?.skills?.technical || []).map(s => ({
+          name: s.name,
+          level: s.level,
+        })),
+        soft: (candidate?.skills?.soft || []).map(s => ({ name: s.name })),
+        languages: candidate?.skills?.languages || [],
+      },
+      preferences: {
+        locations: candidate?.preferences?.locations || [],
+        internshipTypes: candidate?.preferences?.internshipTypes || [],
+      },
+    };
+
+    // Conditional fields
+    if (
+      privacy.profileVisibility === 'public' ||
+      hasRecruitingRelationship ||
+      isVerifiedEmployer
+    ) {
+      // Allow resume URL for verified employer or relationship
+      if (isVerifiedEmployer || hasRecruitingRelationship) {
+        publicCandidate.resume = {
+          current: { url: candidate?.resume?.current?.url },
+        };
+      }
+    }
+
+    base.candidateProfile = publicCandidate;
+  }
+
+  const publicUserData = base;
 
   res.status(200).json({
     success: true,
@@ -427,57 +586,7 @@ const getPublicUserProfile = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Search users
-// @route   GET /api/users/search
-// @access  Public
-const searchUsers = asyncHandler(async (req, res) => {
-  const { q, role, location, skills, page = 1, limit = 10 } = req.query;
-
-  const query = { isActive: true };
-
-  // Search by name or email
-  if (q) {
-    query.$or = [
-      { fullName: { $regex: q, $options: 'i' } },
-      { email: { $regex: q, $options: 'i' } },
-    ];
-  }
-
-  // Filter by role
-  if (role) {
-    query.role = role;
-  }
-
-  // Filter by location
-  if (location) {
-    query['profile.location.city'] = { $regex: location, $options: 'i' };
-  }
-
-  const startIndex = (page - 1) * limit;
-  const endIndex = page * limit;
-
-  const users = await User.find(query)
-    .select('-password')
-    .limit(limit)
-    .skip(startIndex)
-    .sort({ createdAt: -1 });
-
-  const total = await User.countDocuments(query);
-
-  const pagination = {
-    current: page,
-    pages: Math.ceil(total / limit),
-    total,
-    hasNext: endIndex < total,
-    hasPrev: page > 1,
-  };
-
-  res.status(200).json({
-    success: true,
-    data: users.map(user => getPublicUserData(user)),
-    pagination,
-  });
-});
+// Removed search users endpoint as product does not expose public user search
 
 // @desc    Get user statistics
 // @route   GET /api/users/stats
@@ -744,15 +853,14 @@ const reactivateAccount = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  getUser,
-  uploadAvatar,
+  getUser, //get nhanh thông tin cơ bản của user
+  uploadAvatar, //upload avatar của user
   updateProfile,
-  changePassword,
+  changePassword, //thay đổi mật khẩu của user
   linkGoogleAccount,
   unlinkGoogleAccount,
-  getUserProfile,
-  getPublicUserProfile,
-  searchUsers,
+  getUserProfile, // get đầy đủ thông tin
+  getPublicUserProfile, // dành cho admin/ nhà tuyển dụng
   getUserStats,
   updateUserPreferences,
   getUserNotifications,

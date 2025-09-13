@@ -2,7 +2,7 @@ const User = require('../models/User');
 const CandidateProfile = require('../models/CandidateProfile');
 const EmployerProfile = require('../models/EmployerProfile');
 const Job = require('../models/Job');
-const Company = require('../models/Company');
+
 const Application = require('../models/Application');
 const asyncHandler = require('express-async-handler');
 const { logger } = require('../utils/logger');
@@ -41,42 +41,68 @@ const getUsers = asyncHandler(async (req, res) => {
   if (req.query.search) {
     filter.$or = [
       { email: { $regex: req.query.search, $options: 'i' } },
-      { 'profile.firstName': { $regex: req.query.search, $options: 'i' } },
-      { 'profile.lastName': { $regex: req.query.search, $options: 'i' } },
+      { fullName: { $regex: req.query.search, $options: 'i' } },
     ];
   }
 
   const total = await User.countDocuments(filter);
   const users = await User.find(filter)
-    .select('-password')
-    .populate('internProfile', 'education experience skills')
-    .populate('employerProfile', 'company position verification')
+    .select(
+      'email fullName role isEmailVerified isActive avatar createdAt lastLogin preferences.language preferences.timezone preferences.notifications.emailNotifications employerProfile'
+    )
+    .populate({
+      path: 'employerProfile',
+      select: 'company.name company.industry verification.isVerified',
+      model: 'EmployerProfile',
+    })
     .sort({ createdAt: -1 })
     .limit(limit)
     .skip(startIndex);
 
   // Pagination
   const endIndex = startIndex + limit;
-  const pagination = {};
-  if (endIndex < total) {
-    pagination.next = {
-      page: page + 1,
-      limit,
-    };
-  }
-  if (startIndex > 0) {
-    pagination.prev = {
-      page: page - 1,
-      limit,
-    };
-  }
+  const totalPages = Math.ceil(total / limit) || 1;
+  const pagination = {
+    page,
+    limit,
+    totalPages,
+    hasNextPage: page < totalPages,
+    hasPrevPage: page > 1,
+  };
+
+  const data = users.map(u => ({
+    id: u.id,
+    email: u.email,
+    role: u.role,
+    fullName: u.fullName,
+    avatar: u.avatar,
+    isActive: u.isActive,
+    isEmailVerified: u.isEmailVerified,
+    createdAt: u.createdAt,
+    lastLogin: u.lastLogin,
+    preferences: {
+      language: u.preferences?.language,
+      timezone: u.preferences?.timezone,
+      notifications: {
+        emailNotifications: u.preferences?.notifications?.emailNotifications,
+      },
+    },
+    company:
+      u.role === 'employer' && u.employerProfile
+        ? {
+            name: u.employerProfile.company?.name,
+            industry: u.employerProfile.company?.industry,
+            isVerified: u.employerProfile.verification?.isVerified,
+          }
+        : undefined,
+  }));
 
   res.status(200).json({
     success: true,
-    count: users.length,
+    count: data.length,
     total,
     pagination,
-    data: users,
+    data,
   });
 });
 
@@ -85,8 +111,8 @@ const getUsers = asyncHandler(async (req, res) => {
 // @access  Private (Admin only)
 const getUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id)
-    .select('-password')
-    .populate('internProfile')
+    .select('-password -resetPasswordToken -resetPasswordExpire')
+    .populate('candidateProfile')
     .populate('employerProfile');
 
   if (!user) {
@@ -222,6 +248,36 @@ const updateUserStatus = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Update user role (admin only)
+// @route   PUT /api/admin/users/:id/role
+// @access  Private (Admin only)
+const updateUserRole = asyncHandler(async (req, res) => {
+  const { role } = req.body;
+
+  if (!role) {
+    return res.status(400).json({ success: false, error: 'Thiếu role' });
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.params.id,
+    { role },
+    { new: true, runValidators: true }
+  ).select('-password');
+
+  if (!user) {
+    return res
+      .status(404)
+      .json({ success: false, error: 'Không tìm thấy người dùng' });
+  }
+
+  logger.info(`Admin updated user role: ${user.email} -> ${role}`, {
+    adminId: req.user.id,
+    userId: user._id,
+  });
+
+  res.status(200).json({ success: true, data: user });
+});
+
 // ========================================
 // ANALYTICS & DASHBOARD
 // ========================================
@@ -241,7 +297,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     activeJobs,
   ] = await Promise.all([
     User.countDocuments(),
-    User.countDocuments({ role: 'intern' }),
+    User.countDocuments({ role: 'candidate' }),
     User.countDocuments({ role: 'employer' }),
     Job.countDocuments(),
     Application.countDocuments(),
@@ -252,7 +308,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
 
   // Recent activities
   const recentUsers = await User.find()
-    .select('email profile.firstName profile.lastName role createdAt')
+    .select('email fullName role createdAt')
     .sort({ createdAt: -1 })
     .limit(5);
 
@@ -262,7 +318,7 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     .limit(5);
 
   const recentApplications = await Application.find()
-    .populate('userId', 'email profile.firstName profile.lastName')
+    .populate('userId', 'email fullName')
     .populate('jobId', 'title')
     .select('status createdAt')
     .sort({ createdAt: -1 })
@@ -353,26 +409,8 @@ const getUserAnalytics = asyncHandler(async (req, res) => {
 // EMPLOYER VERIFICATION
 // ========================================
 
-// @desc    Get pending employer verifications
-// @route   GET /api/admin/verifications
-// @access  Private (Admin only)
-const getPendingVerifications = asyncHandler(async (req, res) => {
-  const pendingVerifications = await EmployerProfile.find({
-    'verification.isVerified': false,
-    status: 'pending',
-  })
-    .populate('userId', 'email profile.firstName profile.lastName')
-    .sort({ createdAt: 1 });
-
-  res.status(200).json({
-    success: true,
-    count: pendingVerifications.length,
-    data: pendingVerifications,
-  });
-});
-
 // ========================================
-// COMPANY MANAGEMENT
+// COMPANY MANAGEMENT (Disabled - no Company model)
 // ========================================
 
 // @desc    Get all companies (admin only)
@@ -409,13 +447,8 @@ const getCompanies = asyncHandler(async (req, res) => {
     ];
   }
 
-  const total = await Company.countDocuments(filter);
-  const companies = await Company.find(filter)
-    .populate('owner', 'email profile.firstName profile.lastName')
-    .populate('createdBy', 'email profile.firstName profile.lastName')
-    .sort({ createdAt: -1 })
-    .limit(limit)
-    .skip(startIndex);
+  const total = 0;
+  const companies = [];
 
   // Pagination
   const endIndex = startIndex + limit;
@@ -446,209 +479,45 @@ const getCompanies = asyncHandler(async (req, res) => {
 // @route   GET /api/admin/companies/:id
 // @access  Private (Admin only)
 const getCompany = asyncHandler(async (req, res) => {
-  const company = await Company.findById(req.params.id)
-    .populate('owner', 'email profile.firstName profile.lastName')
-    .populate('createdBy', 'email profile.firstName profile.lastName');
-
-  if (!company) {
-    return res.status(404).json({
-      success: false,
-      error: 'Không tìm thấy công ty',
-    });
-  }
-
-  res.status(200).json({
-    success: true,
-    data: company,
-  });
+  return res
+    .status(400)
+    .json({ success: false, error: 'Chưa hỗ trợ quản lý Company' });
 });
 
 // @desc    Update company (admin only)
 // @route   PUT /api/admin/companies/:id
 // @access  Private (Admin only)
 const updateCompany = asyncHandler(async (req, res) => {
-  const company = await Company.findByIdAndUpdate(req.params.id, req.body, {
-    new: true,
-    runValidators: true,
-  });
-
-  if (!company) {
-    return res.status(404).json({
-      success: false,
-      error: 'Không tìm thấy công ty',
-    });
-  }
-
-  logger.info(`Admin updated company: ${company.name}`, {
-    adminId: req.user.id,
-    companyId: company._id,
-  });
-
-  res.status(200).json({
-    success: true,
-    data: company,
-  });
+  return res
+    .status(400)
+    .json({ success: false, error: 'Chưa hỗ trợ quản lý Company' });
 });
 
 // @desc    Delete company (admin only)
 // @route   DELETE /api/admin/companies/:id
 // @access  Private (Admin only)
 const deleteCompany = asyncHandler(async (req, res) => {
-  const company = await Company.findById(req.params.id);
-
-  if (!company) {
-    return res.status(404).json({
-      success: false,
-      error: 'Không tìm thấy công ty',
-    });
-  }
-
-  // Check if company has active jobs
-  const activeJobs = await Job.find({
-    companyId: company._id,
-    status: { $in: ['active', 'pending'] },
-  });
-
-  if (activeJobs.length > 0) {
-    return res.status(400).json({
-      success: false,
-      error: 'Không thể xóa công ty có jobs đang active',
-    });
-  }
-
-  await company.remove();
-
-  logger.info(`Admin deleted company: ${company.name}`, {
-    adminId: req.user.id,
-    companyId: company._id,
-  });
-
-  res.status(200).json({
-    success: true,
-    data: {},
-  });
+  return res
+    .status(400)
+    .json({ success: false, error: 'Chưa hỗ trợ quản lý Company' });
 });
 
 // @desc    Get company's jobs (admin only)
 // @route   GET /api/admin/companies/:id/jobs
 // @access  Private (Admin only)
 const getCompanyJobs = asyncHandler(async (req, res) => {
-  const company = await Company.findById(req.params.id);
-
-  if (!company) {
-    return res.status(404).json({
-      success: false,
-      error: 'Không tìm thấy công ty',
-    });
-  }
-
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 10;
-  const startIndex = (page - 1) * limit;
-
-  const filter = { companyId: company._id };
-
-  // Filter by status
-  if (req.query.status) {
-    filter.status = req.query.status;
-  }
-
-  // Filter by visibility
-  if (req.query.visibility) {
-    filter.visibility = req.query.visibility;
-  }
-
-  const total = await Job.countDocuments(filter);
-  const jobs = await Job.find(filter)
-    .populate('postedBy', 'email profile.firstName profile.lastName')
-    .sort({ createdAt: -1 })
-    .limit(limit)
-    .skip(startIndex);
-
-  // Pagination
-  const endIndex = startIndex + limit;
-  const pagination = {};
-  if (endIndex < total) {
-    pagination.next = {
-      page: page + 1,
-      limit,
-    };
-  }
-  if (startIndex > 0) {
-    pagination.prev = {
-      page: page - 1,
-      limit,
-    };
-  }
-
-  res.status(200).json({
-    success: true,
-    count: jobs.length,
-    total,
-    pagination,
-    data: jobs,
-  });
+  return res
+    .status(400)
+    .json({ success: false, error: 'Chưa hỗ trợ quản lý Company' });
 });
 
 // @desc    Get company's applications (admin only)
 // @route   GET /api/admin/companies/:id/applications
 // @access  Private (Admin only)
 const getCompanyApplications = asyncHandler(async (req, res) => {
-  const company = await Company.findById(req.params.id);
-
-  if (!company) {
-    return res.status(404).json({
-      success: false,
-      error: 'Không tìm thấy công ty',
-    });
-  }
-
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 10;
-  const startIndex = (page - 1) * limit;
-
-  // Get all jobs of this company
-  const companyJobs = await Job.find({ companyId: company._id }).select('_id');
-  const jobIds = companyJobs.map(job => job._id);
-
-  const filter = { jobId: { $in: jobIds } };
-
-  // Filter by status
-  if (req.query.status) {
-    filter.status = req.query.status;
-  }
-
-  const total = await Application.countDocuments(filter);
-  const applications = await Application.find(filter)
-    .populate('userId', 'email profile.firstName profile.lastName')
-    .populate('jobId', 'title status')
-    .sort({ createdAt: -1 })
-    .limit(limit)
-    .skip(startIndex);
-
-  // Pagination
-  const endIndex = startIndex + limit;
-  const pagination = {};
-  if (endIndex < total) {
-    pagination.next = {
-      page: page + 1,
-      limit,
-    };
-  }
-  if (startIndex > 0) {
-    pagination.prev = {
-      page: page - 1,
-      limit,
-    };
-  }
-
-  res.status(200).json({
-    success: true,
-    count: applications.length,
-    total,
-    pagination,
-    data: applications,
-  });
+  return res
+    .status(400)
+    .json({ success: false, error: 'Chưa hỗ trợ quản lý Company' });
 });
 
 // ========================================
@@ -735,6 +604,37 @@ const getJobsAdmin = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data: jobs, pagination });
 });
 
+// @desc    Get applications (admin)
+// @route   GET /api/admin/applications
+// @access  Private (Admin only)
+const getApplicationsAdmin = asyncHandler(async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const startIndex = (page - 1) * limit;
+
+  const filter = {};
+  if (req.query.status) filter.status = req.query.status;
+  if (req.query.jobId) filter.jobId = req.query.jobId;
+  if (req.query.userId) filter.userId = req.query.userId;
+
+  const total = await Application.countDocuments(filter);
+  const applications = await Application.find(filter)
+    .populate('userId', 'email fullName')
+    .populate('jobId', 'title status')
+    .sort({ createdAt: -1 })
+    .skip(startIndex)
+    .limit(limit);
+
+  const pagination = {
+    current: page,
+    pages: Math.ceil(total / limit),
+    total,
+    limit,
+  };
+
+  res.status(200).json({ success: true, data: applications, pagination });
+});
+
 // @desc    Update job status (admin approve/reject/publish)
 // @route   PUT /api/admin/jobs/:id/status
 // @access  Private (Admin only)
@@ -774,20 +674,18 @@ const updateJobStatusAdmin = asyncHandler(async (req, res) => {
     jobId: id,
     status,
   });
-  res
-    .status(200)
-    .json({
-      success: true,
-      data: job,
-      message: 'Cập nhật trạng thái job thành công',
-    });
+  res.status(200).json({
+    success: true,
+    data: job,
+    message: 'Cập nhật trạng thái job thành công',
+  });
 });
 
 // @desc    Verify employer
 // @route   PUT /api/admin/verifications/:id
 // @access  Private (Admin only)
 const verifyEmployer = asyncHandler(async (req, res) => {
-  const { action, reason } = req.body; // action: 'approve' or 'reject'
+  const { action, reason, documentReviews, notes } = req.body; // action: 'approve' or 'reject'
 
   if (!['approve', 'reject'].includes(action)) {
     return res.status(400).json({
@@ -798,7 +696,7 @@ const verifyEmployer = asyncHandler(async (req, res) => {
 
   const employerProfile = await EmployerProfile.findById(
     req.params.id
-  ).populate('userId', 'email');
+  ).populate('mainUserId', 'email');
 
   if (!employerProfile) {
     return res.status(404).json({
@@ -807,10 +705,52 @@ const verifyEmployer = asyncHandler(async (req, res) => {
     });
   }
 
+  // Review individual documents if provided
+  if (documentReviews && Array.isArray(documentReviews)) {
+    for (const review of documentReviews) {
+      const doc = employerProfile.verification.documents.id(review.documentId);
+      if (doc) {
+        doc.verified = review.verified;
+        doc.verifiedBy = req.user.id;
+        doc.verifiedAt = new Date();
+        if (review.rejectionReason) {
+          doc.rejectionReason = review.rejectionReason;
+        }
+      }
+    }
+  }
+
+  // Add admin notes if provided
+  if (notes) {
+    employerProfile.verification.adminNotes.push({
+      note: notes,
+      addedBy: req.user.id,
+    });
+  }
+
   if (action === 'approve') {
+    // Check if all verification steps are completed
+    const steps = employerProfile.verification.verificationSteps;
+    const allStepsCompleted =
+      steps.documentsUploaded &&
+      steps.businessInfoValidated &&
+      steps.legalRepresentativeVerified &&
+      steps.companyEmailVerified;
+
+    if (!allStepsCompleted) {
+      return res.status(400).json({
+        success: false,
+        error: 'Chưa hoàn thành tất cả các bước xác thực',
+        missingSteps: Object.entries(steps)
+          .filter(([key, value]) => !value)
+          .map(([key]) => key),
+      });
+    }
+
     employerProfile.verification.isVerified = true;
     employerProfile.verification.verifiedAt = new Date();
     employerProfile.verification.verifiedBy = req.user.id;
+    employerProfile.verification.verificationSteps.adminReviewed = true;
     employerProfile.status = 'active';
   } else {
     employerProfile.status = 'rejected';
@@ -819,15 +759,93 @@ const verifyEmployer = asyncHandler(async (req, res) => {
 
   await employerProfile.save();
 
-  logger.info(`Admin ${action}ed employer: ${employerProfile.userId.email}`, {
-    adminId: req.user.id,
-    employerId: employerProfile._id,
-    reason,
-  });
+  logger.info(
+    `Admin ${action}ed employer: ${employerProfile.mainUserId.email}`,
+    {
+      adminId: req.user.id,
+      employerId: employerProfile._id,
+      reason,
+      documentReviews: documentReviews?.length || 0,
+      hasNotes: !!notes,
+    }
+  );
 
   res.status(200).json({
     success: true,
-    data: employerProfile,
+    message: `Đã ${
+      action === 'approve' ? 'duyệt' : 'từ chối'
+    } xác thực employer`,
+    data: employerProfile.verification,
+  });
+});
+
+// @desc    Get employer verification details
+// @route   GET /api/admin/verifications/:id
+// @access  Private (Admin only)
+const getEmployerVerificationDetails = asyncHandler(async (req, res) => {
+  const employerProfile = await EmployerProfile.findById(req.params.id)
+    .populate('mainUserId', 'email firstName lastName')
+    .populate('verification.verifiedBy', 'firstName lastName email')
+    .populate('verification.adminNotes.addedBy', 'firstName lastName email');
+
+  if (!employerProfile) {
+    return res.status(404).json({
+      success: false,
+      error: 'Không tìm thấy employer profile',
+    });
+  }
+
+  // Calculate verification progress
+  const steps = employerProfile.verification.verificationSteps;
+  const completedSteps = Object.values(steps).filter(Boolean).length;
+  const totalSteps = Object.keys(steps).length;
+  const progressPercentage = Math.round((completedSteps / totalSteps) * 100);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      ...employerProfile.toObject(),
+      verificationProgress: {
+        percentage: progressPercentage,
+        completedSteps,
+        totalSteps,
+        steps,
+      },
+    },
+  });
+});
+
+// @desc    Get all pending verifications
+// @route   GET /api/admin/verifications
+// @access  Private (Admin only)
+const getPendingVerifications = asyncHandler(async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const startIndex = (page - 1) * limit;
+
+  const filter = { status: 'pending' };
+  if (req.query.industry) {
+    filter['company.industry'] = { $regex: req.query.industry, $options: 'i' };
+  }
+
+  const total = await EmployerProfile.countDocuments(filter);
+  const verifications = await EmployerProfile.find(filter)
+    .populate('mainUserId', 'email firstName lastName')
+    .select('company verification status createdAt')
+    .sort({ createdAt: -1 })
+    .skip(startIndex)
+    .limit(limit);
+
+  res.status(200).json({
+    success: true,
+    pagination: {
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+      hasNextPage: startIndex + limit < total,
+      hasPrevPage: startIndex > 0,
+    },
+    data: verifications,
   });
 });
 
@@ -887,6 +905,20 @@ const getSystemLogs = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Get skills (placeholder for admin)
+// @route   GET /api/admin/skills
+// @access  Private (Admin only)
+const getSkillsAdmin = asyncHandler(async (req, res) => {
+  res.status(200).json({ success: true, data: [], message: 'Chưa triển khai' });
+});
+
+// @desc    Get settings (placeholder for admin)
+// @route   GET /api/admin/settings
+// @access  Private (Admin only)
+const getSettingsAdmin = asyncHandler(async (req, res) => {
+  res.status(200).json({ success: true, data: {}, message: 'Chưa triển khai' });
+});
+
 // @desc    Get all employers
 // @route   GET /api/admin/employers
 // @access  Private (Admin only)
@@ -917,8 +949,7 @@ const getEmployers = asyncHandler(async (req, res) => {
 
   // Get employers with pagination
   const employers = await User.find(filter)
-    .populate('profile', 'firstName lastName avatar')
-    .populate('employerProfile', 'companyName verification status')
+    .select('email fullName role createdAt')
     .sort({ createdAt: -1 })
     .skip(startIndex)
     .limit(limit);
@@ -942,13 +973,9 @@ const getEmployers = asyncHandler(async (req, res) => {
 // @route   GET /api/admin/employers/:id
 // @access  Private (Admin only)
 const getEmployer = asyncHandler(async (req, res) => {
-  const employer = await User.findById(req.params.id)
-    .populate('profile')
-    .populate('employerProfile')
-    .populate({
-      path: 'employerProfile.companies',
-      select: 'name status logo',
-    });
+  const employer = await User.findById(req.params.id).select(
+    'email fullName role createdAt employerProfile'
+  );
 
   if (!employer || employer.role !== 'employer') {
     return res.status(404).json({
@@ -1078,6 +1105,7 @@ module.exports = {
   updateUser,
   deleteUser,
   updateUserStatus,
+  updateUserRole,
 
   // Analytics & Dashboard
   getDashboardStats,
@@ -1100,14 +1128,18 @@ module.exports = {
 
   // Employer Verification
   getPendingVerifications,
+  getEmployerVerificationDetails,
   verifyEmployer,
   updateCompanyStatus,
 
   // Job Moderation
   getJobsAdmin,
   updateJobStatusAdmin,
+  getApplicationsAdmin,
 
   // System Management
   getSystemHealth,
   getSystemLogs,
+  getSkillsAdmin,
+  getSettingsAdmin,
 };

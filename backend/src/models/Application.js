@@ -16,16 +16,11 @@ const ApplicationSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: [
-        'pending',
-        'reviewing',
-        'shortlisted',
-        'interview',
-        'offer',
-        'accepted',
-        'rejected',
-      ],
-      default: 'pending',
+      enum: Object.values(
+        require('../constants/common.constants').APPLICATION_STATUS
+      ),
+      default: require('../constants/common.constants').APPLICATION_STATUS
+        .PENDING,
     },
 
     coverLetter: {
@@ -66,7 +61,6 @@ const ApplicationSchema = new mongoose.Schema(
         duration: Number,
         type: {
           type: String,
-          enum: ['online', 'offline'],
         },
         location: String,
         interviewer: {
@@ -79,7 +73,6 @@ const ApplicationSchema = new mongoose.Schema(
           notes: String,
           decision: {
             type: String,
-            enum: ['pass', 'fail', 'pending'],
           },
         },
       },

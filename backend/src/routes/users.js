@@ -10,7 +10,6 @@ const {
   changePassword,
   linkGoogleAccount,
   unlinkGoogleAccount,
-  searchUsers,
   getUserStats,
   updateUserPreferences,
   getUserNotifications,
@@ -38,8 +37,7 @@ router.put('/preferences', protect, updateUserPreferences);
 router.put('/deactivate', protect, deactivateAccount);
 router.put('/reactivate', protect, reactivateAccount);
 
-// User search & info
-router.get('/search', searchUsers);
+// User info
 router.get('/stats', protect, getUserStats);
 router.get('/:id', protect, getUser);
 router.get(

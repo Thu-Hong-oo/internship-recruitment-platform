@@ -8,6 +8,7 @@ const {
   updateUser,
   deleteUser,
   updateUserStatus,
+  updateUserRole,
 
   // Analytics & Dashboard
   getDashboardStats,
@@ -30,6 +31,7 @@ const {
 
   // Employer Verification
   getPendingVerifications,
+  getEmployerVerificationDetails,
   verifyEmployer,
 
   // Company Moderation
@@ -38,10 +40,13 @@ const {
   // Job Moderation
   getJobsAdmin,
   updateJobStatusAdmin,
+  getApplicationsAdmin,
 
   // System Management
   getSystemHealth,
   getSystemLogs,
+  getSkillsAdmin,
+  getSettingsAdmin,
 } = require('../controllers/adminController');
 
 const router = express.Router();
@@ -286,6 +291,47 @@ router.delete('/users/:id', deleteUser);
  */
 router.put('/users/:id/status', updateUserStatus);
 
+/**
+ * @swagger
+ * /api/admin/users/{id}/role:
+ *   put:
+ *     summary: Update user role (admin only)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - role
+ *             properties:
+ *               role:
+ *                 type: string
+ *                 enum: [student, employer, admin]
+ *     responses:
+ *       200:
+ *         description: User role updated successfully
+ *       400:
+ *         description: Invalid role
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Admin access required
+ *       404:
+ *         description: User not found
+ */
+router.put('/users/:id/role', updateUserRole);
+
 // ========================================
 // ANALYTICS & DASHBOARD
 // ========================================
@@ -398,6 +444,24 @@ router.get('/analytics/users', getUserAnalytics);
  *         description: Admin access required
  */
 router.get('/employers', getEmployers);
+
+/**
+ * @swagger
+ * /api/admin/employers/pending:
+ *   get:
+ *     summary: Get all pending employer verifications
+ *     tags: [Admin - Employer Management]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Pending verifications retrieved successfully
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Admin access required
+ */
+router.get('/employers/pending', getPendingVerifications);
 
 /**
  * @swagger
@@ -825,6 +889,7 @@ router.get('/companies/:id/applications', getCompanyApplications);
  *         description: Admin access required
  */
 router.get('/verifications', getPendingVerifications);
+router.get('/verifications/:id', getEmployerVerificationDetails);
 
 /**
  * @swagger
@@ -994,6 +1059,39 @@ router.get('/jobs', getJobsAdmin);
  */
 router.put('/jobs/:id/status', updateJobStatusAdmin);
 
+/**
+ * @swagger
+ * /api/admin/applications:
+ *   get:
+ *     summary: Get all applications for moderation
+ *     tags: [Admin - Job Moderation]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of applications per page
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, reviewing, interviewing, accepted, rejected]
+ *         description: Filter by application status
+ *     responses:
+ *       200:
+ *         description: Applications retrieved
+ */
+router.get('/applications', getApplicationsAdmin);
+
 // ========================================
 // SYSTEM MANAGEMENT
 // ========================================
@@ -1072,5 +1170,41 @@ router.get('/system/health', getSystemHealth);
  *         description: Admin access required
  */
 router.get('/system/logs', getSystemLogs);
+
+/**
+ * @swagger
+ * /api/admin/skills:
+ *   get:
+ *     summary: Get all skills for admin
+ *     tags: [Admin - System Management]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Skills retrieved successfully
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Admin access required
+ */
+router.get('/skills', getSkillsAdmin);
+
+/**
+ * @swagger
+ * /api/admin/settings:
+ *   get:
+ *     summary: Get admin settings
+ *     tags: [Admin - System Management]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Settings retrieved successfully
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Admin access required
+ */
+router.get('/settings', getSettingsAdmin);
 
 module.exports = router;
