@@ -1,4 +1,3 @@
-import { getPath } from "../../../utils";
 
 export const StatusWidget = ({ status = "Active" }) => {
   const STATUS_CONFIG = {
