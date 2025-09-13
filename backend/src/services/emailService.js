@@ -57,6 +57,13 @@ const sendEmailVerification = async (user, verificationToken) => {
     // Generate 6-digit OTP from the token
     const otp = verificationToken.substring(0, 6).toUpperCase();
     
+    const displayName = (
+      (user.profile && `${user.profile.firstName || ''} ${user.profile.lastName || ''}`.trim()) ||
+      (user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : '') ||
+      (user.googleProfile && user.googleProfile.name) ||
+      (user.email ? user.email.split('@')[0] : 'Bạn')
+    );
+
     const mailOptions = {
       from: `"${process.env.EMAIL_FROM_NAME}" <${process.env.EMAIL_FROM_ADDRESS}>`,
       to: user.email,
@@ -67,7 +74,7 @@ const sendEmailVerification = async (user, verificationToken) => {
             <h1>Xác thực Email</h1>
           </div>
           <div style="padding: 20px; background-color: #f9f9f9;">
-            <h2>Xin chào ${user.firstName} ${user.lastName}!</h2>
+            <h2>Xin chào ${displayName}!</h2>
             <p>Cảm ơn bạn đã đăng ký tài khoản tại Internship Recruitment Platform.</p>
             <p>Để hoàn tất quá trình đăng ký, vui lòng sử dụng mã OTP sau:</p>
             <div style="text-align: center; margin: 30px 0;">

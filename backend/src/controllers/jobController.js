@@ -164,117 +164,6 @@ const getAllJobs = async (req, res) => {
   }
 };
 
-// @desc    Search jobs with text search
-// @route   GET /api/jobs/search
-// @access  Public
-const searchJobs = async (req, res) => {
-  try {
-    const {
-      q, // Required search query
-      page = 1,
-      limit = 10,
-      // Additional filters
-      skills,
-      location,
-      district,
-      category,
-      subCategory,
-      internshipType,
-      salaryMin,
-      salaryMax,
-      yearOfStudy,
-      majors,
-      isPaid,
-      workEnvironment,
-      genderRequirement,
-      level,
-      hiringCount,
-    } = req.query;
-
-    if (!q) {
-      return res.status(400).json({
-        success: false,
-        message: 'Vui lòng cung cấp từ khóa tìm kiếm (q)',
-      });
-    }
-
-    const query = { status: 'active' };
-
-    // Enhanced text search
-    query.$or = [
-      { title: { $regex: q, $options: 'i' } },
-      { description: { $regex: q, $options: 'i' } },
-      { responsibilities: { $in: [new RegExp(q, 'i')] } },
-      { 'requirements.skills': { $in: [new RegExp(q, 'i')] } },
-    ];
-
-    // Apply filters
-    if (skills) {
-      const skillArray = skills.split(',').map(skill => skill.trim());
-      query['requirements.skills'] = { $in: skillArray };
-    }
-    if (location) query['location.city'] = { $regex: location, $options: 'i' };
-    if (district)
-      query['location.district'] = { $regex: district, $options: 'i' };
-    if (category) query['category'] = category;
-    if (subCategory) query['subCategories'] = { $in: subCategory.split(',') };
-    if (internshipType) query['internship.type'] = internshipType;
-    if (isPaid !== undefined) query['internship.isPaid'] = isPaid === 'true';
-    if (workEnvironment) query['workEnvironment'] = workEnvironment;
-    if (genderRequirement)
-      query['requirements.genderRequirement'] = genderRequirement;
-    if (level) query['requirements.level'] = level;
-    if (hiringCount) query['hiringCount'] = { $gte: parseInt(hiringCount) };
-    if (yearOfStudy) {
-      const years = yearOfStudy.split(',').map(year => year.trim());
-      query['requirements.yearOfStudy'] = { $in: years };
-    }
-    if (majors) {
-      const majorArray = majors.split(',').map(major => major.trim());
-      query['requirements.majors'] = { $in: majorArray };
-    }
-
-    // Salary range
-    if (salaryMin || salaryMax) {
-      query['internship.salary.amount'] = {};
-      if (salaryMin)
-        query['internship.salary.amount']['$gte'] = parseInt(salaryMin);
-      if (salaryMax)
-        query['internship.salary.amount']['$lte'] = parseInt(salaryMax);
-    }
-
-    const skip = (page - 1) * limit;
-    const jobs = await Job.find(query)
-      .populate('companyId', 'name logo industry description')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const total = await Job.countDocuments(query);
-
-    res.status(200).json({
-      success: true,
-      data: jobs,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit),
-      },
-      search: {
-        query: q,
-        method: 'text',
-        totalResults: total,
-      },
-    });
-  } catch (error) {
-    logger.error('Error searching jobs:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi tìm kiếm công việc',
-    });
-  }
-};
 
 // @desc    Get single job
 // @route   GET /api/jobs/:id
@@ -283,7 +172,7 @@ const getJob = async (req, res) => {
   try {
     const job = await Job.findById(req.params.id)
       .populate('companyId', 'name logo industry description')
-      .populate('postedBy', 'name email');
+      .populate('postedBy', 'fullName name email profile googleProfile avatar');
 
     if (!job) {
       return res.status(404).json({
@@ -292,9 +181,25 @@ const getJob = async (req, res) => {
       });
     }
 
+    const jobObj = job.toObject();
+    if (jobObj.postedBy) {
+      const pb = jobObj.postedBy;
+      const computedFullName =
+        pb.fullName ||
+        pb.name ||
+        (pb.profile && `${pb.profile.firstName || ''} ${pb.profile.lastName || ''}`.trim()) ||
+        (pb.googleProfile && pb.googleProfile.name) ||
+        pb.email?.split('@')[0] ||
+        'Chưa cập nhật';
+      jobObj.postedBy = {
+        ...pb,
+        fullName: computedFullName,
+      };
+    }
+
     res.status(200).json({
       success: true,
-      data: job,
+      data: jobObj,
     });
   } catch (error) {
     logger.error('Error getting job:', error);
@@ -332,6 +237,10 @@ const createJob = async (req, res) => {
     const jobData = req.body;
     jobData.companyId = company._id;
     jobData.postedBy = req.user.id;
+    // Default: employer creates as draft; must submit for review to move to pending
+    if (req.user.role !== 'admin') {
+      jobData.status = 'draft';
+    }
 
     // Validate subCategories (max 2)
     if (jobData.subCategories && jobData.subCategories.length > 2) {
@@ -353,12 +262,31 @@ const createJob = async (req, res) => {
 
     // Populate company info
     await job.populate('companyId', 'name logo industry description');
-    await job.populate('postedBy', 'name email');
+    await job.populate('postedBy', 'fullName name email profile googleProfile avatar');
+
+    const jobObj = job.toObject();
+    if (jobObj.postedBy) {
+      const pb = jobObj.postedBy;
+      const computedFullName =
+        pb.fullName ||
+        pb.name ||
+        (pb.profile && `${pb.profile.firstName || ''} ${pb.profile.lastName || ''}`.trim()) ||
+        (pb.googleProfile && pb.googleProfile.name) ||
+        pb.email?.split('@')[0] ||
+        'Chưa cập nhật';
+      jobObj.postedBy = {
+        ...pb,
+        fullName: computedFullName,
+      };
+    }
 
     res.status(201).json({
       success: true,
-      data: job,
-      message: 'Đăng job thành công',
+      data: jobObj,
+      message:
+        jobObj.status === 'active'
+          ? 'Đăng job thành công'
+          : 'Tạo job thành công, chờ admin duyệt',
     });
   } catch (error) {
     logger.error('Error creating job:', error);
@@ -403,6 +331,10 @@ const updateJob = async (req, res) => {
     }
 
     const updateData = req.body;
+    // Employers cannot directly change status to active/closed/filled
+    if (updateData.status && req.user.role !== 'admin') {
+      delete updateData.status;
+    }
 
     // Validate subCategories (max 2)
     if (updateData.subCategories && updateData.subCategories.length > 2) {
@@ -413,7 +345,7 @@ const updateJob = async (req, res) => {
     }
 
     // Validate reasonsToApply (max 3)
-    if (updateData.reasonsToApply && updateData.reasonsToApply.length > 3) {
+    if (updateData.reasonsToApply && updateData.reasonsToApply.length > 5) {
       return res.status(400).json({
         success: false,
         message: 'Chỉ được nhập tối đa 3 lý do nên ứng tuyển',
@@ -650,85 +582,6 @@ const getJobBySlug = async (req, res) => {
   }
 };
 
-// @desc    Get jobs by category
-// @route   GET /api/jobs/category/:category
-// @access  Public
-const getJobsByCategory = async (req, res) => {
-  try {
-    const { category } = req.params;
-    const { page = 1, limit = 10 } = req.query;
-
-    const skip = (page - 1) * limit;
-
-    const jobs = await Job.find({ category, status: 'active' })
-      .populate('companyId', 'name logo industry description')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const total = await Job.countDocuments({ category, status: 'active' });
-
-    res.status(200).json({
-      success: true,
-      data: jobs,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit),
-      },
-    });
-  } catch (error) {
-    logger.error('Error getting jobs by category:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi lấy danh sách công việc theo danh mục',
-    });
-  }
-};
-
-// @desc    Get jobs by location
-// @route   GET /api/jobs/location/:location
-// @access  Public
-const getJobsByLocation = async (req, res) => {
-  try {
-    const { location } = req.params;
-    const { page = 1, limit = 10 } = req.query;
-
-    const skip = (page - 1) * limit;
-
-    const jobs = await Job.find({
-      'location.city': { $regex: location, $options: 'i' },
-      status: 'active',
-    })
-      .populate('companyId', 'name logo industry description')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const total = await Job.countDocuments({
-      'location.city': { $regex: location, $options: 'i' },
-      status: 'active',
-    });
-
-    res.status(200).json({
-      success: true,
-      data: jobs,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit),
-      },
-    });
-  } catch (error) {
-    logger.error('Error getting jobs by location:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi lấy danh sách công việc theo địa điểm',
-    });
-  }
-};
 
 // @desc    Increment job views
 // @route   POST /api/jobs/:id/view
@@ -763,92 +616,6 @@ const incrementJobViews = async (req, res) => {
   }
 };
 
-// @desc    Get jobs by company
-// @route   GET /api/jobs/company/:companyId
-// @access  Public
-const getJobsByCompany = async (req, res) => {
-  try {
-    const { companyId } = req.params;
-    const { page = 1, limit = 10, status = 'active' } = req.query;
-
-    const skip = (page - 1) * limit;
-
-    const jobs = await Job.find({ companyId, status })
-      .populate('companyId', 'name logo industry description')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const total = await Job.countDocuments({ companyId, status });
-
-    res.status(200).json({
-      success: true,
-      data: jobs,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit),
-      },
-    });
-  } catch (error) {
-    logger.error('Error getting jobs by company:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi lấy danh sách công việc của công ty',
-    });
-  }
-};
-
-// @desc    Get jobs by skills
-// @route   GET /api/jobs/skills
-// @access  Public
-const getJobsBySkills = async (req, res) => {
-  try {
-    const { skills, page = 1, limit = 10 } = req.query;
-
-    if (!skills) {
-      return res.status(400).json({
-        success: false,
-        message: 'Vui lòng cung cấp danh sách kỹ năng',
-      });
-    }
-
-    const skillArray = skills.split(',').map(skill => skill.trim());
-    const skip = (page - 1) * limit;
-
-    const jobs = await Job.find({
-      'requirements.skills': { $in: skillArray },
-      status: 'active',
-    })
-      .populate('companyId', 'name logo industry description')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const total = await Job.countDocuments({
-      'requirements.skills': { $in: skillArray },
-      status: 'active',
-    });
-
-    res.status(200).json({
-      success: true,
-      data: jobs,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit),
-      },
-    });
-  } catch (error) {
-    logger.error('Error getting jobs by skills:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi lấy danh sách công việc theo kỹ năng',
-    });
-  }
-};
 
 // @desc    Get recent jobs
 // @route   GET /api/jobs/recent
@@ -883,91 +650,6 @@ const getRecentJobs = async (req, res) => {
   }
 };
 
-// @desc    Get jobs by subcategory
-// @route   GET /api/jobs/subcategory/:subCategory
-// @access  Public
-const getJobsBySubCategory = async (req, res) => {
-  try {
-    const { subCategory } = req.params;
-    const { page = 1, limit = 10 } = req.query;
-
-    const skip = (page - 1) * limit;
-
-    const jobs = await Job.find({
-      subCategories: subCategory,
-      status: 'active',
-    })
-      .populate('companyId', 'name logo industry description')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const total = await Job.countDocuments({
-      subCategories: subCategory,
-      status: 'active',
-    });
-
-    res.status(200).json({
-      success: true,
-      data: jobs,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit),
-      },
-    });
-  } catch (error) {
-    logger.error('Error getting jobs by subcategory:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi lấy danh sách công việc theo ngành nghề phụ',
-    });
-  }
-};
-
-// @desc    Get jobs by district
-// @route   GET /api/jobs/district/:district
-// @access  Public
-const getJobsByDistrict = async (req, res) => {
-  try {
-    const { district } = req.params;
-    const { page = 1, limit = 10 } = req.query;
-
-    const skip = (page - 1) * limit;
-
-    const jobs = await Job.find({
-      'location.district': { $regex: district, $options: 'i' },
-      status: 'active',
-    })
-      .populate('companyId', 'name logo industry description')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
-
-    const total = await Job.countDocuments({
-      'location.district': { $regex: district, $options: 'i' },
-      status: 'active',
-    });
-
-    res.status(200).json({
-      success: true,
-      data: jobs,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / limit),
-      },
-    });
-  } catch (error) {
-    logger.error('Error getting jobs by district:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi lấy danh sách công việc theo quận/huyện',
-    });
-  }
-};
 
 // @desc    Get company info for job display
 // @route   GET /api/jobs/:id/company
@@ -1040,24 +722,49 @@ const getJobStats = async (req, res) => {
   }
 };
 
+// @desc    Submit job for admin review (draft -> pending)
+// @route   POST /api/jobs/employer/:id/submit
+// @access  Private (Employer)
+const submitJobForReview = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const job = await Job.findById(id);
+    if (!job) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy công việc' });
+    }
+
+    // Check company ownership
+    const company = await Company.findByOwner(req.user.id);
+    if (!company || job.companyId.toString() !== company._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Không có quyền gửi duyệt công việc này' });
+    }
+
+    if (job.status !== 'draft') {
+      return res.status(400).json({ success: false, message: 'Chỉ có thể gửi duyệt job ở trạng thái draft' });
+    }
+
+    job.status = 'pending';
+    await job.save();
+
+    res.status(200).json({ success: true, data: job, message: 'Đã gửi duyệt. Vui lòng chờ admin phê duyệt' });
+  } catch (error) {
+    logger.error('Error submitting job for review:', error);
+    res.status(500).json({ success: false, message: 'Lỗi khi gửi duyệt job' });
+  }
+};
+
 module.exports = {
   getAllJobs,
   getJob,
   createJob,
   updateJob,
   deleteJob,
-  searchJobs,
   applyForJob,
   getJobApplications,
   getJobBySlug,
-  getJobsByCategory,
-  getJobsBySubCategory,
-  getJobsByLocation,
-  getJobsByDistrict,
   incrementJobViews,
-  getJobsByCompany,
-  getJobsBySkills,
-  getRecentJobs,
   getJobCompany,
   getJobStats,
+  submitJobForReview,
 };

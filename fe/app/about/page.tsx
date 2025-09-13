@@ -7,10 +7,12 @@ export default function AboutPage() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-foreground mb-4">Về TopCV</h1>
+          <h1 className="text-4xl font-bold text-foreground mb-4">
+            Về InternBridge
+          </h1>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            TopCV là nền tảng tìm việc làm hàng đầu tại Việt Nam, kết nối hàng
-            nghìn ứng viên với các doanh nghiệp uy tín.
+            InternBridge là nền tảng tìm việc làm hàng đầu tại Việt Nam, kết nối
+            hàng nghìn ứng viên với các doanh nghiệp uy tín.
           </p>
         </div>
 
