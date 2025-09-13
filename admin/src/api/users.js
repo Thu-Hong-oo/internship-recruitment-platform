@@ -34,7 +34,20 @@ export const usersAPI = {
       raw: response,
     };
   },
+
+  /**
+   * Get user detail by ID
+   * @param {string} userId - User ID
+   * @returns {Promise<Object>} User detail data
+   */
+  getUserDetail: async (userId) => {
+    const response = await axiosClient.get(`/admin/users/${userId}`);
+    return {
+      success: Boolean(response?.success),
+      data: response?.data ?? null,
+      raw: response,
+    };
+  },
 };
 
 export default usersAPI;
-

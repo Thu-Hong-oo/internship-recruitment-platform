@@ -17,7 +17,7 @@ const hardConfig = [
     code: "Pending_Lock_Approval",
   },
   {
-    title: "Chưa hoạt động",
+    title: "Chưa kích hoạt",
     code: "InActive",
   },
 ];
@@ -45,8 +45,8 @@ export default function Accounts() {
       const res = await usersAPI.getUsers({
         page: formData?.page || 1,
         limit: formData?.pageSize || 10,
-        role: formData?.role || undefined, 
-        status: formData?.status || undefined, 
+        role: formData?.role || undefined,
+        status: formData?.status || undefined,
       });
 
       const mapped = (res?.users || []).map((u, idx) => ({
@@ -66,8 +66,8 @@ export default function Accounts() {
         dob: u?.profile?.dateOfBirth
           ? new Date(u.profile.dateOfBirth).toLocaleDateString()
           : "",
-        status: u?.isActive ? "Active" : "InActive",
-        reasonForRejection: u?.reasonForRejection || "",
+        status: u?.isEmailVerified ? "Active" : "InActive",
+        role: u?.role || "",
       }));
 
       setData(mapped);
@@ -196,17 +196,24 @@ export default function Accounts() {
       title: "Email",
       render: (_, data) => <div>{data?.email || "-"}</div>,
     },
-    {
-      title: "Ngày sinh",
-      dataIndex: "dob",
-    },
+    // {
+    //   title: "Ngày sinh",
+    //   dataIndex: "dob",
+    // },
     {
       title: "Trạng thái",
       render: (_, data) => <StatusWidget status={data?.status} />,
     },
     {
-      title: "Lý do khoá",
-      render: (_, data) => <div>{data?.reasonForRejection || "-"}</div>,
+      title: "Vai trò",
+      render: (_, data) => {
+        const roleMap = {
+          student: "Người tìm việc",
+          employer: "Nhà tuyển dụng",
+          admin: "Quản trị viên",
+        };
+        return <div>{roleMap[data?.role] || data?.role || "-"}</div>;
+      },
     },
 
     {
