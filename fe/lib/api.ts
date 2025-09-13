@@ -315,7 +315,6 @@ class ApiClient {
 
     return response;
   }
-
   async googleAuth(idToken: string): Promise<{
     success: boolean;
     token?: string;
