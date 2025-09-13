@@ -12,7 +12,6 @@
 - `POST /forgot-password` - Yêu cầu đặt lại mật khẩu
 - `POST /reset-password` - Đặt lại mật khẩu với OTP
 - `POST /verify-email` - Xác thực email bằng OTP
-- `GET /verify-email/:token` - Xác thực email bằng link
 - `POST /resend-verification` - Gửi lại mã xác thực email
 - `POST /refresh-token` - Làm mới access token
 - `POST /logout` - Đăng xuất
@@ -28,6 +27,11 @@
 - `PUT /password` - Đổi mật khẩu
 - `POST /avatar` - Upload avatar
 - `PUT /preferences` - Cập nhật tùy chọn người dùng
+
+## Public Profiles
+
+- `GET /users/:id` - Lấy BaseUser (thông tin cơ bản) cho mọi role đã đăng nhập
+- `GET /users/:id/public-profile` - Chỉ employer/admin. Trả về thông tin công khai của ứng viên; `resume.current.url` chỉ hiện khi công ty đã xác thực hoặc có quan hệ tuyển dụng hợp lệ
 
 ### Candidate Routes (`/api/candidate`)
 
@@ -57,6 +61,7 @@
 - `DELETE /jobs/:id` - Xóa tin tuyển dụng
 - `PUT /jobs/:id/status` - Cập nhật trạng thái tin
 - `GET /jobs/:id/stats` - Thống kê tin tuyển dụng
+  - Lưu ý quyền: recruiter/hr_manager cần `canPostJobs` để tạo/sửa/đổi trạng thái tin; interviewer không được đăng/sửa
 
 #### Application Management
 
@@ -64,6 +69,7 @@
 - `PUT /applications/:id/status` - Cập nhật trạng thái ứng viên
 - `GET /applications/:id/cv` - Xem CV ứng viên
 - `GET /applications/stats` - Thống kê ứng tuyển
+  - Lưu ý quyền: recruiter đổi trạng thái cần `canChangeStatus`; interviewer đặt/đổi/hủy lịch cần `canScheduleInterview`
 
 #### Analytics & Reports
 
@@ -75,10 +81,22 @@
 
 #### Team Management
 
-- `GET /team` - Danh sách thành viên
-- `POST /team/invite` - Mời thành viên mới
-- `PUT /team/:id/role` - Cập nhật vai trò
-- `DELETE /team/:id` - Xóa thành viên
+- `GET /team/members` - Danh sách thành viên (owner/admin)
+- `POST /team/invite` - Mời thành viên mới (owner/admin)
+- `POST /team/invite/accept` - Người được mời chấp nhận tham gia team
+- `PUT /team/members/:id/role` - Cập nhật vai trò (owner/admin)
+- `PUT /team/members/:id/permissions` - Cập nhật quyền granular (owner/admin)
+- `DELETE /team/members/:id` - Xóa thành viên (owner/admin)
+- `GET /team/roles` - Danh sách role và matrix quyền
+- `GET /team/me/permissions` - Quyền thực tế của user trong team
+
+> Quyền gợi ý: `canPostJobs`, `canViewApplications`, `canChangeStatus`, `canScheduleInterview`, `canExportReports`.
+
+#### Company Verification
+
+- `POST /verification` - Gửi hồ sơ xác thực công ty
+- `GET /verification/status` - Trạng thái xác thực
+  > Một số dữ liệu (VD: resume URL) chỉ hiển thị khi công ty đã xác thực hoặc có quan hệ tuyển dụng hợp lệ
 
 ## Job Management
 
@@ -102,24 +120,6 @@
 - `GET /:id/timeline` - Xem timeline ứng tuyển
 - `POST /:id/attachments` - Thêm tài liệu đính kèm
 
-#### Interview Management (`/api/applications/:id/interview`)
-
-- `POST /schedule` - Đặt lịch phỏng vấn
-- `PUT /reschedule` - Đổi lịch phỏng vấn
-- `POST /cancel` - Hủy lịch phỏng vấn
-- `GET /slots` - Xem các khung giờ phỏng vấn
-- `POST /confirm` - Xác nhận lịch phỏng vấn
-- `POST /reminder` - Gửi nhắc nhở phỏng vấn
-
-#### Feedback System (`/api/applications/:id/feedback`)
-
-- `POST /employer` - Nhà tuyển dụng gửi đánh giá
-- `POST /intern` - Ứng viên gửi đánh giá
-- `GET /summary` - Xem tổng hợp đánh giá
-- `PUT /update` - Cập nhật đánh giá
-- `POST /response` - Phản hồi đánh giá
-
-## AI & NLP Analysis
 
 ### CV Analysis (`/api/ai/cv`)
 
@@ -205,6 +205,8 @@
 - `PUT /:id/read` - Đánh dấu đã đọc
 - `DELETE /:id` - Xóa thông báo
 - `PUT /settings` - Cài đặt thông báo
+- `GET /unread-count` - Đếm thông báo chưa đọc
+- `PUT /:id/archive` - Lưu trữ/ẩn thông báo
 
 ## Admin Management
 
@@ -216,107 +218,19 @@
 - `GET /skills` - Quản lý kỹ năng
 - `GET /analytics` - Báo cáo tổng quan
 - `GET /settings` - Cài đặt hệ thống
+- `PUT /users/:id/role` - Cập nhật vai trò người dùng
+- `PUT /users/:id/status` - Kích hoạt/Vô hiệu hóa tài khoản
+- `GET /employers/pending` - Danh sách công ty chờ xác thực
+- `PUT /employers/:id/verify` - Duyệt xác thực công ty
+- `GET /audit-logs` - Nhật ký hệ thống
+- `GET /system-health` - Tình trạng hệ thống
 
-## Communication
+## Moderation (moderator)
 
-### Messaging Routes (`/api/messages`)
+### Moderation Routes (`/api/moderation`)
 
-- `GET /conversations` - Danh sách cuộc trò chuyện
-- `GET /conversations/:id` - Chi tiết cuộc trò chuyện
-- `POST /conversations/:id/messages` - Gửi tin nhắn
-- `PUT /messages/:id/read` - Đánh dấu tin nhắn đã đọc
-- `DELETE /messages/:id` - Xóa tin nhắn
-- `GET /unread` - Đếm tin nhắn chưa đọc
-
-## Assessment Management
-
-### Test Routes (`/api/tests`)
-
-- `POST /` - Tạo bài test mới
-- `GET /` - Danh sách bài test
-- `GET /:id` - Chi tiết bài test
-- `PUT /:id` - Cập nhật bài test
-- `DELETE /:id` - Xóa bài test
-- `POST /:id/assign` - Gán bài test cho ứng viên
-- `GET /:id/results` - Xem kết quả bài test
-- `POST /:id/submit` - Nộp bài test
-- `GET /templates` - Mẫu bài test
-
-## Company Reviews
-
-### Review Routes (`/api/companies/:id/reviews`)
-
-- `GET /` - Xem đánh giá công ty
-- `POST /` - Thêm đánh giá mới
-- `PUT /:reviewId` - Sửa đánh giá
-- `DELETE /:reviewId` - Xóa đánh giá
-- `POST /:reviewId/helpful` - Đánh dấu đánh giá hữu ích
-- `POST /:reviewId/report` - Báo cáo đánh giá không phù hợp
-
-## Recruitment Events
-
-### Event Routes (`/api/events`)
-
-- `GET /` - Danh sách sự kiện
-- `POST /` - Tạo sự kiện mới
-- `GET /:id` - Chi tiết sự kiện
-- `PUT /:id` - Cập nhật sự kiện
-- `DELETE /:id` - Xóa sự kiện
-- `POST /:id/register` - Đăng ký tham gia
-- `GET /:id/attendees` - Danh sách người tham gia
-- `POST /:id/feedback` - Gửi phản hồi về sự kiện
-
-### Location Routes (`/api/locations`)
-
-- `GET /provinces` - Danh sách tỉnh/thành phố
-- `GET /provinces/:id/districts` - Danh sách quận/huyện
-- `GET /districts/:id/wards` - Danh sách phường/xã
-
-### Industry Routes (`/api/industries`)
-
-- `GET /` - Danh sách ngành nghề
-- `GET /:id/jobs` - Việc làm theo ngành
-- `GET /:id/companies` - Công ty theo ngành
-- `GET /trending` - Ngành nghề thịnh hành
-
-## Internship-Specific Features
-
-### Program Management (`/api/programs`)
-
-- `GET /` - Danh sách chương trình thực tập
-- `GET /:id` - Chi tiết chương trình
-- `POST /:id/apply` - Đăng ký chương trình
-- `GET /upcoming` - Chương trình sắp mở
-- `GET /recommended` - Chương trình phù hợp
-
-### Skill Assessment (`/api/assessments`)
-
-- `POST /technical` - Đánh giá kỹ năng chuyên môn
-- `POST /soft-skills` - Đánh giá kỹ năng mềm
-- `GET /history` - Lịch sử đánh giá
-- `GET /improvement` - Đề xuất cải thiện
-- `GET /certificates` - Chứng chỉ đạt được
-
-### Career Guidance (`/api/career`)
-
-- `GET /paths` - Lộ trình nghề nghiệp
-- `GET /market-trends` - Xu hướng thị trường
-- `GET /skill-demand` - Nhu cầu kỹ năng
-- `GET /salary-insights` - Thông tin lương
-- `GET /success-stories` - Câu chuyện thành công
-
-### Internship Reports (`/api/reports`)
-
-- `POST /weekly` - Báo cáo tuần
-- `POST /monthly` - Báo cáo tháng
-- `POST /final` - Báo cáo tổng kết
-- `GET /templates` - Mẫu báo cáo
-- `GET /feedback` - Phản hồi từ mentor
-
-### Learning Paths (`/api/learning`)
-
-- `GET /paths` - Lộ trình học tập
-- `GET /courses` - Khóa học theo kỹ năng
-- `GET /workshops` - Workshop/Training
-- `POST /complete` - Hoàn thành bài học
-- `GET /progress` - Theo dõi tiến độ
+- `GET /reports` - Danh sách báo cáo nội dung
+- `PUT /reports/:id/resolve` - Xử lý báo cáo
+- `PUT /reviews/:id/hide` - Ẩn/bật đánh giá
+- `DELETE /reviews/:id` - Xóa đánh giá vi phạm
+- `GET /logs` - Nhật ký xử lý

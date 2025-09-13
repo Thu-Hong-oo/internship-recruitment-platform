@@ -103,10 +103,32 @@ module.exports = {
     MODERATOR: 'moderator',
   },
 
+  // Skill levels
+  SKILL_LEVELS: {
+    BEGINNER: 'beginner',
+    INTERMEDIATE: 'intermediate',
+    ADVANCED: 'advanced',
+  },
+
+  // Internship types
+  INTERNSHIP_TYPES: {
+    FULL_TIME: 'full-time',
+    PART_TIME: 'part-time',
+    REMOTE: 'remote',
+    HYBRID: 'hybrid',
+  },
+
+  // Duration units
+  DURATION_UNITS: {
+    WEEKS: 'weeks',
+    MONTHS: 'months',
+  },
+
   // Job status
   JOB_STATUS: {
     DRAFT: 'draft',
-    PUBLISHED: 'published',
+    ACTIVE: 'active',
+    PAUSED: 'paused',
     CLOSED: 'closed',
     EXPIRED: 'expired',
   },
@@ -115,9 +137,43 @@ module.exports = {
   APPLICATION_STATUS: {
     PENDING: 'pending',
     REVIEWING: 'reviewing',
-    INTERVIEWING: 'interviewing',
+    SHORTLISTED: 'shortlisted',
+    INTERVIEW: 'interview',
+    OFFER: 'offer',
     ACCEPTED: 'accepted',
     REJECTED: 'rejected',
-    WITHDRAWN: 'withdrawn',
+  },
+
+  // Roadmap status
+  ROADMAP_STATUS: {
+    PLANNING: 'planning',
+    IN_PROGRESS: 'in_progress',
+    COMPLETED: 'completed',
+    PAUSED: 'paused',
+  },
+
+  // Notification types (recruitment)
+  NOTIFICATION_TYPES: {
+    NEW_APPLICATION: 'NEW_APPLICATION',
+    INTERVIEW_SCHEDULED: 'INTERVIEW_SCHEDULED',
+    APPLICATION_STATUS: 'APPLICATION_STATUS',
+    NEW_MESSAGE: 'NEW_MESSAGE',
+    SKILL_RECOMMENDATION: 'SKILL_RECOMMENDATION',
+    JOB_MATCH: 'JOB_MATCH',
+    SYSTEM: 'SYSTEM',
+  },
+
+  // Notification priorities
+  NOTIFICATION_PRIORITY: {
+    LOW: 'low',
+    MEDIUM: 'medium',
+    HIGH: 'high',
+  },
+
+  // Notification channels
+  NOTIFICATION_CHANNELS: {
+    IN_APP: 'in_app',
+    EMAIL: 'email',
+    PUSH: 'push',
   },
 };

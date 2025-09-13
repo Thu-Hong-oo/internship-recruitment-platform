@@ -69,15 +69,20 @@ const JobSchema = new mongoose.Schema(
     details: {
       type: {
         type: String,
-        enum: ['full-time', 'part-time', 'remote', 'hybrid'],
+        enum: Object.values(
+          require('../constants/common.constants').INTERNSHIP_TYPES
+        ),
         required: true,
       },
       duration: {
         value: Number,
         unit: {
           type: String,
-          enum: ['days', 'weeks', 'months'],
-          default: 'months',
+          enum: Object.values(
+            require('../constants/common.constants').DURATION_UNITS
+          ),
+          default: require('../constants/common.constants').DURATION_UNITS
+            .MONTHS,
         },
       },
       startDate: Date,
@@ -94,8 +99,8 @@ const JobSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ['draft', 'active', 'paused', 'closed', 'expired'],
-      default: 'draft',
+      enum: Object.values(require('../constants/common.constants').JOB_STATUS),
+      default: require('../constants/common.constants').JOB_STATUS.DRAFT,
     },
 
     statistics: {

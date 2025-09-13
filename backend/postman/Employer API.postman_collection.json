@@ -1,751 +1,390 @@
 {
-	"info": {
-		"_postman_id": "88b5f092-3375-4691-90fb-dda73fc0e292",
-		"name": "Employer API",
-		"description": "API endpoints for employer profile management, company management, and job posting",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-		"_exporter_id": "38146107"
-	},
-	"item": [
-		{
-			"name": "Authentication",
-			"item": [
-				{
-					"name": "Login Employer",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"email\": \"employer@vnpt.com.vn\",\n  \"password\": \"employer123\"\n}"
-						},
-						"url": {
-							"raw": "{{api_url}}/auth/login",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"auth",
-								"login"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Register Employer",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"email\": \"employer@vnpt.com.vn\",\n  \"password\": \"employer123\",\n  \"firstName\": \"Nguyễn\",\n  \"lastName\": \"Văn A\",\n  \"role\": \"employer\"\n}"
-						},
-						"url": {
-							"raw": "{{api_url}}/auth/register",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"auth",
-								"register"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		},
-		{
-			"name": "Employer Profile Management",
-			"item": [
-				{
-					"name": "Get My Profile",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"url": {
-							"raw": "{{api_url}}/employer-profile",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"employer-profile"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Create Profile",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"personalInfo\": {\n    \"bio\": \"Nhà tuyển dụng tại VNPT với 5 năm kinh nghiệm\",\n    \"position\": \"HR Manager\",\n    \"phone\": \"0123456789\",\n    \"linkedin\": \"https://linkedin.com/in/employer\"\n  },\n  \"company\": {\n    \"name\": \"VNPT\",\n    \"industry\": \"tech\",\n    \"size\": \"enterprise\"\n  },\n  \"hiring\": {\n    \"totalPositions\": 0,\n    \"activePositions\": 0,\n    \"averageHiringTime\": 30,\n    \"successRate\": 0\n  },\n  \"preferences\": {\n    \"internshipTypes\": [\"full-time\", \"part-time\"],\n    \"durations\": [\"3-months\", \"6-months\"],\n    \"locations\": [\"Hà Nội\", \"TP.HCM\"],\n    \"salaryRange\": {\n      \"min\": 5000000,\n      \"max\": 15000000,\n      \"currency\": \"VND\"\n    }\n  }\n}"
-						},
-						"url": {
-							"raw": "{{api_url}}/employer-profile",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"employer-profile"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Update Profile",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"personalInfo\": {\n    \"bio\": \"Nhà tuyển dụng tại VNPT với 6 năm kinh nghiệm\",\n    \"position\": \"Senior HR Manager\",\n    \"phone\": \"0123456789\",\n    \"linkedin\": \"https://linkedin.com/in/employer\"\n  },\n  \"hiring\": {\n    \"totalPositions\": 10,\n    \"activePositions\": 5,\n    \"averageHiringTime\": 25,\n    \"successRate\": 85\n  }\n}"
-						},
-						"url": {
-							"raw": "{{api_url}}/employer-profile",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"employer-profile"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Get Dashboard",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"url": {
-							"raw": "{{api_url}}/employer-profile/dashboard",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"employer-profile",
-								"dashboard"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Get Profile Completion",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"url": {
-							"raw": "{{api_url}}/employer-profile/completion",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"employer-profile",
-								"completion"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Delete Profile",
-					"request": {
-						"method": "DELETE",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"url": {
-							"raw": "{{api_url}}/employer-profile",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"employer-profile"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		},
-		{
-			"name": "Company Management",
-			"item": [
-				{
-					"name": "Create Company",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"name\": \"VNPT\",\n  \"description\": \"Tập đoàn Bưu chính Viễn thông Việt Nam\",\n  \"shortDescription\": \"Doanh nghiệp hàng đầu lĩnh vực viễn thông và công nghệ\",\n  \"industry\": {\n    \"primary\": \"tech\",\n    \"secondary\": [\"telecommunications\"],\n    \"tags\": [\"viễn thông\", \"công nghệ\", \"hạ tầng\"]\n  },\n  \"size\": \"enterprise\",\n  \"companyType\": \"public\",\n  \"foundedYear\": 2006,\n  \"website\": \"https://vnpt.com.vn\",\n  \"location\": {\n    \"headquarters\": {\n      \"address\": \"57 Huỳnh Thúc Kháng\",\n      \"city\": \"Hà Nội\",\n      \"district\": \"Đống Đa\",\n      \"country\": \"VN\"\n    },\n    \"type\": \"onsite\",\n    \"offices\": []\n  },\n  \"contact\": {\n    \"email\": \"contact@vnpt.com.vn\",\n    \"phone\": \"02435556666\"\n  },\n  \"employeeCount\": {\n    \"min\": 1000,\n    \"max\": 30000\n  },\n  \"benefits\": [\n    {\n      \"name\": \"Bảo hiểm sức khỏe\",\n      \"category\": \"health\",\n      \"isHighlighted\": false\n    },\n    {\n      \"name\": \"Giờ làm linh hoạt\",\n      \"category\": \"work-life\",\n      \"isHighlighted\": false\n    }\n  ],\n  \"culture\": {\n    \"values\": [\"đổi mới\", \"chất lượng\", \"phục vụ\"],\n    \"mission\": \"Kết nối mọi người bằng công nghệ\",\n    \"vision\": \"Tập đoàn công nghệ số hàng đầu Việt Nam\",\n    \"workStyle\": []\n  },\n  \"internshipProgram\": {\n    \"hasProgram\": true,\n    \"programName\": \"VNPT Tech Internship\",\n    \"description\": \"Chương trình thực tập công nghệ\",\n    \"duration\": {\n      \"min\": 3,\n      \"unit\": \"months\"\n    },\n    \"stipend\": {\n      \"hasStipend\": true,\n      \"amount\": {\n        \"min\": 5000000\n      },\n      \"currency\": \"VND\",\n      \"period\": \"month\"\n    },\n    \"benefits\": [\"mentorship\", \"training\"],\n    \"mentorship\": false,\n    \"networking\": false,\n    \"employmentOpportunity\": false,\n    \"academicCredit\": false\n  }\n}"
-						},
-						"url": {
-							"raw": "{{api_url}}/companies",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"companies"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Get My Company",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"url": {
-							"raw": "{{api_url}}/companies/me",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"companies",
-								"me"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Update My Company",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"description\": \"Tập đoàn Bưu chính Viễn thông Việt Nam - Cập nhật\",\n  \"shortDescription\": \"Doanh nghiệp hàng đầu lĩnh vực viễn thông và công nghệ tại Việt Nam\",\n  \"culture\": {\n    \"values\": [\"đổi mới\", \"chất lượng\", \"phục vụ\", \"sáng tạo\"],\n    \"mission\": \"Kết nối mọi người bằng công nghệ tiên tiến\",\n    \"vision\": \"Tập đoàn công nghệ số hàng đầu Việt Nam và khu vực\"\n  },\n  \"benefits\": [\n    {\n      \"name\": \"Bảo hiểm sức khỏe\",\n      \"category\": \"health\",\n      \"isHighlighted\": true\n    },\n    {\n      \"name\": \"Giờ làm linh hoạt\",\n      \"category\": \"work-life\",\n      \"isHighlighted\": true\n    },\n    {\n      \"name\": \"Đào tạo nâng cao\",\n      \"category\": \"development\",\n      \"isHighlighted\": false\n    }\n  ]\n}"
-						},
-						"url": {
-							"raw": "{{api_url}}/companies/me",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"companies",
-								"me"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Update Company Logo",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"logo\": {\n    \"url\": \"https://res.cloudinary.com/du10thaqs/image/upload/v1757414872/internbridge/logos/r68drfnhj7efqhestovj.jpg\",\n    \"filename\": \"internbridge/logos/r68drfnhj7efqhestovj\",\n    \"uploadedAt\": \"2025-09-09T10:47:55.343Z\"\n  }\n}"
-						},
-						"url": {
-							"raw": "{{api_url}}/companies/me/logo",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"companies",
-								"me",
-								"logo"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Get Company Details (Public)",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{api_url}}/companies/{{company_id}}",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"companies",
-								"{{company_id}}"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Get Company Jobs (Public)",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{api_url}}/companies/{{company_id}}/jobs?page=1&limit=10&status=active",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"companies",
-								"{{company_id}}",
-								"jobs"
-							],
-							"query": [
-								{
-									"key": "page",
-									"value": "1"
-								},
-								{
-									"key": "limit",
-									"value": "10"
-								},
-								{
-									"key": "status",
-									"value": "active"
-								}
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Get Company Stats (Public)",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{api_url}}/companies/{{company_id}}/stats",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"companies",
-								"{{company_id}}",
-								"stats"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		},
-		{
-			"name": "Job Management",
-			"item": [
-				{
-					"name": "Create Job",
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"title\": \"Frontend Developer Intern\",\n  \"description\": \"Tìm kiếm thực tập sinh Frontend Developer có đam mê với React, Vue.js và các công nghệ web hiện đại.\",\n  \"shortDescription\": \"Thực tập Frontend Developer tại VNPT\",\n  \"companyId\": \"{{company_id}}\",\n  \"type\": \"internship\",\n  \"category\": \"technology\",\n  \"level\": \"intern\",\n  \"location\": {\n    \"type\": \"onsite\",\n    \"address\": \"57 Huỳnh Thúc Kháng, Đống Đa, Hà Nội\",\n    \"city\": \"Hà Nội\",\n    \"district\": \"Đống Đa\",\n    \"country\": \"VN\"\n  },\n  \"salary\": {\n    \"min\": 5000000,\n    \"max\": 8000000,\n    \"currency\": \"VND\",\n    \"period\": \"month\",\n    \"isNegotiable\": true\n  },\n  \"duration\": {\n    \"min\": 3,\n    \"max\": 6,\n    \"unit\": \"months\"\n  },\n  \"requirements\": {\n    \"education\": [\"bachelor\", \"college\"],\n    \"experience\": {\n      \"min\": 0,\n      \"max\": 1,\n      \"unit\": \"years\"\n    },\n    \"skills\": [\n      {\n        \"skillId\": \"{{skill_id}}\",\n        \"name\": \"React\",\n        \"level\": \"intermediate\",\n        \"isRequired\": true\n      },\n      {\n        \"skillId\": \"{{skill_id_2}}\",\n        \"name\": \"JavaScript\",\n        \"level\": \"intermediate\",\n        \"isRequired\": true\n      }\n    ],\n    \"languages\": [\n      {\n        \"name\": \"Tiếng Việt\",\n        \"level\": \"native\"\n      },\n      {\n        \"name\": \"English\",\n        \"level\": \"intermediate\"\n      }\n    ]\n  },\n  \"benefits\": [\n    \"Mentorship từ senior developers\",\n    \"Tham gia các dự án thực tế\",\n    \"Cơ hội chuyển đổi thành nhân viên chính thức\",\n    \"Môi trường làm việc năng động\"\n  ],\n  \"applicationDeadline\": \"2025-12-31T23:59:59.000Z\",\n  \"startDate\": \"2025-10-01T00:00:00.000Z\",\n  \"isRemote\": false,\n  \"isUrgent\": false,\n  \"tags\": [\"frontend\", \"react\", \"javascript\", \"internship\"]\n}"
-						},
-						"url": {
-							"raw": "{{api_url}}/jobs",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"jobs"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Get My Jobs",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"url": {
-							"raw": "{{api_url}}/jobs/my-jobs?page=1&limit=10&status=all",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"jobs",
-								"my-jobs"
-							],
-							"query": [
-								{
-									"key": "page",
-									"value": "1"
-								},
-								{
-									"key": "limit",
-									"value": "10"
-								},
-								{
-									"key": "status",
-									"value": "all"
-								}
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Update Job",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"title\": \"Senior Frontend Developer Intern\",\n  \"description\": \"Tìm kiếm thực tập sinh Frontend Developer có kinh nghiệm với React, Vue.js và các công nghệ web hiện đại. Có cơ hội tham gia các dự án lớn.\",\n  \"salary\": {\n    \"min\": 6000000,\n    \"max\": 10000000,\n    \"currency\": \"VND\",\n    \"period\": \"month\",\n    \"isNegotiable\": true\n  },\n  \"benefits\": [\n    \"Mentorship từ senior developers\",\n    \"Tham gia các dự án thực tế\",\n    \"Cơ hội chuyển đổi thành nhân viên chính thức\",\n    \"Môi trường làm việc năng động\",\n    \"Đào tạo kỹ năng mềm\"\n  ],\n  \"tags\": [\"frontend\", \"react\", \"javascript\", \"internship\", \"senior\"]\n}"
-						},
-						"url": {
-							"raw": "{{api_url}}/jobs/{{job_id}}",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"jobs",
-								"{{job_id}}"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Get Job Applications",
-					"request": {
-						"method": "GET",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"url": {
-							"raw": "{{api_url}}/jobs/{{job_id}}/applications?page=1&limit=10&status=all",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"jobs",
-								"{{job_id}}",
-								"applications"
-							],
-							"query": [
-								{
-									"key": "page",
-									"value": "1"
-								},
-								{
-									"key": "limit",
-									"value": "10"
-								},
-								{
-									"key": "status",
-									"value": "all"
-								}
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Update Application Status",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							},
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"status\": \"interviewing\",\n  \"notes\": \"Ứng viên có kinh nghiệm tốt, mời phỏng vấn\"\n}"
-						},
-						"url": {
-							"raw": "{{api_url}}/applications/{{application_id}}/status",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"applications",
-								"{{application_id}}",
-								"status"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Delete Job",
-					"request": {
-						"method": "DELETE",
-						"header": [
-							{
-								"key": "Authorization",
-								"value": "Bearer {{token}}"
-							}
-						],
-						"url": {
-							"raw": "{{api_url}}/jobs/{{job_id}}",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"jobs",
-								"{{job_id}}"
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		},
-		{
-			"name": "Public Company & Job Search",
-			"item": [
-				{
-					"name": "Search Companies",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{api_url}}/companies?page=1&limit=10&search=vnpt&industry=tech&size=enterprise",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"companies"
-							],
-							"query": [
-								{
-									"key": "page",
-									"value": "1"
-								},
-								{
-									"key": "limit",
-									"value": "10"
-								},
-								{
-									"key": "search",
-									"value": "vnpt"
-								},
-								{
-									"key": "industry",
-									"value": "tech"
-								},
-								{
-									"key": "size",
-									"value": "enterprise"
-								}
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "Search Jobs",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{api_url}}/jobs?page=1&limit=10&search=frontend&type=internship&location=Hà Nội&status=active",
-							"host": [
-								"{{api_url}}"
-							],
-							"path": [
-								"jobs"
-							],
-							"query": [
-								{
-									"key": "page",
-									"value": "1"
-								},
-								{
-									"key": "limit",
-									"value": "10"
-								},
-								{
-									"key": "search",
-									"value": "frontend"
-								},
-								{
-									"key": "type",
-									"value": "internship"
-								},
-								{
-									"key": "location",
-									"value": "Hà Nội"
-								},
-								{
-									"key": "status",
-									"value": "active"
-								}
-							]
-						}
-					},
-					"response": []
-				}
-			]
-		}
-	],
-	"auth": {
-		"type": "bearer",
-		"bearer": [
-			{
-				"key": "token",
-				"value": "{{token}}",
-				"type": "string"
-			}
-		]
-	},
-	"variable": [
-		{
-			"key": "base_url",
-			"value": "http://localhost:3000",
-			"type": "string"
-		},
-		{
-			"key": "api_url",
-			"value": "http://localhost:3000/api",
-			"type": "string"
-		},
-		{
-			"key": "token",
-			"value": "your_jwt_token_here",
-			"type": "string"
-		},
-		{
-			"key": "company_id",
-			"value": "68bfe3077cad9d9d41c1020e",
-			"type": "string"
-		},
-		{
-			"key": "job_id",
-			"value": "job_id_here",
-			"type": "string"
-		},
-		{
-			"key": "application_id",
-			"value": "application_id_here",
-			"type": "string"
-		},
-		{
-			"key": "skill_id",
-			"value": "skill_id_here",
-			"type": "string"
-		},
-		{
-			"key": "skill_id_2",
-			"value": "skill_id_2_here",
-			"type": "string"
-		}
-	]
+  "info": {
+    "_postman_id": "88b5f092-3375-4691-90fb-dda73fc0e292",
+    "name": "Employer API",
+    "description": "Employer endpoints under /api/employers with enhanced verification system",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Profile Management",
+      "item": [
+        {
+          "name": "GET /employers/profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{api_url}}/employers/profile",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "profile"]
+            }
+          }
+        },
+        {
+          "name": "PUT /employers/profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company\": { \"name\": \"VNPT\", \"industry\": \"IT\", \"size\": \"enterprise\" },\n  \"position\": { \"title\": \"HR Manager\", \"level\": \"manager\" },\n  \"contact\": { \"name\": \"Nguyễn Văn A\", \"phone\": \"0123456789\" }\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/employers/profile",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "profile"]
+            }
+          }
+        },
+        {
+          "name": "PUT /employers/company",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Công ty ABC\",\n  \"industry\": \"healthcare\",\n  \"size\": \"medium\",\n  \"website\": \"https://example.com\",\n  \"description\": \"Công ty chuyên về y tế\",\n  \"foundedYear\": 2020,\n  \"headquarters\": {\n    \"city\": \"Hà Nội\",\n    \"country\": \"Vietnam\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/employers/company",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "company"]
+            }
+          }
+        },
+        {
+          "name": "POST /employers/upload-logo",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "multipart/form-data" }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "logo",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{api_url}}/employers/upload-logo",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "upload-logo"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Verification System",
+      "item": [
+        {
+          "name": "GET /employers/document-types",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{api_url}}/employers/document-types?industry=healthcare",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "document-types"],
+              "query": [
+                {
+                  "key": "industry",
+                  "value": "healthcare",
+                  "description": "Industry to get document types for"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "PUT /employers/verification/business-info",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessInfo\": {\n    \"registrationNumber\": \"0123456789\",\n    \"issueDate\": \"2023-01-01\",\n    \"issuePlace\": \"Sở Kế hoạch và Đầu tư TP.HCM\",\n    \"taxId\": \"0123456789\",\n    \"legalAddress\": {\n      \"street\": \"123 Đường ABC\",\n      \"ward\": \"Phường 1\",\n      \"district\": \"Quận 1\",\n      \"city\": \"TP.HCM\",\n      \"country\": \"Vietnam\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/employers/verification/business-info",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "verification", "business-info"]
+            }
+          }
+        },
+        {
+          "name": "POST /employers/verify",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessInfo\": {\n    \"registrationNumber\": \"0123456789\",\n    \"issueDate\": \"2023-01-01\",\n    \"issuePlace\": \"Sở Kế hoạch và Đầu tư TP.HCM\",\n    \"taxId\": \"0123456789\",\n    \"legalAddress\": {\n      \"street\": \"123 Đường ABC\",\n      \"ward\": \"Phường 1\",\n      \"district\": \"Quận 1\",\n      \"city\": \"TP.HCM\",\n      \"country\": \"Vietnam\"\n    }\n  },\n  \"legalRepresentative\": {\n    \"fullName\": \"Nguyễn Văn A\",\n    \"position\": \"Giám đốc\",\n    \"idType\": \"CCCD\",\n    \"idNumber\": \"123456789\",\n    \"idIssueDate\": \"2020-01-01\",\n    \"idIssuePlace\": \"Công an TP.HCM\",\n    \"phone\": \"0123456789\",\n    \"email\": \"nguyenvana@company.com\"\n  },\n  \"companyEmail\": \"contact@company.com\",\n  \"documents\": [\n    {\n      \"type\": \"business-license\",\n      \"url\": \"https://example.com/business-license.pdf\",\n      \"filename\": \"business-license.pdf\",\n      \"metadata\": {\n        \"documentNumber\": \"0123456789\",\n        \"issueDate\": \"2023-01-01\",\n        \"issuePlace\": \"Sở Kế hoạch và Đầu tư TP.HCM\"\n      }\n    },\n    {\n      \"type\": \"tax-certificate\",\n      \"url\": \"https://example.com/tax-certificate.pdf\",\n      \"filename\": \"tax-certificate.pdf\",\n      \"metadata\": {\n        \"documentNumber\": \"0123456789\",\n        \"issueDate\": \"2023-01-01\"\n      }\n    },\n    {\n      \"type\": \"legal-representative-id\",\n      \"url\": \"https://example.com/cccd.pdf\",\n      \"filename\": \"cccd.pdf\",\n      \"metadata\": {\n        \"documentNumber\": \"123456789\",\n        \"issueDate\": \"2020-01-01\",\n        \"issuePlace\": \"Công an TP.HCM\"\n      }\n    },\n    {\n      \"type\": \"medical-license\",\n      \"url\": \"https://example.com/medical-license.pdf\",\n      \"filename\": \"medical-license.pdf\",\n      \"metadata\": {\n        \"documentNumber\": \"ML-2023-001\",\n        \"issueDate\": \"2023-01-01\",\n        \"issuePlace\": \"Bộ Y tế\"\n      }\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/employers/verify",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "verify"]
+            }
+          }
+        },
+        {
+          "name": "GET /employers/verification-status",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{api_url}}/employers/verification-status",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "verification-status"]
+            }
+          }
+        },
+        {
+          "name": "POST /employers/verify-company-email",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"verificationCode\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/employers/verify-company-email",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "verify-company-email"]
+            }
+          }
+        },
+        {
+          "name": "POST /employers/resend-verification-email",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{api_url}}/employers/resend-verification-email",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "resend-verification-email"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Jobs & Applications",
+      "item": [
+        {
+          "name": "GET /employers/jobs",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{api_url}}/employers/jobs?page=1&limit=10&status=active",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "jobs"],
+              "query": [
+                { "key": "page", "value": "1", "description": "Page number" },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page"
+                },
+                {
+                  "key": "status",
+                  "value": "active",
+                  "description": "Filter by job status"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /employers/applications",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{api_url}}/employers/applications?page=1&limit=10&status=pending",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "applications"],
+              "query": [
+                { "key": "page", "value": "1", "description": "Page number" },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page"
+                },
+                {
+                  "key": "status",
+                  "value": "pending",
+                  "description": "Filter by application status"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /employers/recommended-candidates",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{api_url}}/employers/recommended-candidates",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "recommended-candidates"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analytics & Dashboard",
+      "item": [
+        {
+          "name": "GET /employers/analytics",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{api_url}}/employers/analytics",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "analytics"]
+            }
+          }
+        },
+        {
+          "name": "GET /employers/dashboard",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{api_url}}/employers/dashboard",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "dashboard"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Settings & Preferences",
+      "item": [
+        {
+          "name": "PUT /employers/preferences",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"internshipTypes\": [\"full-time\", \"part-time\"],\n  \"durations\": [\"3-months\", \"6-months\"],\n  \"locations\": [\"Hà Nội\", \"TP.HCM\"],\n  \"skills\": [\n    {\n      \"skillId\": \"60f7b3b3b3b3b3b3b3b3b3b3\",\n      \"priority\": \"required\"\n    }\n  ],\n  \"salaryRange\": {\n    \"min\": 5000000,\n    \"max\": 10000000,\n    \"currency\": \"VND\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/employers/preferences",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "preferences"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Company Reviews",
+      "item": [
+        {
+          "name": "GET /employers/company/reviews",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{api_url}}/employers/company/reviews",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "company", "reviews"]
+            }
+          }
+        },
+        {
+          "name": "POST /employers/company/reviews/:reviewId/respond",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"response\": \"Cảm ơn bạn đã đánh giá. Chúng tôi sẽ cải thiện dịch vụ.\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/employers/company/reviews/60f7b3b3b3b3b3b3b3b3b3b3/respond",
+              "host": ["{{api_url}}"],
+              "path": [
+                "employers",
+                "company",
+                "reviews",
+                "60f7b3b3b3b3b3b3b3b3b3b3",
+                "respond"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    {
+      "key": "api_url",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    },
+    { "key": "token", "value": "your_jwt_token_here", "type": "string" }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-generate verification code for testing",
+          "if (pm.info.requestName === 'POST /employers/verify-company-email') {",
+          "    pm.environment.set('verification_code', '123456');",
+          "}"
+        ]
+      }
+    }
+  ]
 }

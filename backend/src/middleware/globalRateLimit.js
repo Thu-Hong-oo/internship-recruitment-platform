@@ -27,6 +27,19 @@ const RATE_LIMIT_CONFIG = {
     message: 'Quá nhiều yêu cầu upload. Vui lòng thử lại sau 10 phút.',
     retryAfter: parseInt(process.env.UPLOAD_RATE_LIMIT_WINDOW) || 10 * 60,
   },
+  verification: {
+    windowMs:
+      parseInt(process.env.VERIFICATION_RATE_LIMIT_WINDOW) || 5 * 60 * 1000, // 5 phút
+    max: parseInt(process.env.VERIFICATION_RATE_LIMIT_MAX) || 5,
+    message: 'Quá nhiều yêu cầu xác thực. Vui lòng thử lại sau 5 phút.',
+    retryAfter: parseInt(process.env.VERIFICATION_RATE_LIMIT_WINDOW) || 5 * 60,
+  },
+  email: {
+    windowMs: parseInt(process.env.EMAIL_RATE_LIMIT_WINDOW) || 1 * 60 * 1000, // 1 phút
+    max: parseInt(process.env.EMAIL_RATE_LIMIT_MAX) || 3,
+    message: 'Quá nhiều yêu cầu gửi email. Vui lòng thử lại sau 1 phút.',
+    retryAfter: parseInt(process.env.EMAIL_RATE_LIMIT_WINDOW) || 1 * 60,
+  },
 };
 
 // Factory function tạo ra objects với config khác nhau
@@ -75,10 +88,21 @@ const searchRateLimit = createRateLimiter('Search', RATE_LIMIT_CONFIG.search);
 // Rate limiter cho file upload
 const uploadRateLimit = createRateLimiter('Upload', RATE_LIMIT_CONFIG.upload);
 
+// Rate limiter cho verification endpoints
+const verificationRateLimit = createRateLimiter(
+  'Verification',
+  RATE_LIMIT_CONFIG.verification
+);
+
+// Rate limiter cho email endpoints
+const emailRateLimit = createRateLimiter('Email', RATE_LIMIT_CONFIG.email);
+
 module.exports = {
   globalRateLimit,
   apiRateLimit,
   searchRateLimit,
   uploadRateLimit,
+  verificationRateLimit,
+  emailRateLimit,
   RATE_LIMIT_CONFIG,
 };
