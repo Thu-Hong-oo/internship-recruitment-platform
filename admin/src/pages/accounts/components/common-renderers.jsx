@@ -8,7 +8,7 @@ export const StatusWidget = ({ status = "Active" }) => {
     Locked: { color: "#BF272D", text: "Khoá tài khoản" },
     Pending_Review: { color: "#FFA21F", text: "Chờ kiểm duyệt" },
     Pending_Lock: { color: "#FFA21F", text: "Chờ khoá tài khoản" },
-    InActive: { color: "#343A40", text: "Ngừng hoạt động" },
+    InActive: { color: "#343A40", text: "Chưa kích hoạt" },
   };
   const { color, text } = STATUS_CONFIG[status] || {};
   return (
