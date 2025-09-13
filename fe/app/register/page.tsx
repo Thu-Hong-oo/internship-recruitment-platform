@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useGoogleAuth } from "@/hooks/useGoogleAuth";
@@ -34,8 +34,34 @@ export default function RegisterPage() {
     agreeToTerms: false,
   });
 
-  const { register } = useAuth();
+  const { register, user, loading: authLoading } = useAuth();
   const router = useRouter();
+
+  // Redirect if user is already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.push("/");
+    }
+  }, [user, authLoading, router]);
+
+  // Show loading while checking auth status
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">
+            Đang kiểm tra trạng thái đăng nhập...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render the form if user is logged in (will redirect)
+  if (user) {
+    return null;
+  }
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData((prev) => ({
@@ -108,21 +134,27 @@ export default function RegisterPage() {
         // Email is valid and user created, proceed to verification
         setSuccess(response.message || "Đăng ký thành công!");
         // Store email for verification page
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('pendingEmail', formData.email);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("pendingEmail", formData.email);
         }
         setTimeout(() => {
           router.push("/email-verification");
         }, 2000);
       } else {
         // Registration failed
-        if (response.errorType === 'INVALID_EMAIL_ADDRESS') {
-          setError(response.error || "Email không tồn tại hoặc không thể nhận thư. Vui lòng kiểm tra lại địa chỉ email.");
-        } else if (response.errorType === 'EMAIL_NOT_VERIFIED') {
-          setError(response.error || "Email này đã được đăng ký nhưng chưa xác thực. Vui lòng kiểm tra email để xác thực hoặc đợi hết hạn để đăng ký lại.");
+        if (response.errorType === "INVALID_EMAIL_ADDRESS") {
+          setError(
+            response.error ||
+              "Email không tồn tại hoặc không thể nhận thư. Vui lòng kiểm tra lại địa chỉ email."
+          );
+        } else if (response.errorType === "EMAIL_NOT_VERIFIED") {
+          setError(
+            response.error ||
+              "Email này đã được đăng ký nhưng chưa xác thực. Vui lòng kiểm tra email để xác thực hoặc đợi hết hạn để đăng ký lại."
+          );
           // Store email for verification page
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('pendingEmail', formData.email);
+          if (typeof window !== "undefined") {
+            localStorage.setItem("pendingEmail", formData.email);
           }
           // Auto redirect to verification page after 2 seconds
           setTimeout(() => {
@@ -170,17 +202,21 @@ export default function RegisterPage() {
                 <AlertCircle className="w-5 h-5 mr-2" />
                 {error}
               </div>
-              {(error.includes('chưa xác thực') || error.includes('EMAIL_NOT_VERIFIED')) && (
+              {(error.includes("chưa xác thực") ||
+                error.includes("EMAIL_NOT_VERIFIED")) && (
                 <Button
                   onClick={() => {
-                    console.log('Button clicked, email:', formData.email);
+                    console.log("Button clicked, email:", formData.email);
                     // Ensure email is stored before redirecting
-                    if (typeof window !== 'undefined') {
-                      localStorage.setItem('pendingEmail', formData.email);
-                      console.log('Email stored in localStorage:', formData.email);
+                    if (typeof window !== "undefined") {
+                      localStorage.setItem("pendingEmail", formData.email);
+                      console.log(
+                        "Email stored in localStorage:",
+                        formData.email
+                      );
                     }
-                    console.log('Redirecting to email-verification...');
-                    router.push('/email-verification');
+                    console.log("Redirecting to email-verification...");
+                    router.push("/email-verification");
                   }}
                   className="w-full mt-2 bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
