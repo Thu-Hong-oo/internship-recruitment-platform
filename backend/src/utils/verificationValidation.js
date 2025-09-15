@@ -1,179 +1,96 @@
 const { logger } = require('./logger');
-const {
-  getDocumentTypesForIndustry,
-  getDocumentTypeById,
-} = require('../config/documentTypes');
 
-// Validation functions for employer verification
-const validateVerificationData = data => {
+// Core validation functions for employer verification
+const validateBusinessInfo = businessInfo => {
   const errors = [];
 
-  // Validate business info
-  if (data.businessInfo) {
-    const { registrationNumber, taxId, legalAddress } = data.businessInfo;
+  if (
+    !businessInfo.registrationNumber ||
+    businessInfo.registrationNumber.length < 10
+  ) {
+    errors.push('Số đăng ký doanh nghiệp không hợp lệ (tối thiểu 10 ký tự)');
+  }
 
-    if (!registrationNumber || registrationNumber.length < 10) {
-      errors.push('Số đăng ký doanh nghiệp không hợp lệ (tối thiểu 10 ký tự)');
-    }
-
-    if (!taxId || !/^\d{10,13}$/.test(taxId)) {
-      errors.push('Mã số thuế không hợp lệ (10-13 chữ số)');
-    }
-
-    if (!legalAddress || !legalAddress.street || !legalAddress.city) {
-      errors.push('Địa chỉ trụ sở không đầy đủ (cần có đường và thành phố)');
+  // Validate Vietnamese Tax ID (MST)
+  // 10 digits: for companies/individuals (e.g., 0312345678)
+  // 13 digits: for branches/subsidiaries (e.g., 0312345678001 or 0312345678-001)
+  if (!businessInfo.taxId) {
+    errors.push('Mã số thuế không được để trống');
+  } else {
+    const taxId = businessInfo.taxId.replace(/[-\s]/g, ''); // Remove dashes and spaces
+    if (!/^\d{10}$|^\d{13}$/.test(taxId)) {
+      errors.push(
+        'Mã số thuế không hợp lệ (phải có 10 số cho doanh nghiệp hoặc 13 số cho chi nhánh)'
+      );
     }
   }
 
-  // Validate legal representative
-  if (data.legalRepresentative) {
-    const { fullName, idNumber, idType, email } = data.legalRepresentative;
+  if (
+    !businessInfo.address ||
+    (typeof businessInfo.address === 'object' &&
+      (!businessInfo.address.street || !businessInfo.address.city)) ||
+    (typeof businessInfo.address === 'string' &&
+      businessInfo.address.length < 10)
+  ) {
+    errors.push(
+      'Địa chỉ trụ sở không đầy đủ (cần có đường và thành phố hoặc địa chỉ đầy đủ)'
+    );
+  }
 
-    if (!fullName || fullName.length < 2) {
-      errors.push('Họ tên người đại diện không hợp lệ (tối thiểu 2 ký tự)');
-    }
+  return errors;
+};
 
-    if (!idNumber || !/^\d{9,12}$/.test(idNumber)) {
-      errors.push('Số CMND/CCCD không hợp lệ (9-12 chữ số)');
-    }
+const validateLegalRepresentative = legalRep => {
+  const errors = [];
 
-    if (!idType || !['CMND', 'CCCD', 'Passport'].includes(idType)) {
+  if (!legalRep.fullName || legalRep.fullName.length < 2) {
+    errors.push('Họ tên người đại diện không hợp lệ (tối thiểu 2 ký tự)');
+  }
+
+  if (!legalRep.position || legalRep.position.length < 2) {
+    errors.push('Chức vụ người đại diện không hợp lệ');
+  }
+
+  if (!legalRep.phone || !/^[0-9+\-\s()]{10,15}$/.test(legalRep.phone)) {
+    errors.push('Số điện thoại người đại diện không hợp lệ');
+  }
+
+  if (legalRep.email && !isValidEmail(legalRep.email)) {
+    errors.push('Email người đại diện không hợp lệ');
+  }
+
+  // Validate identification if provided (optional)
+  if (legalRep.identification) {
+    const { type, number } = legalRep.identification;
+
+    // Only validate if type is provided
+    if (type && !['CMND', 'CCCD', 'Passport'].includes(type)) {
       errors.push('Loại giấy tờ không hợp lệ');
     }
 
-    if (email && !isValidEmail(email)) {
-      errors.push('Email người đại diện không hợp lệ');
-    }
-  }
-
-  // Validate company email
-  if (data.companyEmail) {
-    if (!isValidCompanyEmail(data.companyEmail)) {
-      errors.push(
-        'Email phải là tên miền công ty (không dùng Gmail, Yahoo, Hotmail)'
-      );
-    }
-  }
-
-  // Validate documents
-  if (data.documents && data.documents.length > 0) {
-    // Get required document types based on industry
-    const industry = data.industry || 'general';
-    const documentTypes = getDocumentTypesForIndustry(industry);
-    const requiredTypes = documentTypes.required.map(type => type.id);
-    const uploadedTypes = data.documents.map(doc => doc.type);
-
-    // Check for missing required documents
-    for (const requiredType of requiredTypes) {
-      if (!uploadedTypes.includes(requiredType)) {
-        const docType = getDocumentTypeById(requiredType);
-        errors.push(
-          `Thiếu tài liệu bắt buộc: ${docType?.name || requiredType}`
-        );
-      }
+    // Only validate if number is provided
+    if (number && !/^\d{9,12}$/.test(number)) {
+      errors.push('Số CMND/CCCD không hợp lệ (9-12 chữ số)');
     }
 
-    // Validate document metadata
-    for (const doc of data.documents) {
-      if (doc.metadata) {
-        const docErrors = validateDocumentMetadata(
-          doc.type,
-          doc.metadata,
-          industry
-        );
-        errors.push(...docErrors);
-      }
+    // If type is provided, number should also be provided
+    if (type && !number) {
+      errors.push('Vui lòng nhập số CMND/CCCD khi đã chọn loại giấy tờ');
     }
 
-    // Cross-check business info with documents
-    if (data.businessInfo) {
-      const crossCheckWarnings = crossCheckBusinessInfo(
-        data.businessInfo,
-        data.documents
-      );
-      if (crossCheckWarnings.length > 0) {
-        errors.push(...crossCheckWarnings);
-      }
+    // If number is provided, type should also be provided
+    if (number && !type) {
+      errors.push('Vui lòng chọn loại giấy tờ khi đã nhập số');
     }
   }
 
   return errors;
 };
 
-const validateDocumentMetadata = (docType, metadata, industry = 'general') => {
-  const errors = [];
-  const docTypeConfig = getDocumentTypeById(docType);
-
-  if (!docTypeConfig) {
-    errors.push(`Loại tài liệu không hợp lệ: ${docType}`);
-    return errors;
-  }
-
-  // Validate required metadata fields
-  const requiredFields = docTypeConfig.validation?.metadataRequired || [];
-  for (const field of requiredFields) {
-    if (!metadata[field]) {
-      errors.push(
-        `Thiếu thông tin bắt buộc: ${field} cho tài liệu ${docTypeConfig.name}`
-      );
-    }
-  }
-
-  // Type-specific validation
-  switch (docType) {
-    case 'business-license':
-      if (metadata.documentNumber && metadata.documentNumber.length < 5) {
-        errors.push('Số giấy phép đăng ký kinh doanh không hợp lệ');
-      }
-      break;
-
-    case 'tax-certificate':
-      if (metadata.documentNumber && metadata.documentNumber.length < 5) {
-        errors.push('Số giấy chứng nhận đăng ký thuế không hợp lệ');
-      }
-      break;
-
-    case 'legal-representative-id':
-      if (
-        metadata.documentNumber &&
-        !/^\d{9,12}$/.test(metadata.documentNumber)
-      ) {
-        errors.push('Số CMND/CCCD không hợp lệ');
-      }
-      break;
-
-    case 'company-website-screenshot':
-      if (metadata.websiteUrl && !isValidUrl(metadata.websiteUrl)) {
-        errors.push('URL website không hợp lệ');
-      }
-      break;
-
-    case 'financial-statement':
-      if (
-        metadata.reportYear &&
-        (metadata.reportYear < 2020 ||
-          metadata.reportYear > new Date().getFullYear())
-      ) {
-        errors.push('Năm báo cáo tài chính không hợp lệ');
-      }
-      break;
-  }
-
-  return errors;
-};
-
+// Email validation
 const isValidEmail = email => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
-};
-
-const isValidUrl = url => {
-  try {
-    new URL(url);
-    return true;
-  } catch {
-    return false;
-  }
 };
 
 const isValidCompanyEmail = email => {
@@ -196,27 +113,13 @@ const isValidCompanyEmail = email => {
   return !personalDomains.includes(domain);
 };
 
-const getDocumentTypeName = type => {
-  const names = {
-    'business-license': 'Giấy phép đăng ký kinh doanh',
-    'tax-certificate': 'Giấy chứng nhận đăng ký thuế',
-    'legal-representative-id': 'CMND/CCCD người đại diện',
-    'company-logo': 'Logo công ty',
-    'company-website-screenshot': 'Screenshot website công ty',
-  };
-  return names[type] || type;
-};
-
-const generateVerificationCode = () => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-};
-
+// Tax ID validation with checksum
 const validateTaxId = taxId => {
   if (!taxId || !/^\d{10,13}$/.test(taxId)) {
     return false;
   }
 
-  // Basic checksum validation for Vietnamese tax ID
+  // Basic checksum validation for Vietnamese tax ID (10 digits)
   if (taxId.length === 10) {
     const weights = [31, 29, 23, 19, 17, 13, 7, 5, 3];
     let sum = 0;
@@ -234,35 +137,14 @@ const validateTaxId = taxId => {
   return true; // For 11-13 digit tax IDs, assume valid
 };
 
+// Cross-check business info with documents
 const crossCheckBusinessInfo = (businessInfo, documents) => {
   const warnings = [];
-
-  // Check if company name matches across documents
-  const businessLicenseDoc = documents.find(
-    doc => doc.type === 'business-license'
-  );
-  if (businessLicenseDoc && businessLicenseDoc.metadata) {
-    // This would require OCR text extraction in real implementation
-    // For now, just log the check
-    logger.info('Cross-checking company name in business license');
-  }
-
-  // Check if tax ID matches
-  const taxDoc = documents.find(doc => doc.type === 'tax-certificate');
-  if (taxDoc && taxDoc.metadata && businessInfo.taxId) {
-    // This would require OCR text extraction in real implementation
-    logger.info('Cross-checking tax ID in tax certificate');
-  }
-
-  // Check if legal address matches
-  if (businessInfo.legalAddress) {
-    logger.info('Validating legal address consistency');
-  }
 
   // Check if registration number is consistent
   if (businessInfo.registrationNumber) {
     const businessLicenseDoc = documents.find(
-      doc => doc.type === 'business-license'
+      doc => doc.documentType === 'business-license'
     );
     if (businessLicenseDoc && businessLicenseDoc.metadata?.documentNumber) {
       if (
@@ -278,7 +160,9 @@ const crossCheckBusinessInfo = (businessInfo, documents) => {
 
   // Check if tax ID is consistent
   if (businessInfo.taxId) {
-    const taxDoc = documents.find(doc => doc.type === 'tax-certificate');
+    const taxDoc = documents.find(
+      doc => doc.documentType === 'tax-certificate'
+    );
     if (taxDoc && taxDoc.metadata?.documentNumber) {
       if (businessInfo.taxId !== taxDoc.metadata.documentNumber) {
         warnings.push('Mã số thuế không khớp với tài liệu đã upload');
@@ -289,6 +173,7 @@ const crossCheckBusinessInfo = (businessInfo, documents) => {
   return warnings;
 };
 
+// Input sanitization
 const sanitizeInput = input => {
   if (typeof input === 'string') {
     return input.trim().replace(/[<>]/g, '');
@@ -306,12 +191,10 @@ const sanitizeInput = input => {
 };
 
 module.exports = {
-  validateVerificationData,
-  validateDocumentMetadata,
+  validateBusinessInfo,
+  validateLegalRepresentative,
   isValidEmail,
   isValidCompanyEmail,
-  getDocumentTypeName,
-  generateVerificationCode,
   validateTaxId,
   crossCheckBusinessInfo,
   sanitizeInput,

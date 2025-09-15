@@ -1,28 +1,88 @@
 const EmployerProfile = require('../models/EmployerProfile');
 const User = require('../models/User');
 const { logger } = require('../utils/logger');
-const { uploadImage } = require('../services/imageUploadService');
+const { uploadImage, deleteImage } = require('../services/imageUploadService');
+const documentUploadService = require('../services/documentUploadService');
 const asyncHandler = require('express-async-handler');
+const EmployerProfileHelpers = require('../helpers/EmployerProfileHelpers');
 const {
-  validateVerificationData,
+  validateBusinessInfo,
+  validateLegalRepresentative,
   isValidCompanyEmail,
-  generateVerificationCode,
-  sanitizeInput,
+  validateTaxId,
   crossCheckBusinessInfo,
+  sanitizeInput,
 } = require('../utils/verificationValidation');
-const { getDocumentTypesForIndustry } = require('../config/documentTypes');
+const {
+  getDocumentTypesForIndustry,
+  validateDocumentType,
+  validateDocumentMetadata,
+  checkRequiredDocuments,
+  getVerificationProgress,
+} = require('../config/documentTypes');
 const { otpCooldownService } = require('../config/initializeServices');
 
-// Helpers
+// Helpers: check user đã có employer profile chưa, nếu chưa thì tạo profile mặc định với các placeholders
 const ensureEmployerProfile = async userId => {
   let profile = await EmployerProfile.findOne({ mainUserId: userId });
   if (!profile) {
     profile = await EmployerProfile.create({
       mainUserId: userId,
-      company: { name: 'Chưa cập nhật', industry: 'unknown', size: 'small' },
-      position: { title: 'representative', level: 'junior' },
+      company: {
+        name: 'Chưa cập nhật',
+        industry: 'unknown',
+        size: 'small',
+        email: 'temp@example.com',
+      },
+      position: {
+        title: 'Chưa cập nhật',
+        level: 'junior',
+        department: 'Chưa cập nhật',
+      },
+      contact: {
+        name: 'Chưa cập nhật',
+        phone: 'Chưa cập nhật',
+        email: 'temp@example.com',
+      },
+      officeAddress: {
+        street: 'Chưa cập nhật',
+        ward: 'Chưa cập nhật',
+        district: 'Chưa cập nhật',
+        city: 'Chưa cập nhật',
+        country: 'Vietnam',
+        postalCode: '000000',
+      },
+      legalRepresentative: {
+        fullName: 'Chưa cập nhật',
+        position: 'Chưa cập nhật',
+        phone: 'Chưa cập nhật',
+        email: 'temp@example.com',
+      },
+      businessInfo: {
+        registrationNumber: 'temp',
+        taxId: `temp_${userId}_${Date.now()}`,
+        issueDate: new Date(),
+        issuePlace: 'Chưa cập nhật',
+        address: {
+          street: 'Chưa cập nhật',
+          ward: 'Chưa cập nhật',
+          district: 'Chưa cập nhật',
+          city: 'Chưa cập nhật',
+          country: 'Vietnam',
+        },
+      },
     });
+
+    // Update User reference
+    await User.findByIdAndUpdate(userId, { employerProfile: profile._id });
   }
+
+  // Ensure all nested objects exist even for existing profiles
+  if (!profile.company) profile.company = {};
+  if (!profile.position) profile.position = {};
+  if (!profile.contact) profile.contact = {};
+  if (!profile.officeAddress) profile.officeAddress = {};
+
   return profile;
 };
 
@@ -33,252 +93,340 @@ const getProfile = asyncHandler(async (req, res) => {
 });
 
 // PUT /api/employers/profile
+// Update Personal Profile (position, contact, office address only)
 const updateProfile = asyncHandler(async (req, res) => {
-  // Whitelist allowed fields for profile update
-  const allowedFields = [
-    'position',
-    'contact',
-    'preferences',
-    'availability',
-    'bio',
-    'skills',
-    'experience',
-    'education',
-  ];
-
-  // Filter and sanitize input
-  const sanitizedData = {};
-  for (const field of allowedFields) {
-    if (req.body[field] !== undefined) {
-      sanitizedData[field] = sanitizeInput(req.body[field]);
-    }
-  }
-
-  const updated = await EmployerProfile.findOneAndUpdate(
-    { mainUserId: req.user.id },
-    sanitizedData,
-    { new: true, runValidators: true, upsert: true }
-  );
-
-  logger.info('Profile updated', {
-    userId: req.user.id,
-    updatedFields: Object.keys(sanitizedData),
-  });
-
-  res
-    .status(200)
-    .json({ success: true, message: 'Cập nhật thành công', data: updated });
-});
-
-// POST /api/employers/verify
-const submitVerification = asyncHandler(async (req, res) => {
   try {
-    const {
-      businessInfo,
-      legalRepresentative,
-      companyEmail,
-      documents = [],
-    } = req.body;
-
     const profile = await ensureEmployerProfile(req.user.id);
 
-    // Validate required fields
-    const validationErrors = validateVerificationData({
-      businessInfo,
-      legalRepresentative,
-      companyEmail,
-      documents,
-      industry: profile.company.industry,
-    });
+    // Initialize nested objects if they don't exist
+    if (!profile.position) profile.position = {};
+    if (!profile.contact) profile.contact = {};
+    if (!profile.officeAddress) profile.officeAddress = {};
 
-    if (validationErrors.length > 0) {
+    // Validate input - only allow personal fields
+    const allowedFields = ['position', 'contact', 'officeAddress'];
+    const invalidFields = Object.keys(req.body).filter(
+      field => !allowedFields.includes(field)
+    );
+
+    if (invalidFields.length > 0) {
       return res.status(400).json({
         success: false,
-        error: 'Dữ liệu xác thực không hợp lệ',
-        details: validationErrors,
+        error: 'Endpoint này chỉ cho phép cập nhật thông tin cá nhân',
+        message: `Các trường không được phép: ${invalidFields.join(', ')}`,
+        allowedFields: allowedFields,
+        note: 'Để cập nhật thông tin công ty, sử dụng PUT /employers/company',
       });
     }
 
-    // Sanitize input data
-    const sanitizedBusinessInfo = businessInfo
-      ? sanitizeInput(businessInfo)
-      : null;
-    const sanitizedLegalRep = legalRepresentative
-      ? sanitizeInput(legalRepresentative)
-      : null;
-    const sanitizedDocuments = documents.map(doc => ({
-      ...doc,
-      metadata: doc.metadata ? sanitizeInput(doc.metadata) : {},
-    }));
+    let hasUpdates = false;
 
-    // Update business info
-    if (sanitizedBusinessInfo) {
-      profile.verification.businessInfo = {
-        ...profile.verification.businessInfo,
-        ...sanitizedBusinessInfo,
-      };
-      profile.verification.verificationSteps.businessInfoValidated = true;
-    }
+    // Update position info if provided
+    if (req.body.position) {
+      const positionFields = ['title', 'level', 'department'];
+      const positionData = {};
 
-    // Update legal representative info
-    if (sanitizedLegalRep) {
-      profile.verification.legalRepresentative = {
-        ...profile.verification.legalRepresentative,
-        ...sanitizedLegalRep,
-      };
-      profile.verification.verificationSteps.legalRepresentativeVerified = true;
-    }
+      for (const field of positionFields) {
+        if (req.body.position[field] !== undefined) {
+          positionData[field] = sanitizeInput(req.body.position[field]);
+        }
+      }
 
-    // Update company email
-    if (companyEmail) {
-      profile.verification.companyEmail = {
-        ...profile.verification.companyEmail,
-        email: companyEmail,
-        verified: false,
-      };
-    }
-
-    // Add or update documents with metadata
-    for (const doc of sanitizedDocuments) {
-      // Check if document of this type already exists
-      const existingDocIndex = profile.verification.documents.findIndex(
-        existingDoc => existingDoc.type === doc.type
-      );
-
-      const documentData = {
-        type: doc.type,
-        url: doc.url,
-        filename: doc.filename,
-        uploadedAt: new Date(),
-        verified: false,
-        metadata: doc.metadata || {},
-      };
-
-      if (existingDocIndex >= 0) {
-        // Update existing document
-        profile.verification.documents[existingDocIndex] = documentData;
-        logger.info('Document updated', {
-          userId: req.user.id,
-          documentType: doc.type,
-          action: 'updated',
-        });
-      } else {
-        // Add new document
-        profile.verification.documents.push(documentData);
-        logger.info('Document added', {
-          userId: req.user.id,
-          documentType: doc.type,
-          action: 'added',
-        });
+      if (Object.keys(positionData).length > 0) {
+        Object.assign(profile.position, positionData);
+        hasUpdates = true;
       }
     }
 
-    // Update verification steps
-    profile.verification.verificationSteps.documentsUploaded = true;
+    // Update contact info if provided
+    if (req.body.contact) {
+      const contactFields = ['name', 'phone', 'email'];
+      const contactData = {};
 
-    // Check if all required steps are completed
-    const steps = profile.verification.verificationSteps;
-    const allStepsCompleted =
-      steps.documentsUploaded &&
-      steps.businessInfoValidated &&
-      steps.legalRepresentativeVerified &&
-      steps.companyEmailVerified;
+      for (const field of contactFields) {
+        if (req.body.contact[field] !== undefined) {
+          contactData[field] = sanitizeInput(req.body.contact[field]);
+        }
+      }
 
-    if (allStepsCompleted) {
-      profile.verification.verificationSteps.crossCheckCompleted = true;
+      if (Object.keys(contactData).length > 0) {
+        Object.assign(profile.contact, contactData);
+      }
     }
 
-    profile.status = 'pending';
+    // Update office address if provided
+    if (req.body.officeAddress) {
+      const addressFields = [
+        'street',
+        'ward',
+        'district',
+        'city',
+        'country',
+        'postalCode',
+      ];
+      const addressData = {};
 
-    await profile.save();
+      for (const field of addressFields) {
+        if (req.body.officeAddress[field] !== undefined) {
+          addressData[field] = sanitizeInput(req.body.officeAddress[field]);
+        }
+      }
 
-    // Send verification email to company email if provided
-    if (companyEmail) {
-      const verificationCode = generateVerificationCode();
-      profile.verification.companyEmail.verificationCode = verificationCode;
-      profile.verification.companyEmail.sentAt = new Date();
-      profile.verification.companyEmail.resendCount = 0;
-      await profile.save();
+      if (Object.keys(addressData).length > 0) {
+        Object.assign(profile.officeAddress, addressData);
+        hasUpdates = true;
+      }
+    }
 
-      // TODO: Implement email service
-      logger.info('Company email verification code generated', {
-        userId: req.user.id,
-        email: companyEmail,
-        code: verificationCode,
+    if (!hasUpdates) {
+      return res.status(400).json({
+        success: false,
+        error: 'Không có dữ liệu hợp lệ để cập nhật',
+        allowedFields: ['position', 'contact', 'officeAddress'],
       });
     }
 
-    logger.info('Verification submitted', {
+    // Save with validation disabled to avoid required field errors for incomplete profile
+    await profile.save({ validateBeforeSave: false });
+
+    // Update User model if contact info changed
+    if (req.body.contact?.name || req.body.contact?.phone) {
+      const userUpdates = {};
+      if (req.body.contact.name) userUpdates.fullName = req.body.contact.name;
+      if (req.body.contact.phone) userUpdates.phone = req.body.contact.phone;
+
+      await User.findByIdAndUpdate(req.user.id, userUpdates);
+    }
+
+    logger.info('Personal profile updated', {
       userId: req.user.id,
-      employerProfileId: profile._id,
-      documentsCount: documents.length,
-      hasBusinessInfo: !!businessInfo,
-      hasLegalRep: !!legalRepresentative,
-      hasCompanyEmail: !!companyEmail,
+      updatedSections: Object.keys(req.body),
     });
 
     res.status(200).json({
       success: true,
-      message:
-        'Đã gửi hồ sơ xác thực. Vui lòng kiểm tra email công ty để xác thực.',
+      message: 'Cập nhật thông tin cá nhân thành công',
       data: {
-        verification: profile.verification,
-        nextSteps: [
-          'Xác thực email công ty',
-          'Chờ admin duyệt tài liệu',
-          'Kiểm tra thông tin đối chiếu',
-        ],
+        position: profile.position,
+        contact: profile.contact,
+        officeAddress: profile.officeAddress,
+        updatedFields: Object.keys(req.body),
       },
     });
   } catch (error) {
-    logger.error('Verification submission failed:', {
+    logger.error('Profile update failed:', {
       error: error.message,
       userId: req.user?.id,
       stack: error.stack,
     });
+
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(
+        err => err.message
+      );
+      return res.status(400).json({
+        success: false,
+        error: 'Dữ liệu không hợp lệ',
+        details: validationErrors,
+      });
+    }
+
     res.status(500).json({
       success: false,
-      error: 'Gửi hồ sơ xác thực thất bại',
+      error: 'Cập nhật hồ sơ thất bại',
     });
   }
 });
 
+// DEPRECATED: submitVerification removed - use specific workflows instead
+// - PUT /employers/company for company info + business info + legal representative
+// - POST /employers/documents/business-license for business license upload
+// - POST /employers/documents/tax-certificate for tax certificate upload
 // GET /api/employers/verification-status
+//trả về tiến độ hoàn thành xác thực
 const getVerificationStatus = asyncHandler(async (req, res) => {
   const profile = await ensureEmployerProfile(req.user.id);
 
+  // Check if business info is actually complete
+  const hasBusinessInfo =
+    profile.businessInfo &&
+    profile.businessInfo.registrationNumber &&
+    profile.businessInfo.taxId;
+
+  // Update businessInfo step if data exists but step is false
+  if (hasBusinessInfo && !profile.verification.steps.businessInfo) {
+    profile.verification.steps.businessInfo = true;
+    await profile.save({ validateBeforeSave: false });
+  }
+
   // Calculate verification progress
-  const steps = profile.verification.verificationSteps;
+  const steps = profile.verification.steps;
   const completedSteps = Object.values(steps).filter(Boolean).length;
   const totalSteps = Object.keys(steps).length;
   const progressPercentage = Math.round((completedSteps / totalSteps) * 100);
 
+  // Check required documents
+  const requiredDocuments = ['business-license', 'tax-certificate'];
+  const uploadedDocs = profile.verification.documents || [];
+  const verifiedDocs = uploadedDocs.filter(doc => doc.verified === true);
+  const missingDocs = requiredDocuments.filter(
+    docType => !uploadedDocs.some(doc => doc.documentType === docType)
+  );
+
+  // Determine next steps
+  const nextSteps = [];
+  if (!steps.businessInfo) {
+    nextSteps.push({
+      step: 'businessInfo',
+      title: 'Cập nhật thông tin doanh nghiệp',
+      description: 'Số ĐKKD, MST, địa chỉ trụ sở',
+      endpoint: 'PUT /employers/company',
+    });
+  }
+
+  if (missingDocs.length > 0) {
+    missingDocs.forEach(docType => {
+      if (docType === 'business-license') {
+        nextSteps.push({
+          step: 'upload-business-license',
+          title: 'Upload giấy phép kinh doanh',
+          description: 'File PDF hoặc hình ảnh + metadata',
+          endpoint: 'POST /employers/documents/business-license',
+        });
+      }
+      if (docType === 'tax-certificate') {
+        nextSteps.push({
+          step: 'upload-tax-certificate',
+          title: 'Upload giấy chứng nhận đăng ký thuế',
+          description: 'File PDF hoặc hình ảnh + metadata',
+          endpoint: 'POST /employers/documents/tax-certificate',
+        });
+      }
+    });
+  }
+
+  if (uploadedDocs.length > 0 && verifiedDocs.length === 0) {
+    nextSteps.push({
+      step: 'wait-verification',
+      title: 'Chờ admin duyệt tài liệu',
+      description: 'Tài liệu đã upload, chờ admin xác thực',
+      endpoint: null,
+    });
+  }
+
+  // Overall status
+  let overallStatus = 'incomplete';
+  if (steps.basicInfo && steps.businessInfo && uploadedDocs.length >= 2) {
+    if (steps.adminApproved) {
+      overallStatus = 'verified';
+    } else if (verifiedDocs.length >= 2) {
+      overallStatus = 'pending-approval';
+    } else {
+      overallStatus = 'pending-verification';
+    }
+  }
+
   res.status(200).json({
     success: true,
     data: {
-      ...profile.verification.toObject(),
+      // Basic verification info
+      isVerified: profile.verification.isVerified,
+      status: profile.status,
+      overallStatus,
+
+      // Progress tracking
       progress: {
         percentage: progressPercentage,
         completedSteps,
         totalSteps,
-        steps,
+        steps: {
+          basicInfo: steps.basicInfo,
+          businessInfo: steps.businessInfo,
+          adminApproved: steps.adminApproved,
+        },
       },
+
+      // Documents info
+      documents: {
+        uploaded: uploadedDocs.length,
+        verified: verifiedDocs.length,
+        required: requiredDocuments.length,
+        missing: missingDocs,
+        list: uploadedDocs.map(doc => ({
+          _id: doc._id,
+          documentType: doc.documentType,
+          url: doc.url,
+          verified: doc.verified,
+          uploadedAt: doc.uploadedAt,
+          verifiedAt: doc.verifiedAt,
+          rejectionReason: doc.rejectionReason,
+        })),
+      },
+
+      // Next steps guidance
+      nextSteps,
+
+      // User-friendly messages
+      message: getStatusMessage(overallStatus, nextSteps.length),
     },
   });
 });
 
+// Helper function for status messages
+const getStatusMessage = (status, nextStepsCount) => {
+  switch (status) {
+    case 'verified':
+      return 'Tài khoản đã được xác thực thành công! Bạn có thể bắt đầu đăng tuyển.';
+    case 'pending-approval':
+      return 'Tài liệu đã được xác thực, chờ admin phê duyệt cuối cùng.';
+    case 'pending-verification':
+      return 'Đã upload tài liệu, chờ admin xác thực.';
+    case 'incomplete':
+      return nextStepsCount > 0
+        ? `Còn ${nextStepsCount} bước cần hoàn thành để xác thực tài khoản.`
+        : 'Hồ sơ chưa đầy đủ thông tin.';
+    default:
+      return 'Đang xử lý xác thực tài khoản.';
+  }
+};
+
 // GET /api/employers/document-types
+//lấy ds loại giấy tờ cần cho ngành nghề của công ty. check cem thiếu/tồn tại
 const getDocumentTypes = asyncHandler(async (req, res) => {
   try {
     const { industry } = req.query;
-    const documentTypes = getDocumentTypesForIndustry(industry || 'general');
+    const profile = await ensureEmployerProfile(req.user.id);
+    const documentTypes = getDocumentTypesForIndustry(
+      industry || profile.company.industry || 'general'
+    );
+
+    // Get verification progress
+    const progress = getVerificationProgress(
+      profile.verification.documents,
+      industry || profile.company.industry || 'general'
+    );
+
+    // Check required documents status
+    const requiredCheck = checkRequiredDocuments(
+      profile.verification.documents,
+      industry || profile.company.industry || 'general'
+    );
 
     res.status(200).json({
       success: true,
       data: {
-        industry: industry || 'general',
+        industry: industry || profile.company.industry || 'general',
         required: documentTypes.required,
         optional: documentTypes.optional,
+        uploadedDocuments: profile.verification.documents,
+        progress: {
+          percentage: progress.percentage,
+          uploadedRequired: progress.uploadedRequired,
+          totalRequired: progress.totalRequired,
+          missingRequired: progress.missingRequired,
+        },
+        requiredCheck,
       },
     });
   } catch (error) {
@@ -293,227 +441,308 @@ const getDocumentTypes = asyncHandler(async (req, res) => {
   }
 });
 
-// PUT /api/employers/verification/business-info
-const updateBusinessInfo = asyncHandler(async (req, res) => {
+// DEPRECATED: Generic addDocument removed - use specific endpoints instead
+// Use uploadBusinessLicense or uploadTaxCertificate for document uploads
+
+// POST /api/employers/documents/business-license
+// Upload giấy phép kinh doanh (chỉ cần file + metadata)
+const uploadBusinessLicense = asyncHandler(async (req, res) => {
   try {
-    const { businessInfo } = req.body;
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'Không có file được upload',
+      });
+    }
+
+    const { documentNumber, issueDate, issuePlace, validUntil } = req.body;
     const profile = await ensureEmployerProfile(req.user.id);
+    const documentType = 'business-license';
 
-    // Validate business info
-    const validationErrors = validateVerificationData({
-      businessInfo,
-      industry: profile.company.industry,
-    });
+    // Validate metadata cho business license
+    const metadata = { documentNumber, issueDate, issuePlace, validUntil };
+    const metadataValidation = validateDocumentMetadata(documentType, metadata);
+    if (!metadataValidation.valid) {
+      logger.warn('Business license metadata validation failed', {
+        userId: req.user.id,
+        missingFields: metadataValidation.missingFields,
+        providedMetadata: metadata,
+      });
 
-    if (validationErrors.length > 0) {
       return res.status(400).json({
         success: false,
-        error: 'Thông tin doanh nghiệp không hợp lệ',
-        details: validationErrors,
+        error: metadataValidation.error,
+        missingFields: metadataValidation.missingFields,
+        hint: 'Cần có: documentNumber (số giấy phép), issueDate (ngày cấp), issuePlace (nơi cấp)',
       });
     }
 
-    // Sanitize and update
-    const sanitizedBusinessInfo = sanitizeInput(businessInfo);
-    profile.verification.businessInfo = {
-      ...profile.verification.businessInfo,
-      ...sanitizedBusinessInfo,
-    };
-    profile.verification.verificationSteps.businessInfoValidated = true;
-
-    await profile.save();
-
-    logger.info('Business info updated', {
-      userId: req.user.id,
-      employerProfileId: profile._id,
-      updatedFields: Object.keys(sanitizedBusinessInfo),
-    });
-
-    res.status(200).json({
-      success: true,
-      message: 'Cập nhật thông tin doanh nghiệp thành công',
-      data: profile.verification.businessInfo,
-    });
-  } catch (error) {
-    logger.error('Business info update failed:', {
-      error: error.message,
-      userId: req.user?.id,
-      stack: error.stack,
-    });
-    res.status(500).json({
-      success: false,
-      error: 'Cập nhật thông tin doanh nghiệp thất bại',
-    });
-  }
-});
-
-// POST /api/employers/verify-company-email
-const verifyCompanyEmail = asyncHandler(async (req, res) => {
-  try {
-    const { verificationCode } = req.body;
-    const profile = await ensureEmployerProfile(req.user.id);
-
-    if (!profile.verification.companyEmail.email) {
-      return res.status(400).json({
-        success: false,
-        error: 'Chưa có email công ty để xác thực',
-      });
-    }
-
-    if (!verificationCode) {
-      return res.status(400).json({
-        success: false,
-        error: 'Vui lòng nhập mã xác thực',
-      });
-    }
-
-    if (
-      profile.verification.companyEmail.verificationCode !== verificationCode
-    ) {
-      return res.status(400).json({
-        success: false,
-        error: 'Mã xác thực không đúng',
-      });
-    }
-
-    // Check if code is expired (15 minutes)
-    const codeAge =
-      Date.now() - new Date(profile.verification.companyEmail.sentAt).getTime();
-    if (codeAge > 15 * 60 * 1000) {
-      return res.status(400).json({
-        success: false,
-        error: 'Mã xác thực đã hết hạn. Vui lòng yêu cầu mã mới.',
-      });
-    }
-
-    profile.verification.companyEmail.verified = true;
-    profile.verification.companyEmail.verifiedAt = new Date();
-    profile.verification.verificationSteps.companyEmailVerified = true;
-
-    await profile.save();
-
-    logger.info('Company email verified successfully', {
-      userId: req.user.id,
-      email: profile.verification.companyEmail.email,
-      employerProfileId: profile._id,
-    });
-
-    res.status(200).json({
-      success: true,
-      message: 'Xác thực email công ty thành công',
-      data: profile.verification,
-    });
-  } catch (error) {
-    logger.error('Company email verification failed:', {
-      error: error.message,
-      userId: req.user?.id,
-      stack: error.stack,
-    });
-    res.status(500).json({
-      success: false,
-      error: 'Xác thực email công ty thất bại',
-    });
-  }
-});
-
-// POST /api/employers/resend-verification-email
-const resendVerificationEmail = asyncHandler(async (req, res) => {
-  try {
-    const profile = await ensureEmployerProfile(req.user.id);
-
-    if (!profile.verification.companyEmail.email) {
-      return res.status(400).json({
-        success: false,
-        error: 'Chưa có email công ty để xác thực',
-      });
-    }
-
-    if (profile.verification.companyEmail.verified) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email công ty đã được xác thực',
-      });
-    }
-
-    // Check cooldown period
-    const isInCooldown = await otpCooldownService.isInCooldown(
-      'resend_verification',
-      req.user.id
+    // Kiểm tra document cũ để xóa
+    const existingDoc = profile.verification.documents.find(
+      doc => doc.documentType === documentType
     );
 
-    if (isInCooldown) {
-      const remainingTime = await otpCooldownService.getRemainingCooldown(
-        'resend_verification',
-        req.user.id
-      );
-      return res.status(429).json({
-        success: false,
-        error: `Vui lòng chờ ${remainingTime} giây trước khi gửi lại mã`,
-        retryAfter: remainingTime,
-      });
-    }
-
-    // Check daily resend limit (max 5 times per day)
-    const today = new Date().toDateString();
-    const lastResendDate = profile.verification.companyEmail.lastResendAt
-      ? new Date(profile.verification.companyEmail.lastResendAt).toDateString()
-      : null;
-
+    let oldCloudinaryId = null;
     if (
-      lastResendDate === today &&
-      profile.verification.companyEmail.resendCount >= 5
+      existingDoc &&
+      existingDoc.metadata &&
+      existingDoc.metadata.cloudinaryId
     ) {
-      return res.status(429).json({
-        success: false,
-        error: 'Đã gửi quá 5 lần trong ngày. Vui lòng thử lại vào ngày mai.',
-      });
+      oldCloudinaryId = existingDoc.metadata.cloudinaryId;
     }
 
-    // Reset count if new day
-    if (lastResendDate !== today) {
-      profile.verification.companyEmail.resendCount = 0;
+    // Upload file
+    const uploadResult = await documentUploadService.uploadDocument(
+      req.file,
+      req.user.id,
+      documentType
+    );
+
+    // Add document - Fixed signature: (url, cloudinaryId, documentType, metadata)
+    await EmployerProfileHelpers.addDocument(
+      profile,
+      uploadResult.url,
+      uploadResult.publicId,
+      documentType,
+      {
+        ...metadata,
+        originalName: uploadResult.originalName,
+        size: uploadResult.size,
+        mimeType: uploadResult.mimeType,
+      }
+    ); // Xóa file cũ
+    if (oldCloudinaryId) {
+      try {
+        await documentUploadService.deleteDocument(oldCloudinaryId);
+      } catch (deleteError) {
+        logger.warn('Failed to delete old business license', {
+          userId: req.user.id,
+          oldCloudinaryId,
+          error: deleteError.message,
+        });
+      }
     }
 
-    // Generate new verification code
-    const verificationCode = generateVerificationCode();
-    profile.verification.companyEmail.verificationCode = verificationCode;
-    profile.verification.companyEmail.sentAt = new Date();
-    profile.verification.companyEmail.lastResendAt = new Date();
-    profile.verification.companyEmail.resendCount += 1;
-
-    await profile.save();
-
-    // Set cooldown
-    await otpCooldownService.setCooldown('resend_verification', req.user.id);
-
-    // TODO: Implement email service
-    logger.info('Verification email resent', {
+    logger.info('Business license uploaded successfully', {
       userId: req.user.id,
-      email: profile.verification.companyEmail.email,
-      code: verificationCode,
-      resendCount: profile.verification.companyEmail.resendCount,
+      employerProfileId: profile._id,
+      cloudinaryId: uploadResult.publicId,
     });
 
     res.status(200).json({
       success: true,
-      message: 'Đã gửi lại mã xác thực email công ty',
+      message: 'Upload giấy phép kinh doanh thành công',
       data: {
-        resendCount: profile.verification.companyEmail.resendCount,
-        remainingResends: 5 - profile.verification.companyEmail.resendCount,
+        type: documentType,
+        url: uploadResult.url,
+        cloudinaryId: uploadResult.publicId,
+        filename: uploadResult.originalName,
+        metadata: {
+          ...metadata,
+          originalName: uploadResult.originalName,
+          size: uploadResult.size,
+          mimeType: uploadResult.mimeType,
+        },
       },
     });
   } catch (error) {
-    logger.error('Resend verification email failed:', {
+    logger.error('Upload business license failed:', {
       error: error.message,
-      userId: req.user?.id,
+      userId: req.user.id,
       stack: error.stack,
     });
     res.status(500).json({
       success: false,
-      error: 'Gửi lại email xác thực thất bại',
+      error: 'Upload giấy phép kinh doanh thất bại',
     });
   }
 });
+
+// POST /api/employers/documents/tax-certificate
+// Upload giấy chứng nhận đăng ký thuế (chỉ cần file + metadata)
+const uploadTaxCertificate = asyncHandler(async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'Không có file được upload',
+      });
+    }
+
+    const { documentNumber, issueDate, validUntil } = req.body;
+    const profile = await ensureEmployerProfile(req.user.id);
+    const documentType = 'tax-certificate';
+
+    // Validate metadata cho tax certificate
+    const metadata = { documentNumber, issueDate, validUntil };
+    const metadataValidation = validateDocumentMetadata(documentType, metadata);
+    if (!metadataValidation.valid) {
+      logger.warn('Tax certificate metadata validation failed', {
+        userId: req.user.id,
+        missingFields: metadataValidation.missingFields,
+        providedMetadata: metadata,
+      });
+
+      return res.status(400).json({
+        success: false,
+        error: metadataValidation.error,
+        missingFields: metadataValidation.missingFields,
+        hint: 'Cần có: documentNumber (số giấy chứng nhận), issueDate (ngày cấp)',
+      });
+    }
+
+    // Kiểm tra document cũ để xóa
+    const existingDoc = profile.verification.documents.find(
+      doc => doc.documentType === documentType
+    );
+
+    let oldCloudinaryId = null;
+    if (
+      existingDoc &&
+      existingDoc.metadata &&
+      existingDoc.metadata.cloudinaryId
+    ) {
+      oldCloudinaryId = existingDoc.metadata.cloudinaryId;
+    }
+
+    // Upload file
+    const uploadResult = await documentUploadService.uploadDocument(
+      req.file,
+      req.user.id,
+      documentType
+    );
+
+    // Add document - Fixed signature: (url, cloudinaryId, documentType, metadata)
+    await EmployerProfileHelpers.addDocument(
+      profile,
+      uploadResult.url,
+      uploadResult.publicId,
+      documentType,
+      {
+        ...metadata,
+        originalName: uploadResult.originalName,
+        size: uploadResult.size,
+        mimeType: uploadResult.mimeType,
+      }
+    ); // Xóa file cũ
+    if (oldCloudinaryId) {
+      try {
+        await documentUploadService.deleteDocument(oldCloudinaryId);
+      } catch (deleteError) {
+        logger.warn('Failed to delete old tax certificate', {
+          userId: req.user.id,
+          oldCloudinaryId,
+          error: deleteError.message,
+        });
+      }
+    }
+
+    logger.info('Tax certificate uploaded successfully', {
+      userId: req.user.id,
+      employerProfileId: profile._id,
+      cloudinaryId: uploadResult.publicId,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Upload giấy chứng nhận đăng ký thuế thành công',
+      data: {
+        type: documentType,
+        url: uploadResult.url,
+        filename: uploadResult.originalName,
+        metadata: {
+          ...metadata,
+          originalName: uploadResult.originalName,
+          size: uploadResult.size,
+          mimeType: uploadResult.mimeType,
+          cloudinaryId: uploadResult.publicId,
+        },
+      },
+    });
+  } catch (error) {
+    logger.error('Upload tax certificate failed:', {
+      error: error.message,
+      userId: req.user.id,
+      stack: error.stack,
+    });
+    res.status(500).json({
+      success: false,
+      error: 'Upload giấy chứng nhận đăng ký thuế thất bại',
+    });
+  }
+});
+
+// DELETE /api/employers/documents/:documentId
+const removeDocument = asyncHandler(async (req, res) => {
+  try {
+    const { documentId } = req.params;
+    const profile = await ensureEmployerProfile(req.user.id);
+
+    // Find the document to get cloudinary ID before deletion
+    const document = profile.verification.documents.find(
+      doc => doc._id.toString() === documentId
+    );
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        error: 'Không tìm thấy tài liệu',
+      });
+    }
+
+    // Delete from Cloudinary if cloudinaryId exists (support both old and new structure)
+    let cloudinaryId = document.cloudinaryId || document.metadata?.cloudinaryId;
+
+    if (cloudinaryId) {
+      try {
+        await documentUploadService.deleteDocument(cloudinaryId);
+        logger.info('Document deleted from Cloudinary', {
+          userId: req.user.id,
+          documentId,
+          cloudinaryId,
+        });
+      } catch (cloudinaryError) {
+        logger.error('Failed to delete document from Cloudinary:', {
+          error: cloudinaryError.message,
+          cloudinaryId,
+        });
+        // Continue with database deletion even if Cloudinary deletion fails
+      }
+    }
+
+    // Remove from database using helper method
+    await EmployerProfileHelpers.removeDocument(profile, documentId);
+
+    logger.info('Document removed from employer profile', {
+      userId: req.user.id,
+      documentId,
+      employerProfileId: profile._id,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Xóa tài liệu thành công',
+      data: {
+        uploadedDocuments: profile.verification.documents,
+      },
+    });
+  } catch (error) {
+    logger.error('Remove document failed:', {
+      error: error.message,
+      userId: req.user?.id,
+      documentId: req.params.documentId,
+      stack: error.stack,
+    });
+    res.status(500).json({
+      success: false,
+      error: 'Xóa tài liệu thất bại',
+    });
+  }
+});
+
+// DEPRECATED: updateBusinessInfo removed - use updateCompanyInfo instead
+
+// DEPRECATED: Email verification endpoints moved to User model
 
 // GET /api/employers/jobs
 const getPostedJobs = asyncHandler(async (req, res) => {
@@ -582,7 +811,7 @@ const getApplications = asyncHandler(async (req, res) => {
   });
 });
 
-// GET /api/employers/analytics
+// GET /api/employers/analytics (combined dashboard stats)
 const getAnalytics = asyncHandler(async (req, res) => {
   const Job = require('../models/Job');
   const Application = require('../models/Application');
@@ -597,61 +826,286 @@ const getAnalytics = asyncHandler(async (req, res) => {
     jobId: { $in: await Job.find({ employer: profile._id }).distinct('_id') },
   });
 
+  // Enhanced analytics with more details
+  const draftJobs = await Job.countDocuments({
+    employer: profile._id,
+    status: 'draft',
+  });
+  const closedJobs = await Job.countDocuments({
+    employer: profile._id,
+    status: 'closed',
+  });
+
   res.status(200).json({
     success: true,
-    data: { totalJobs, activeJobs, totalApplications },
+    data: {
+      jobs: {
+        total: totalJobs,
+        active: activeJobs,
+        draft: draftJobs,
+        closed: closedJobs,
+      },
+      applications: {
+        total: totalApplications,
+      },
+      summary: {
+        totalJobs,
+        activeJobs,
+        totalApplications,
+      },
+    },
   });
 });
 
-// PUT /api/employers/company
+// DEPRECATED: Use getAnalytics instead
+
+// Update Company Information & Verification Data
 const updateCompanyInfo = asyncHandler(async (req, res) => {
   try {
     const profile = await ensureEmployerProfile(req.user.id);
 
-    // Whitelist allowed fields for company update
-    const allowedFields = [
-      'name',
-      'industry',
-      'size',
-      'website',
-      'description',
-      'foundedYear',
-      'headquarters',
-      'address',
-      'phone',
-      'email',
-    ];
+    // Initialize nested objects if they don't exist
+    if (!profile.company) profile.company = {};
+    if (!profile.businessInfo) profile.businessInfo = {};
+    if (!profile.legalRepresentative) profile.legalRepresentative = {};
 
-    // Filter and sanitize input
-    const sanitizedData = {};
-    for (const field of allowedFields) {
-      if (req.body[field] !== undefined) {
-        sanitizedData[field] = sanitizeInput(req.body[field]);
+    // Validate input - only allow company verification fields
+    const allowedSections = [
+      'company',
+      'businessInfo',
+      'legalRepresentative',
+      'documents',
+    ];
+    const invalidFields = Object.keys(req.body).filter(
+      field => !allowedSections.includes(field)
+    );
+
+    if (invalidFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error:
+          'Endpoint này chỉ cho phép cập nhật thông tin công ty và xác thực',
+        message: `Các trường không được phép: ${invalidFields.join(', ')}`,
+        allowedSections: allowedSections,
+        note: 'Để cập nhật thông tin cá nhân, sử dụng PUT /employers/profile',
+      });
+    }
+
+    let hasUpdates = false;
+
+    // Update company basic info if provided
+    if (req.body.company) {
+      const companyFields = [
+        'name',
+        'industry',
+        'size',
+        'email',
+        'website',
+        'description',
+        'employeesCount',
+        'foundedYear',
+      ];
+      const companyData = {};
+
+      for (const field of companyFields) {
+        if (req.body.company[field] !== undefined) {
+          companyData[field] = sanitizeInput(req.body.company[field]);
+        }
+      }
+
+      if (Object.keys(companyData).length > 0) {
+        // Validate company email if provided
+        if (companyData.email && !isValidCompanyEmail(companyData.email)) {
+          return res.status(400).json({
+            success: false,
+            error: 'Email công ty không hợp lệ',
+            message:
+              'Email phải thuộc tên miền công ty, không được sử dụng email cá nhân (gmail, yahoo, etc.)',
+          });
+        }
+
+        Object.assign(profile.company, companyData);
+        hasUpdates = true;
       }
     }
 
-    profile.company = { ...profile.company.toObject(), ...sanitizedData };
+    // Update business info if provided
+    if (req.body.businessInfo) {
+      const businessFields = [
+        'registrationNumber',
+        'taxId',
+        'address',
+        'establishedDate',
+        'registrationDate',
+      ];
+      const businessData = {};
 
-    // If industry changed, update verification steps
-    if (
-      sanitizedData.industry &&
-      sanitizedData.industry !== profile.company.industry
-    ) {
-      profile.verification.verificationSteps.businessInfoValidated = false;
+      for (const field of businessFields) {
+        if (req.body.businessInfo[field] !== undefined) {
+          businessData[field] = sanitizeInput(req.body.businessInfo[field]);
+        }
+      }
+
+      if (Object.keys(businessData).length > 0) {
+        // Validate business info
+        const businessValidation = validateBusinessInfo(businessData);
+        if (businessValidation.length > 0) {
+          return res.status(400).json({
+            success: false,
+            error: 'Thông tin đăng ký kinh doanh không hợp lệ',
+            details: businessValidation,
+          });
+        }
+
+        Object.assign(profile.businessInfo, businessData);
+        profile.verification.steps.businessInfo = true; // Mark business info as completed
+        hasUpdates = true;
+      }
     }
 
-    await profile.save();
+    // Update legal representative if provided
+    if (req.body.legalRepresentative) {
+      const legalFields = [
+        'fullName',
+        'position',
+        'phone',
+        'email',
+        'identityCard',
+        'address',
+      ];
+      const legalData = {};
+
+      for (const field of legalFields) {
+        if (req.body.legalRepresentative[field] !== undefined) {
+          legalData[field] = sanitizeInput(req.body.legalRepresentative[field]);
+        }
+      }
+
+      if (Object.keys(legalData).length > 0) {
+        // Validate legal representative info
+        const legalValidation = validateLegalRepresentative(legalData);
+        if (legalValidation.length > 0) {
+          return res.status(400).json({
+            success: false,
+            error: 'Thông tin người đại diện pháp luật không hợp lệ',
+            details: legalValidation,
+          });
+        }
+
+        Object.assign(profile.legalRepresentative, legalData);
+        hasUpdates = true;
+      }
+    }
+
+    // Handle documents update if provided
+    if (req.body.documents && Array.isArray(req.body.documents)) {
+      // Validate document types
+      for (const doc of req.body.documents) {
+        const docValidation = validateDocumentType(
+          doc.type,
+          profile.company.industry
+        );
+        if (!docValidation) {
+          return res.status(400).json({
+            success: false,
+            error: `Document type không hợp lệ: ${doc.type}`,
+            details: [
+              `Document type "${doc.type}" không được hỗ trợ cho ngành ${profile.company.industry}`,
+            ],
+          });
+        }
+      }
+
+      profile.documents = req.body.documents;
+      hasUpdates = true;
+    }
+
+    if (!hasUpdates) {
+      return res.status(400).json({
+        success: false,
+        error: 'Không có dữ liệu hợp lệ để cập nhật',
+        allowedSections: [
+          'company',
+          'businessInfo',
+          'legalRepresentative',
+          'documents',
+        ],
+      });
+    }
+
+    // Save with validation disabled for partial updates
+    await profile.save({ validateBeforeSave: false });
+
+    // Update User model company name if changed
+    if (req.body.company?.name) {
+      await User.findByIdAndUpdate(req.user.id, {
+        companyName: req.body.company.name,
+      });
+    }
 
     logger.info('Company info updated', {
       userId: req.user.id,
       employerProfileId: profile._id,
-      updatedFields: Object.keys(sanitizedData),
+      updatedSections: Object.keys(req.body),
     });
+
+    // Check verification progress
+    const verificationProgress = getVerificationProgress(
+      profile.verification?.documents || [],
+      profile.company.industry
+    );
+    const nextSteps = getNextVerificationSteps(profile);
 
     res.status(200).json({
       success: true,
-      message: 'Cập nhật công ty thành công',
-      data: profile.company,
+      message: 'Cập nhật thông tin công ty thành công',
+      data: {
+        company: {
+          name: profile.company.name,
+          industry: profile.company.industry,
+          size: profile.company.size,
+          email: profile.company.email,
+          website: profile.company.website,
+          description: profile.company.description,
+          foundedYear: profile.company.foundedYear,
+          employeesCount: profile.company.employeesCount,
+          ...(profile.company.logo?.url && {
+            logo: { url: profile.company.logo.url },
+          }),
+          ...(profile.company.coverImage?.url && {
+            coverImage: { url: profile.company.coverImage.url },
+          }),
+        },
+        ...(profile.businessInfo &&
+          Object.keys(profile.businessInfo.toObject()).length > 0 && {
+            businessInfo: {
+              registrationNumber: profile.businessInfo.registrationNumber,
+              taxId: profile.businessInfo.taxId,
+              issueDate: profile.businessInfo.issueDate,
+              issuePlace: profile.businessInfo.issuePlace,
+              ...(profile.businessInfo.address && {
+                address: profile.businessInfo.address,
+              }),
+            },
+          }),
+        ...(profile.legalRepresentative &&
+          Object.keys(profile.legalRepresentative.toObject()).length > 0 && {
+            legalRepresentative: {
+              fullName: profile.legalRepresentative.fullName,
+              position: profile.legalRepresentative.position,
+              phone: profile.legalRepresentative.phone,
+              email: profile.legalRepresentative.email,
+            },
+          }),
+        verification: {
+          progress: verificationProgress,
+          status: profile.verification?.status || 'pending',
+          nextSteps: nextSteps,
+          requiredDocuments: getDocumentTypesForIndustry(
+            profile.company.industry
+          ),
+        },
+      },
     });
   } catch (error) {
     logger.error('Company info update failed:', {
@@ -659,6 +1113,19 @@ const updateCompanyInfo = asyncHandler(async (req, res) => {
       userId: req.user?.id,
       stack: error.stack,
     });
+
+    // Handle specific validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(
+        err => err.message
+      );
+      return res.status(400).json({
+        success: false,
+        error: 'Dữ liệu không hợp lệ',
+        details: validationErrors,
+      });
+    }
+
     res.status(500).json({
       success: false,
       error: 'Cập nhật thông tin công ty thất bại',
@@ -666,64 +1133,66 @@ const updateCompanyInfo = asyncHandler(async (req, res) => {
   }
 });
 
-// Stubs for reviews
-const getCompanyReviews = asyncHandler(async (req, res) => {
-  res.status(200).json({ success: true, data: [], message: 'Chưa triển khai' });
-});
-const respondToReview = asyncHandler(async (req, res) => {
-  res.status(200).json({ success: true, message: 'Chưa triển khai' });
-});
+// Helper function to get next verification steps
+const getNextVerificationSteps = profile => {
+  const steps = [];
+  const verificationSteps = profile.verification?.steps || {};
 
-// GET /api/employers/dashboard
-const getDashboardStats = asyncHandler(async (req, res) => {
-  const Job = require('../models/Job');
-  const Application = require('../models/Application');
-  const profile = await ensureEmployerProfile(req.user.id);
+  if (!verificationSteps.businessInfo) {
+    steps.push({
+      step: 'businessInfo',
+      title: 'Cập nhật thông tin đăng ký kinh doanh',
+      description: 'Số ĐKKD, MST, địa chỉ trụ sở',
+      endpoint: 'PUT /employers/verification/business-info',
+    });
+  }
 
-  const totalJobs = await Job.countDocuments({ employer: profile._id });
-  const activeJobs = await Job.countDocuments({
-    employer: profile._id,
-    status: 'active',
-  });
-  const totalApplications = await Application.countDocuments({
-    jobId: { $in: await Job.find({ employer: profile._id }).distinct('_id') },
-  });
+  if (!verificationSteps.legalRepresentative) {
+    steps.push({
+      step: 'legalRepresentative',
+      title: 'Thông tin người đại diện pháp luật',
+      description: 'Họ tên, chức vụ, CCCD/CMND',
+      endpoint: 'POST /employers/verify',
+    });
+  }
 
-  res.status(200).json({
-    success: true,
-    data: { totalJobs, activeJobs, totalApplications },
-  });
-});
+  if (!verificationSteps.documents) {
+    const requiredDocs = getDocumentTypesForIndustry(profile.company.industry);
+    steps.push({
+      step: 'documents',
+      title: 'Upload giấy tờ chứng minh',
+      description: `Cần có: ${
+        requiredDocs.required?.map(d => d.name).join(', ') ||
+        'Giấy tờ chứng minh'
+      }`,
+      endpoint: 'POST /employers/documents',
+    });
+  }
 
-// PUT /api/employers/preferences
-const updatePreferences = asyncHandler(async (req, res) => {
-  const profile = await ensureEmployerProfile(req.user.id);
-  profile.preferences = { ...profile.preferences.toObject(), ...req.body };
-  await profile.save();
-  res.status(200).json({
-    success: true,
-    message: 'Cập nhật preferences thành công',
-    data: profile.preferences,
-  });
-});
-
-// GET /api/employers/recommended-candidates
-const getRecommendedCandidates = asyncHandler(async (req, res) => {
-  res.status(200).json({ success: true, data: [], message: 'Chưa triển khai' });
-});
+  return steps;
+};
 
 // POST /api/employers/upload-logo
 const uploadCompanyLogo = asyncHandler(async (req, res) => {
   try {
     if (!req.file) {
-      return res
-        .status(400)
-        .json({ success: false, error: 'Không có file nào được upload' });
+      return res.status(400).json({
+        success: false,
+        error: 'Không có file nào được upload',
+      });
     }
+
     const result = await uploadImage('logo', req.file.buffer);
     const profile = await ensureEmployerProfile(req.user.id);
-    profile.company.logo = { url: result.url, filename: result.publicId };
-    await profile.save();
+
+    // Update logo directly without triggering validation
+    profile.company.logo = {
+      url: result.url,
+      filename: result.publicId,
+      uploadedAt: new Date(),
+    };
+
+    await profile.save({ validateBeforeSave: false });
 
     logger.info('Company logo upload successful', {
       userId: req.user.id,
@@ -749,23 +1218,171 @@ const uploadCompanyLogo = asyncHandler(async (req, res) => {
   }
 });
 
+// POST /api/employers/upload-cover-image
+const uploadCoverImage = asyncHandler(async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'Không có file nào được upload',
+      });
+    }
+
+    const result = await uploadImage('cover', req.file.buffer);
+    const profile = await ensureEmployerProfile(req.user.id);
+
+    // Update cover image directly without triggering validation
+    profile.company.coverImage = {
+      url: result.url,
+      filename: result.publicId,
+      uploadedAt: new Date(),
+    };
+
+    await profile.save({ validateBeforeSave: false });
+
+    logger.info('Company cover image upload successful', {
+      userId: req.user.id,
+      originalName: req.file.originalname,
+      publicId: result.publicId,
+      employerProfileId: profile._id,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Upload ảnh bìa công ty thành công',
+      data: { coverImage: profile.company.coverImage },
+    });
+  } catch (error) {
+    logger.error('Company cover image upload failed:', {
+      error: error.message,
+      userId: req.user?.id,
+    });
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Upload ảnh bìa công ty thất bại',
+    });
+  }
+});
+
+const removeCoverImage = asyncHandler(async (req, res) => {
+  try {
+    const profile = await ensureEmployerProfile(req.user.id);
+
+    if (profile.company.coverImage && profile.company.coverImage.filename) {
+      // Delete from Cloudinary first
+      await deleteImage(profile.company.coverImage.filename);
+
+      // Remove from database directly without triggering validation
+      profile.company.coverImage = undefined;
+      await profile.save({ validateBeforeSave: false });
+    }
+
+    logger.info('Company cover image removed', {
+      userId: req.user.id,
+      employerProfileId: profile._id,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Xóa ảnh bìa thành công',
+    });
+  } catch (error) {
+    logger.error('Remove cover image failed:', {
+      error: error.message,
+      userId: req.user?.id,
+    });
+    res.status(500).json({
+      success: false,
+      error: 'Xóa ảnh bìa thất bại',
+    });
+  }
+});
+
+// DELETE /api/employers/logo
+const removeLogo = asyncHandler(async (req, res) => {
+  try {
+    const profile = await ensureEmployerProfile(req.user.id);
+
+    if (profile.company.logo && profile.company.logo.filename) {
+      // Delete from Cloudinary first
+      await deleteImage(profile.company.logo.filename);
+
+      // Remove from database directly without triggering validation
+      profile.company.logo = undefined;
+      await profile.save({ validateBeforeSave: false });
+    }
+
+    logger.info('Company logo removed', {
+      userId: req.user.id,
+      employerProfileId: profile._id,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Xóa logo thành công',
+    });
+  } catch (error) {
+    logger.error('Remove logo failed:', {
+      error: error.message,
+      userId: req.user?.id,
+    });
+    res.status(500).json({
+      success: false,
+      error: 'Xóa logo thất bại',
+    });
+  }
+});
+
+// GET /api/employers/company
+// Chỉ trả về thông tin công ty (không bao gồm verification, businessInfo...)
+const getCompanyInfo = asyncHandler(async (req, res) => {
+  const profile = await ensureEmployerProfile(req.user.id);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      company: profile.company,
+      stats: profile.stats,
+      hiring: profile.hiring,
+      preferences: profile.preferences,
+      status: profile.status,
+    },
+  });
+});
+
+// Remove the duplicated code at the end and fix getRecommendedCandidates export
+const getRecommendedCandidates = asyncHandler(async (req, res) => {
+  res.status(200).json({ success: true, data: [], message: 'Chưa triển khai' });
+});
+
 module.exports = {
-  getProfile,
-  updateProfile,
-  submitVerification,
-  getVerificationStatus,
-  getDocumentTypes,
-  updateBusinessInfo,
-  verifyCompanyEmail,
-  resendVerificationEmail,
-  getPostedJobs,
-  getApplications,
-  getAnalytics,
-  updateCompanyInfo,
-  getCompanyReviews,
-  respondToReview,
-  getDashboardStats,
-  updatePreferences,
-  getRecommendedCandidates,
-  uploadCompanyLogo,
+  // === PROFILE MANAGEMENT ===
+  getProfile, // GET /employers/profile - Lấy toàn bộ thông tin employer profile
+  updateProfile, // PUT /employers/profile - Cập nhật thông tin cá nhân (position, contact, officeAddress)
+  getCompanyInfo, // GET /employers/company - Lấy thông tin công ty (company, stats, hiring, preferences)
+
+  // === COMPANY VERIFICATION SYSTEM ===
+  getVerificationStatus, // GET /employers/verification-status - Xem tiến độ xác thực
+  getDocumentTypes, // GET /employers/document-types - Lấy danh sách loại giấy tờ cần thiết theo ngành
+  updateCompanyInfo, // PUT /employers/company - Cập nhật thông tin công ty và xác thực
+
+  // === DOCUMENT UPLOAD (CLEANED UP) ===
+  uploadBusinessLicense, // POST /employers/documents/business-license - Upload giấy phép kinh doanh
+  uploadTaxCertificate, // POST /employers/documents/tax-certificate - Upload giấy chứng nhận đăng ký thuế
+  removeDocument, // DELETE /employers/documents/:documentId - Xóa tài liệu
+
+  // === JOB & APPLICATION MANAGEMENT ===
+  getPostedJobs, // GET /employers/jobs - Lấy danh sách job đã đăng
+  getApplications, // GET /employers/applications - Lấy danh sách ứng viên apply
+
+  // === ANALYTICS (MERGED) ===
+  getAnalytics, // GET /employers/analytics - Thống kê tổng hợp (jobs, applications, dashboard)
+
+  getRecommendedCandidates, // GET /employers/recommended-candidates - Gợi ý ứng viên (STUB)
+
+  // === MEDIA UPLOAD ===
+  uploadCompanyLogo, // POST /employers/upload-logo - Upload logo công ty
+  uploadCoverImage, // POST /employers/upload-cover-image - Upload ảnh bìa
+  removeLogo, // DELETE /employers/logo - Xóa logo
+  removeCoverImage, // DELETE /employers/cover-image - Xóa ảnh bìa
 };

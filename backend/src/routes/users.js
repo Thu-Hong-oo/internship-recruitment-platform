@@ -1,4 +1,5 @@
 const express = require('express');
+const multer = require('multer');
 const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
 const {
@@ -20,14 +21,25 @@ const {
   reactivateAccount,
 } = require('../controllers/userController');
 
-const {
-  uploadAvatar: uploadAvatarMiddleware,
-} = require('../middleware/upload');
+// Configure multer for avatar uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Chỉ chấp nhận file hình ảnh'), false);
+    }
+  },
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+  },
+});
 
 // Profile routes
 router.get('/profile', protect, getUserProfile);
 router.put('/profile', protect, updateProfile);
-router.post('/avatar', protect, uploadAvatarMiddleware, uploadAvatar);
+router.post('/avatar', protect, upload.single('avatar'), uploadAvatar);
 router.put('/password', protect, changePassword);
 
 // Account management

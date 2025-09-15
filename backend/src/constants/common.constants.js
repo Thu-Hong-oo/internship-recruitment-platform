@@ -103,6 +103,24 @@ module.exports = {
     MODERATOR: 'moderator',
   },
 
+  // User status
+  USER_STATUS: {
+    ACTIVE: 'active',
+    INACTIVE: 'inactive',
+    SUSPENDED: 'suspended',
+    BANNED: 'banned',
+    PENDING: 'pending',
+  },
+
+  // Status labels for display
+  USER_STATUS_LABELS: {
+    active: 'Đang hoạt động',
+    inactive: 'Không hoạt động',
+    suspended: 'Tạm khóa',
+    banned: 'Bị cấm',
+    pending: 'Chờ duyệt',
+  },
+
   // Skill levels
   SKILL_LEVELS: {
     BEGINNER: 'beginner',
@@ -141,6 +159,14 @@ module.exports = {
     INTERVIEW: 'interview',
     OFFER: 'offer',
     ACCEPTED: 'accepted',
+    REJECTED: 'rejected',
+  },
+
+  // Employer profile status
+  EMPLOYER_PROFILE_STATUS: {
+    DRAFT: 'draft',
+    PENDING: 'pending',
+    VERIFIED: 'verified',
     REJECTED: 'rejected',
   },
 

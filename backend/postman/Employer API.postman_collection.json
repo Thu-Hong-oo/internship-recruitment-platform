@@ -2,12 +2,13 @@
   "info": {
     "_postman_id": "88b5f092-3375-4691-90fb-dda73fc0e292",
     "name": "Employer API",
-    "description": "Employer endpoints under /api/employers with enhanced verification system",
+    "description": "Complete Employer API collection matching current employerProfileController.js. Updated to reflect the latest controller structure with proper file uploads, validation, and endpoint separation.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
       "name": "Profile Management",
+      "description": "Endpoints for managing basic employer profile information. These handle personal contact details, position information, and office address - different from company verification details.",
       "item": [
         {
           "name": "GET /employers/profile",
@@ -31,17 +32,95 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"company\": { \"name\": \"VNPT\", \"industry\": \"IT\", \"size\": \"enterprise\" },\n  \"position\": { \"title\": \"HR Manager\", \"level\": \"manager\" },\n  \"contact\": { \"name\": \"Nguyễn Văn A\", \"phone\": \"0123456789\" }\n}"
+              "raw": "{\n  \"contact\": {\n    \"name\": \"Nguyễn Văn B\",\n    \"phone\": \"0987654321\",\n    \"email\": \"nvb@personal.com\"\n  },\n  \"position\": {\n    \"title\": \"Senior HR Manager\",\n    \"level\": \"senior\",\n    \"department\": \"Human Resources\"\n  },\n  \"officeAddress\": {\n    \"street\": \"57 Huỳnh Thúc Kháng\",\n    \"ward\": \"Phường Láng Hạ\",\n    \"district\": \"Quận Đống Đa\",\n    \"city\": \"Hà Nội\",\n    \"country\": \"Vietnam\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{api_url}}/employers/profile",
               "host": ["{{api_url}}"],
               "path": ["employers", "profile"]
             }
-          }
+          },
+          "response": [
+            {
+              "name": "Profile updated successfully",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"contact\": {\n    \"name\": \"Nguyễn Văn B\",\n    \"phone\": \"0987654321\"\n  },\n  \"position\": {\n    \"title\": \"Senior HR Manager\"\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{api_url}}/employers/profile",
+                  "host": ["{{api_url}}"],
+                  "path": ["employers", "profile"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Cập nhật thông tin cá nhân thành công\",\n  \"data\": {\n    \"position\": {\n      \"title\": \"Senior HR Manager\",\n      \"level\": \"senior\",\n      \"department\": \"Human Resources\"\n    },\n    \"contact\": {\n      \"name\": \"Nguyễn Văn B\",\n      \"phone\": \"0987654321\",\n      \"email\": \"nvb@personal.com\"\n    },\n    \"officeAddress\": {\n      \"street\": \"57 Huỳnh Thúc Kháng\",\n      \"ward\": \"Phường Láng Hạ\",\n      \"district\": \"Quận Đống Đa\",\n      \"city\": \"Hà Nội\",\n      \"country\": \"Vietnam\"\n    },\n    \"updatedFields\": [\"contact\", \"position\", \"officeAddress\"]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "GET /employers/company",
+          "description": "Get only company information without verification details. Returns company profile, stats, hiring info, and preferences - lighter response than full profile.",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{api_url}}/employers/company",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "company"]
+            }
+          },
+          "response": [
+            {
+              "name": "Company info retrieved successfully",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ],
+                "url": {
+                  "raw": "{{api_url}}/employers/company",
+                  "host": ["{{api_url}}"],
+                  "path": ["employers", "company"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"company\": {\n      \"logo\": {\n        \"url\": \"https://res.cloudinary.com/example/image/upload/logo.jpg\",\n        \"filename\": \"company-logo\",\n        \"uploadedAt\": \"2025-09-15T04:14:58.336Z\"\n      },\n      \"name\": \"Công ty TNHH Công Nghệ ABC\",\n      \"industry\": \"technology\",\n      \"size\": \"medium\",\n      \"email\": \"contact@abc-tech.com.vn\",\n      \"website\": \"https://abc-tech.com.vn\",\n      \"description\": \"Công ty chuyên về phát triển phần mềm\"\n    },\n    \"stats\": {\n      \"activeJobs\": 5,\n      \"successfulHires\": 12,\n      \"totalApplications\": 45\n    },\n    \"hiring\": {\n      \"totalPositions\": 8,\n      \"activePositions\": 3\n    },\n    \"preferences\": {\n      \"salaryRange\": {\n        \"currency\": \"VND\"\n      },\n      \"internshipTypes\": [\"full-time\", \"part-time\"]\n    },\n    \"status\": \"verified\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "PUT /employers/company",
+          "description": "Update company information for verification purposes. This endpoint handles company details needed for business verification including MST, business registration, legal representative info. Do not use for personal profile updates.",
           "request": {
             "method": "PUT",
             "header": [
@@ -50,30 +129,119 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Công ty ABC\",\n  \"industry\": \"healthcare\",\n  \"size\": \"medium\",\n  \"website\": \"https://example.com\",\n  \"description\": \"Công ty chuyên về y tế\",\n  \"foundedYear\": 2020,\n  \"headquarters\": {\n    \"city\": \"Hà Nội\",\n    \"country\": \"Vietnam\"\n  }\n}"
+              "raw": "{\n  \"company\": {\n    \"name\": \"Công ty TNHH Công Nghệ ABC\",\n    \"industry\": \"technology\",\n    \"size\": \"medium\",\n    \"email\": \"contact@abc-tech.com.vn\",\n    \"website\": \"https://abc-tech.com.vn\",\n    \"description\": \"Công ty chuyên về phát triển phần mềm, ứng dụng web và mobile\",\n    \"foundedYear\": 2015,\n    \"employeesCount\": 50\n  },\n  \"businessInfo\": {\n    \"registrationNumber\": \"0123456789\",\n    \"taxId\": \"123456789\",\n    \"issueDate\": \"2015-03-15\",\n    \"issuePlace\": \"Sở Kế hoạch và Đầu tư Hà Nội\",\n    \"address\": {\n      \"street\": \"123 Đường Láng\",\n      \"ward\": \"Phường Láng Thượng\",\n      \"district\": \"Quận Đống Đa\",\n      \"city\": \"Hà Nội\",\n      \"country\": \"Vietnam\"\n    }\n  },\n  \"legalRepresentative\": {\n    \"fullName\": \"Nguyễn Văn A\",\n    \"position\": \"Giám đốc\",\n    \"phone\": \"0123456789\",\n    \"email\": \"director@abc-tech.com.vn\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{api_url}}/employers/company",
               "host": ["{{api_url}}"],
               "path": ["employers", "company"]
             }
-          }
+          },
+          "response": [
+            {
+              "name": "Success with verification status",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Công ty TNHH Công Nghệ ABC\",\n  \"industry\": \"technology\",\n  \"email\": \"contact@abc-tech.com.vn\"\n}"
+                },
+                "url": {
+                  "raw": "{{api_url}}/employers/company",
+                  "host": ["{{api_url}}"],
+                  "path": ["employers", "company"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Cập nhật thông tin công ty thành công\",\n  \"data\": {\n    \"company\": {\n      \"name\": \"Công ty TNHH Công Nghệ ABC\",\n      \"industry\": \"technology\",\n      \"email\": \"contact@abc-tech.com.vn\",\n      \"size\": \"medium\",\n      \"website\": \"https://abc-tech.com.vn\",\n      \"description\": \"Công ty chuyên về phát triển phần mềm\"\n    },\n    \"businessInfo\": {\n      \"registrationNumber\": \"0123456789\",\n      \"taxId\": \"MST123456789\",\n      \"address\": \"123 Đường Láng, Phường Láng Thượng, Quận Đống Đa, Hà Nội\"\n    },\n    \"legalRepresentative\": {\n      \"fullName\": \"Nguyễn Văn A\",\n      \"position\": \"Giám đốc\",\n      \"phone\": \"0123456789\",\n      \"email\": \"director@abc-tech.com.vn\"\n    },\n    \"verification\": {\n      \"progress\": {\n        \"completed\": 3,\n        \"total\": 4,\n        \"percentage\": 75\n      },\n      \"status\": \"pending\",\n      \"nextSteps\": [\n        {\n          \"step\": \"documents\",\n          \"title\": \"Upload giấy tờ chứng minh\",\n          \"description\": \"Cần có: Giấy phép kinh doanh, Giấy chứng nhận đăng ký thuế\",\n          \"endpoint\": \"POST /employers/documents\"\n        }\n      ],\n      \"requiredDocuments\": [\n        {\n          \"type\": \"business-license\",\n          \"displayName\": \"Giấy phép kinh doanh\"\n        },\n        {\n          \"type\": \"tax-certificate\",\n          \"displayName\": \"Giấy chứng nhận đăng ký thuế\"\n        }\n      ]\n    }\n  }\n}"
+            },
+            {
+              "name": "Missing required fields",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"description\": \"Công ty ABC\"\n}"
+                },
+                "url": {
+                  "raw": "{{api_url}}/employers/company",
+                  "host": ["{{api_url}}"],
+                  "path": ["employers", "company"]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": false,\n  \"error\": \"Endpoint này chỉ cho phép cập nhật thông tin công ty và xác thực\",\n  \"message\": \"Các trường không được phép: position, contact\",\n  \"allowedSections\": [\"company\", \"businessInfo\", \"legalRepresentative\", \"documents\"],\n  \"note\": \"Để cập nhật thông tin cá nhân, sử dụng PUT /employers/profile\"\n}"
+            }
+          ]
         },
+        {
+          "name": "PUT /employers/preferences",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"internshipTypes\": [\"full-time\", \"part-time\"],\n  \"durations\": [\"3-months\", \"6-months\"],\n  \"locations\": [\"Hà Nội\", \"TP.HCM\"],\n  \"skills\": [\n    {\n      \"skillId\": \"60f7b3b3b3b3b3b3b3b3b3b3\",\n      \"priority\": \"required\"\n    },\n    {\n      \"skillId\": \"60f7b3b3b3b3b3b3b3b3b3b4\",\n      \"priority\": \"preferred\"\n    }\n  ],\n  \"salaryRange\": {\n    \"min\": 8000000,\n    \"max\": 15000000,\n    \"currency\": \"VND\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/employers/preferences",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "preferences"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Image Management",
+      "item": [
         {
           "name": "POST /employers/upload-logo",
           "request": {
             "method": "POST",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{token}}" },
-              { "key": "Content-Type", "value": "multipart/form-data" }
-            ],
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "body": {
               "mode": "formdata",
               "formdata": [
                 {
                   "key": "logo",
                   "type": "file",
-                  "src": []
+                  "src": [],
+                  "description": "Company logo image (JPEG, PNG, GIF, WEBP max 5MB)"
                 }
               ]
             },
@@ -81,6 +249,53 @@
               "raw": "{{api_url}}/employers/upload-logo",
               "host": ["{{api_url}}"],
               "path": ["employers", "upload-logo"]
+            }
+          }
+        },
+        {
+          "name": "POST /employers/upload-cover-image",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "coverImage",
+                  "type": "file",
+                  "src": [],
+                  "description": "Company cover image (JPEG, PNG, GIF, WEBP max 10MB)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{api_url}}/employers/upload-cover-image",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "upload-cover-image"]
+            }
+          }
+        },
+        {
+          "name": "DELETE /employers/logo",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{api_url}}/employers/logo",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "logo"]
+            }
+          }
+        },
+        {
+          "name": "DELETE /employers/cover-image",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{api_url}}/employers/cover-image",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "cover-image"]
             }
           }
         }
@@ -95,16 +310,342 @@
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "url": {
-              "raw": "{{api_url}}/employers/document-types?industry=healthcare",
+              "raw": "{{api_url}}/employers/document-types?industry=technology",
               "host": ["{{api_url}}"],
               "path": ["employers", "document-types"],
               "query": [
                 {
                   "key": "industry",
-                  "value": "healthcare",
-                  "description": "Industry to get document types for"
+                  "value": "technology",
+                  "description": "Industry to get document types for (technology, healthcare, finance, education, manufacturing, etc.)"
                 }
               ]
+            }
+          }
+        },
+        {
+          "name": "POST /employers/documents",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "document",
+                  "type": "file",
+                  "src": "/path/to/your/document.pdf",
+                  "description": "Document file (PDF, JPG, PNG)"
+                },
+                {
+                  "key": "type",
+                  "value": "business-license",
+                  "type": "text",
+                  "description": "Document type (business-license, tax-certificate, etc.)"
+                },
+                {
+                  "key": "documentNumber",
+                  "value": "0123456789",
+                  "type": "text",
+                  "description": "Document number"
+                },
+                {
+                  "key": "issueDate",
+                  "value": "2023-01-01",
+                  "type": "text",
+                  "description": "Issue date (YYYY-MM-DD)"
+                },
+                {
+                  "key": "issuePlace",
+                  "value": "Sở Kế hoạch và Đầu tư TP.HCM",
+                  "type": "text",
+                  "description": "Issue place"
+                },
+                {
+                  "key": "validUntil",
+                  "value": "2033-01-01",
+                  "type": "text",
+                  "description": "Valid until date (YYYY-MM-DD) - optional"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{api_url}}/employers/documents",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "documents"]
+            }
+          },
+          "response": [
+            {
+              "name": "Success - Document Added",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "document",
+                      "type": "file",
+                      "src": "/path/to/business-license.pdf"
+                    },
+                    {
+                      "key": "type",
+                      "value": "business-license",
+                      "type": "text"
+                    },
+                    {
+                      "key": "documentNumber",
+                      "value": "0123456789",
+                      "type": "text"
+                    },
+                    {
+                      "key": "issueDate",
+                      "value": "2023-01-01",
+                      "type": "text"
+                    },
+                    {
+                      "key": "issuePlace",
+                      "value": "Sở Kế hoạch và Đầu tư TP.HCM",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{api_url}}/employers/documents",
+                  "host": ["{{api_url}}"],
+                  "path": ["employers", "documents"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                { "key": "Content-Type", "value": "application/json" }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Thêm tài liệu thành công\",\n  \"data\": {\n    \"type\": \"business-license\",\n    \"url\": \"https://res.cloudinary.com/your-cloud/image/upload/v1234567890/employers/user123/documents/business-license_1234567890.pdf\",\n    \"filename\": \"business-license.pdf\",\n    \"metadata\": {\n      \"documentNumber\": \"0123456789\",\n      \"issueDate\": \"2023-01-01\",\n      \"issuePlace\": \"Sở Kế hoạch và Đầu tư TP.HCM\",\n      \"originalName\": \"business-license.pdf\",\n      \"size\": 524288,\n      \"mimeType\": \"application/pdf\"\n    }\n  }\n}"
+            },
+            {
+              "name": "Error - No File",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "type",
+                      "value": "business-license",
+                      "type": "text"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{api_url}}/employers/documents",
+                  "host": ["{{api_url}}"],
+                  "path": ["employers", "documents"]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                { "key": "Content-Type", "value": "application/json" }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": false,\n  \"error\": \"Không có file được upload\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST /employers/documents/business-license",
+          "description": "Upload giấy phép kinh doanh riêng biệt. Frontend chỉ cần gửi file + metadata, không cần chỉ định type.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "document",
+                  "type": "file",
+                  "src": "/path/to/business-license.pdf"
+                },
+                {
+                  "key": "documentNumber",
+                  "value": "0123456789",
+                  "type": "text"
+                },
+                {
+                  "key": "issueDate",
+                  "value": "2023-01-01",
+                  "type": "text"
+                },
+                {
+                  "key": "issuePlace",
+                  "value": "Sở Kế hoạch và Đầu tư TP.HCM",
+                  "type": "text"
+                },
+                {
+                  "key": "validUntil",
+                  "value": "2033-01-01",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{api_url}}/employers/documents/business-license",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "documents", "business-license"]
+            }
+          },
+          "response": [
+            {
+              "name": "Business license uploaded successfully",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "document",
+                      "type": "file",
+                      "src": "/path/to/business-license.pdf"
+                    },
+                    {
+                      "key": "documentNumber",
+                      "value": "0123456789"
+                    },
+                    {
+                      "key": "issueDate",
+                      "value": "2023-01-01"
+                    },
+                    {
+                      "key": "issuePlace",
+                      "value": "Sở Kế hoạch và Đầu tư TP.HCM"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{api_url}}/employers/documents/business-license",
+                  "host": ["{{api_url}}"],
+                  "path": ["employers", "documents", "business-license"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Upload giấy phép kinh doanh thành công\",\n  \"data\": {\n    \"type\": \"business-license\",\n    \"url\": \"https://res.cloudinary.com/example/image/upload/v1234567890/employers/user123/documents/business-license_1234567890.pdf\",\n    \"filename\": \"business-license.pdf\",\n    \"metadata\": {\n      \"documentNumber\": \"0123456789\",\n      \"issueDate\": \"2023-01-01\",\n      \"issuePlace\": \"Sở Kế hoạch và Đầu tư TP.HCM\",\n      \"validUntil\": \"2033-01-01\",\n      \"originalName\": \"business-license.pdf\",\n      \"size\": 524288,\n      \"mimeType\": \"application/pdf\",\n      \"cloudinaryId\": \"employers/user123/documents/business-license_1234567890\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "POST /employers/documents/tax-certificate",
+          "description": "Upload giấy chứng nhận đăng ký thuế riêng biệt. Frontend chỉ cần gửi file + metadata, không cần chỉ định type.",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "document",
+                  "type": "file",
+                  "src": "/path/to/tax-certificate.pdf"
+                },
+                {
+                  "key": "documentNumber",
+                  "value": "0123456789",
+                  "type": "text"
+                },
+                {
+                  "key": "issueDate",
+                  "value": "2023-01-01",
+                  "type": "text"
+                },
+                {
+                  "key": "validUntil",
+                  "value": "2033-01-01",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{api_url}}/employers/documents/tax-certificate",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "documents", "tax-certificate"]
+            }
+          },
+          "response": [
+            {
+              "name": "Tax certificate uploaded successfully",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "document",
+                      "type": "file",
+                      "src": "/path/to/tax-certificate.pdf"
+                    },
+                    {
+                      "key": "documentNumber",
+                      "value": "0123456789"
+                    },
+                    {
+                      "key": "issueDate",
+                      "value": "2023-01-01"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{api_url}}/employers/documents/tax-certificate",
+                  "host": ["{{api_url}}"],
+                  "path": ["employers", "documents", "tax-certificate"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Upload giấy chứng nhận đăng ký thuế thành công\",\n  \"data\": {\n    \"type\": \"tax-certificate\",\n    \"url\": \"https://res.cloudinary.com/example/image/upload/v1234567890/employers/user123/documents/tax-certificate_1234567890.pdf\",\n    \"filename\": \"tax-certificate.pdf\",\n    \"metadata\": {\n      \"documentNumber\": \"0123456789\",\n      \"issueDate\": \"2023-01-01\",\n      \"validUntil\": \"2033-01-01\",\n      \"originalName\": \"tax-certificate.pdf\",\n      \"size\": 524288,\n      \"mimeType\": \"application/pdf\",\n      \"cloudinaryId\": \"employers/user123/documents/tax-certificate_1234567890\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "DELETE /employers/documents/:documentId",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{api_url}}/employers/documents/doc_business_license_001",
+              "host": ["{{api_url}}"],
+              "path": ["employers", "documents", "doc_business_license_001"]
             }
           }
         },
@@ -118,14 +659,81 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"businessInfo\": {\n    \"registrationNumber\": \"0123456789\",\n    \"issueDate\": \"2023-01-01\",\n    \"issuePlace\": \"Sở Kế hoạch và Đầu tư TP.HCM\",\n    \"taxId\": \"0123456789\",\n    \"legalAddress\": {\n      \"street\": \"123 Đường ABC\",\n      \"ward\": \"Phường 1\",\n      \"district\": \"Quận 1\",\n      \"city\": \"TP.HCM\",\n      \"country\": \"Vietnam\"\n    }\n  }\n}"
+              "raw": "{\n  \"businessInfo\": {\n    \"registrationNumber\": \"0123456789012\",\n    \"issueDate\": \"2015-03-15\",\n    \"issuePlace\": \"Sở Kế hoạch và Đầu tư Thành phố Hà Nội\",\n    \"taxId\": \"0123456789\",\n    \"address\": {\n      \"street\": \"123 Đường Láng\",\n      \"ward\": \"Phường Láng Thượng\",\n      \"district\": \"Quận Đống Đa\",\n      \"city\": \"Hà Nội\",\n      \"country\": \"Vietnam\",\n      \"postalCode\": \"100000\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{api_url}}/employers/verification/business-info",
               "host": ["{{api_url}}"],
               "path": ["employers", "verification", "business-info"]
             }
-          }
+          },
+          "response": [
+            {
+              "name": "Business info updated successfully",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"businessInfo\": {\n    \"registrationNumber\": \"0123456789012\",\n    \"taxId\": \"0123456789\",\n    \"address\": {\n      \"street\": \"123 Đường Láng\",\n      \"city\": \"Hà Nội\"\n    }\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{api_url}}/employers/verification/business-info",
+                  "host": ["{{api_url}}"],
+                  "path": ["employers", "verification", "business-info"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Cập nhật thông tin doanh nghiệp thành công\",\n  \"data\": {\n    \"registrationNumber\": \"0123456789012\",\n    \"taxId\": \"0123456789\",\n    \"issueDate\": \"2015-03-15\",\n    \"issuePlace\": \"Sở Kế hoạch và Đầu tư Thành phố Hà Nội\",\n    \"address\": {\n      \"street\": \"123 Đường Láng\",\n      \"ward\": \"Phường Láng Thượng\",\n      \"district\": \"Quận Đống Đa\",\n      \"city\": \"Hà Nội\",\n      \"country\": \"Vietnam\",\n      \"postalCode\": \"100000\"\n    }\n  }\n}"
+            },
+            {
+              "name": "Validation error - Missing required fields",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"businessInfo\": {\n    \"registrationNumber\": \"123\"\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{api_url}}/employers/verification/business-info",
+                  "host": ["{{api_url}}"],
+                  "path": ["employers", "verification", "business-info"]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": false,\n  \"error\": \"Thông tin doanh nghiệp không hợp lệ\",\n  \"details\": [\n    \"Số đăng ký doanh nghiệp không hợp lệ (tối thiểu 10 ký tự)\",\n    \"Mã số thuế không hợp lệ (10-13 chữ số)\",\n    \"Địa chỉ trụ sở không đầy đủ (cần có đường và thành phố)\"\n  ]\n}"
+            }
+          ]
         },
         {
           "name": "POST /employers/verify",
@@ -137,7 +745,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"businessInfo\": {\n    \"registrationNumber\": \"0123456789\",\n    \"issueDate\": \"2023-01-01\",\n    \"issuePlace\": \"Sở Kế hoạch và Đầu tư TP.HCM\",\n    \"taxId\": \"0123456789\",\n    \"legalAddress\": {\n      \"street\": \"123 Đường ABC\",\n      \"ward\": \"Phường 1\",\n      \"district\": \"Quận 1\",\n      \"city\": \"TP.HCM\",\n      \"country\": \"Vietnam\"\n    }\n  },\n  \"legalRepresentative\": {\n    \"fullName\": \"Nguyễn Văn A\",\n    \"position\": \"Giám đốc\",\n    \"idType\": \"CCCD\",\n    \"idNumber\": \"123456789\",\n    \"idIssueDate\": \"2020-01-01\",\n    \"idIssuePlace\": \"Công an TP.HCM\",\n    \"phone\": \"0123456789\",\n    \"email\": \"nguyenvana@company.com\"\n  },\n  \"companyEmail\": \"contact@company.com\",\n  \"documents\": [\n    {\n      \"type\": \"business-license\",\n      \"url\": \"https://example.com/business-license.pdf\",\n      \"filename\": \"business-license.pdf\",\n      \"metadata\": {\n        \"documentNumber\": \"0123456789\",\n        \"issueDate\": \"2023-01-01\",\n        \"issuePlace\": \"Sở Kế hoạch và Đầu tư TP.HCM\"\n      }\n    },\n    {\n      \"type\": \"tax-certificate\",\n      \"url\": \"https://example.com/tax-certificate.pdf\",\n      \"filename\": \"tax-certificate.pdf\",\n      \"metadata\": {\n        \"documentNumber\": \"0123456789\",\n        \"issueDate\": \"2023-01-01\"\n      }\n    },\n    {\n      \"type\": \"legal-representative-id\",\n      \"url\": \"https://example.com/cccd.pdf\",\n      \"filename\": \"cccd.pdf\",\n      \"metadata\": {\n        \"documentNumber\": \"123456789\",\n        \"issueDate\": \"2020-01-01\",\n        \"issuePlace\": \"Công an TP.HCM\"\n      }\n    },\n    {\n      \"type\": \"medical-license\",\n      \"url\": \"https://example.com/medical-license.pdf\",\n      \"filename\": \"medical-license.pdf\",\n      \"metadata\": {\n        \"documentNumber\": \"ML-2023-001\",\n        \"issueDate\": \"2023-01-01\",\n        \"issuePlace\": \"Bộ Y tế\"\n      }\n    }\n  ]\n}"
+              "raw": "{\n  \"businessInfo\": {\n    \"registrationNumber\": \"0123456789\",\n    \"issueDate\": \"2023-01-01\",\n    \"issuePlace\": \"Sở Kế hoạch và Đầu tư TP.HCM\",\n    \"taxId\": \"0123456789\",\n    \"address\": {\n      \"street\": \"123 Đường ABC\",\n      \"ward\": \"Phường 1\",\n      \"district\": \"Quận 1\",\n      \"city\": \"TP.HCM\",\n      \"country\": \"Vietnam\",\n      \"postalCode\": \"700000\"\n    }\n  },\n  \"legalRepresentative\": {\n    \"fullName\": \"Nguyễn Văn A\",\n    \"position\": \"Giám đốc\",\n    \"phone\": \"0123456789\",\n    \"email\": \"nguyenvana@company.com\",\n    \"identification\": {\n      \"type\": \"CCCD\",\n      \"number\": \"123456789012\",\n      \"issueDate\": \"2020-01-01\",\n      \"issuePlace\": \"Công an TP.HCM\"\n    }\n  },\n  \"companyEmail\": \"contact@company.com\",\n  \"documents\": [\n    {\n      \"documentId\": \"doc_business_license_001\",\n      \"type\": \"business-license\",\n      \"metadata\": {\n        \"documentNumber\": \"0123456789\",\n        \"issueDate\": \"2023-01-01\",\n        \"issuePlace\": \"Sở Kế hoạch và Đầu tư TP.HCM\"\n      }\n    },\n    {\n      \"documentId\": \"doc_tax_cert_001\",\n      \"type\": \"tax-certificate\",\n      \"metadata\": {\n        \"documentNumber\": \"0123456789\",\n        \"issueDate\": \"2023-01-01\"\n      }\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{api_url}}/employers/verify",
@@ -175,7 +783,39 @@
               "host": ["{{api_url}}"],
               "path": ["employers", "verify-company-email"]
             }
-          }
+          },
+          "response": [
+            {
+              "name": "Email verification redirected to User model",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"verificationCode\": \"123456\"\n}"
+                },
+                "url": {
+                  "raw": "{{api_url}}/employers/verify-company-email",
+                  "host": ["{{api_url}}"],
+                  "path": ["employers", "verify-company-email"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Email verification is handled in User model\",\n  \"data\": {\n    \"note\": \"Use User model email verification endpoints\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "POST /employers/resend-verification-email",
@@ -194,7 +834,39 @@
               "host": ["{{api_url}}"],
               "path": ["employers", "resend-verification-email"]
             }
-          }
+          },
+          "response": [
+            {
+              "name": "Resend verification redirected to User model",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}"
+                },
+                "url": {
+                  "raw": "{{api_url}}/employers/resend-verification-email",
+                  "host": ["{{api_url}}"],
+                  "path": ["employers", "resend-verification-email"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Email verification is handled in User model\",\n  \"data\": {\n    \"note\": \"Use User model email verification endpoints\"\n  }\n}"
+            }
+          ]
         }
       ]
     },
@@ -207,20 +879,29 @@
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "url": {
-              "raw": "{{api_url}}/employers/jobs?page=1&limit=10&status=active",
+              "raw": "{{api_url}}/employers/jobs?page=1&limit=10&status=active&search=developer",
               "host": ["{{api_url}}"],
               "path": ["employers", "jobs"],
               "query": [
-                { "key": "page", "value": "1", "description": "Page number" },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default: 1)"
+                },
                 {
                   "key": "limit",
                   "value": "10",
-                  "description": "Items per page"
+                  "description": "Items per page (default: 10)"
                 },
                 {
                   "key": "status",
                   "value": "active",
-                  "description": "Filter by job status"
+                  "description": "Filter by job status (active, inactive, closed)"
+                },
+                {
+                  "key": "search",
+                  "value": "developer",
+                  "description": "Search term for job title or description"
                 }
               ]
             }
@@ -232,20 +913,34 @@
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "url": {
-              "raw": "{{api_url}}/employers/applications?page=1&limit=10&status=pending",
+              "raw": "{{api_url}}/employers/applications?page=1&limit=10&status=pending&sortBy=createdAt&sortOrder=desc",
               "host": ["{{api_url}}"],
               "path": ["employers", "applications"],
               "query": [
-                { "key": "page", "value": "1", "description": "Page number" },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default: 1)"
+                },
                 {
                   "key": "limit",
                   "value": "10",
-                  "description": "Items per page"
+                  "description": "Items per page (default: 10)"
                 },
                 {
                   "key": "status",
                   "value": "pending",
-                  "description": "Filter by application status"
+                  "description": "Filter by application status (pending, reviewed, accepted, rejected)"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt",
+                  "description": "Sort field (createdAt, status, applicantName)"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "desc",
+                  "description": "Sort order (asc, desc)"
                 }
               ]
             }
@@ -257,9 +952,26 @@
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "url": {
-              "raw": "{{api_url}}/employers/recommended-candidates",
+              "raw": "{{api_url}}/employers/recommended-candidates?limit=20&skills=javascript,react&experience=junior",
               "host": ["{{api_url}}"],
-              "path": ["employers", "recommended-candidates"]
+              "path": ["employers", "recommended-candidates"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Number of candidates to return"
+                },
+                {
+                  "key": "skills",
+                  "value": "javascript,react",
+                  "description": "Comma-separated list of required skills"
+                },
+                {
+                  "key": "experience",
+                  "value": "junior",
+                  "description": "Experience level filter"
+                }
+              ]
             }
           }
         }
@@ -274,9 +986,21 @@
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "url": {
-              "raw": "{{api_url}}/employers/analytics",
+              "raw": "{{api_url}}/employers/analytics?period=30d&metrics=applications,views,clicks",
               "host": ["{{api_url}}"],
-              "path": ["employers", "analytics"]
+              "path": ["employers", "analytics"],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "30d",
+                  "description": "Time period (7d, 30d, 90d, 1y)"
+                },
+                {
+                  "key": "metrics",
+                  "value": "applications,views,clicks",
+                  "description": "Comma-separated metrics to include"
+                }
+              ]
             }
           }
         },
@@ -295,30 +1019,6 @@
       ]
     },
     {
-      "name": "Settings & Preferences",
-      "item": [
-        {
-          "name": "PUT /employers/preferences",
-          "request": {
-            "method": "PUT",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{token}}" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"internshipTypes\": [\"full-time\", \"part-time\"],\n  \"durations\": [\"3-months\", \"6-months\"],\n  \"locations\": [\"Hà Nội\", \"TP.HCM\"],\n  \"skills\": [\n    {\n      \"skillId\": \"60f7b3b3b3b3b3b3b3b3b3b3\",\n      \"priority\": \"required\"\n    }\n  ],\n  \"salaryRange\": {\n    \"min\": 5000000,\n    \"max\": 10000000,\n    \"currency\": \"VND\"\n  }\n}"
-            },
-            "url": {
-              "raw": "{{api_url}}/employers/preferences",
-              "host": ["{{api_url}}"],
-              "path": ["employers", "preferences"]
-            }
-          }
-        }
-      ]
-    },
-    {
       "name": "Company Reviews",
       "item": [
         {
@@ -327,9 +1027,27 @@
             "method": "GET",
             "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
             "url": {
-              "raw": "{{api_url}}/employers/company/reviews",
+              "raw": "{{api_url}}/employers/company/reviews?page=1&limit=10&rating=4&sortBy=createdAt",
               "host": ["{{api_url}}"],
-              "path": ["employers", "company", "reviews"]
+              "path": ["employers", "company", "reviews"],
+              "query": [
+                { "key": "page", "value": "1", "description": "Page number" },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Reviews per page"
+                },
+                {
+                  "key": "rating",
+                  "value": "4",
+                  "description": "Filter by rating (1-5)"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt",
+                  "description": "Sort by field (createdAt, rating)"
+                }
+              ]
             }
           }
         },
@@ -343,7 +1061,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"response\": \"Cảm ơn bạn đã đánh giá. Chúng tôi sẽ cải thiện dịch vụ.\"\n}"
+              "raw": "{\n  \"response\": \"Cảm ơn bạn đã đánh giá và phản hồi. Chúng tôi rất trân trọng ý kiến của bạn và sẽ tiếp tục cải thiện chất lượng dịch vụ để mang lại trải nghiệm tốt nhất cho các bạn thực tập sinh.\"\n}"
             },
             "url": {
               "raw": "{{api_url}}/employers/company/reviews/60f7b3b3b3b3b3b3b3b3b3b3/respond",
@@ -380,8 +1098,43 @@
         "type": "text/javascript",
         "exec": [
           "// Auto-generate verification code for testing",
-          "if (pm.info.requestName === 'POST /employers/verify-company-email') {",
-          "    pm.environment.set('verification_code', '123456');",
+          "if (pm.info.requestName.includes('verify-company-email')) {",
+          "    pm.environment.set('verification_code', Math.floor(100000 + Math.random() * 900000).toString());",
+          "}",
+          "",
+          "// Auto-generate document IDs for testing",
+          "if (pm.info.requestName.includes('documents')) {",
+          "    const timestamp = Date.now();",
+          "    pm.environment.set('document_id', `doc_${timestamp}`);",
+          "}",
+          "",
+          "// Set current timestamp for date fields",
+          "pm.environment.set('current_date', new Date().toISOString().split('T')[0]);"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Common response validation",
+          "pm.test('Response status code is successful', function () {",
+          "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204]);",
+          "});",
+          "",
+          "pm.test('Response has success field', function () {",
+          "    const responseJson = pm.response.json();",
+          "    pm.expect(responseJson).to.have.property('success');",
+          "});",
+          "",
+          "// Store tokens and IDs for subsequent requests",
+          "if (pm.response.json().data && pm.response.json().data.token) {",
+          "    pm.environment.set('token', pm.response.json().data.token);",
+          "}",
+          "",
+          "if (pm.response.json().data && pm.response.json().data.profileId) {",
+          "    pm.environment.set('profile_id', pm.response.json().data.profileId);",
           "}"
         ]
       }

@@ -26,43 +26,20 @@ const DOCUMENT_TYPES = {
         maxSize: '10MB',
       },
     },
-    {
-      id: 'legal-representative-id',
-      name: 'CMND/CCCD người đại diện',
-      nameEn: 'Legal Representative ID',
-      required: true,
-      description: 'CMND/CCCD/Hộ chiếu của người đại diện pháp luật',
-      validation: {
-        metadataRequired: ['documentNumber', 'issueDate', 'issuePlace'],
-        fileTypes: ['pdf', 'jpg', 'png'],
-        maxSize: '5MB',
-      },
-    },
   ],
 
   // Optional documents
   OPTIONAL: [
     {
-      id: 'company-logo',
-      name: 'Logo công ty',
-      nameEn: 'Company Logo',
+      id: 'legal-representative-id',
+      name: 'CMND/CCCD người đại diện',
+      nameEn: 'Legal Representative ID',
       required: false,
-      description: 'Logo chính thức của công ty',
+      description:
+        'CMND/CCCD/Hộ chiếu của người đại diện pháp luật (tùy chọn - chỉ cần khi xác minh nâng cao)',
       validation: {
-        metadataRequired: [],
-        fileTypes: ['jpg', 'png', 'svg'],
-        maxSize: '2MB',
-      },
-    },
-    {
-      id: 'company-website-screenshot',
-      name: 'Screenshot website công ty',
-      nameEn: 'Company Website Screenshot',
-      required: false,
-      description: 'Screenshot trang chủ website chính thức của công ty',
-      validation: {
-        metadataRequired: ['websiteUrl'],
-        fileTypes: ['jpg', 'png'],
+        metadataRequired: ['documentNumber', 'issueDate', 'issuePlace'],
+        fileTypes: ['pdf', 'jpg', 'png'],
         maxSize: '5MB',
       },
     },
@@ -155,9 +132,77 @@ const validateDocumentType = (typeId, industry) => {
   return allTypes.some(type => type.id === typeId);
 };
 
+// Validate document metadata
+const validateDocumentMetadata = (documentType, metadata) => {
+  const docType = getDocumentTypeById(documentType);
+  if (!docType) return { valid: false, error: 'Document type not found' };
+
+  const requiredFields = docType.validation.metadataRequired || [];
+  const missingFields = requiredFields.filter(field => !metadata[field]);
+
+  if (missingFields.length > 0) {
+    return {
+      valid: false,
+      error: `Missing required metadata: ${missingFields.join(', ')}`,
+      missingFields,
+    };
+  }
+
+  return { valid: true };
+};
+
+// Check if all required documents are uploaded
+const checkRequiredDocuments = (uploadedDocuments, industry) => {
+  const documentTypes = getDocumentTypesForIndustry(industry);
+  const requiredTypes = documentTypes.required.map(doc => doc.id);
+  const uploadedTypes = uploadedDocuments.map(doc => doc.documentType || doc);
+
+  const missingRequired = requiredTypes.filter(
+    type => !uploadedTypes.includes(type)
+  );
+
+  return {
+    allRequiredUploaded: missingRequired.length === 0,
+    missingRequired,
+    requiredCount: requiredTypes.length,
+    uploadedCount: uploadedTypes.length,
+  };
+};
+
+// Get document validation rules
+const getDocumentValidationRules = documentType => {
+  const docType = getDocumentTypeById(documentType);
+  if (!docType) return null;
+
+  return {
+    fileTypes: docType.validation.fileTypes,
+    maxSize: docType.validation.maxSize,
+    metadataRequired: docType.validation.metadataRequired || [],
+  };
+};
+
+// Get verification progress
+const getVerificationProgress = (uploadedDocuments, industry) => {
+  const check = checkRequiredDocuments(uploadedDocuments, industry);
+  const documentTypes = getDocumentTypesForIndustry(industry);
+  const totalRequired = documentTypes.required.length;
+  const uploadedRequired = totalRequired - check.missingRequired.length;
+
+  return {
+    percentage: Math.round((uploadedRequired / totalRequired) * 100),
+    uploadedRequired,
+    totalRequired,
+    missingRequired: check.missingRequired,
+  };
+};
+
 module.exports = {
   DOCUMENT_TYPES,
   getDocumentTypesForIndustry,
   getDocumentTypeById,
   validateDocumentType,
+  validateDocumentMetadata,
+  checkRequiredDocuments,
+  getDocumentValidationRules,
+  getVerificationProgress,
 };
