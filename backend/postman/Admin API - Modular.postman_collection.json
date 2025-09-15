@@ -1,0 +1,940 @@
+{
+  "info": {
+    "_postman_id": "admin-api-modular",
+    "name": "Admin API - Modular Structure",
+    "description": "Updated Admin API collection matching new modular controller structure",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "👥 User Management",
+      "item": [
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/users?page=1&limit=20&role=candidate&status=active&emailVerified=true&search=",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "users"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "role", "value": "candidate" },
+                { "key": "status", "value": "active" },
+                { "key": "emailVerified", "value": "true" },
+                { "key": "search", "value": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Single User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/users/{{user_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "users", "{{user_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"newuser@example.com\",\n  \"password\": \"Password123!\",\n  \"fullName\": \"New User\",\n  \"role\": \"candidate\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/users",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "users"]
+            }
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Updated Name\",\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/users/{{user_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "users", "{{user_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update User Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"suspended\",\n  \"reason\": \"Violation of terms\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/users/{{user_id}}/status",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "users", "{{user_id}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Update User Role",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"employer\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/users/{{user_id}}/role",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "users", "{{user_id}}", "role"]
+            }
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/users/{{user_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "users", "{{user_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📊 Analytics & Dashboard",
+      "item": [
+        {
+          "name": "Get Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/dashboard",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "dashboard"]
+            }
+          }
+        },
+        {
+          "name": "Get User Analytics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/analytics/users?period=30",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "analytics", "users"],
+              "query": [
+                { "key": "period", "value": "30", "description": "Days" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏢 Employer Management",
+      "item": [
+        {
+          "name": "Get All Employers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/employers?page=1&limit=20&status=all&verified=all&industry=all&search=",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "employers"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "status", "value": "all" },
+                { "key": "verified", "value": "all" },
+                { "key": "industry", "value": "all" },
+                { "key": "search", "value": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Single Employer",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/employers/{{employer_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "employers", "{{employer_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Employer Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"suspended\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/employers/{{employer_id}}/status",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "employers", "{{employer_id}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Get Employer Companies",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/employers/{{employer_id}}/companies",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "employers", "{{employer_id}}", "companies"]
+            }
+          }
+        },
+        {
+          "name": "Get Employer Jobs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/employers/{{employer_id}}/jobs?page=1&limit=10&status=all",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "employers", "{{employer_id}}", "jobs"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "status", "value": "all" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Employers",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/employers/search?query=company&status=all&verified=all&industry=all&page=1&limit=10",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "employers", "search"],
+              "query": [
+                { "key": "query", "value": "company" },
+                { "key": "status", "value": "all" },
+                { "key": "verified", "value": "all" },
+                { "key": "industry", "value": "all" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏢 Company Management",
+      "item": [
+        {
+          "name": "Get All Companies",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/companies?page=1&limit=20&status=all&size=all&industry=all&search=",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "companies"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "status", "value": "all" },
+                { "key": "size", "value": "all" },
+                { "key": "industry", "value": "all" },
+                { "key": "search", "value": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Single Company",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/companies/{{company_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "companies", "{{company_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Company",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Company Name\",\n  \"industry\": \"Technology\",\n  \"size\": \"medium\",\n  \"description\": \"Updated description\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/companies/{{company_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "companies", "{{company_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Company Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"suspended\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/companies/{{company_id}}/status",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "companies", "{{company_id}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Get Company Jobs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/companies/{{company_id}}/jobs?page=1&limit=10&status=all",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "companies", "{{company_id}}", "jobs"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "status", "value": "all" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Company Applications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/companies/{{company_id}}/applications?page=1&limit=10&status=all",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "companies", "{{company_id}}", "applications"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "status", "value": "all" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Company",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/companies/{{company_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "companies", "{{company_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "✅ Verification Management",
+      "item": [
+        {
+          "name": "Get Pending Verifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/verifications?page=1&limit=10&industry=all&hasDocuments=true&verified=false&search=",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "verifications"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "industry", "value": "all" },
+                { "key": "hasDocuments", "value": "true" },
+                { "key": "verified", "value": "false" },
+                { "key": "search", "value": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Verification Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/verifications/{{user_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "verifications", "{{user_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Approve Employer",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"approve\",\n  \"notes\": \"All documents verified and business information complete\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/verifications/{{user_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "verifications", "{{user_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Reject Employer",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"reject\",\n  \"reason\": \"Incomplete documentation\",\n  \"notes\": \"Business license not valid\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/verifications/{{user_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "verifications", "{{user_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Verify Document",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"verified\": true,\n  \"notes\": \"Document is valid and matches business information\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/employers/{{employer_id}}/documents/{{document_id}}/verify",
+              "host": ["{{api_url}}"],
+              "path": [
+                "admin",
+                "employers",
+                "{{employer_id}}",
+                "documents",
+                "{{document_id}}",
+                "verify"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Reject Document",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"verified\": false,\n  \"rejectionReason\": \"Document is not clear or invalid\",\n  \"notes\": \"Please upload a clearer version\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/employers/{{employer_id}}/documents/{{document_id}}/verify",
+              "host": ["{{api_url}}"],
+              "path": [
+                "admin",
+                "employers",
+                "{{employer_id}}",
+                "documents",
+                "{{document_id}}",
+                "verify"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "💼 Job Moderation",
+      "item": [
+        {
+          "name": "Get All Jobs (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/jobs?page=1&limit=20&status=all&level=all&jobType=all&location=&salaryMin=&salaryMax=&dateFrom=&dateTo=&search=&flagged=false",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "jobs"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "status", "value": "all" },
+                { "key": "level", "value": "all" },
+                { "key": "jobType", "value": "all" },
+                { "key": "location", "value": "" },
+                { "key": "salaryMin", "value": "" },
+                { "key": "salaryMax", "value": "" },
+                { "key": "dateFrom", "value": "" },
+                { "key": "dateTo", "value": "" },
+                { "key": "search", "value": "" },
+                { "key": "flagged", "value": "false" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Job Details (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/jobs/{{job_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "jobs", "{{job_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Job Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"flagged\",\n  \"reason\": \"Inappropriate content\",\n  \"adminNote\": \"Job description contains misleading information\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/jobs/{{job_id}}/status",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "jobs", "{{job_id}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Delete Job",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Violation of terms\",\n  \"notifyEmployer\": true\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/jobs/{{job_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "jobs", "{{job_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Job Applications (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/jobs/{{job_id}}/applications?page=1&limit=10&status=all",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "jobs", "{{job_id}}", "applications"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "status", "value": "all" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "⚙️ System Management",
+      "item": [
+        {
+          "name": "Get System Health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/system/health",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "system", "health"]
+            }
+          }
+        },
+        {
+          "name": "Get System Logs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/system/logs?level=all&limit=100&page=1&startDate=&endDate=",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "system", "logs"],
+              "query": [
+                { "key": "level", "value": "all" },
+                { "key": "limit", "value": "100" },
+                { "key": "page", "value": "1" },
+                { "key": "startDate", "value": "" },
+                { "key": "endDate", "value": "" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get System Overview",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/system/overview?period=7d",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "system", "overview"],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "7d",
+                  "description": "24h, 7d, or 30d"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update System Settings",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"settings\": {\n    \"maintenanceMode\": false,\n    \"registrationEnabled\": true,\n    \"jobPostingEnabled\": true,\n    \"maxFileSize\": 10485760,\n    \"supportedFileTypes\": [\"pdf\", \"doc\", \"docx\", \"jpg\", \"png\"],\n    \"emailNotifications\": true\n  }\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/system/settings",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "system", "settings"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "api_url",
+      "value": "http://localhost:5000/api",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string",
+      "description": "Admin JWT token"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string",
+      "description": "User._id (for employers & users) - CHÍNH LÀ EMPLOYER_ID"
+    },
+    {
+      "key": "employer_id",
+      "value": "",
+      "type": "string",
+      "description": "DEPRECATED: Sử dụng user_id thay thế (User._id của employer)"
+    },
+    {
+      "key": "employer_profile_id",
+      "value": "",
+      "type": "string",
+      "description": "DEPRECATED: EmployerProfile._id - Không dùng nữa"
+    },
+    {
+      "key": "company_id",
+      "value": "",
+      "type": "string",
+      "description": "EmployerProfile._id (company = employerProfile)"
+    },
+    {
+      "key": "job_id",
+      "value": "",
+      "type": "string",
+      "description": "Job._id"
+    },
+    {
+      "key": "document_id",
+      "value": "",
+      "type": "string",
+      "description": "Document._id trong EmployerProfile.verification.documents"
+    }
+  ]
+}
