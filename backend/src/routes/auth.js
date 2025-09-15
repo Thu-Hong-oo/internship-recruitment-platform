@@ -10,7 +10,6 @@ const {
   forgotPassword,
   resetPassword,
   verifyEmail,
-  verifyEmailToken,
   resendEmailVerification,
   refreshToken,
   logout,

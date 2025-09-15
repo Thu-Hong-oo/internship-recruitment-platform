@@ -1,7 +1,11 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { USER_ROLES } = require('../constants/common.constants');
+const {
+  USER_ROLES,
+  USER_STATUS,
+  USER_STATUS_LABELS,
+} = require('../constants/common.constants');
 
 const UserSchema = new mongoose.Schema(
   {
@@ -143,6 +147,25 @@ const UserSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    status: {
+      type: String,
+      enum: {
+        values: Object.values(USER_STATUS),
+        message: 'Trạng thái tài khoản không hợp lệ',
+      },
+      default: USER_STATUS.ACTIVE,
+    },
+    statusReason: {
+      type: String,
+      maxlength: [500, 'Lý do trạng thái không được vượt quá 500 ký tự'],
+    },
+    statusChangedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    statusChangedAt: {
+      type: Date,
+    },
   },
   {
     timestamps: true,
@@ -215,5 +238,45 @@ UserSchema.methods.matchPassword = async function (enteredPassword) {
 UserSchema.methods.canUsePassword = function () {
   return this.authMethod === 'local' || this.authMethod === 'hybrid';
 };
+
+// Kiểm tra trạng thái tài khoản có hoạt động được không
+UserSchema.methods.isAccountActive = function () {
+  return this.isActive && this.status === USER_STATUS.ACTIVE;
+};
+
+// Kiểm tra tài khoản có bị khóa không
+UserSchema.methods.isAccountLocked = function () {
+  return (
+    this.status === USER_STATUS.SUSPENDED || this.status === USER_STATUS.BANNED
+  );
+};
+
+// Cập nhật trạng thái tài khoản
+UserSchema.methods.updateStatus = function (
+  newStatus,
+  reason = null,
+  adminId = null
+) {
+  this.status = newStatus;
+  this.statusReason = reason;
+  this.statusChangedBy = adminId;
+  this.statusChangedAt = new Date();
+
+  // Đồng bộ với isActive
+  if (newStatus === USER_STATUS.ACTIVE) {
+    this.isActive = true;
+  } else if (
+    [USER_STATUS.SUSPENDED, USER_STATUS.BANNED, USER_STATUS.INACTIVE].includes(
+      newStatus
+    )
+  ) {
+    this.isActive = false;
+  }
+};
+
+// Virtual để hiển thị trạng thái đầy đủ
+UserSchema.virtual('statusDisplay').get(function () {
+  return USER_STATUS_LABELS[this.status] || this.status;
+});
 
 module.exports = mongoose.model('User', UserSchema);
