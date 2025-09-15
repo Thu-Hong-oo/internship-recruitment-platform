@@ -25,24 +25,11 @@ const swaggerUi = require('swagger-ui-express');
 // Redis client
 const { createClient } = require('redis');
 
-// Routes
+// Core Routes
 const authRoutes = require('./src/routes/auth');
 const userRoutes = require('./src/routes/users');
 const adminRoutes = require('./src/routes/admin');
-const jobRoutes = require('./src/routes/jobs');
-const applicationRoutes = require('./src/routes/applications');
-const aiRoutes = require('./src/routes/ai');
-const roadmapRoutes = require('./src/routes/roadmaps');
-const analyticsRoutes = require('./src/routes/analytics');
-const uploadRoutes = require('./src/routes/upload');
-const webhookRoutes = require('./src/routes/webhooks');
-const companyRoutes = require('./src/routes/companies');
-const skillRoutes = require('./src/routes/skills');
-const skillCategoryRoutes = require('./src/routes/skillCategories');
-const notificationRoutes = require('./src/routes/notifications');
-const savedJobRoutes = require('./src/routes/savedJobs');
-const candidateProfileRoutes = require('./src/routes/candidateProfiles');
-const employerProfileRoutes = require('./src/routes/employerProfiles');
+const employerRoutes = require('./src/routes/employerProfiles');
 
 // Middleware & Utils
 const errorHandler = require('./src/middleware/errorHandler');
@@ -121,15 +108,14 @@ async function connectDB() {
 
 // Initialize database and Redis
 connectDB();
-initializeRedis().then(() => {
+initializeRedis().then(async () => {
   // Initialize OTP service after Redis is ready
   try {
-    const authController = require('./src/controllers/authController');
-    if (authController.initializeOTPService) {
-      authController.initializeOTPService(redisClient);
-    } else {
-      logger.warn('initializeOTPService function not found in authController');
-    }
+    const {
+      initializeRedisServices,
+    } = require('./src/config/initializeServices');
+    await initializeRedisServices();
+    logger.info('OTP services initialized successfully');
   } catch (error) {
     logger.error('Failed to initialize OTP service:', error.message);
   }
@@ -168,14 +154,23 @@ const swaggerOptions = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'AI Internship Platform API',
+      title: 'AI-Powered Internship Platform API',
       version: '1.0.0',
       description:
-        'API documentation for AI-powered internship recruitment platform',
+        'API for internship recruitment platform with AI-powered CV analysis and skill roadmap generation',
       contact: {
-        name: 'API Support',
-        email: 'support@internship-ai.com',
+        name: 'Platform Support',
+        email: 'support@intern-ai-platform.com',
       },
+      tags: [
+        { name: 'Auth', description: 'Authentication endpoints' },
+        { name: 'Interns', description: 'Intern profile management' },
+        { name: 'Employers', description: 'Employer operations' },
+        { name: 'Jobs', description: 'Internship posting management' },
+        { name: 'Applications', description: 'Application processing' },
+        { name: 'AI Analysis', description: 'CV and job matching analysis' },
+        { name: 'Skills', description: 'Skill and roadmap management' },
+      ],
     },
     servers: [
       {
@@ -224,20 +219,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/api/jobs', jobRoutes);
-app.use('/api/applications', applicationRoutes);
-app.use('/api/ai', aiRoutes);
-app.use('/api/roadmaps', roadmapRoutes);
-app.use('/api/analytics', analyticsRoutes);
-app.use('/api/upload', uploadRoutes);
-app.use('/api/webhooks', webhookRoutes);
-app.use('/api/companies', companyRoutes);
-app.use('/api/skills', skillRoutes);
-app.use('/api/skill-categories', skillCategoryRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/saved-jobs', savedJobRoutes);
-app.use('/api/candidate-profiles', candidateProfileRoutes);
-app.use('/api/employer-profiles', employerProfileRoutes);
+app.use('/api/employers', employerRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -259,24 +241,10 @@ cron.schedule(
   async () => {
     logger.info('Running daily maintenance tasks...');
     try {
-      // Clean up expired sessions
-      if (redisClient && redisConnected) {
-        // Add cleanup logic here
-      }
+      // Cleanup expired sessions/tokens
+      // TODO: Implement session cleanup
 
-      // Update job statuses
-      const Job = require('./src/models/Job');
-      const expiredJobs = await Job.updateMany(
-        {
-          applicationDeadline: { $lt: new Date() },
-          status: 'active',
-        },
-        { status: 'closed' }
-      );
-
-      if (expiredJobs.modifiedCount > 0) {
-        logger.info(`Closed ${expiredJobs.modifiedCount} expired jobs`);
-      }
+      logger.info('Daily maintenance completed successfully');
     } catch (error) {
       logger.error('Daily maintenance task failed:', error);
     }

@@ -1,53 +1,48 @@
 const express = require('express');
 const { protect, authorize } = require('../middleware/auth');
 const {
-  getAllJobs,
-  getJob,
   createJob,
+  getJobs,
+  getJob,
   updateJob,
   deleteJob,
   applyForJob,
-  getJobApplications,
-  getJobBySlug,
-  getJobsByCategory,
-  getJobsBySubCategory,
-  getJobsByLocation,
-  getJobsByDistrict,
-  incrementJobViews,
-  getJobsByCompany,
-  getJobsBySkills,
-  getRecentJobs,
-  getJobCompany,
+  saveJob,
+  unsaveJob,
+  getSimilarJobs,
+  getJobCategories,
+  getTrendingJobs,
   getJobStats,
-  submitJobForReview,
+  searchJobs,
+  getJobApplications,
+  updateJobStatus,
+  getJobAnalytics,
 } = require('../controllers/jobController');
 
 const router = express.Router();
 
-// Public routes (consolidated: use /api/jobs with query filters)
-router.get('/', getAllJobs);
-router.get('/search', getAllJobs); // alias to listing with q filter
-router.get('/slug/:slug', getJobBySlug);
+// Public routes
+router.get('/', getJobs);
+router.get('/search', searchJobs);
+router.get('/categories', getJobCategories);
+router.get('/trending', getTrendingJobs);
 router.get('/:id', getJob);
-router.get('/:id/stats', getJobStats);
-router.get('/:id/company', getJobCompany);
-router.post('/:id/view', incrementJobViews);
+router.get('/:id/similar', getSimilarJobs);
 
-// Protected routes
-router.use(protect);
+// Protected routes - Employer only
+router.post('/', protect, authorize('employer'), createJob);
+router.put('/:id', protect, authorize('employer'), updateJob);
+router.delete('/:id', protect, authorize('employer'), deleteJob);
+router.get('/:id/applications', protect, authorize('employer'), getJobApplications);
+router.put('/:id/status', protect, authorize('employer'), updateJobStatus);
+router.get('/:id/analytics', protect, authorize('employer'), getJobAnalytics);
 
-// Employer namespace: clearer semantics
-router.post('/employer', authorize('employer', 'admin'), createJob);
-router.put('/employer/:id', authorize('employer', 'admin'), updateJob);
-router.delete('/employer/:id', authorize('employer', 'admin'), deleteJob);
-router.post('/employer/:id/submit', authorize('employer', 'admin'), submitJobForReview);
+// Protected routes - Intern only
+router.post('/:id/apply', protect, authorize('intern'), applyForJob);
+router.post('/:id/save', protect, authorize('intern'), saveJob);
+router.delete('/:id/save', protect, authorize('intern'), unsaveJob);
 
-// Application management
-router.post('/:id/apply', authorize('student'), applyForJob);
-router.get(
-  '/employer/:id/applications',
-  authorize('employer', 'admin'),
-  getJobApplications
-);
+// Protected routes - Any authenticated user
+router.get('/:id/stats', protect, getJobStats);
 
 module.exports = router;

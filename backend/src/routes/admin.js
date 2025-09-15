@@ -1,25 +1,35 @@
 const express = require('express');
 const { protect, authorize } = require('../middleware/auth');
+
+// Import từ admin controllers mới - modular structure
 const {
   // User Management
   getUsers,
   getUser,
   createUser,
   updateUser,
-  deleteUser,
-  updateUserStatus,
 
+  updateUserStatus,
+  updateUserRole,
+} = require('../controllers/admin/userController');
+
+const {
   // Analytics & Dashboard
   getDashboardStats,
   getUserAnalytics,
+} = require('../controllers/admin/analyticsController');
 
+const {
   // Employer Management
   getEmployers,
   getEmployer,
   updateEmployerStatus,
   getEmployerCompanies,
   getEmployerJobs,
+  searchEmployers,
+} = require('../controllers/admin/employerController');
 
+const {
   // Company Management
   getCompanies,
   getCompany,
@@ -27,22 +37,33 @@ const {
   deleteCompany,
   getCompanyJobs,
   getCompanyApplications,
+  updateCompanyStatus,
+} = require('../controllers/admin/companyController');
 
+const {
   // Employer Verification
   getPendingVerifications,
+  getEmployerVerificationDetails,
   verifyEmployer,
+  verifyEmployerDocument,
+} = require('../controllers/admin/verificationController');
 
-  // Company Moderation
-  updateCompanyStatus,
-
+const {
   // Job Moderation
   getJobsAdmin,
-  updateJobStatusAdmin,
+  getJobAdmin,
+  updateJobStatus,
+  deleteJobAdmin,
+  getJobApplicationsAdmin,
+} = require('../controllers/admin/jobController');
 
+const {
   // System Management
   getSystemHealth,
   getSystemLogs,
-} = require('../controllers/adminController');
+  getSystemOverview,
+  updateSystemSettings,
+} = require('../controllers/admin/systemController');
 
 const router = express.Router();
 
@@ -216,34 +237,7 @@ router.post('/users', createUser);
  */
 router.put('/users/:id', updateUser);
 
-/**
- * @swagger
- * /api/admin/users/{id}:
- *   delete:
- *     summary: Delete user (admin only)
- *     tags: [Admin]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: User ID
- *     responses:
- *       200:
- *         description: User deleted successfully
- *       400:
- *         description: Cannot delete user with active applications
- *       401:
- *         description: Not authorized
- *       403:
- *         description: Admin access required
- *       404:
- *         description: User not found
- */
-router.delete('/users/:id', deleteUser);
+
 
 /**
  * @swagger
@@ -285,6 +279,47 @@ router.delete('/users/:id', deleteUser);
  *         description: User not found
  */
 router.put('/users/:id/status', updateUserStatus);
+
+/**
+ * @swagger
+ * /api/admin/users/{id}/role:
+ *   put:
+ *     summary: Update user role (admin only)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - role
+ *             properties:
+ *               role:
+ *                 type: string
+ *                 enum: [student, employer, admin]
+ *     responses:
+ *       200:
+ *         description: User role updated successfully
+ *       400:
+ *         description: Invalid role
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Admin access required
+ *       404:
+ *         description: User not found
+ */
+router.put('/users/:id/role', updateUserRole);
 
 // ========================================
 // ANALYTICS & DASHBOARD
@@ -398,6 +433,25 @@ router.get('/analytics/users', getUserAnalytics);
  *         description: Admin access required
  */
 router.get('/employers', getEmployers);
+
+/**
+ * @swagger
+ * /api/admin/employers/pending:
+ *   get:
+ *     summary: Get all pending employer verifications (DEPRECATED - use /verifications)
+ *     tags: [Admin - Employer Management]
+ *     deprecated: true
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Pending verifications retrieved successfully
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Admin access required
+ */
+router.get('/employers/pending', getPendingVerifications);
 
 /**
  * @swagger
@@ -543,6 +597,62 @@ router.get('/employers/:id/companies', getEmployerCompanies);
  *         description: Employer not found
  */
 router.get('/employers/:id/jobs', getEmployerJobs);
+
+/**
+ * @swagger
+ * /api/admin/employers/search:
+ *   get:
+ *     summary: Search employers
+ *     tags: [Admin - Employer Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *           minLength: 2
+ *         description: Search query (company name, email, tax ID)
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [pending, approved, rejected, suspended]
+ *         description: Filter by employer status
+ *       - in: query
+ *         name: verified
+ *         schema:
+ *           type: boolean
+ *         description: Filter by verification status
+ *       - in: query
+ *         name: industry
+ *         schema:
+ *           type: string
+ *         description: Filter by industry
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *         description: Number of results per page
+ *     responses:
+ *       200:
+ *         description: Search results retrieved successfully
+ *       400:
+ *         description: Invalid search query
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Admin access required
+ */
+router.get('/employers/search', searchEmployers);
 
 // ========================================
 // COMPANY MANAGEMENT
@@ -829,6 +939,44 @@ router.get('/verifications', getPendingVerifications);
 /**
  * @swagger
  * /api/admin/verifications/{id}:
+ *   get:
+ *     summary: Get employer verification details
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Employer profile ID
+ *     responses:
+ *       200:
+ *         description: Employer verification details retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *       400:
+ *         description: Invalid ID
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Admin access required
+ *       404:
+ *         description: Employer profile not found
+ */
+router.get('/verifications/:id', getEmployerVerificationDetails);
+
+/**
+ * @swagger
+ * /api/admin/verifications/{id}:
  *   put:
  *     summary: Verify employer (admin only)
  *     tags: [Admin]
@@ -869,6 +1017,60 @@ router.get('/verifications', getPendingVerifications);
  *         description: Employer profile not found
  */
 router.put('/verifications/:id', verifyEmployer);
+
+/**
+ * @swagger
+ * /api/admin/employers/{employerId}/documents/{documentId}/verify:
+ *   put:
+ *     summary: Verify single employer document (admin only)
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: employerId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Employer user ID
+ *       - in: path
+ *         name: documentId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Document ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               verified:
+ *                 type: boolean
+ *                 description: Whether document is verified
+ *               rejectionReason:
+ *                 type: string
+ *                 description: Reason for rejection (if verified is false)
+ *               notes:
+ *                 type: string
+ *                 description: Admin notes
+ *     responses:
+ *       200:
+ *         description: Document verification updated successfully
+ *       400:
+ *         description: Invalid request data
+ *       401:
+ *         description: Not authorized
+ *       403:
+ *         description: Admin access required
+ *       404:
+ *         description: Employer or document not found
+ */
+router.put(
+  '/employers/:employerId/documents/:documentId/verify',
+  verifyEmployerDocument
+);
 
 // ========================================
 // COMPANY MODERATION
@@ -992,7 +1194,15 @@ router.get('/jobs', getJobsAdmin);
  *       200:
  *         description: Job status updated
  */
-router.put('/jobs/:id/status', updateJobStatusAdmin);
+router.put('/jobs/:id/status', updateJobStatus);
+
+// Route cho job details và delete
+router.route('/jobs/:id').get(getJobAdmin).delete(deleteJobAdmin);
+
+// Route cho job applications
+router.get('/jobs/:id/applications', getJobApplicationsAdmin);
+
+// Xóa route applications cũ vì không còn hàm getApplicationsAdmin
 
 // ========================================
 // SYSTEM MANAGEMENT
@@ -1072,5 +1282,14 @@ router.get('/system/health', getSystemHealth);
  *         description: Admin access required
  */
 router.get('/system/logs', getSystemLogs);
+
+// Thêm route mới cho system overview
+router.get('/system/overview', getSystemOverview);
+
+// Thêm route mới cho system settings
+router.put('/system/settings', updateSystemSettings);
+
+// Removed deprecated routes: /skills and /settings
+// These functions no longer exist in the new modular structure
 
 module.exports = router;
