@@ -96,8 +96,10 @@ const uploadAvatar = asyncHandler(async (req, res) => {
 
     // Update user avatar in database
     const user = await User.findByIdAndUpdate(
-      req.user.id,
-      { avatar: result.publicId }, // Lưu publicId thay vì URL
+
+      req.file.buffer,
+      { 'profile.avatar': result.url },
+
       { new: true }
     );
 
