@@ -1,169 +1,114 @@
 const mongoose = require('mongoose');
+const {
+  JOB_TYPES,
+  JOB_STATUS,
+  WORK_TYPES,
+} = require('../constants/job.constants');
 
 const JobSchema = new mongoose.Schema(
   {
-    employer: {
+    // Thông tin người tạo (có thể mở rộng)
+    createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'EmployerProfile',
+      ref: 'User', // Có thể là employer hoặc HR staff
+      required: true,
+    },
+    company: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'EmployerProfile', // Company info
       required: true,
     },
 
+    // Thông tin cơ bản
     title: {
       type: String,
-      required: [true, 'Vui lòng nhập tiêu đề công việc'],
+      required: true,
       trim: true,
-      maxlength: [100, 'Tiêu đề không được vượt quá 100 ký tự'],
+      maxlength: 200,
     },
-
     description: {
       type: String,
-      required: [true, 'Vui lòng nhập mô tả công việc'],
-      maxlength: [5000, 'Mô tả không được vượt quá 5000 ký tự'],
+      required: true,
     },
 
+    // Yêu cầu (có thể mở rộng cho AI analysis)
     requirements: {
-      skills: [
-        {
-          name: String,
-          level: String,
-          required: Boolean,
-          weight: {
-            type: Number,
-            default: 1,
-          },
-        },
-      ],
-      education: {
-        level: String,
-        majors: [String],
-        required: Boolean,
-      },
-      experience: {
-        years: Number,
-        description: String,
-      },
-      languages: [
-        {
-          name: String,
-          level: String,
-        },
-      ],
-      other: [String],
+      skills: [String], // ["JavaScript", "React", "Node.js"]
+      education: String, // "Đại học CNTT"
+      experience: String, // "0-1 năm kinh nghiệm"
+      languages: [String], // ["English", "Vietnamese"]
+      other: String, // Yêu cầu khác
     },
 
-    benefits: {
-      salary: {
-        min: Number,
-        max: Number,
-        currency: {
-          type: String,
-          default: 'VND',
-        },
-        negotiable: Boolean,
-      },
-      perks: [String],
-      training: String,
-      opportunities: [String],
+    // Thông tin job
+    jobType: {
+      type: String,
+      enum: Object.values(JOB_TYPES),
+      default: JOB_TYPES.INTERNSHIP,
     },
 
-    details: {
-      type: {
+    // Lương
+    salary: {
+      min: Number,
+      max: Number,
+      currency: {
         type: String,
-        enum: Object.values(
-          require('../constants/common.constants').INTERNSHIP_TYPES
-        ),
-        required: true,
+        default: 'VND',
       },
-      duration: {
-        value: Number,
-        unit: {
-          type: String,
-          enum: Object.values(
-            require('../constants/common.constants').DURATION_UNITS
-          ),
-          default: require('../constants/common.constants').DURATION_UNITS
-            .MONTHS,
-        },
-      },
-      startDate: Date,
-      locations: [
-        {
-          city: String,
-          district: String,
-          address: String,
-        },
-      ],
-      positions: Number,
-      applicationDeadline: Date,
+      negotiable: { type: Boolean, default: false },
     },
 
+    // Phúc lợi
+    benefits: [String], // ["Laptop", "Free lunch", "Training"]
+
+    // Địa điểm (có thể multiple locations sau)
+    location: {
+      city: String,
+      district: String,
+      address: String,
+      workType: {
+        type: String,
+        enum: Object.values(WORK_TYPES),
+        default: WORK_TYPES.ONSITE,
+      },
+    },
+
+    // Thời gian
+    timeline: {
+      duration: String, // "3 tháng", "6 tháng"
+      startDate: Date,
+      deadline: Date,
+    },
+    positions: { type: Number, default: 1 },
+
+    // Trạng thái
     status: {
       type: String,
-      enum: Object.values(require('../constants/common.constants').JOB_STATUS),
-      default: require('../constants/common.constants').JOB_STATUS.DRAFT,
+      enum: Object.values(JOB_STATUS),
+      default: JOB_STATUS.DRAFT,
     },
 
-    statistics: {
-      views: {
-        type: Number,
-        default: 0,
-      },
-      applications: {
-        total: {
-          type: Number,
-          default: 0,
-        },
-        pending: {
-          type: Number,
-          default: 0,
-        },
-        reviewing: {
-          type: Number,
-          default: 0,
-        },
-        shortlisted: {
-          type: Number,
-          default: 0,
-        },
-        interviewed: {
-          type: Number,
-          default: 0,
-        },
-        offered: {
-          type: Number,
-          default: 0,
-        },
-        accepted: {
-          type: Number,
-          default: 0,
-        },
-        rejected: {
-          type: Number,
-          default: 0,
-        },
-      },
+    // Stats cơ bản (có thể mở rộng cho analytics)
+    analytics: {
+      views: { type: Number, default: 0 },
+      applications: { type: Number, default: 0 },
+      clicks: { type: Number, default: 0 },
     },
 
-    nlpAnalysis: {
-      keywords: [String],
-      requiredSkills: [
-        {
-          name: String,
-          confidence: Number,
-          context: String,
-        },
-      ],
-      suggestedCandidates: [
-        {
-          internId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'CandidateProfile',
-          },
-          score: Number,
-          matchingSkills: [String],
-        },
-      ],
-      analyzedAt: Date,
+    // Classification cho AI analysis sau này
+    classification: {
+      industry: String, // "IT", "Marketing", "Finance"
+      level: String, // "Entry", "Mid", "Senior"
+      category: String, // "Frontend", "Backend", "Mobile"
+      tags: [String], // Auto-generated hoặc manual
+    },
+
+    // Metadata cho future features
+    metadata: {
+      priority: { type: Number, default: 0 }, // Featured jobs
+      source: { type: String, default: 'manual' }, // manual, imported, ai-generated
+      lastAnalyzed: Date, // Cho AI analysis
+      searchKeywords: [String], // SEO keywords
     },
   },
   {
@@ -171,51 +116,45 @@ const JobSchema = new mongoose.Schema(
   }
 );
 
-// Indexes
+// Indexes cho performance và future analytics
 JobSchema.index({ title: 'text', description: 'text' });
-JobSchema.index({ employer: 1 });
-JobSchema.index({ status: 1 });
-JobSchema.index({ 'details.locations.city': 1 });
-JobSchema.index({ 'requirements.skills.name': 1 });
+JobSchema.index({ createdBy: 1, status: 1 });
+JobSchema.index({ company: 1, status: 1 });
+JobSchema.index({ 'location.city': 1 });
+JobSchema.index({ 'requirements.skills': 1 });
+JobSchema.index({ 'classification.industry': 1 });
+JobSchema.index({ 'classification.category': 1 });
+JobSchema.index({ 'timeline.deadline': 1 });
 JobSchema.index({ createdAt: -1 });
 
-// Virtual field for remaining days until deadline
-JobSchema.virtual('remainingDays').get(function () {
-  if (!this.details.applicationDeadline) return null;
-  const now = new Date();
-  const deadline = new Date(this.details.applicationDeadline);
-  const diffTime = deadline - now;
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+// Virtuals
+JobSchema.virtual('isExpired').get(function () {
+  return this.timeline.deadline && new Date() > this.timeline.deadline;
 });
 
-// Methods
-JobSchema.methods.updateStatistics = async function () {
-  const Application = mongoose.model('Application');
+JobSchema.virtual('daysRemaining').get(function () {
+  if (!this.timeline.deadline) return null;
+  const diff = this.timeline.deadline - new Date();
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+});
 
-  const stats = await Application.aggregate([
-    { $match: { jobId: this._id } },
-    {
-      $group: {
-        _id: '$status',
-        count: { $sum: 1 },
-      },
-    },
-  ]);
-
-  stats.forEach(stat => {
-    this.statistics.applications[stat._id] = stat.count;
-  });
-
-  this.statistics.applications.total = stats.reduce(
-    (acc, curr) => acc + curr.count,
-    0
-  );
-
+// Methods đơn giản nhưng có thể mở rộng
+JobSchema.methods.incrementViews = function () {
+  this.analytics.views += 1;
   return this.save();
 };
 
-JobSchema.methods.incrementViews = async function () {
-  this.statistics.views += 1;
+JobSchema.methods.incrementApplications = function () {
+  this.analytics.applications += 1;
+  return this.save();
+};
+
+// Method cho future AI analysis
+JobSchema.methods.updateClassification = function (aiResults) {
+  if (aiResults) {
+    this.classification = { ...this.classification, ...aiResults };
+    this.metadata.lastAnalyzed = new Date();
+  }
   return this.save();
 };
 
