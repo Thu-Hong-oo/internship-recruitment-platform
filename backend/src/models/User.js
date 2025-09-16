@@ -256,7 +256,7 @@ UserSchema.methods.updateStatus = function (
   newStatus,
   reason = null,
   adminId = null
-) {
+) {S
   this.status = newStatus;
   this.statusReason = reason;
   this.statusChangedBy = adminId;
