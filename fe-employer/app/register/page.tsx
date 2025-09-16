@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,32 +14,27 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useToast } from "@/components/ui/use-toast";
 import {
   Eye,
   EyeOff,
   Mail,
   Lock,
-  Phone,
-  Building2,
-  MapPin,
+  CheckCircle,
+  AlertCircle,
 } from "lucide-react";
+import { registerEmployer } from "@/lib/api";
 
 export default function EmployerRegisterPage() {
-  const { toast } = useToast();
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [gender, setGender] = useState("male");
-  const [phone, setPhone] = useState("");
-  const [companyName, setCompanyName] = useState("");
-  const [city, setCity] = useState("");
-  const [district, setDistrict] = useState("");
   const [agree, setAgree] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   const handleGoogleRegister = () => {
     // Redirect to your backend Google OAuth for employer
@@ -46,34 +42,60 @@ export default function EmployerRegisterPage() {
   };
 
   const validate = (): string | null => {
-    if (!agree) return "Bạn cần đồng ý với Điều khoản & Chính sách.";
-    if (!email) return "Vui lòng nhập email.";
-    if (!password || password.length < 6) return "Mật khẩu tối thiểu 6 ký tự.";
-    if (password !== confirmPassword) return "Mật khẩu nhập lại không khớp.";
-    if (!fullName) return "Vui lòng nhập họ và tên.";
-    if (!phone) return "Vui lòng nhập số điện thoại.";
-    if (!companyName) return "Vui lòng nhập tên công ty.";
-    if (!city) return "Vui lòng chọn tỉnh/thành phố.";
-    if (!district) return "Vui lòng chọn quận/huyện.";
+    if (!fullName.trim()) return "Vui lòng nhập họ và tên";
+    if (!email) return "Vui lòng nhập email";
+    if (!password || password.length < 6) return "Mật khẩu tối thiểu 6 ký tự";
+    if (password !== confirmPassword) return "Mật khẩu xác nhận không khớp";
+    if (!agree) return "Vui lòng đồng ý với điều khoản dịch vụ";
     return null;
   };
 
   const onSubmit = async () => {
+    setError("");
+    setSuccess("");
     const err = validate();
     if (err) {
-      toast({ title: "Thiếu thông tin", description: err });
+      setError(err);
       return;
     }
     try {
       setSubmitting(true);
-      // TODO: integrate backend API here
-      await new Promise((r) => setTimeout(r, 800));
-      toast({
-        title: "Đăng ký thành công",
-        description: "Vui lòng kiểm tra email để xác minh.",
-      });
-    } catch (e) {
-      toast({ title: "Đăng ký thất bại", description: "Vui lòng thử lại." });
+      const res = await registerEmployer({ email, password, fullName });
+      if (res.success) {
+        const msg =
+          res.message ||
+          "Đăng ký thành công. Vui lòng kiểm tra email để xác thực tài khoản.";
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem("pendingEmail", email);
+          } catch {}
+        }
+        router.push("/email-verification");
+      } else {
+        const msg = res.error || "Đăng ký thất bại";
+        // Nếu email đã đăng ký trước (chưa xác thực hoặc đang trong quá trình), lưu pendingEmail và chuyển sang xác thực
+        const lower = String(msg).toLowerCase();
+        const shouldForwardToVerification =
+          lower.includes("đang trong quá trình đăng ký") ||
+          lower.includes("chưa xác thực") ||
+          lower.includes("chua xac thuc") ||
+          lower.includes("đã được đăng ký") ||
+          lower.includes("da duoc dang ky");
+
+        if (shouldForwardToVerification) {
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.setItem("pendingEmail", email);
+            } catch {}
+          }
+          router.push("/email-verification");
+        } else {
+          setError(msg);
+        }
+      }
+    } catch (e: any) {
+      const msg = e?.message || "Không thể kết nối máy chủ";
+      setError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -126,6 +148,20 @@ export default function EmployerRegisterPage() {
             </svg>
             Đăng ký bằng Google
           </Button>
+
+          {/* Thông báo kết quả */}
+          {success && (
+            <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-center mb-4">
+              <CheckCircle className="w-5 h-5 mr-2" />
+              {success}
+            </div>
+          )}
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center mb-4">
+              <AlertCircle className="w-5 h-5 mr-2" />
+              {error}
+            </div>
+          )}
 
           <div className="flex items-center gap-4 mb-6">
             <div className="flex-1 h-px bg-gray-200" />
@@ -187,12 +223,12 @@ export default function EmployerRegisterPage() {
             </div>
           </div>
 
-          {/* Recruiter info */}
+          {/* Recruiter info (API 1 fields only) */}
           <h2 className="text-lg font-semibold text-slate-800 mb-3">
-            Thông tin nhà tuyển dụng
+            Thông tin tài khoản
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
+            <div className="col-span-1 md:col-span-2">
               <Label className="mb-2 block">Họ và tên</Label>
               <Input
                 placeholder="Họ và tên"
@@ -200,78 +236,6 @@ export default function EmployerRegisterPage() {
                 onChange={(e) => setFullName(e.target.value)}
                 className="h-11"
               />
-            </div>
-            <div>
-              <Label className="mb-2 block">Giới tính</Label>
-              <RadioGroup
-                value={gender}
-                onValueChange={setGender}
-                className="flex items-center gap-6 h-11"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="male" id="male" />
-                  <Label htmlFor="male">Nam</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="female" id="female" />
-                  <Label htmlFor="female">Nữ</Label>
-                </div>
-              </RadioGroup>
-            </div>
-            <div>
-              <Label className="mb-2 block">Số điện thoại cá nhân</Label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-primary w-4 h-4" />
-                <Input
-                  placeholder="Số điện thoại cá nhân"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="pl-10 h-11"
-                />
-              </div>
-            </div>
-            <div>
-              <Label className="mb-2 block">Công ty</Label>
-              <div className="relative">
-                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-primary w-4 h-4" />
-                <Input
-                  placeholder="Tên công ty"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  className="pl-10 h-11"
-                />
-              </div>
-            </div>
-            <div>
-              <Label className="mb-2 block">Địa điểm làm việc</Label>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-primary w-4 h-4" />
-                  <Select value={city} onValueChange={setCity}>
-                    <SelectTrigger className="pl-10 h-11 w-full">
-                      <SelectValue placeholder="Chọn tỉnh/thành phố" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="hn">Hà Nội</SelectItem>
-                      <SelectItem value="hcm">Hồ Chí Minh</SelectItem>
-                      <SelectItem value="dn">Đà Nẵng</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-primary w-4 h-4" />
-                  <Select value={district} onValueChange={setDistrict}>
-                    <SelectTrigger className="pl-10 h-11 w-full">
-                      <SelectValue placeholder="Chọn quận/huyện" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-72">
-                      <SelectItem value="q1">Quận 1</SelectItem>
-                      <SelectItem value="q3">Quận 3</SelectItem>
-                      <SelectItem value="dd">Đống Đa</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
             </div>
           </div>
 
@@ -301,6 +265,16 @@ export default function EmployerRegisterPage() {
           >
             {submitting ? "Đang xử lý..." : "Hoàn tất"}
           </Button>
+
+          {/* status ? (
+            <div
+              className={`mt-3 text-sm ${
+                status.type === "success" ? "text-green-600" : "text-red-600"
+              }`}
+            >
+              {status.message}
+            </div>
+          ) : null} */}
 
           <div className="text-center mt-4">
             <span className="text-slate-600 text-sm">Đã có tài khoản? </span>
