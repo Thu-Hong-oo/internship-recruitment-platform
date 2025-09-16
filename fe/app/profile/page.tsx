@@ -1,18 +1,22 @@
 "use client";
 
 import React, { useState } from "react";
-import { Camera, ArrowUp, CheckCircle } from "lucide-react";
+import { CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { useAuth } from "@/hooks/useAuth";
+import AvatarUpload from "@/components/AvatarUpload";
+import { getUserAvatar } from "@/lib/api";
 
 export default function ProfilePage() {
+  const { user } = useAuth();
+  
   const [formData, setFormData] = useState({
-    fullName: "Vẹt Con",
+    fullName: user?.fullName || `${user?.firstName} ${user?.lastName}` || "",
     phone: "",
-    email: "boilenlanxuong@gmail.com",
+    email: user?.email || "",
   });
 
   const [settings, setSettings] = useState({
@@ -126,18 +130,11 @@ export default function ProfilePage() {
             <div className="bg-white rounded-lg shadow-sm p-6 space-y-6">
               {/* User Header */}
               <div className="text-center">
-                <div className="relative inline-block mb-4">
-                  <Avatar className="w-24 h-24">
-                    <AvatarImage
-                      src="/placeholder-user.jpg"
-                      alt="User avatar"
-                    />
-                    <AvatarFallback className="text-2xl">VC</AvatarFallback>
-                  </Avatar>
-                  <div className="absolute -bottom-1 -right-1 bg-primary rounded-full p-2 cursor-pointer hover:bg-primary/90 transition-colors">
-                    <Camera className="w-4 h-4 text-white" />
-                  </div>
-                </div>
+                                 <AvatarUpload
+                   currentAvatar={getUserAvatar(user)}
+                   userName={formData.fullName}
+                   className="mb-4"
+                 />
 
                 <Badge className="bg-green-100 text-green-800 text-xs mb-2">
                   VERIFIED
@@ -149,9 +146,8 @@ export default function ProfilePage() {
                 </h2>
 
                 <Badge variant="secondary" className="mb-3">
-                  Tài khoản đã xác thực
+                  {user?.isEmailVerified ? "Tài khoản đã xác thực" : "Chưa xác thực email"}
                 </Badge>
-
               </div>
 
               {/* Job Seeking Status */}
@@ -178,7 +174,7 @@ export default function ProfilePage() {
               {/* Profile Visibility */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">
+                  <span className="text-sm font-medium text-foreground">
                     Cho phép NTD tìm kiếm hồ sơ
                   </span>
                   <Switch
@@ -192,7 +188,7 @@ export default function ProfilePage() {
 
               {/* Contact Preferences */}
               <div className="space-y-3">
-                <h3 className="text-sm font-medium text-gray-700">
+                <h3 className="text-sm font-medium text-foreground">
                   Khi có cơ hội việc làm phù hợp, NTD sẽ liên hệ và trao đổi với
                   bạn qua:
                 </h3>

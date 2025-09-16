@@ -1,0 +1,1095 @@
+{
+  "info": {
+    "_postman_id": "admin-api-enhanced",
+    "name": "Admin API Enhanced - Corrected",
+    "description": "Corrected Admin API collection matching actual backend implementation",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "👥 User Management",
+      "item": [
+        {
+          "name": "Get All Users (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/users?page=1&limit=20&role=candidate&status=active&emailVerified=true&search=",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "users"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "role",
+                  "value": "candidate",
+                  "description": "Filter by role: candidate, employer, admin"
+                },
+                {
+                  "key": "status",
+                  "value": "active",
+                  "description": "Filter by user status from constants"
+                },
+                {
+                  "key": "emailVerified",
+                  "value": "true",
+                  "description": "Filter by email verification: true/false"
+                },
+                {
+                  "key": "includeAdmin",
+                  "value": "false",
+                  "description": "Include admin users: true/false (default false)"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Search by email or fullName",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "✅ WORKING: Get all users with pagination and filters"
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Details (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/users/{{user_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "users", "{{user_id}}"]
+            },
+            "description": "✅ WORKING: Get single user details with populated profiles"
+          },
+          "response": []
+        },
+        {
+          "name": "Create User (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"newuser@example.com\",\n  \"fullName\": \"New User\",\n  \"role\": \"candidate\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/users",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "users"]
+            },
+            "description": "✅ WORKING: Create new user (admin only)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update User (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Updated Name\",\n  \"role\": \"employer\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/users/{{user_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "users", "{{user_id}}"]
+            },
+            "description": "✅ WORKING: Update user information"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete User (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/users/{{user_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "users", "{{user_id}}"]
+            },
+            "description": "✅ WORKING: Delete user (checks for active applications)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update User Status (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"suspended\",\n  \"reason\": \"Account suspended due to policy violation\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/users/{{user_id}}/status",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "users", "{{user_id}}", "status"]
+            },
+            "description": "✅ WORKING: Update user status using User.updateStatus method"
+          },
+          "response": []
+        },
+        {
+          "name": "Update User Role (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"employer\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/users/{{user_id}}/role",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "users", "{{user_id}}", "role"]
+            },
+            "description": "✅ WORKING: Update user role"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📊 Dashboard & Analytics",
+      "item": [
+        {
+          "name": "Get Dashboard Stats (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/dashboard",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "dashboard"]
+            },
+            "description": "✅ WORKING: Get dashboard statistics and recent activities"
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Analytics (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/analytics/users?period=30",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "analytics", "users"],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "30",
+                  "description": "Analytics period in days"
+                }
+              ]
+            },
+            "description": "✅ WORKING: Get user registration trends and role distribution"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🏢 Employer Management",
+      "item": [
+        {
+          "name": "Get All Employers (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/employers?page=1&limit=20&status=pending&verified=false&industry=tech&search=",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "employers"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "pending",
+                  "description": "Filter by employer profile status"
+                },
+                {
+                  "key": "verified",
+                  "value": "false",
+                  "description": "Filter by verification status: true/false"
+                },
+                {
+                  "key": "industry",
+                  "value": "tech",
+                  "description": "Filter by industry"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Search by email or fullName",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "✅ WORKING: Get employers with User and EmployerProfile data"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Single Employer (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/employers/{{employer_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "employers", "{{employer_id}}"]
+            },
+            "description": "✅ WORKING: Get single employer details"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Employer Status (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"suspended\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/employers/{{employer_id}}/status",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "employers", "{{employer_id}}", "status"]
+            },
+            "description": "✅ WORKING: Update employer status (active, inactive, suspended, banned)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Employer Jobs (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/employers/{{employer_id}}/jobs?page=1&limit=10&status=active",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "employers", "{{employer_id}}", "jobs"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "status",
+                  "value": "active",
+                  "description": "Filter by job status"
+                },
+                {
+                  "key": "visibility",
+                  "value": "",
+                  "description": "Filter by job visibility",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "✅ WORKING: Get jobs posted by specific employer"
+          },
+          "response": []
+        },
+        {
+          "name": "Search Employers (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/employers/search?query=company&status=pending&verified=false&industry=tech&page=1&limit=10",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "employers", "search"],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "company",
+                  "description": "Search query (min 2 chars) - company name, email, taxId"
+                },
+                {
+                  "key": "status",
+                  "value": "pending",
+                  "description": "Filter by status"
+                },
+                {
+                  "key": "verified",
+                  "value": "false",
+                  "description": "Filter by verification status"
+                },
+                {
+                  "key": "industry",
+                  "value": "tech",
+                  "description": "Filter by industry"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "✅ WORKING: Search employers by company info"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🔍 Employer Verification",
+      "item": [
+        {
+          "name": "Get Pending Verifications (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/verifications?page=1&limit=10&industry=tech&hasDocuments=true&verified=false&search=",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "verifications"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "industry",
+                  "value": "tech",
+                  "description": "Filter by industry"
+                },
+                {
+                  "key": "hasDocuments",
+                  "value": "true",
+                  "description": "Filter by document presence"
+                },
+                {
+                  "key": "verified",
+                  "value": "false",
+                  "description": "Filter by verification status"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Search by company name",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "✅ WORKING: Get pending employer verifications with progress calculation"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Verification Details (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/verifications/{{employer_profile_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "verifications", "{{employer_profile_id}}"]
+            },
+            "description": "✅ WORKING: Get detailed verification info with documents and progress"
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Employer (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"approve\",\n  \"notes\": \"All documents verified successfully\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/verifications/{{employer_profile_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "verifications", "{{employer_profile_id}}"]
+            },
+            "description": "✅ WORKING: Approve or reject employer verification"
+          },
+          "response": []
+        },
+        {
+          "name": "Verify Single Document (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"verified\": true,\n  \"notes\": \"Document is valid and clear\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/employers/{{employer_id}}/documents/{{document_id}}/verify",
+              "host": ["{{api_url}}"],
+              "path": [
+                "admin",
+                "employers",
+                "{{employer_id}}",
+                "documents",
+                "{{document_id}}",
+                "verify"
+              ]
+            },
+            "description": "✅ WORKING: Verify individual document with auto-approval logic"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "💼 Job Moderation",
+      "item": [
+        {
+          "name": "Get Jobs for Moderation (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/jobs?page=1&limit=10&status=draft&companyId=&employerId=&q=",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "jobs"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "status",
+                  "value": "draft",
+                  "description": "Filter by job status: draft, active, closed, filled"
+                },
+                {
+                  "key": "companyId",
+                  "value": "",
+                  "description": "Filter by company ID",
+                  "disabled": true
+                },
+                {
+                  "key": "employerId",
+                  "value": "",
+                  "description": "Filter by employer ID",
+                  "disabled": true
+                },
+                {
+                  "key": "q",
+                  "value": "",
+                  "description": "Text search",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "✅ WORKING: Get jobs for moderation with filters"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Job Status (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/jobs/{{job_id}}/status",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "jobs", "{{job_id}}", "status"]
+            },
+            "description": "✅ WORKING: Update job status (approve/reject/publish)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Applications for Moderation (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/applications?page=1&limit=10&status=pending&jobId=&userId=",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "applications"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "status",
+                  "value": "pending",
+                  "description": "Filter by application status"
+                },
+                {
+                  "key": "jobId",
+                  "value": "",
+                  "description": "Filter by job ID",
+                  "disabled": true
+                },
+                {
+                  "key": "userId",
+                  "value": "",
+                  "description": "Filter by user ID",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "✅ WORKING: Get applications for review"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🏢 Company Management (VIA EMPLOYERPROFILE)",
+      "item": [
+        {
+          "name": "Get Companies (Admin) - FIXED",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/companies?page=1&limit=10&status=verified&industry=tech&search=",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "companies"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "status",
+                  "value": "verified",
+                  "description": "Filter by EmployerProfile status"
+                },
+                {
+                  "key": "industry",
+                  "value": "tech",
+                  "description": "Filter by company.industry"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Search by company name or description",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "✅ FIXED: Gets company info from EmployerProfile.company (no separate Company model)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Single Company (Admin) - FIXED",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/companies/{{employer_profile_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "companies", "{{employer_profile_id}}"]
+            },
+            "description": "✅ FIXED: Gets company details from EmployerProfile (ID = EmployerProfile._id)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Company (Admin) - FIXED",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Company Name\",\n  \"industry\": \"fintech\",\n  \"description\": \"Updated description\",\n  \"businessInfo\": {\n    \"taxId\": \"new-tax-id\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/companies/{{employer_profile_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "companies", "{{employer_profile_id}}"]
+            },
+            "description": "✅ FIXED: Updates EmployerProfile.company fields"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Company (Admin) - FIXED",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/companies/{{employer_profile_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "companies", "{{employer_profile_id}}"]
+            },
+            "description": "✅ FIXED: Deletes EmployerProfile (checks for active jobs first)"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Company Status (Admin) - FIXED",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"verified\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/admin/companies/{{employer_profile_id}}/status",
+              "host": ["{{api_url}}"],
+              "path": [
+                "admin",
+                "companies",
+                "{{employer_profile_id}}",
+                "status"
+              ]
+            },
+            "description": "✅ FIXED: Updates EmployerProfile.status (not separate Company)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Company Jobs (Admin) - FIXED",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/companies/{{employer_profile_id}}/jobs?page=1&limit=10&status=active",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "companies", "{{employer_profile_id}}", "jobs"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "status",
+                  "value": "active",
+                  "description": "Filter by job status"
+                }
+              ]
+            },
+            "description": "✅ FIXED: Gets jobs posted by employer from EmployerProfile"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Company Applications (Admin) - FIXED",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/companies/{{employer_profile_id}}/applications?page=1&limit=10&status=pending",
+              "host": ["{{api_url}}"],
+              "path": [
+                "admin",
+                "companies",
+                "{{employer_profile_id}}",
+                "applications"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "status",
+                  "value": "pending",
+                  "description": "Filter by application status"
+                }
+              ]
+            },
+            "description": "✅ FIXED: Gets applications for all jobs of this employer"
+          },
+          "response": []
+        },
+        {
+          "name": "✅ Get Employer Companies - FIXED",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/employers/{{employer_id}}/companies",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "employers", "{{employer_id}}", "companies"]
+            },
+            "description": "✅ FIXED: Returns company info from EmployerProfile.company"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "⚙️ System Management",
+      "item": [
+        {
+          "name": "Get System Health (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/system/health",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "system", "health"]
+            },
+            "description": "✅ WORKING: Check system health (database, redis, email, storage)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get System Logs (Admin) - PLACEHOLDER",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/system/logs?level=error&limit=100",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "system", "logs"],
+              "query": [
+                {
+                  "key": "level",
+                  "value": "error",
+                  "description": "Log level: error, warn, info, debug"
+                },
+                {
+                  "key": "limit",
+                  "value": "100",
+                  "description": "Number of log entries"
+                }
+              ]
+            },
+            "description": "⚠️ PLACEHOLDER: Returns placeholder message - Not implemented"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Skills (Admin) - PLACEHOLDER",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/skills",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "skills"]
+            },
+            "description": "⚠️ PLACEHOLDER: Returns empty array - Not implemented"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Settings (Admin) - PLACEHOLDER",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/admin/settings",
+              "host": ["{{api_url}}"],
+              "path": ["admin", "settings"]
+            },
+            "description": "⚠️ PLACEHOLDER: Returns empty object - Not implemented"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "api_url",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "68c3c5b8180a285708903ad2",
+      "type": "string"
+    },
+    {
+      "key": "employer_id",
+      "value": "68c3c5b8180a285708903ad3",
+      "type": "string"
+    },
+    {
+      "key": "employer_profile_id",
+      "value": "68c3c5b8180a285708903ad4",
+      "type": "string"
+    },
+    {
+      "key": "document_id",
+      "value": "68c3c5b8180a285708903ad5",
+      "type": "string"
+    },
+    {
+      "key": "job_id",
+      "value": "68c3c5b8180a285708903ad6",
+      "type": "string"
+    }
+  ]
+}

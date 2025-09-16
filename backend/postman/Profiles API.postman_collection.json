@@ -1,0 +1,142 @@
+{
+	"info": {
+		"_postman_id": "beab7987-f5a6-4f61-8ad2-f390fe54cbaf",
+		"name": "Profiles API",
+		"description": "Profile management endpoints for candidates and employers",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "38146107",
+		"_collection_link": "https://intership-platform.postman.co/workspace/Team-Workspace~96be9a72-219c-4bbc-8714-71a2edb8a68d/collection/38146107-beab7987-f5a6-4f61-8ad2-f390fe54cbaf?action=share&source=collection_link&creator=38146107"
+	},
+	"item": [
+		{
+			"name": "Get Candidate Profile",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					}
+				],
+				"url": {
+					"raw": "{{api_url}}/profiles/candidate",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"profiles",
+						"candidate"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update Candidate Profile",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"personalInfo\": {\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"dateOfBirth\": \"1998-01-01\",\n    \"phone\": \"0123456789\",\n    \"address\": \"123 ABC Street\",\n    \"city\": \"Ho Chi Minh\",\n    \"country\": \"Vietnam\"\n  },\n  \"education\": [\n    {\n      \"institution\": \"ABC University\",\n      \"degree\": \"Bachelor\",\n      \"fieldOfStudy\": \"Computer Science\",\n      \"startDate\": \"2020-09-01\",\n      \"endDate\": \"2024-06-01\",\n      \"gpa\": 3.5,\n      \"isCurrentlyStudying\": true\n    }\n  ],\n  \"skills\": [\n    {\n      \"skillId\": \"{{skill_id}}\",\n      \"level\": \"intermediate\",\n      \"yearsOfExperience\": 2\n    }\n  ],\n  \"experience\": [\n    {\n      \"company\": \"Tech Startup\",\n      \"position\": \"Junior Developer\",\n      \"startDate\": \"2023-01-01\",\n      \"endDate\": \"2023-12-31\",\n      \"description\": \"Developed web applications using React\",\n      \"isCurrentPosition\": false\n    }\n  ],\n  \"portfolio\": {\n    \"website\": \"https://johndoe.dev\",\n    \"github\": \"https://github.com/johndoe\",\n    \"linkedin\": \"https://linkedin.com/in/johndoe\"\n  }\n}"
+				},
+				"url": {
+					"raw": "{{api_url}}/profiles/candidate",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"profiles",
+						"candidate"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Employer Profile",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					}
+				],
+				"url": {
+					"raw": "{{api_url}}/profiles/employer",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"profiles",
+						"employer"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update Employer Profile",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"companyId\": \"{{company_id}}\",\n  \"position\": \"HR Manager\",\n  \"department\": \"Human Resources\",\n  \"permissions\": [\"post_jobs\", \"review_applications\", \"manage_company\"]\n}"
+				},
+				"url": {
+					"raw": "{{api_url}}/profiles/employer",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"profiles",
+						"employer"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "api_url",
+			"value": "http://localhost:3000/api",
+			"type": "string"
+		}
+	]
+}

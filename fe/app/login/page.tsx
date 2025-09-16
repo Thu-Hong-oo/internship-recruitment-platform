@@ -1,29 +1,98 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Eye, EyeOff, Mail, Lock, CheckCircle } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, CheckCircle, AlertCircle, AlertTriangle, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/useAuth";
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { login } = useAuth();
+  
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
+  const [errorType, setErrorType] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // No Google script/init needed with NextAuth
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({
       ...prev,
       [field]: value,
     }));
+    
+    // Clear error/warning/success when user starts typing
+    if (error || warning || success) {
+      setError(null);
+      setWarning(null);
+      setErrorType(null);
+      setSuccess(null);
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Form submitted:", formData);
-    // TODO: Implement login logic
+    if (submitting) return;
+    setError(null);
+    setWarning(null);
+    setErrorType(null);
+    setSuccess(null);
+    setSubmitting(true);
+    
+    try {
+      const res = await login(formData.email, formData.password);
+      if (res.success) {
+        setSuccess("Đăng nhập thành công! Đang chuyển hướng...");
+        setTimeout(() => {
+          router.push("/");
+        }, 1000);
+        return;
+      }
+      
+      // Handle email not verified case
+      if (res.errorType === "EMAIL_NOT_VERIFIED" && res.requiresEmailVerification) {
+        // Store email for verification
+        localStorage.setItem("pendingEmail", formData.email);
+        // Redirect to email verification page
+        router.push("/email-verification");
+        return;
+      }
+      
+      // Handle specific error types
+      if (res.errorType === "EMAIL_NOT_REGISTERED") {
+        setError("Email này chưa được đăng ký trong hệ thống");
+        setWarning("Bạn có thể đăng ký tài khoản mới hoặc kiểm tra lại email");
+      } else if (res.errorType === "INVALID_PASSWORD") {
+        setError("Mật khẩu không chính xác");
+        setWarning("Vui lòng kiểm tra lại mật khẩu hoặc sử dụng tính năng quên mật khẩu");
+      } else if (res.errorType === "GOOGLE_OAUTH_REQUIRED") {
+        setError("Tài khoản này sử dụng Google OAuth");
+        setWarning("Vui lòng đăng nhập bằng Google thay vì mật khẩu");
+      } else if (res.errorType === "ACCOUNT_DISABLED") {
+        setError("Tài khoản đã bị vô hiệu hóa");
+        setWarning("Vui lòng liên hệ hỗ trợ để được hỗ trợ");
+      } else {
+        setError(res.error || res.message || "Đăng nhập thất bại");
+      }
+      
+      setErrorType(res.errorType || null);
+    } catch (err: any) {
+      setError(err?.message || "Đăng nhập thất bại");
+      setWarning("Vui lòng kiểm tra kết nối mạng và thử lại");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -44,6 +113,72 @@ export default function LoginPage() {
 
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Success Message */}
+            {success && (
+              <div className="text-sm text-green-600 bg-green-50 border border-green-200 rounded-md p-4">
+                <div className="flex items-start space-x-2">
+                  <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                  <div className="font-medium">{success}</div>
+                </div>
+              </div>
+            )}
+            
+            {/* Error Message */}
+            {error && (
+              <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-4">
+                <div className="flex items-start space-x-2">
+                  <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <div className="font-medium">{error}</div>
+                    {warning && (
+                      <div className="mt-1 text-red-500">{warning}</div>
+                    )}
+                    {errorType === "EMAIL_NOT_REGISTERED" && (
+                      <div className="mt-2">
+                        <Link
+                          href="/register"
+                          className="text-primary hover:underline font-medium inline-flex items-center"
+                        >
+                          Đăng ký tài khoản mới →
+                        </Link>
+                      </div>
+                    )}
+                    {errorType === "INVALID_PASSWORD" && (
+                      <div className="mt-2">
+                        <Link
+                          href="/forgot-password"
+                          className="text-primary hover:underline font-medium inline-flex items-center"
+                        >
+                          Quên mật khẩu? →
+                        </Link>
+                      </div>
+                    )}
+                    {errorType === "GOOGLE_OAUTH_REQUIRED" && (
+                      <div className="mt-2">
+                        <Button
+                          variant="outline"
+                          className="h-10 bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
+                          onClick={() => signIn("google", { callbackUrl: "/" })}
+                        >
+                          <span className="font-bold text-lg">G</span>
+                          <span className="ml-2">Đăng nhập bằng Google</span>
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Warning Message (when no error) */}
+            {warning && !error && (
+              <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-md p-4">
+                <div className="flex items-start space-x-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
+                  <div className="font-medium">{warning}</div>
+                </div>
+              </div>
+            )}
             {/* Email */}
             <div className="space-y-2">
               <label
@@ -57,10 +192,16 @@ export default function LoginPage() {
                 <Input
                   id="email"
                   type="email"
+                  name="email"
+                  autoComplete="username email"
+                  inputMode="email"
+                  autoCorrect="off"
+                  spellCheck={false}
                   placeholder="Email"
                   value={formData.email}
                   onChange={(e) => handleInputChange("email", e.target.value)}
                   className="pl-10 h-12 border-border focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  disabled={submitting}
                   required
                 />
               </div>
@@ -79,18 +220,22 @@ export default function LoginPage() {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
+                  name="password"
+                  autoComplete="current-password"
                   placeholder="Mật khẩu"
                   value={formData.password}
                   onChange={(e) =>
                     handleInputChange("password", e.target.value)
                   }
                   className="pl-10 pr-10 h-12 border-border focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  disabled={submitting}
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  disabled={submitting}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground disabled:opacity-50"
                 >
                   {showPassword ? (
                     <EyeOff className="w-5 h-5" />
@@ -114,9 +259,10 @@ export default function LoginPage() {
             {/* Login Button */}
             <Button
               type="submit"
-              className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-lg rounded-lg transition-colors duration-200"
+              disabled={submitting}
+              className="w-full h-12 bg-primary hover:bg-primary/90 disabled:opacity-70 disabled:cursor-not-allowed text-primary-foreground font-semibold text-lg rounded-lg transition-colors duration-200"
             >
-              Đăng nhập
+              {submitting ? "Đang đăng nhập..." : "Đăng nhập"}
             </Button>
           </form>
 
@@ -137,6 +283,7 @@ export default function LoginPage() {
               <Button
                 variant="outline"
                 className="h-12 bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
+                onClick={() => signIn("google", { callbackUrl: "/" })}
               >
                 <span className="font-bold text-lg">G</span>
                 <span className="ml-2">Google</span>

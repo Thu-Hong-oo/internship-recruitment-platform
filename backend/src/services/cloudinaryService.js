@@ -1,28 +1,30 @@
 const cloudinary = require('cloudinary').v2;
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const multer = require('multer');
 
 // Configure Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Configure storage for multer
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: 'internship-avatars',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
-    transformation: [
-      { width: 300, height: 300, crop: 'fill', gravity: 'face' },
-      { quality: 'auto', fetch_format: 'auto' }
-    ]
+// Test connection
+const testConnection = async () => {
+  try {
+    await cloudinary.api.ping();
+    console.log('✅ Cloudinary connection successful');
+    return true;
+  } catch (error) {
+    console.error('❌ Cloudinary connection failed:', error.message);
+    return false;
   }
-});
+};
 
-// Helper function to delete image from Cloudinary
-const deleteImage = async (publicId) => {
+// Configure multer for memory storage
+const storage = multer.memoryStorage();
+
+// Delete image function
+const deleteImage = async publicId => {
   try {
     if (publicId && !publicId.includes('http')) {
       // Extract public ID from URL if needed
@@ -31,7 +33,7 @@ const deleteImage = async (publicId) => {
       const publicIdWithoutExt = filename.split('.')[0];
       const folder = 'internship-avatars';
       const fullPublicId = `${folder}/${publicIdWithoutExt}`;
-      
+
       await cloudinary.uploader.destroy(fullPublicId);
       console.log(`Deleted image: ${fullPublicId}`);
     }
@@ -43,5 +45,6 @@ const deleteImage = async (publicId) => {
 module.exports = {
   cloudinary,
   storage,
-  deleteImage
+  deleteImage,
+  testConnection,
 };

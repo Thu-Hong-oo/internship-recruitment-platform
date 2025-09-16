@@ -10,22 +10,22 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
  * @param {string} idToken - Google ID token
  * @returns {Object} Google user information
  */
-const verifyIdToken = async (idToken) => {
+const verifyIdToken = async idToken => {
   try {
     const ticket = await client.verifyIdToken({
       idToken,
-      audience: process.env.GOOGLE_CLIENT_ID
+      audience: process.env.GOOGLE_CLIENT_ID,
     });
 
     const payload = ticket.getPayload();
-    
+
     if (!payload) {
       throw new Error('Invalid token payload');
     }
 
-    logger.info('Google ID token verified successfully', { 
+    logger.info('Google ID token verified successfully', {
       email: payload.email,
-      googleId: payload.sub 
+      googleId: payload.sub,
     });
 
     return {
@@ -36,7 +36,7 @@ const verifyIdToken = async (idToken) => {
       fullName: payload.name || '',
       avatar: payload.picture || '',
       locale: payload.locale || '',
-      emailVerified: payload.email_verified || false
+      emailVerified: payload.email_verified || false,
     };
   } catch (error) {
     logger.error('Failed to verify Google ID token', { error: error.message });
@@ -49,7 +49,7 @@ const verifyIdToken = async (idToken) => {
  * @param {string} idToken - Google ID token
  * @returns {Object} Authentication result
  */
-const processGoogleAuth = async (idToken) => {
+const processGoogleAuth = async idToken => {
   try {
     // Verify the Google ID token
     const googleUser = await verifyIdToken(idToken);
@@ -59,15 +59,15 @@ const processGoogleAuth = async (idToken) => {
 
     if (user) {
       // User exists with Google OAuth
-      logger.info('Google OAuth login successful', { 
-        userId: user._id, 
-        email: user.email 
+      logger.info('Google OAuth login successful', {
+        userId: user._id,
+        email: user.email,
       });
 
       return {
         user,
         isNew: false,
-        message: 'Google OAuth login successful'
+        message: 'Google OAuth login successful',
       };
     }
 
@@ -82,22 +82,22 @@ const processGoogleAuth = async (idToken) => {
         user.googleProfile = {
           picture: googleUser.avatar,
           locale: googleUser.locale,
-          verified_email: googleUser.emailVerified
+          verified_email: googleUser.emailVerified,
         };
         user.authMethod = 'hybrid';
         user.isEmailVerified = true;
-        
+
         await user.save();
 
-        logger.info('Google account linked to existing user', { 
-          userId: user._id, 
-          email: user.email 
+        logger.info('Google account linked to existing user', {
+          userId: user._id,
+          email: user.email,
         });
 
         return {
           user,
           isNew: false,
-          message: 'Google account linked successfully'
+          message: 'Google account linked successfully',
         };
       } else if (user.authMethod === 'google') {
         // This shouldn't happen if googleId check above passed
@@ -108,35 +108,37 @@ const processGoogleAuth = async (idToken) => {
     // Create new user with Google OAuth
     const newUser = await User.create({
       email: googleUser.email,
-      firstName: googleUser.firstName,
-      lastName: googleUser.lastName,
+      profile: {
+        firstName: googleUser.firstName,
+        lastName: googleUser.lastName,
+        avatar: googleUser.avatar,
+      },
       googleId: googleUser.googleId,
       googleEmail: googleUser.email,
       googleProfile: {
         picture: googleUser.avatar,
         locale: googleUser.locale,
-        verified_email: googleUser.emailVerified
+        verified_email: googleUser.emailVerified,
       },
       role: 'student',
       authMethod: 'google',
-      isEmailVerified: true
+      isEmailVerified: true,
     });
 
-    logger.info('New user created with Google OAuth', { 
-      userId: newUser._id, 
-      email: newUser.email 
+    logger.info('New user created with Google OAuth', {
+      userId: newUser._id,
+      email: newUser.email,
     });
 
     return {
       user: newUser,
       isNew: true,
-      message: 'New user created with Google OAuth'
+      message: 'New user created with Google OAuth',
     };
-
   } catch (error) {
-    logger.error('Google OAuth processing failed', { 
+    logger.error('Google OAuth processing failed', {
       error: error.message,
-      stack: error.stack 
+      stack: error.stack,
     });
     throw error;
   }
@@ -144,5 +146,5 @@ const processGoogleAuth = async (idToken) => {
 
 module.exports = {
   verifyIdToken,
-  processGoogleAuth
+  processGoogleAuth,
 };

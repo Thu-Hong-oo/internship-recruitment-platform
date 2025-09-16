@@ -3,6 +3,7 @@
 import { ReactNode } from "react";//đại diện cho các thành phần của react có thể render
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
+import EmailVerificationBanner from "@/components/EmailVerificationBanner";
 
 //typescript cần mô tả props của component nhận vào nên cần interface ( autocomplete, compile time error)
 interface PageLayoutProps {
@@ -28,7 +29,10 @@ export default function PageLayout({
         </div>
       )}
 
-      <main>{children}</main>
+      <main>
+        <EmailVerificationBanner />
+        {children}
+      </main>
 
       <Footer />
     </div>

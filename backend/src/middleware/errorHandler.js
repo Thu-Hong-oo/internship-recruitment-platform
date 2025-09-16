@@ -14,13 +14,13 @@ const errorHandler = (err, req, res, next) => {
 
   // Mongoose bad ObjectId
   if (err.name === 'CastError') {
-    const message = 'Resource not found';
+    const message = 'Không tìm thấy tài nguyên';
     error = { message, statusCode: 404 };
   }
 
   // Mongoose duplicate key
   if (err.code === 11000) {
-    const message = 'Duplicate field value entered';
+    const message = 'Giá trị trường bị trùng lặp';
     error = { message, statusCode: 400 };
   }
 
@@ -32,18 +32,18 @@ const errorHandler = (err, req, res, next) => {
 
   // JWT errors
   if (err.name === 'JsonWebTokenError') {
-    const message = 'Invalid token';
+    const message = 'Token không hợp lệ';
     error = { message, statusCode: 401 };
   }
 
   if (err.name === 'TokenExpiredError') {
-    const message = 'Token expired';
+    const message = 'Token đã hết hạn';
     error = { message, statusCode: 401 };
   }
 
   res.status(error.statusCode || 500).json({
     success: false,
-    error: error.message || 'Server Error',
+    error: error.message || 'Lỗi máy chủ',
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   });
 };

@@ -2,7 +2,9 @@ import type React from "react";
 import type { Metadata } from "next";
 import { DM_Sans } from "next/font/google";
 import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider";
+import { Providers } from "./providers";
+
+//auth provider quản lý auth state
 
 const dmSans = DM_Sans({
   subsets: ["latin"],
@@ -24,14 +26,7 @@ export default function RootLayout({
   return (
     <html lang="vi" className={`${dmSans.variable} antialiased`}>
       <body className="font-sans">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-        </ThemeProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
