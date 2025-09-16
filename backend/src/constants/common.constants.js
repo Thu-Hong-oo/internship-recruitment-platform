@@ -136,19 +136,120 @@ module.exports = {
     HYBRID: 'hybrid',
   },
 
-  // Duration units
-  DURATION_UNITS: {
-    WEEKS: 'weeks',
-    MONTHS: 'months',
-  },
 
   // Job status
   JOB_STATUS: {
     DRAFT: 'draft',
+    PENDING: 'pending',
     ACTIVE: 'active',
     PAUSED: 'paused',
     CLOSED: 'closed',
-    EXPIRED: 'expired',
+    FILLED: 'filled',
+    REJECTED: 'rejected',
+  },
+
+  // Posted by types
+  POSTED_BY_TYPES: {
+    USER: 'User',
+    EMPLOYER_PROFILE: 'EmployerProfile',
+    ADMIN: 'Admin',
+  },
+
+  // Job types
+  JOB_TYPES: {
+    INTERNSHIP: 'internship',
+    FULL_TIME: 'full-time',
+    PART_TIME: 'part-time',
+    CONTRACT: 'contract',
+    FREELANCE: 'freelance',
+  },
+
+  // Job categories
+  JOB_CATEGORIES: {
+    TECHNOLOGY: 'technology',
+    DESIGN: 'design',
+    DATA_SCIENCE: 'data-science',
+    MOBILE_DEVELOPMENT: 'mobile-development',
+    WEB_DEVELOPMENT: 'web-development',
+    MARKETING: 'marketing',
+    SALES: 'sales',
+    BUSINESS_DEVELOPMENT: 'business-development',
+    FINANCE: 'finance',
+    ACCOUNTING: 'accounting',
+    HUMAN_RESOURCES: 'human-resources',
+    CONTENT_WRITING: 'content-writing',
+    CUSTOMER_SERVICE: 'customer-service',
+    OPERATIONS: 'operations',
+    RESEARCH: 'research',
+    EDUCATION: 'education',
+    HEALTHCARE: 'healthcare',
+    ENGINEERING: 'engineering',
+    LEGAL: 'legal',
+    OTHER: 'other',
+  },
+
+  // Location types
+  LOCATION_TYPES: {
+    ONSITE: 'onsite',
+    REMOTE: 'remote',
+    HYBRID: 'hybrid',
+  },
+
+  // Work schedules
+  WORK_SCHEDULES: {
+    FULL_TIME: 'full-time',
+    PART_TIME: 'part-time',
+    FLEXIBLE: 'flexible',
+  },
+
+  // Duration units
+  DURATION_UNITS: {
+    WEEKS: 'weeks',
+    MONTHS: 'months',
+    YEARS: 'years',
+  },
+
+  // Currency types
+  CURRENCY_TYPES: {
+    VND: 'VND',
+    USD: 'USD',
+    EUR: 'EUR',
+  },
+
+  // Salary periods
+  SALARY_PERIODS: {
+    HOUR: 'hour',
+    DAY: 'day',
+    WEEK: 'week',
+    MONTH: 'month',
+    YEAR: 'year',
+    PROJECT: 'project',
+  },
+
+  // Application methods
+  APPLICATION_METHODS: {
+    PLATFORM: 'platform',
+    EMAIL: 'email',
+    WEBSITE: 'website',
+    PHONE: 'phone',
+  },
+
+  // Education levels
+  EDUCATION_LEVELS: {
+    HIGH_SCHOOL: 'high-school',
+    VOCATIONAL: 'vocational',
+    COLLEGE: 'college',
+    UNIVERSITY: 'university',
+    MASTERS: 'masters',
+    PHD: 'phd',
+    ANY: 'any',
+  },
+
+  // Team roles
+  TEAM_ROLES: {
+    RECRUITER: 'recruiter',
+    HR: 'hr',
+    MANAGER: 'manager',
   },
 
   // Application status
