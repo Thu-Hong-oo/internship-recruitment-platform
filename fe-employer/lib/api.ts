@@ -50,9 +50,7 @@ export async function verifyEmail(
   }
 }
 
-export async function resendEmailVerification(
-  email: string
-): Promise<{
+export async function resendEmailVerification(email: string): Promise<{
   success: boolean;
   message?: string;
   error?: string;
@@ -73,9 +71,7 @@ export async function resendEmailVerification(
   }
 }
 
-export async function getUnverifiedAccount(
-  email: string
-): Promise<{
+export async function getUnverifiedAccount(email: string): Promise<{
   success: boolean;
   data?: any;
   expired?: boolean;

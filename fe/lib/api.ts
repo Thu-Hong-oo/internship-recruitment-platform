@@ -301,7 +301,7 @@ class ApiClient {
     formData.append("avatar", file);
 
     // Backend returns: { success, message, data: { avatar: { url, ... }, user: {...} } }
-    const response = await this.request<any>("/users/upload-avatar", {
+    const response = await this.request<any>("/users/avatar", {
       method: "POST",
       headers: {
         // Don't set Content-Type for FormData, let browser set it
