@@ -1,26 +1,39 @@
 const express = require('express');
+const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
 const {
-  getUserApplications,
   getApplication,
-  createApplication,
-  updateApplication,
-  deleteApplication,
   updateApplicationStatus,
-  getEmployerApplications
+  scheduleInterview,
+  submitFeedback,
+  getApplicationTimeline,
+  withdrawApplication,
+  addInterviewFeedback,
+  uploadAttachment,
+  getApplicationAnalytics,
+  bulkUpdateStatus
 } = require('../controllers/applicationController');
 
-const router = express.Router();
-
-// Protected routes for candidates
-router.get('/', protect, authorize('candidate'), getUserApplications);
-router.get('/employer', protect, authorize('employer'), getEmployerApplications);
+// Application Management
 router.get('/:id', protect, getApplication);
-router.post('/', protect, authorize('candidate'), createApplication);
-router.put('/:id', protect, authorize('candidate'), updateApplication);
-router.delete('/:id', protect, authorize('candidate'), deleteApplication);
-
-// Protected routes for employers
 router.put('/:id/status', protect, authorize('employer'), updateApplicationStatus);
+router.post('/:id/withdraw', protect, authorize('intern'), withdrawApplication);
+
+// Interview Process
+router.post('/:id/interview', protect, authorize('employer'), scheduleInterview);
+router.post('/:id/interview/feedback', protect, authorize('employer'), addInterviewFeedback);
+
+// Feedback & Timeline
+router.post('/:id/feedback', protect, submitFeedback);
+router.get('/:id/timeline', protect, getApplicationTimeline);
+
+// Attachments
+router.post('/:id/attachments', protect, uploadAttachment);
+
+// Analytics
+router.get('/:id/analytics', protect, authorize('employer'), getApplicationAnalytics);
+
+// Bulk Operations (Admin/Employer only)
+router.put('/bulk/status', protect, authorize(['admin', 'employer']), bulkUpdateStatus);
 
 module.exports = router;

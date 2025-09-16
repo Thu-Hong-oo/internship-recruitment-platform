@@ -48,28 +48,43 @@ const SkillCategorySchema = new mongoose.Schema(
       default: 0,
     },
     metadata: {
-      skillCount: {
-        type: Number,
-        default: 0,
+      skillCount: Number,
+      internCount: Number,
+      learningPath: {
+        recommendedOrder: Number,
+        estimatedDuration: {
+          value: Number,
+          unit: {
+            type: String,
+            enum: ['days', 'weeks', 'months']
+          }
+        },
+        prerequisites: [{
+          categoryId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'SkillCategory'
+          },
+          required: Boolean
+        }],
+        outcomes: [String]
       },
-      jobCount: {
-        type: Number,
-        default: 0,
-      },
-      averageSalary: {
-        type: Number,
-        default: 0,
-      },
-      demandLevel: {
+      difficulty: {
         type: String,
-        enum: ['low', 'medium', 'high', 'critical'],
-        default: 'medium',
+        enum: ['beginner', 'intermediate', 'advanced'],
+        default: 'beginner'
       },
-      trendDirection: {
-        type: String,
-        enum: ['declining', 'stable', 'growing', 'emerging'],
-        default: 'stable',
-      },
+      relevance: {
+        internshipDemand: {
+          type: String,
+          enum: ['low', 'medium', 'high'],
+          default: 'medium'
+        },
+        marketTrend: {
+          type: String,
+          enum: ['declining', 'stable', 'growing'],
+          default: 'stable'
+        }
+      }
     },
   },
   {
