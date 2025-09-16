@@ -1,18 +1,21 @@
 const express = require('express');
+const router = express.Router();
+const { protect } = require('../middleware/auth');
 const {
   register,
   login,
-  logout,
+  loginWithGoogle,
+  requestLoginOTP,
+  verifyLoginOTP,
   forgotPassword,
   resetPassword,
-  googleAuth,
   verifyEmail,
-  resendEmailVerification
+  resendEmailVerification,
+  refreshToken,
+  logout,
+  getMe,
+  getUnverifiedAccount,
 } = require('../controllers/authController');
-
-const { protect } = require('../middleware/auth');
-
-const router = express.Router();
 
 /**
  * @swagger
@@ -189,7 +192,87 @@ router.post('/register', register);
  */
 router.post('/login', login);
 
+/**
+ * @swagger
+ * /api/auth/google:
+ *   post:
+ *     summary: Google OAuth login/register
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - idToken
+ *             properties:
+ *               idToken:
+ *                 type: string
+ *                 description: Google ID token
+ *     responses:
+ *       200:
+ *         description: Google OAuth successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 token:
+ *                   type: string
+ *                 user:
+ *                   type: object
+ *                 isNew:
+ *                   type: boolean
+ */
+router.post('/login/google', loginWithGoogle);
 
+/**
+ * @swagger
+ * /api/auth/request-otp:
+ *   post:
+ *     summary: Request OTP for login
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: OTP sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *       400:
+ *         description: Bad request - invalid email format
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ */
+router.post('/request-otp', requestLoginOTP);
 
 /**
  * @swagger
@@ -214,11 +297,30 @@ router.post('/login', login);
  */
 router.post('/logout', protect, logout);
 
-
-
-
-
-
+/**
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Get current user information
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Current user information retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 user:
+ *                   $ref: '#/components/schemas/User'
+ *       401:
+ *         description: Not authorized
+ */
+router.get('/me', protect, getMe);
 
 /**
  * @swagger
@@ -253,7 +355,7 @@ router.post('/logout', protect, logout);
  *                 resetUrl:
  *                   type: string
  */
-router.post('/forgotpassword', forgotPassword);
+router.post('/forgot-password', forgotPassword);
 
 /**
  * @swagger
@@ -302,13 +404,32 @@ router.post('/forgotpassword', forgotPassword);
  *       404:
  *         description: User not found
  */
-router.post('/resetpassword', resetPassword);
+router.post('/reset-password', resetPassword);
 
 /**
  * @swagger
- * /api/auth/google:
+ * /api/auth/verify-email/{token}:
+ *   get:
+ *     summary: Verify email with token link
+ *     tags: [Authentication]
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Email verified successfully
+ *       400:
+ *         description: Invalid or expired token
+ */
+
+/**
+ * @swagger
+ * /api/auth/verify-otp:
  *   post:
- *     summary: Google OAuth login/register
+ *     summary: Login with OTP code
  *     tags: [Authentication]
  *     requestBody:
  *       required: true
@@ -317,31 +438,21 @@ router.post('/resetpassword', resetPassword);
  *           schema:
  *             type: object
  *             required:
- *               - idToken
+ *               - email
+ *               - otp
  *             properties:
- *               idToken:
+ *               email:
  *                 type: string
- *                 description: Google ID token
+ *                 format: email
+ *               otp:
+ *                 type: string
  *     responses:
  *       200:
- *         description: Google OAuth successful
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 token:
- *                   type: string
- *                 user:
- *                   type: object
- *                 isNew:
- *                   type: boolean
+ *         description: Login successful
+ *       400:
+ *         description: Invalid OTP
  */
-router.post('/google', googleAuth);
-
-
+router.post('/verify-otp', verifyLoginOTP);
 
 /**
  * @swagger
@@ -395,8 +506,19 @@ router.post('/verify-email', verifyEmail);
  *   post:
  *     summary: Resend email verification
  *     tags: [Authentication]
- *     security:
- *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: User's email address
  *     responses:
  *       200:
  *         description: Verification email sent successfully
@@ -434,6 +556,81 @@ router.post('/verify-email', verifyEmail);
  *                 error:
  *                   type: string
  */
-router.post('/resend-verification', protect, resendEmailVerification);
+router.post('/resend-verification', resendEmailVerification);
+
+/**
+ * @swagger
+ * /api/auth/unverified:
+ *   get:
+ *     summary: Get unverified account information
+ *     tags: [Authentication]
+ *     parameters:
+ *       - in: query
+ *         name: email
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: email
+ *         description: Email address to check for unverified account
+ *     responses:
+ *       200:
+ *         description: Unverified account found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     email:
+ *                       type: string
+ *                     firstName:
+ *                       type: string
+ *                     lastName:
+ *                       type: string
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                     verificationExpiry:
+ *                       type: string
+ *                       format: date-time
+ *                     timeRemaining:
+ *                       type: number
+ *       400:
+ *         description: Account already verified or verification expired
+ *       404:
+ *         description: No unverified account found
+ */
+router.get('/unverified', getUnverifiedAccount);
+
+/**
+ * @swagger
+ * /api/auth/refresh-token:
+ *   post:
+ *     summary: Refresh access token
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *             properties:
+ *               token:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Token refreshed successfully
+ *       400:
+ *         description: Invalid token
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/refresh-token', refreshToken);
 
 module.exports = router;

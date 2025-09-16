@@ -34,6 +34,10 @@ import {
 } from "@/components/ui/accordion";
 import Link from "next/link"; // link to other page
 import { truncate } from "fs/promises";
+import { useAuth } from "@/hooks/useAuth";
+import { useRouter } from "next/navigation";
+import { getUserAvatar } from "@/lib/api";
+import { useSession, signOut } from "next-auth/react";
 
 // Custom hook để quản lý dropdown
 const useDropdown = (delay = 150) => {
@@ -68,12 +72,15 @@ const useDropdown = (delay = 150) => {
 
 export default function Header() {
   const { resolvedTheme, setTheme } = useTheme();
+  const router = useRouter();
+  const { user, loading, logout } = useAuth();
+  const { data: session, status } = useSession();
+
   // Sử dụng custom hook cho 2 dropdowns
   const jobsDropdown = useDropdown(150);
   const cvDropdown = useDropdown(150);
 
-  // State để kiểm tra trạng thái đăng nhập
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  // Đăng nhập khi có user trong context
 
   // Mock data cho các vị trí việc làm (sẽ thay bằng API call sau)
   const jobPositions = [
@@ -372,7 +379,7 @@ export default function Header() {
               Cẩm nang nghề nghiệp
             </a>
             <div className="flex items-center space-x-2">
-              <span className="text-foreground">TopCV</span>
+              <span className="text-foreground">InternBridge</span>
               <Badge className="bg-secondary text-secondary-foreground">
                 Pro
               </Badge>
@@ -392,7 +399,13 @@ export default function Header() {
               className="w-10 h-6"
             />
 
-            {isLoggedIn ? (
+            {loading || status === "loading" ? (
+              // UI khi đang loading - hiển thị skeleton hoặc ẩn
+              <div className="flex items-center space-x-4">
+                <div className="w-5 h-5 bg-muted animate-pulse rounded"></div>
+                <div className="w-8 h-8 bg-muted animate-pulse rounded-full"></div>
+              </div>
+            ) : session?.user || user ? (
               // UI khi đã đăng nhập
               <>
                 <Bell className="w-5 h-5 text-muted-foreground hover:text-primary cursor-pointer transition-colors duration-200" />
@@ -402,10 +415,16 @@ export default function Header() {
                       <button className="flex items-center space-x-2">
                         <Avatar>
                           <AvatarImage
-                            src="/placeholder-user.jpg"
+
+                            src={(session?.user?.image as string | undefined) || (user ? getUserAvatar(user) : undefined) || "/placeholder-user.jpg"}
                             alt="User avatar"
+                            referrerPolicy="no-referrer"
                           />
-                          <AvatarFallback>NH</AvatarFallback>
+                          <AvatarFallback>
+                            {(session?.user?.name?.[0] as string | undefined) || user?.firstName?.[0]}
+                            {user?.lastName?.[0]}
+
+                          </AvatarFallback>
                         </Avatar>
                       </button>
                     </HoverCardTrigger>
@@ -413,20 +432,30 @@ export default function Header() {
                       <div className="p-4 border-b border-border flex items-center space-x-3">
                         <Avatar>
                           <AvatarImage
-                            src="/placeholder-user.jpg"
+
+                            src={(session?.user?.image as string | undefined) || (user ? getUserAvatar(user) : undefined) || "/placeholder-user.jpg"}
                             alt="User avatar"
+                            referrerPolicy="no-referrer"
                           />
-                          <AvatarFallback>NH</AvatarFallback>
+                          <AvatarFallback>
+                            {(session?.user?.name?.[0] as string | undefined) || user?.firstName?.[0]}
+                            {user?.lastName?.[0]}
+
+                          </AvatarFallback>
                         </Avatar>
                         <div>
                           <div className="font-semibold text-foreground">
-                            Nguyễn Ngọc Tường Vân
+                            {session?.user?.name || user?.fullName || `${user?.firstName ?? ""} ${user?.lastName ?? ""}`}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            Tài khoản đã xác thực
+                            {session?.user
+                              ? "Đăng nhập bằng Google (đã xác thực)"
+                              : user?.isEmailVerified
+                                ? "Tài khoản đã xác thực"
+                                : "Chưa xác thực email"}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            ID 9794804 | nguyennogctuongvan4it@g...
+                            {session?.user?.email || user?.email}
                           </div>
                         </div>
                       </div>
@@ -541,7 +570,14 @@ export default function Header() {
                             type="button"
                             className="group w-full flex items-center justify-center gap-2 rounded-full bg-muted text-foreground hover:bg-muted/80 active:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none shadow-sm hover:shadow transition-all py-3 active:scale-[0.98]"
                             aria-label="Đăng xuất"
-                            onClick={() => console.log("logout")}
+                            onClick={() => {
+                              if (session?.user) {
+                                signOut({ callbackUrl: "/login" });
+                              } else {
+                                logout();
+                                router.push("/login");
+                              }
+                            }}
                           >
                             <LogOut className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
                             <span className="font-medium">Đăng xuất</span>

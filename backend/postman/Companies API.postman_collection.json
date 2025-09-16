@@ -1,0 +1,173 @@
+{
+  "info": {
+    "_postman_id": "d96624bc-a166-4a51-83bf-70da92793436",
+    "name": "Companies API",
+    "description": "Company management endpoints for company profiles, search, and management",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get All Companies",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{api_url}}/companies?page=1&limit=10&industry=tech&location=Ho Chi Minh&size=startup&search=innovation&sortBy=createdAt&sortOrder=desc",
+          "host": ["{{api_url}}"],
+          "path": ["companies"],
+          "query": [
+            { "key": "page", "value": "1" },
+            { "key": "limit", "value": "10" },
+            { "key": "industry", "value": "tech" },
+            { "key": "location", "value": "Ho Chi Minh" },
+            { "key": "size", "value": "startup" },
+            { "key": "search", "value": "innovation" },
+            { "key": "sortBy", "value": "createdAt" },
+            { "key": "sortOrder", "value": "desc" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Company by ID",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{api_url}}/companies/{{company_id}}",
+          "host": ["{{api_url}}"],
+          "path": ["companies", "{{company_id}}"]
+        }
+      }
+    },
+    {
+      "name": "Create Company",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Tech Solutions Inc\",\n  \"shortDescription\": \"Leading technology solutions provider\",\n  \"description\": \"We are a technology company focused on innovative solutions\",\n  \"industry\": {\n    \"primary\": \"tech\",\n    \"secondary\": [\"software\", \"ai\"],\n    \"tags\": [\"startup\", \"innovation\"]\n  },\n  \"size\": \"startup\",\n  \"employeeCount\": { \"min\": 10, \"max\": 50 },\n  \"companyType\": \"private\",\n  \"foundedYear\": 2020,\n  \"website\": \"https://techsolutions.com\",\n  \"location\": {\n    \"type\": \"onsite\",\n    \"headquarters\": {\n      \"address\": \"123 Tech Street\",\n      \"city\": \"Ho Chi Minh\",\n      \"district\": \"District 1\",\n      \"country\": \"VN\"\n    }\n  },\n  \"contact\": {\n    \"email\": \"contact@techsolutions.com\",\n    \"phone\": \"0123456789\"\n  },\n  \"culture\": {\n    \"values\": [\"innovation\", \"collaboration\"],\n    \"mission\": \"Innovate the future\",\n    \"vision\": \"Be the leading AI company\"\n  },\n  \"benefits\": [\n    {\"name\": \"Health Insurance\", \"category\": \"health\"},\n    {\"name\": \"Flexible Hours\", \"category\": \"work-life\"}\n  ],\n  \"internshipProgram\": {\n    \"hasProgram\": true,\n    \"programName\": \"Summer Tech Internship\",\n    \"description\": \"3-month intensive program\",\n    \"duration\": {\"min\": 3, \"unit\": \"months\"},\n    \"stipend\": {\"hasStipend\": true, \"amount\": {\"min\": 5000000}, \"currency\": \"VND\"},\n    \"benefits\": [\"mentorship\", \"networking\"]\n  }\n}"
+        },
+        "url": {
+          "raw": "{{api_url}}/companies",
+          "host": ["{{api_url}}"],
+          "path": ["companies"]
+        }
+      }
+    },
+    {
+      "name": "Update Company",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"description\": \"Updated description\",\n  \"culture\": {\"mission\": \"Empower young talents\"},\n  \"status\": \"pending\"\n}"
+        },
+        "url": {
+          "raw": "{{api_url}}/companies/{{company_id}}",
+          "host": ["{{api_url}}"],
+          "path": ["companies", "{{company_id}}"]
+        }
+      }
+    },
+    {
+      "name": "Delete Company",
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": {
+          "raw": "{{api_url}}/companies/{{company_id}}",
+          "host": ["{{api_url}}"],
+          "path": ["companies", "{{company_id}}"]
+        }
+      }
+    },
+    {
+      "name": "Get Company Jobs",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{api_url}}/companies/{{company_id}}/jobs?page=1&limit=10&status=active",
+          "host": ["{{api_url}}"],
+          "path": ["companies", "{{company_id}}", "jobs"],
+          "query": [
+            { "key": "page", "value": "1" },
+            { "key": "limit", "value": "10" },
+            { "key": "status", "value": "active" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get My Company",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "url": {
+          "raw": "{{api_url}}/companies/me",
+          "host": ["{{api_url}}"],
+          "path": ["companies", "me"]
+        }
+      }
+    },
+    {
+      "name": "Update My Company",
+      "request": {
+        "method": "PUT",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"shortDescription\": \"Updated my company short desc\"\n}"
+        },
+        "url": {
+          "raw": "{{api_url}}/companies/me",
+          "host": ["{{api_url}}"],
+          "path": ["companies", "me"]
+        }
+      }
+    },
+    {
+      "name": "Upload Company Logo (One-step)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "logo", "type": "file", "src": "path/to/logo.png" }
+          ]
+        },
+        "url": {
+          "raw": "{{api_url}}/upload/logo",
+          "host": ["{{api_url}}"],
+          "path": ["upload", "logo"]
+        }
+      }
+    },
+    {
+      "name": "Get Company Stats",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{api_url}}/companies/{{company_id}}/stats",
+          "host": ["{{api_url}}"],
+          "path": ["companies", "{{company_id}}", "stats"]
+        }
+      }
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [{ "key": "api_url", "value": "http://localhost:3000/api" }]
+}

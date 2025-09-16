@@ -6,6 +6,7 @@ const { v4: uuidv4 } = require('uuid');
 
 const User = require('../models/User');
 const Job = require('../models/Job');
+const Company = require('../models/Company');
 const Application = require('../models/Application');
 const aiService = require('../services/aiService');
 const { logger } = require('../utils/logger');
@@ -17,9 +18,11 @@ const storage = multer.diskStorage({
     cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
-    const uniqueName = `${uuidv4()}-${Date.now()}${path.extname(file.originalname)}`;
+    const uniqueName = `${uuidv4()}-${Date.now()}${path.extname(
+      file.originalname
+    )}`;
     cb(null, uniqueName);
-  }
+  },
 });
 
 const upload = multer({
@@ -29,7 +32,9 @@ const upload = multer({
   },
   fileFilter: function (req, file, cb) {
     const allowedTypes = /pdf|doc|docx/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const extname = allowedTypes.test(
+      path.extname(file.originalname).toLowerCase()
+    );
     const mimetype = allowedTypes.test(file.mimetype);
 
     if (mimetype && extname) {
@@ -37,7 +42,7 @@ const upload = multer({
     } else {
       cb(new Error('Only PDF, DOC, and DOCX files are allowed'));
     }
-  }
+  },
 });
 
 // @desc    Analyze CV/Resume
@@ -49,27 +54,28 @@ const analyzeCV = asyncHandler(async (req, res) => {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        error: 'Please upload a CV file'
+        error: 'Please upload a CV file',
       });
     }
 
     const filePath = req.file.path;
     const userId = req.user.id;
 
-    logger.info(`Starting CV analysis for user ${userId}`, { 
+    logger.info(`Starting CV analysis for user ${userId}`, {
       filename: req.file.filename,
-      originalName: req.file.originalname 
+      originalName: req.file.originalname,
     });
 
     // Extract text from CV
     const extractedText = await aiService.extractTextFromCV(filePath);
-    
+
     if (!extractedText || extractedText.trim().length === 0) {
       // Clean up uploaded file
       await fs.unlink(filePath);
       return res.status(400).json({
         success: false,
-        error: 'Could not extract text from CV. Please ensure the file is readable.'
+        error:
+          'Could not extract text from CV. Please ensure the file is readable.',
       });
     }
 
@@ -81,8 +87,8 @@ const analyzeCV = asyncHandler(async (req, res) => {
       resume: {
         url: filePath,
         filename: req.file.filename,
-        uploadedAt: new Date()
-      }
+        uploadedAt: new Date(),
+      },
     };
 
     // Update skills if extracted
@@ -90,7 +96,7 @@ const analyzeCV = asyncHandler(async (req, res) => {
       updateData.skills = analysis.skills.map(skill => ({
         name: skill.name,
         level: skill.level || 'intermediate',
-        yearsOfExperience: skill.yearsOfExperience || 0
+        yearsOfExperience: skill.yearsOfExperience || 0,
       }));
     }
 
@@ -107,9 +113,9 @@ const analyzeCV = asyncHandler(async (req, res) => {
     // Save updated user profile
     await User.findByIdAndUpdate(userId, updateData, { new: true });
 
-    logger.info(`CV analysis completed for user ${userId}`, { 
+    logger.info(`CV analysis completed for user ${userId}`, {
       skillsCount: analysis.skills?.length || 0,
-      experienceCount: analysis.experience?.length || 0 
+      experienceCount: analysis.experience?.length || 0,
     });
 
     res.status(200).json({
@@ -118,10 +124,9 @@ const analyzeCV = asyncHandler(async (req, res) => {
         analysis,
         extractedText: extractedText.substring(0, 500) + '...', // First 500 chars for preview
         filename: req.file.filename,
-        uploadedAt: new Date()
-      }
+        uploadedAt: new Date(),
+      },
     });
-
   } catch (error) {
     // Clean up uploaded file in case of error
     if (req.file && req.file.path) {
@@ -135,7 +140,7 @@ const analyzeCV = asyncHandler(async (req, res) => {
     logger.error('CV analysis error:', error);
     res.status(500).json({
       success: false,
-      error: 'CV analysis failed. Please try again.'
+      error: 'CV analysis failed. Please try again.',
     });
   }
 });
@@ -153,45 +158,49 @@ const getJobRecommendations = asyncHandler(async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        error: 'User not found'
+        error: 'User not found',
       });
     }
 
     // Get active jobs
-    const jobs = await Job.findActive().populate('postedBy', 'firstName lastName company');
+    const jobs = await Job.findActive().populate(
+      'postedBy',
+      'firstName lastName company'
+    );
 
     if (jobs.length === 0) {
       return res.status(200).json({
         success: true,
         data: {
           recommendations: [],
-          message: 'No active jobs available at the moment'
-        }
+          message: 'No active jobs available at the moment',
+        },
       });
     }
 
     // Get recommendations from AI service
     const recommendations = await aiService.getJobRecommendations(user, jobs, {
       limit: parseInt(limit),
-      minScore: parseInt(minScore)
+      minScore: parseInt(minScore),
     });
 
-    logger.info(`Generated ${recommendations.length} job recommendations for user ${userId}`);
+    logger.info(
+      `Generated ${recommendations.length} job recommendations for user ${userId}`
+    );
 
     res.status(200).json({
       success: true,
       data: {
         recommendations,
         totalJobs: jobs.length,
-        filteredCount: recommendations.length
-      }
+        filteredCount: recommendations.length,
+      },
     });
-
   } catch (error) {
     logger.error('Job recommendations error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to generate job recommendations'
+      error: 'Failed to generate job recommendations',
     });
   }
 });
@@ -201,14 +210,19 @@ const getJobRecommendations = asyncHandler(async (req, res) => {
 // @access  Private
 const generateSkillRoadmap = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-  const { targetRole, targetSkills, timeframe = 12, currentLevel = 'beginner' } = req.body;
+  const {
+    targetRole,
+    targetSkills,
+    timeframe = 12,
+    currentLevel = 'beginner',
+  } = req.body;
 
   try {
     // Validate input
     if (!targetRole && (!targetSkills || targetSkills.length === 0)) {
       return res.status(400).json({
         success: false,
-        error: 'Please provide either a target role or target skills'
+        error: 'Please provide either a target role or target skills',
       });
     }
 
@@ -217,7 +231,7 @@ const generateSkillRoadmap = asyncHandler(async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        error: 'User not found'
+        error: 'User not found',
       });
     }
 
@@ -227,25 +241,24 @@ const generateSkillRoadmap = asyncHandler(async (req, res) => {
       targetRole,
       targetSkills,
       timeframe: parseInt(timeframe),
-      currentLevel
+      currentLevel,
     });
 
-    logger.info(`Generated skill roadmap for user ${userId}`, { 
-      targetRole, 
-      timeframe, 
-      skillsCount: roadmap.skills?.length || 0 
+    logger.info(`Generated skill roadmap for user ${userId}`, {
+      targetRole,
+      timeframe,
+      skillsCount: roadmap.skills?.length || 0,
     });
 
     res.status(200).json({
       success: true,
-      data: roadmap
+      data: roadmap,
     });
-
   } catch (error) {
     logger.error('Skill roadmap generation error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to generate skill roadmap'
+      error: 'Failed to generate skill roadmap',
     });
   }
 });
@@ -265,15 +278,18 @@ const analyzeJobPosting = asyncHandler(async (req, res) => {
       if (!job) {
         return res.status(404).json({
           success: false,
-          error: 'Job not found'
+          error: 'Job not found',
         });
       }
 
       // Check if user owns this job
-      if (job.postedBy.toString() !== req.user.id && req.user.role !== 'admin') {
+      if (
+        job.postedBy.toString() !== req.user.id &&
+        req.user.role !== 'admin'
+      ) {
         return res.status(403).json({
           success: false,
-          error: 'Not authorized to analyze this job'
+          error: 'Not authorized to analyze this job',
         });
       }
     } else if (jobDescription) {
@@ -282,7 +298,7 @@ const analyzeJobPosting = asyncHandler(async (req, res) => {
     } else {
       return res.status(400).json({
         success: false,
-        error: 'Please provide either jobId or jobDescription'
+        error: 'Please provide either jobId or jobDescription',
       });
     }
 
@@ -293,26 +309,25 @@ const analyzeJobPosting = asyncHandler(async (req, res) => {
     if (jobId && job._id) {
       job.aiAnalysis = {
         ...analysis,
-        lastAnalyzed: new Date()
+        lastAnalyzed: new Date(),
       };
       await job.save();
     }
 
-    logger.info(`Job analysis completed`, { 
+    logger.info(`Job analysis completed`, {
       jobId: jobId || 'description-only',
-      skillsFound: analysis.skillsExtracted?.length || 0 
+      skillsFound: analysis.skillsExtracted?.length || 0,
     });
 
     res.status(200).json({
       success: true,
-      data: analysis
+      data: analysis,
     });
-
   } catch (error) {
     logger.error('Job analysis error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to analyze job posting'
+      error: 'Failed to analyze job posting',
     });
   }
 });
@@ -330,7 +345,7 @@ const getMatchScore = asyncHandler(async (req, res) => {
     if (!job) {
       return res.status(404).json({
         success: false,
-        error: 'Job not found'
+        error: 'Job not found',
       });
     }
 
@@ -340,15 +355,20 @@ const getMatchScore = asyncHandler(async (req, res) => {
     if (!applicant) {
       return res.status(404).json({
         success: false,
-        error: 'Applicant not found'
+        error: 'Applicant not found',
       });
     }
 
     // Check authorization
-    if (applicantId && applicantId !== userId && req.user.role !== 'admin' && job.postedBy.toString() !== userId) {
+    if (
+      applicantId &&
+      applicantId !== userId &&
+      req.user.role !== 'admin' &&
+      job.postedBy.toString() !== userId
+    ) {
       return res.status(403).json({
         success: false,
-        error: 'Not authorized to view this match score'
+        error: 'Not authorized to view this match score',
       });
     }
 
@@ -358,9 +378,9 @@ const getMatchScore = asyncHandler(async (req, res) => {
     // Check if there's an existing application
     let application = null;
     if (targetApplicantId === userId) {
-      application = await Application.findOne({ 
-        job: jobId, 
-        applicant: targetApplicantId 
+      application = await Application.findOne({
+        job: jobId,
+        applicant: targetApplicantId,
       });
 
       // Update application with match score if it exists
@@ -368,16 +388,16 @@ const getMatchScore = asyncHandler(async (req, res) => {
         application.aiAnalysis = {
           ...application.aiAnalysis,
           ...matchScore,
-          lastAnalyzed: new Date()
+          lastAnalyzed: new Date(),
         };
         await application.save();
       }
     }
 
-    logger.info(`Match score calculated`, { 
-      jobId, 
-      applicantId: targetApplicantId, 
-      score: matchScore.overallScore 
+    logger.info(`Match score calculated`, {
+      jobId,
+      applicantId: targetApplicantId,
+      score: matchScore.overallScore,
     });
 
     res.status(200).json({
@@ -385,15 +405,14 @@ const getMatchScore = asyncHandler(async (req, res) => {
       data: {
         matchScore,
         hasApplication: !!application,
-        applicationId: application?._id
-      }
+        applicationId: application?._id,
+      },
     });
-
   } catch (error) {
     logger.error('Match score calculation error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to calculate match score'
+      error: 'Failed to calculate match score',
     });
   }
 });
@@ -421,26 +440,28 @@ const getAIInsights = asyncHandler(async (req, res) => {
         skillGaps: await aiService.identifySkillGaps(user),
         applicationInsights: {
           totalApplications: applications.length,
-          averageScore: applications.reduce((acc, app) => 
-            acc + (app.aiAnalysis?.overallScore || 0), 0) / Math.max(applications.length, 1),
+          averageScore:
+            applications.reduce(
+              (acc, app) => acc + (app.aiAnalysis?.overallScore || 0),
+              0
+            ) / Math.max(applications.length, 1),
           topMatchingJobs: applications
             .filter(app => app.aiAnalysis?.overallScore > 80)
             .map(app => ({
               job: app.job,
-              score: app.aiAnalysis.overallScore
-            }))
+              score: app.aiAnalysis.overallScore,
+            })),
         },
         recommendations: {
           skillsToImprove: await aiService.getSkillRecommendations(user),
-          careerSuggestions: await aiService.getCareerSuggestions(user)
-        }
+          careerSuggestions: await aiService.getCareerSuggestions(user),
+        },
       };
-
     } else if (userRole === 'employer') {
       // Employer insights
       const jobs = await Job.find({ postedBy: userId });
-      const applications = await Application.find({ 
-        job: { $in: jobs.map(j => j._id) } 
+      const applications = await Application.find({
+        job: { $in: jobs.map(j => j._id) },
       }).populate('applicant', 'firstName lastName');
 
       insights = {
@@ -449,17 +470,16 @@ const getAIInsights = asyncHandler(async (req, res) => {
         marketTrends: await aiService.getMarketTrends(),
         recommendations: {
           jobOptimization: await aiService.getJobOptimizationTips(jobs),
-          talentPool: await aiService.getTalentPoolInsights()
-        }
+          talentPool: await aiService.getTalentPoolInsights(),
+        },
       };
-
     } else if (userRole === 'admin') {
       // Admin insights
       insights = {
         platformStats: await aiService.getPlatformStatistics(),
         userBehavior: await aiService.getUserBehaviorInsights(),
         systemPerformance: await aiService.getSystemPerformanceMetrics(),
-        trends: await aiService.getPlatformTrends()
+        trends: await aiService.getPlatformTrends(),
       };
     }
 
@@ -467,14 +487,13 @@ const getAIInsights = asyncHandler(async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: insights
+      data: insights,
     });
-
   } catch (error) {
     logger.error('AI insights error:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to generate AI insights'
+      error: 'Failed to generate AI insights',
     });
   }
 });
@@ -492,28 +511,30 @@ const batchAnalyzeApplications = asyncHandler(async (req, res) => {
     if (!job) {
       return res.status(404).json({
         success: false,
-        error: 'Job not found'
+        error: 'Job not found',
       });
     }
 
     if (job.postedBy.toString() !== userId && req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
-        error: 'Not authorized to analyze applications for this job'
+        error: 'Not authorized to analyze applications for this job',
       });
     }
 
     // Get all applications for this job
-    const applications = await Application.find({ job: jobId })
-      .populate('applicant', 'firstName lastName skills experience education');
+    const applications = await Application.find({ job: jobId }).populate(
+      'applicant',
+      'firstName lastName skills experience education'
+    );
 
     if (applications.length === 0) {
       return res.status(200).json({
         success: true,
         data: {
           message: 'No applications found for this job',
-          analyzed: 0
-        }
+          analyzed: 0,
+        },
       });
     }
 
@@ -521,36 +542,38 @@ const batchAnalyzeApplications = asyncHandler(async (req, res) => {
     const analysisResults = [];
     for (const application of applications) {
       try {
-        const matchScore = await aiService.calculateMatchScore(application.applicant, job);
-        
+        const matchScore = await aiService.calculateMatchScore(
+          application.applicant,
+          job
+        );
+
         application.aiAnalysis = {
           ...application.aiAnalysis,
           ...matchScore,
-          lastAnalyzed: new Date()
+          lastAnalyzed: new Date(),
         };
-        
+
         await application.save();
         analysisResults.push({
           applicationId: application._id,
           applicantName: application.applicant.fullName,
           score: matchScore.overallScore,
-          status: 'analyzed'
+          status: 'analyzed',
         });
-
       } catch (error) {
         logger.error(`Error analyzing application ${application._id}:`, error);
         analysisResults.push({
           applicationId: application._id,
           applicantName: application.applicant.fullName,
           status: 'error',
-          error: error.message
+          error: error.message,
         });
       }
     }
 
-    logger.info(`Batch analysis completed for job ${jobId}`, { 
+    logger.info(`Batch analysis completed for job ${jobId}`, {
       totalApplications: applications.length,
-      successful: analysisResults.filter(r => r.status === 'analyzed').length
+      successful: analysisResults.filter(r => r.status === 'analyzed').length,
     });
 
     res.status(200).json({
@@ -560,15 +583,14 @@ const batchAnalyzeApplications = asyncHandler(async (req, res) => {
         totalApplications: applications.length,
         analyzed: analysisResults.filter(r => r.status === 'analyzed').length,
         errors: analysisResults.filter(r => r.status === 'error').length,
-        results: analysisResults
-      }
+        results: analysisResults,
+      },
     });
-
   } catch (error) {
     logger.error('Batch analysis error:', error);
     res.status(500).json({
       success: false,
-      error: 'Batch analysis failed'
+      error: 'Batch analysis failed',
     });
   }
 });
@@ -580,5 +602,5 @@ module.exports = {
   analyzeJobPosting,
   getMatchScore,
   getAIInsights,
-  batchAnalyzeApplications
+  batchAnalyzeApplications,
 };

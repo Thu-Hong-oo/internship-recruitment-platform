@@ -1,273 +1,222 @@
 const mongoose = require('mongoose');
 
+const JobSchema = new mongoose.Schema(
+  {
+    employer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'EmployerProfile',
+      required: true,
+    },
 
+    title: {
+      type: String,
+      required: [true, 'Vui lòng nhập tiêu đề công việc'],
+      trim: true,
+      maxlength: [100, 'Tiêu đề không được vượt quá 100 ký tự'],
+    },
 
-const JobSchema = new mongoose.Schema({
-  title: {
-    type: String,
-    required: [true, 'Please add a job title'],
-    trim: true,
-    maxlength: [100, 'Job title cannot be more than 100 characters']
-  },
-  description: {
-    type: String,
-    required: [true, 'Please add a job description'],
-    maxlength: [2000, 'Description cannot be more than 2000 characters']
-  },
-  company: {
-    type: String,
-    required: [true, 'Please add a company name'],
-    trim: true,
-    maxlength: [100, 'Company name cannot be more than 100 characters']
-  },
-  location: {
-    city: {
+    description: {
       type: String,
-      required: [true, 'Please add a city']
+      required: [true, 'Vui lòng nhập mô tả công việc'],
+      maxlength: [5000, 'Mô tả không được vượt quá 5000 ký tự'],
     },
-    state: String,
-    country: {
-      type: String,
-      default: 'Vietnam'
-    },
-    remote: {
-      type: Boolean,
-      default: false
-    }
-  },
-  employmentType: {
-    type: String,
-    enum: ['internship', 'part-time', 'full-time', 'contract', 'freelance'],
-    required: [true, 'Please add employment type']
-  },
-  salaryRange: {
-    min: {
-      type: Number,
-      min: 0
-    },
-    max: {
-      type: Number,
-      min: 0
-    },
-    currency: {
-      type: String,
-      default: 'VND'
-    },
-    period: {
-      type: String,
-      enum: ['hourly', 'daily', 'weekly', 'monthly', 'yearly'],
-      default: 'monthly'
-    }
-  },
-  requirements: {
-    education: {
-      level: {
-        type: String,
-        enum: ['high-school', 'associate', 'bachelor', 'master', 'phd', 'any'],
-        default: 'any'
-      },
-      field: [String]
-    },
-    experience: {
-      years: {
-        type: Number,
-        min: 0,
-        default: 0
-      },
-      level: {
-        type: String,
-        enum: ['entry', 'junior', 'mid', 'senior', 'lead', 'any'],
-        default: 'entry'
-      }
-    },
-    skills: {
-      required: [{
-        name: String,
-        level: {
-          type: String,
-          enum: ['beginner', 'intermediate', 'advanced'],
-          default: 'beginner'
+
+    requirements: {
+      skills: [
+        {
+          name: String,
+          level: String,
+          required: Boolean,
+          weight: {
+            type: Number,
+            default: 1,
+          },
         },
-        priority: {
+      ],
+      education: {
+        level: String,
+        majors: [String],
+        required: Boolean,
+      },
+      experience: {
+        years: Number,
+        description: String,
+      },
+      languages: [
+        {
+          name: String,
+          level: String,
+        },
+      ],
+      other: [String],
+    },
+
+    benefits: {
+      salary: {
+        min: Number,
+        max: Number,
+        currency: {
           type: String,
-          enum: ['must-have', 'nice-to-have'],
-          default: 'must-have'
-        }
-      }],
-      preferred: [String]
+          default: 'VND',
+        },
+        negotiable: Boolean,
+      },
+      perks: [String],
+      training: String,
+      opportunities: [String],
     },
-    languages: [{
-      name: String,
-      level: {
+
+    details: {
+      type: {
         type: String,
-        enum: ['basic', 'conversational', 'fluent', 'native'],
-        default: 'basic'
-      }
-    }]
-  },
-  benefits: [String],
-  applicationDeadline: {
-    type: Date,
-    required: [true, 'Please add application deadline']
-  },
-  startDate: {
-    type: Date
-  },
-  duration: {
-    months: Number,
-    description: String
-  },
-  contactInfo: {
-    email: {
+        enum: Object.values(
+          require('../constants/common.constants').INTERNSHIP_TYPES
+        ),
+        required: true,
+      },
+      duration: {
+        value: Number,
+        unit: {
+          type: String,
+          enum: Object.values(
+            require('../constants/common.constants').DURATION_UNITS
+          ),
+          default: require('../constants/common.constants').DURATION_UNITS
+            .MONTHS,
+        },
+      },
+      startDate: Date,
+      locations: [
+        {
+          city: String,
+          district: String,
+          address: String,
+        },
+      ],
+      positions: Number,
+      applicationDeadline: Date,
+    },
+
+    status: {
       type: String,
-      match: [
-        /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
-        'Please add a valid email'
-      ]
+      enum: Object.values(require('../constants/common.constants').JOB_STATUS),
+      default: require('../constants/common.constants').JOB_STATUS.DRAFT,
     },
-    phone: String,
-    website: String
-  },
-  postedBy: {
-    type: mongoose.Schema.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  status: {
-    type: String,
-    enum: ['draft', 'active', 'paused', 'closed', 'cancelled'],
-    default: 'active'
-  },
-  isVerified: {
-    type: Boolean,
-    default: false
-  },
-  viewCount: {
-    type: Number,
-    default: 0
-  },
-  applicationCount: {
-    type: Number,
-    default: 0
-  },
-  tags: [String],
-  
-  // AI Analysis Fields
-  aiAnalysis: {
-    skillsExtracted: [String],
-    difficultyLevel: {
-      type: String,
-      enum: ['entry', 'junior', 'mid', 'senior'],
-      default: 'entry'
+
+    statistics: {
+      views: {
+        type: Number,
+        default: 0,
+      },
+      applications: {
+        total: {
+          type: Number,
+          default: 0,
+        },
+        pending: {
+          type: Number,
+          default: 0,
+        },
+        reviewing: {
+          type: Number,
+          default: 0,
+        },
+        shortlisted: {
+          type: Number,
+          default: 0,
+        },
+        interviewed: {
+          type: Number,
+          default: 0,
+        },
+        offered: {
+          type: Number,
+          default: 0,
+        },
+        accepted: {
+          type: Number,
+          default: 0,
+        },
+        rejected: {
+          type: Number,
+          default: 0,
+        },
+      },
     },
-    matchingScore: {
-      type: Number,
-      min: 0,
-      max: 100
+
+    nlpAnalysis: {
+      keywords: [String],
+      requiredSkills: [
+        {
+          name: String,
+          confidence: Number,
+          context: String,
+        },
+      ],
+      suggestedCandidates: [
+        {
+          internId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'CandidateProfile',
+          },
+          score: Number,
+          matchingSkills: [String],
+        },
+      ],
+      analyzedAt: Date,
     },
-    embedding: [Number], // Vector embedding for similarity search
-    lastAnalyzed: Date,
-    keywords: [String],
-    category: String,
-    estimatedApplications: Number
   },
-  
-  // SEO and Search
-  slug: String,
-  
-  // Internal tracking
-  internalNotes: String,
-  priority: {
-    type: String,
-    enum: ['low', 'medium', 'high', 'urgent'],
-    default: 'medium'
+  {
+    timestamps: true,
   }
-}, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
-});
+);
 
-// Virtuals
-JobSchema.virtual('isActive').get(function() {
-  return this.status === 'active' && this.applicationDeadline > new Date();
-});
-
-JobSchema.virtual('daysLeft').get(function() {
-  const today = new Date();
-  const deadline = new Date(this.applicationDeadline);
-  const diffTime = deadline - today;
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return Math.max(0, diffDays);
-});
-
-JobSchema.virtual('applications', {
-  ref: 'Application',
-  localField: '_id',
-  foreignField: 'job',
-  justOne: false
-});
-
-// Indexes for better search performance
-JobSchema.index({ title: 'text', description: 'text', company: 'text' });
-JobSchema.index({ 'location.city': 1, 'location.country': 1 });
-JobSchema.index({ employmentType: 1 });
+// Indexes
+JobSchema.index({ title: 'text', description: 'text' });
+JobSchema.index({ employer: 1 });
 JobSchema.index({ status: 1 });
-JobSchema.index({ applicationDeadline: 1 });
-JobSchema.index({ postedBy: 1 });
+JobSchema.index({ 'details.locations.city': 1 });
+JobSchema.index({ 'requirements.skills.name': 1 });
 JobSchema.index({ createdAt: -1 });
-JobSchema.index({ 'requirements.skills.required.name': 1 });
-JobSchema.index({ 'aiAnalysis.category': 1 });
-JobSchema.index({ 'aiAnalysis.difficultyLevel': 1 });
 
-// Compound indexes
-JobSchema.index({ status: 1, applicationDeadline: 1 });
-JobSchema.index({ employmentType: 1, 'location.city': 1 });
-JobSchema.index({ 'requirements.experience.level': 1, employmentType: 1 });
-
-// Create slug before saving
-JobSchema.pre('save', function(next) {
-  if (this.isModified('title')) {
-    this.slug = this.title
-      .toLowerCase()
-      .replace(/[^a-zA-Z0-9]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
-  }
-  next();
+// Virtual field for remaining days until deadline
+JobSchema.virtual('remainingDays').get(function () {
+  if (!this.details.applicationDeadline) return null;
+  const now = new Date();
+  const deadline = new Date(this.details.applicationDeadline);
+  const diffTime = deadline - now;
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 });
 
-// Update application count when applications change
-JobSchema.methods.updateApplicationCount = async function() {
+// Methods
+JobSchema.methods.updateStatistics = async function () {
   const Application = mongoose.model('Application');
-  const count = await Application.countDocuments({ job: this._id });
-  this.applicationCount = count;
-  await this.save();
+
+  const stats = await Application.aggregate([
+    { $match: { jobId: this._id } },
+    {
+      $group: {
+        _id: '$status',
+        count: { $sum: 1 },
+      },
+    },
+  ]);
+
+  stats.forEach(stat => {
+    this.statistics.applications[stat._id] = stat.count;
+  });
+
+  this.statistics.applications.total = stats.reduce(
+    (acc, curr) => acc + curr.count,
+    0
+  );
+
+  return this.save();
 };
 
-// Static methods
-JobSchema.statics.findActive = function() {
-  return this.find({
-    status: 'active',
-    applicationDeadline: { $gt: new Date() }
-  });
-};
-
-JobSchema.statics.findBySkills = function(skills) {
-  return this.find({
-    'requirements.skills.required.name': { $in: skills }
-  });
-};
-
-JobSchema.statics.findByLocation = function(city, country = 'Vietnam') {
-  return this.find({
-    $or: [
-      { 'location.city': new RegExp(city, 'i') },
-      { 'location.remote': true }
-    ],
-    'location.country': country
-  });
+JobSchema.methods.incrementViews = async function () {
+  this.statistics.views += 1;
+  return this.save();
 };
 
 module.exports = mongoose.model('Job', JobSchema);
-

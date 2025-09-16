@@ -9,7 +9,7 @@ html.dark {
 }
 
 :root {
-  /* Updated color palette for modern, professional TopCV design */
+  /* Updated color palette for modern, professional InternBridge design */
   --background: oklch(1 0 0); /* Pure white background */
   --foreground: oklch(0.35 0 0); /* Dark gray for main text */
   --card: oklch(0.98 0 0); /* Light gray for cards */

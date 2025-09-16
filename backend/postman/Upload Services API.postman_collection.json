@@ -1,0 +1,218 @@
+{
+	"info": {
+		"_postman_id": "7d1e7fff-fa61-4898-83df-831b7d509be5",
+		"name": "Upload Services API",
+		"description": "File upload services for images, avatars, company logos, and document management",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "38146107",
+		"_collection_link": "https://intership-platform.postman.co/workspace/Team-Workspace~96be9a72-219c-4bbc-8714-71a2edb8a68d/collection/38146107-7d1e7fff-fa61-4898-83df-831b7d509be5?action=share&source=collection_link&creator=38146107"
+	},
+	"item": [
+		{
+			"name": "Upload Single Image",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "image",
+							"type": "file",
+							"src": "path/to/image.jpg"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{api_url}}/upload/image",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"upload",
+						"image"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Upload Multiple Images",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "images",
+							"type": "file",
+							"src": "path/to/image1.jpg"
+						},
+						{
+							"key": "images",
+							"type": "file",
+							"src": "path/to/image2.jpg"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{api_url}}/upload/images",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"upload",
+						"images"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Upload Avatar",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "avatar",
+							"type": "file",
+							"src": "path/to/avatar.jpg"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{api_url}}/upload/avatar",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"upload",
+						"avatar"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Upload Company Logo",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "logo",
+							"type": "file",
+							"src": "path/to/logo.png"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{api_url}}/upload/company-logo",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"upload",
+						"company-logo"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Delete Image",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					}
+				],
+				"url": {
+					"raw": "{{api_url}}/upload/{{public_id}}",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"upload",
+						"{{public_id}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Image Info",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					}
+				],
+				"url": {
+					"raw": "{{api_url}}/upload/{{public_id}}/info",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"upload",
+						"{{public_id}}",
+						"info"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "api_url",
+			"value": "http://localhost:3000/api",
+			"type": "string"
+		}
+	]
+}

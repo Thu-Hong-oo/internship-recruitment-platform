@@ -1,5 +1,6 @@
 const express = require('express');
 const { protect, authorize } = require('../middleware/auth');
+const { uploadRateLimit } = require('../middleware/globalRateLimit');
 const {
   analyzeCV,
   getJobRecommendations,
@@ -59,7 +60,7 @@ router.use(protect);
  *                       type: string
  *                       format: date-time
  */
-router.post('/analyze-cv', analyzeCV);
+router.post('/analyze-cv', uploadRateLimit, analyzeCV);
 
 /**
  * @swagger

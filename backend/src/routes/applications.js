@@ -1,13 +1,39 @@
 const express = require('express');
-const { protect, authorize } = require('../middleware/auth');
-
 const router = express.Router();
+const { protect, authorize } = require('../middleware/auth');
+const {
+  getApplication,
+  updateApplicationStatus,
+  scheduleInterview,
+  submitFeedback,
+  getApplicationTimeline,
+  withdrawApplication,
+  addInterviewFeedback,
+  uploadAttachment,
+  getApplicationAnalytics,
+  bulkUpdateStatus
+} = require('../controllers/applicationController');
 
-// TODO: Add application routes
-// GET /api/applications - Get all applications
-// GET /api/applications/:id - Get single application
-// POST /api/applications - Create application
-// PUT /api/applications/:id - Update application
-// DELETE /api/applications/:id - Delete application
+// Application Management
+router.get('/:id', protect, getApplication);
+router.put('/:id/status', protect, authorize('employer'), updateApplicationStatus);
+router.post('/:id/withdraw', protect, authorize('intern'), withdrawApplication);
+
+// Interview Process
+router.post('/:id/interview', protect, authorize('employer'), scheduleInterview);
+router.post('/:id/interview/feedback', protect, authorize('employer'), addInterviewFeedback);
+
+// Feedback & Timeline
+router.post('/:id/feedback', protect, submitFeedback);
+router.get('/:id/timeline', protect, getApplicationTimeline);
+
+// Attachments
+router.post('/:id/attachments', protect, uploadAttachment);
+
+// Analytics
+router.get('/:id/analytics', protect, authorize('employer'), getApplicationAnalytics);
+
+// Bulk Operations (Admin/Employer only)
+router.put('/bulk/status', protect, authorize(['admin', 'employer']), bulkUpdateStatus);
 
 module.exports = router;

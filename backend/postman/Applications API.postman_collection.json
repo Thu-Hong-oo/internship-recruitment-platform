@@ -1,0 +1,147 @@
+{
+	"info": {
+		"_postman_id": "c2f39972-364f-4985-a666-6dee8ac4363f",
+		"name": "Applications API",
+		"description": "Job application management endpoints for candidates and employers",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "38146107",
+		"_collection_link": "https://intership-platform.postman.co/workspace/Team-Workspace~96be9a72-219c-4bbc-8714-71a2edb8a68d/collection/38146107-c2f39972-364f-4985-a666-6dee8ac4363f?action=share&source=collection_link&creator=38146107"
+	},
+	"item": [
+		{
+			"name": "Get User Applications",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					}
+				],
+				"url": {
+					"raw": "{{api_url}}/applications?status=pending&page=1&limit=10",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"applications"
+					],
+					"query": [
+						{
+							"key": "status",
+							"value": "pending"
+						},
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "limit",
+							"value": "10"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Application by ID",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					}
+				],
+				"url": {
+					"raw": "{{api_url}}/applications/{{application_id}}",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"applications",
+						"{{application_id}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Update Application",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"coverLetter\": \"Updated cover letter\",\n  \"additionalInfo\": {\n    \"availableStartDate\": \"2024-07-01\"\n  }\n}"
+				},
+				"url": {
+					"raw": "{{api_url}}/applications/{{application_id}}",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"applications",
+						"{{application_id}}"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Delete Application",
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{token}}"
+					}
+				],
+				"url": {
+					"raw": "{{api_url}}/applications/{{application_id}}",
+					"host": [
+						"{{api_url}}"
+					],
+					"path": [
+						"applications",
+						"{{application_id}}"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "api_url",
+			"value": "http://localhost:3000/api",
+			"type": "string"
+		}
+	]
+}
