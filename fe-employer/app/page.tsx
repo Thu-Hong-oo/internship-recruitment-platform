@@ -3,13 +3,93 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Eye, EyeOff, Mail, Lock } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Mail,
+  Lock,
+  CheckCircle,
+  AlertCircle,
+  AlertTriangle,
+} from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
+  const [errorType, setErrorType] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (submitting) return;
+    setError(null);
+    setWarning(null);
+    setErrorType(null);
+    setSuccess(null);
+    setSubmitting(true);
+
+    try {
+      const res = await fetch("http://localhost:3000/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (data?.success) {
+        if (data?.token && typeof window !== "undefined") {
+          localStorage.setItem("token", data.token);
+        }
+        setSuccess("Đăng nhập thành công! Đang chuyển hướng...");
+        setTimeout(() => router.push("/dashboard"), 1000);
+        return;
+      }
+
+      // EMAIL_NOT_VERIFIED: chuyển qua xác thực
+      if (
+        data?.errorType === "EMAIL_NOT_VERIFIED" &&
+        data?.requiresEmailVerification
+      ) {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("pendingEmail", email);
+        }
+        router.push("/email-verification");
+        return;
+      }
+
+      // Các lỗi cụ thể
+      if (data?.errorType === "EMAIL_NOT_REGISTERED") {
+        setError("Email này chưa được đăng ký trong hệ thống");
+        setWarning("Bạn có thể đăng ký tài khoản mới hoặc kiểm tra lại email");
+      } else if (data?.errorType === "INVALID_PASSWORD") {
+        setError("Mật khẩu không chính xác");
+        setWarning(
+          "Vui lòng kiểm tra lại mật khẩu hoặc sử dụng tính năng quên mật khẩu"
+        );
+      } else if (data?.errorType === "GOOGLE_OAUTH_REQUIRED") {
+        setError("Tài khoản này sử dụng Google OAuth");
+        setWarning("Vui lòng đăng nhập bằng Google thay vì mật khẩu");
+      } else if (data?.errorType === "ACCOUNT_DISABLED") {
+        setError("Tài khoản đã bị vô hiệu hóa");
+        setWarning("Vui lòng liên hệ hỗ trợ để được hỗ trợ");
+      } else {
+        setError(data?.error || data?.message || "Đăng nhập thất bại");
+      }
+      setErrorType(data?.errorType || null);
+    } catch (err: any) {
+      setError(err?.message || "Đăng nhập thất bại");
+      setWarning("Vui lòng kiểm tra kết nối mạng và thử lại");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -61,6 +141,49 @@ export default function LoginPage() {
             </svg>
             Đăng nhập bằng Google
           </Button>
+
+          {/* Messages */}
+          {success && (
+            <div className="text-sm text-green-600 bg-green-50 border border-green-200 rounded-md p-4 mb-4">
+              <div className="flex items-start space-x-2">
+                <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
+                <div className="font-medium">{success}</div>
+              </div>
+            </div>
+          )}
+          {error && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-4 mb-4">
+              <div className="flex items-start space-x-2">
+                <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <div className="font-medium">{error}</div>
+                  {warning && (
+                    <div className="mt-1 text-red-500">{warning}</div>
+                  )}
+                  {errorType === "EMAIL_NOT_REGISTERED" && (
+                    <div className="mt-2">
+                      <Link
+                        href="/register"
+                        className="text-primary hover:underline font-medium inline-flex items-center"
+                      >
+                        Đăng ký tài khoản mới →
+                      </Link>
+                    </div>
+                  )}
+                  {errorType === "INVALID_PASSWORD" && (
+                    <div className="mt-2">
+                      <Link
+                        href="/forgot-password"
+                        className="text-primary hover:underline font-medium inline-flex items-center"
+                      >
+                        Quên mật khẩu? →
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Email Input */}
           <div className="mb-4">
@@ -118,8 +241,12 @@ export default function LoginPage() {
           </div>
 
           {/* Login Button */}
-          <Button className="w-full h-12 bg-primary hover:brightness-110 text-white font-medium mb-6">
-            Đăng nhập
+          <Button
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="w-full h-12 bg-primary hover:brightness-110 text-white font-medium mb-6 disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {submitting ? "Đang đăng nhập..." : "Đăng nhập"}
           </Button>
 
           {/* Sign Up Link */}
