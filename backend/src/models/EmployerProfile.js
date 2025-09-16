@@ -1,160 +1,101 @@
 const mongoose = require('mongoose');
+const {
+  USER_ROLES,
+  EMPLOYER_PROFILE_STATUS,
+} = require('../constants/common.constants');
+
+// Import sub-schemas
+const CompanyInfoSchema = require('./schemas/CompanyInfoSchema');
+const BusinessInfoSchema = require('./schemas/BusinessInfoSchema');
+const VerificationSchema = require('./schemas/VerificationSchema');
+
+// Import services
+const EmployerDocumentService = require('../services/EmployerDocumentService');
+const EmployerVerificationService = require('../services/EmployerVerificationService');
 
 const EmployerProfileSchema = new mongoose.Schema(
   {
-    userId: {
+    // Chủ tài khoản
+    mainUserId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
       unique: true,
     },
-    company: {
-      name: {
-        type: String,
-        required: true,
-      },
-      industry: {
-        type: String,
-        required: true,
-      },
-      size: {
-        type: String,
-        enum: ['startup', 'small', 'medium', 'large', 'enterprise'],
-        required: true,
-      },
-      website: String,
-      description: String,
-      foundedYear: Number,
-      headquarters: {
-        city: String,
-        country: String,
-      },
-    },
-    position: {
-      title: {
-        type: String,
-        required: true,
-      },
-      department: String,
-      level: {
-        type: String,
-        enum: [
-          'junior',
-          'mid-level',
-          'senior',
-          'manager',
-          'director',
-          'executive',
-        ],
-        required: true,
-      },
-      responsibilities: [String],
-      hiringAuthority: {
-        type: Boolean,
-        default: false,
+
+    // Thông tin công ty - sử dụng sub-schema
+    company: CompanyInfoSchema,
+
+    // Thông tin pháp lý - sử dụng sub-schema
+    businessInfo: BusinessInfoSchema,
+
+    // Người đại diện pháp luật - simplified
+    legalRepresentative: {
+      fullName: { type: String, required: true },
+      position: { type: String, required: true },
+      phone: { type: String, required: true },
+      email: { type: String, required: true },
+      identification: {
+        type: {
+          type: String,
+          enum: ['CMND', 'CCCD', 'Passport'],
+          required: false,
+        },
+        number: { type: String, required: false },
+        issueDate: { type: Date, required: false },
+        issuePlace: { type: String, required: false },
+        required: { type: Boolean, default: false },
+        requiredReason: String,
       },
     },
+
+    // Liên hệ chính
     contact: {
-      phone: String,
-      linkedin: String,
-      workEmail: String,
-      availability: {
-        type: String,
-        enum: ['weekdays', 'weekends', 'flexible'],
-        default: 'weekdays',
-      },
+      name: { type: String, required: true },
+      phone: { type: String, required: true },
+      email: { type: String, lowercase: true },
     },
-    preferences: {
-      internshipTypes: [
-        {
+
+    // Thành viên công ty - simplified
+    companyMembers: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        role: {
           type: String,
-          enum: ['full-time', 'part-time', 'remote', 'hybrid'],
+          enum: Object.values(USER_ROLES),
+          default: USER_ROLES.RECRUITER,
         },
-      ],
-      durations: [
-        {
+        permissions: {
+          canPostJobs: { type: Boolean, default: false },
+          canViewApplications: { type: Boolean, default: false },
+          canEditProfile: { type: Boolean, default: false },
+          canManageTeam: { type: Boolean, default: false },
+        },
+        status: {
           type: String,
-          enum: ['3-months', '6-months', '1-year', 'flexible'],
+          enum: ['active', 'inactive'],
+          default: 'active',
         },
-      ],
-      locations: [String],
-      skills: [
-        {
-          skillId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'Skill',
-          },
-          priority: {
-            type: String,
-            enum: ['required', 'preferred', 'bonus'],
-            default: 'preferred',
-          },
-        },
-      ],
-      salaryRange: {
-        min: Number,
-        max: Number,
-        currency: {
-          type: String,
-          default: 'VND',
-        },
+        addedAt: { type: Date, default: Date.now },
       },
-    },
-    hiring: {
-      totalPositions: {
-        type: Number,
-        default: 0,
-      },
-      activePositions: {
-        type: Number,
-        default: 0,
-      },
-      averageHiringTime: {
-        type: Number, // days
-        default: 30,
-      },
-      successRate: {
-        type: Number, // percentage
-        min: 0,
-        max: 100,
-        default: 0,
-      },
-    },
-    verification: {
-      isVerified: {
-        type: Boolean,
-        default: false,
-      },
-      verifiedAt: Date,
-      verifiedBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-      },
-      documents: [
-        {
-          type: {
-            type: String,
-            enum: [
-              'business-license',
-              'tax-certificate',
-              'company-registration',
-            ],
-            required: true,
-          },
-          url: String,
-          filename: String,
-          uploadedAt: Date,
-          verified: {
-            type: Boolean,
-            default: false,
-          },
-        },
-      ],
-    },
+    ],
+
+    // Xác thực - sử dụng sub-schema
+    verification: VerificationSchema,
+
+    // Status
     status: {
       type: String,
-      enum: ['active', 'inactive', 'suspended', 'pending'],
-      default: 'pending',
+      enum: Object.values(EMPLOYER_PROFILE_STATUS),
+      default: EMPLOYER_PROFILE_STATUS.DRAFT,
+    },
+
+    // Thống kê
+    stats: {
+      totalJobsPosted: { type: Number, default: 0 },
+      activeJobs: { type: Number, default: 0 },
+      totalApplications: { type: Number, default: 0 },
+      successfulHires: { type: Number, default: 0 },
     },
   },
   {
@@ -162,93 +103,93 @@ const EmployerProfileSchema = new mongoose.Schema(
   }
 );
 
-// Indexes
-EmployerProfileSchema.index({ userId: 1 });
+// === INDEXES ===
 EmployerProfileSchema.index({ 'company.name': 1 });
 EmployerProfileSchema.index({ 'company.industry': 1 });
-EmployerProfileSchema.index({ 'company.size': 1 });
-EmployerProfileSchema.index({ 'position.level': 1 });
-EmployerProfileSchema.index({ 'verification.isVerified': 1 });
+EmployerProfileSchema.index({ 'businessInfo.taxId': 1 }, { unique: true });
 EmployerProfileSchema.index({ status: 1 });
+EmployerProfileSchema.index({ 'verification.isVerified': 1 });
 
-// Virtuals
+// === VIRTUALS ===
 EmployerProfileSchema.virtual('isHiring').get(function () {
-  return this.hiring.activePositions > 0;
+  return this.stats.activeJobs > 0;
 });
 
-EmployerProfileSchema.virtual('hiringRate').get(function () {
-  if (this.hiring.totalPositions === 0) return 0;
-  return Math.round(
-    (this.hiring.successRate / 100) * this.hiring.totalPositions
-  );
+EmployerProfileSchema.virtual('verificationProgress').get(function () {
+  const service = new EmployerVerificationService(this);
+  return service.getVerificationProgress();
 });
 
-// Methods
-EmployerProfileSchema.methods.addDocument = function (type, url, filename) {
-  this.verification.documents.push({
-    type,
-    url,
-    filename,
-    uploadedAt: new Date(),
-  });
+// === ESSENTIAL METHODS ONLY ===
+EmployerProfileSchema.methods.updateStats = function (totalJobs, activeJobs) {
+  this.stats.totalJobsPosted = totalJobs;
+  this.stats.activeJobs = activeJobs;
   return this.save();
 };
 
-EmployerProfileSchema.methods.verifyDocument = function (documentId) {
-  const document = this.verification.documents.id(documentId);
-  if (document) {
-    document.verified = true;
-    return this.save();
-  }
-  throw new Error('Document not found');
+// Service getters - để access services
+EmployerProfileSchema.methods.getDocumentService = function () {
+  return new EmployerDocumentService(this);
 };
 
-EmployerProfileSchema.methods.updateHiringStats = function (
-  totalPositions,
-  activePositions,
-  successRate
-) {
-  this.hiring.totalPositions = totalPositions;
-  this.hiring.activePositions = activePositions;
-  this.hiring.successRate = successRate;
-  return this.save();
+EmployerProfileSchema.methods.getVerificationService = function () {
+  return new EmployerVerificationService(this);
 };
 
-// Statics
+// === STATIC METHODS ===
 EmployerProfileSchema.statics.findVerified = function () {
-  return this.find({ 'verification.isVerified': true, status: 'active' });
+  return this.find({
+    'verification.isVerified': true,
+    status: EMPLOYER_PROFILE_STATUS.VERIFIED,
+  });
 };
 
 EmployerProfileSchema.statics.findByIndustry = function (industry) {
   return this.find({ 'company.industry': { $regex: industry, $options: 'i' } });
 };
 
-EmployerProfileSchema.statics.findHiring = function () {
-  return this.find({ 'hiring.activePositions': { $gt: 0 } });
-};
-
-EmployerProfileSchema.statics.findByLocation = function (location) {
+EmployerProfileSchema.statics.findCanPostJobs = function () {
   return this.find({
-    'preferences.locations': { $regex: location, $options: 'i' },
+    status: {
+      $in: [EMPLOYER_PROFILE_STATUS.VERIFIED, EMPLOYER_PROFILE_STATUS.PENDING],
+    },
   });
 };
 
-// Pre-save middleware
+// === PRE-SAVE MIDDLEWARE ===
 EmployerProfileSchema.pre('save', function (next) {
-  // Auto-verify if all required documents are uploaded
-  if (this.verification.documents.length >= 2) {
-    const requiredDocs = ['business-license', 'tax-certificate'];
-    const hasRequiredDocs = requiredDocs.every(docType =>
-      this.verification.documents.some(
-        doc => doc.type === docType && doc.verified
-      )
-    );
+  const steps = this.verification.steps;
 
-    if (hasRequiredDocs && !this.verification.isVerified) {
-      this.verification.isVerified = true;
-      this.verification.verifiedAt = new Date();
-      this.status = 'active';
+  // Update basic info step
+  if (
+    this.company.name &&
+    this.company.industry &&
+    this.company.size &&
+    this.contact.name &&
+    this.contact.phone
+  ) {
+    steps.basicInfo = true;
+  }
+
+  // Update business info step
+  if (
+    this.businessInfo.registrationNumber &&
+    this.businessInfo.taxId &&
+    this.businessInfo.issueDate &&
+    this.businessInfo.issuePlace
+  ) {
+    steps.businessInfo = true;
+  }
+
+  // Update status based on steps
+  if (steps.basicInfo && steps.businessInfo) {
+    if (this.status === EMPLOYER_PROFILE_STATUS.DRAFT) {
+      this.status = EMPLOYER_PROFILE_STATUS.PENDING;
     }
+  }
+
+  if (steps.adminApproved && this.verification.isVerified) {
+    this.status = EMPLOYER_PROFILE_STATUS.VERIFIED;
   }
 
   next();

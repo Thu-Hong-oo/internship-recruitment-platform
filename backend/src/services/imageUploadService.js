@@ -1,9 +1,9 @@
 const { cloudinary } = require('./cloudinaryService');
 
 /**
- * Upload an image to Cloudinary with sane defaults per type
- * @param {('avatar'|'logo'|'image')} type
- * @param {string} filePath
+ * Upload an image to Cloudinary with optimized settings per type
+ * @param {('avatar'|'logo'|'cover'|'document')} type
+ * @param {Buffer|string} filePathOrBuffer
  * @param {object} options
  * @returns {Promise<{ publicId: string, url: string, bytes: number, format: string, width: number, height: number }>}
  */
@@ -12,31 +12,35 @@ async function uploadImage(type, filePathOrBuffer, options = {}) {
     avatar: {
       folder: 'internbridge/avatars',
       transformation: [
-        { width: 800, height: 800, crop: 'fill', gravity: 'face' },
+        { width: 400, height: 400, crop: 'fill', gravity: 'face' },
         { quality: 85, fetch_format: 'auto' },
       ],
+      allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
     },
     logo: {
       folder: 'internbridge/logos',
       transformation: [
-        { width: 1200, height: 600, crop: 'limit' },
+        { width: 800, height: 400, crop: 'limit' },
         { quality: 90, fetch_format: 'auto' },
       ],
+      allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'svg'],
     },
-    image: {
-      folder: options.folder || 'internbridge',
+    cover: {
+      folder: 'internbridge/covers',
       transformation: [
-        {
-          width: options.optimization?.maxWidth || 1920,
-          height: options.optimization?.maxHeight || 1080,
-          crop: 'limit',
-        },
-        { quality: options.optimization?.quality || 80, fetch_format: 'auto' },
+        { width: 1200, height: 600, crop: 'fill', gravity: 'center' },
+        { quality: 85, fetch_format: 'auto' },
       ],
+      allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    },
+    document: {
+      folder: 'internbridge/documents',
+      resource_type: 'auto',
+      allowed_formats: ['pdf', 'jpg', 'jpeg', 'png'],
     },
   };
 
-  const config = configByType[type] || configByType.image;
+  const config = { ...configByType[type], ...options };
 
   // Support both disk path and buffer (from multer.memoryStorage)
   let result;
@@ -65,4 +69,24 @@ async function uploadImage(type, filePathOrBuffer, options = {}) {
   };
 }
 
-module.exports = { uploadImage };
+/**
+ * Delete image from Cloudinary
+ * @param {string} publicId
+ * @returns {Promise<void>}
+ */
+async function deleteImage(publicId) {
+  try {
+    if (publicId && !publicId.includes('http')) {
+      await cloudinary.uploader.destroy(publicId);
+      console.log(`Deleted image: ${publicId}`);
+    }
+  } catch (error) {
+    console.error('Error deleting image from Cloudinary:', error);
+    throw error;
+  }
+}
+
+module.exports = {
+  uploadImage,
+  deleteImage,
+};
