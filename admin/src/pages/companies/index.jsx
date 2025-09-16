@@ -1,4 +1,6 @@
+
 import React, { useEffect, useMemo, useState } from "react";
+
 import {
   Card,
   Row,
@@ -9,6 +11,7 @@ import {
   Tag,
   Avatar,
   Statistic,
+
   Form,
   Select,
   Input,
@@ -21,6 +24,7 @@ import {
   UserOutlined,
   FileTextOutlined,
   StarOutlined,
+
   ReloadOutlined,
 } from "@ant-design/icons";
 import companiesAPI from "../../api/companies";
@@ -63,6 +67,7 @@ const Companies = () => {
       title: "Địa điểm",
       dataIndex: "location",
       key: "location",
+
       render: (_, record) =>
         record?.fullAddress || record?.location?.headquarters?.city || "-",
     },
@@ -100,12 +105,24 @@ const Companies = () => {
       title: "Trạng thái",
       dataIndex: "status",
       key: "status",
-      render: (status, record) => {
-        const verified = record?.verification?.isVerified;
-        const color = verified ? "green" : "orange";
-        const label = verified ? "Đã xác thực" : "Chờ duyệt";
-        return <Tag color={color}>{label}</Tag>;
-      },
+      render: (status) => (
+        <Tag
+          color={
+            status === "verified"
+              ? "green"
+              : status === "pending"
+              ? "orange"
+              : "red"
+          }
+        >
+          {status === "verified"
+            ? "Đã xác thực"
+            : status === "pending"
+            ? "Chờ duyệt"
+            : "Tạm khóa"}
+        </Tag>
+      ),
+
     },
     {
       title: "Hành động",
@@ -137,6 +154,7 @@ const Companies = () => {
       { title: "Chờ duyệt", value: pending, icon: <FileTextOutlined /> },
     ];
   }, [companies, total]);
+
 
   const fetchCompanies = async (
     page = pagination.current,

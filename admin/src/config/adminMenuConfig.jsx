@@ -22,7 +22,7 @@ import Posts from "../pages/admin/posts";
 const adminMenuConfig = [
   { key: "dashboard", label: "Trang chủ", path: "/admin/dashboard", icon: Icons.HomeIcon, element: <Dashboard userRole="admin" /> },
   { key: "charts", label: "Đồ thị", path: "/admin/charts", icon: Icons.ChartIcon, element: <Charts /> },
-  { key: "users", label: "Quản lý User", path: "/admin/users", icon: Icons.UserIcon, element: <Accounts /> },
+  { key: "users", label: "Quản lý các tài khoản", path: "/admin/users", icon: Icons.UserIcon, element: <Accounts /> },
   
   {
     key: "job-management",
