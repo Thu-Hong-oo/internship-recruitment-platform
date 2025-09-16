@@ -22,7 +22,9 @@ export default function EmailVerificationPage() {
   const [success, setSuccess] = useState("");
   const [email, setEmail] = useState("");
   const [countdown, setCountdown] = useState(0);
-  const [emailStatus, setEmailStatus] = useState<'checking' | 'valid' | 'invalid' | 'unknown'>('checking');
+  const [emailStatus, setEmailStatus] = useState<
+    "checking" | "valid" | "invalid" | "unknown"
+  >("checking");
   const [emailError, setEmailError] = useState("");
 
   const { verifyEmail, getStoredEmail } = useAuth();
@@ -44,11 +46,11 @@ export default function EmailVerificationPage() {
   const checkUnverifiedAccount = async (emailToCheck: string) => {
     try {
       const data = await authAPI.getUnverifiedAccount(emailToCheck);
-      
+
       if (data.success && data.data) {
         // Tài khoản chưa xác thực tồn tại
-        setEmailStatus('valid');
-        
+        setEmailStatus("valid");
+
         // // Hiển thị thông tin tài khoản với fallback tên
         // const displayName = (
         //   (data.data.firstName || data.data.lastName)
@@ -60,27 +62,27 @@ export default function EmailVerificationPage() {
         // setSuccess(`Tìm thấy tài khoản chưa xác thực cho ${displayName}`);
       } else if (data.expired) {
         // Mã xác thực đã hết hạn
-        setEmailStatus('invalid');
-        setEmailError('Mã xác thực đã hết hạn. Vui lòng đăng ký lại.');
+        setEmailStatus("invalid");
+        setEmailError("Mã xác thực đã hết hạn. Vui lòng đăng ký lại.");
       } else {
         // Không tìm thấy tài khoản chưa xác thực
-        setEmailStatus('unknown');
-        setEmailError('Không tìm thấy tài khoản chưa xác thực với email này.');
+        setEmailStatus("unknown");
+        setEmailError("Không tìm thấy tài khoản chưa xác thực với email này.");
       }
     } catch (error) {
-      console.error('Error checking unverified account:', error);
-      setEmailStatus('unknown');
-      setEmailError('Lỗi khi kiểm tra tài khoản. Vui lòng thử lại.');
+      console.error("Error checking unverified account:", error);
+      setEmailStatus("unknown");
+      setEmailError("Lỗi khi kiểm tra tài khoản. Vui lòng thử lại.");
     }
   };
 
   const checkEmailStatus = async (emailToCheck: string) => {
     try {
       // Fallback function - not used in current flow
-      setEmailStatus('unknown');
+      setEmailStatus("unknown");
     } catch (error) {
-      console.error('Error checking email status:', error);
-      setEmailStatus('unknown');
+      console.error("Error checking email status:", error);
+      setEmailStatus("unknown");
     }
   };
 
@@ -125,7 +127,9 @@ export default function EmailVerificationPage() {
           router.push("/login");
         }, 2000);
       } else {
-        setError(response.error || response.message || "Xác thực email thất bại");
+        setError(
+          response.error || response.message || "Xác thực email thất bại"
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Xác thực email thất bại");
@@ -136,24 +140,25 @@ export default function EmailVerificationPage() {
 
   const handleResendOTP = async () => {
     if (!email) return;
-    
+
     setCountdown(60); // 60 seconds cooldown
     setError("");
     setSuccess("");
-    
+
     try {
       const response = await authAPI.resendEmailVerification(email);
-      
+
       if (response.success) {
         setSuccess(response.message || "Mã OTP đã được gửi lại!");
       } else {
-        setError(response.error || response.message || "Không thể gửi lại mã OTP");
+        setError(
+          response.error || response.message || "Không thể gửi lại mã OTP"
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Không thể gửi lại mã OTP");
     }
   };
-
 
   if (!email) {
     return (
@@ -166,14 +171,16 @@ export default function EmailVerificationPage() {
   }
 
   // Show loading while checking email status
-  if (emailStatus === 'checking') {
+  if (emailStatus === "checking") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
             <RefreshCw className="w-8 h-8 text-primary animate-spin" />
           </div>
-          <h1 className="text-2xl font-bold text-primary">Đang kiểm tra email...</h1>
+          <h1 className="text-2xl font-bold text-primary">
+            Đang kiểm tra email...
+          </h1>
           <p className="text-muted-foreground">Vui lòng chờ trong giây lát</p>
         </div>
       </div>
@@ -181,19 +188,19 @@ export default function EmailVerificationPage() {
   }
 
   // Show error if email is invalid
-  if (emailStatus === 'invalid') {
+  if (emailStatus === "invalid") {
     return (
       <div className="min-h-screen flex items-center justify-center p-8">
         <div className="w-full max-w-md space-y-8 text-center">
           <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
             <AlertCircle className="w-8 h-8 text-red-600" />
           </div>
-          
+
           <div className="space-y-3">
-            <h1 className="text-3xl font-bold text-red-600">Email không hợp lệ</h1>
-            <p className="text-muted-foreground text-lg">
-              {emailError}
-            </p>
+            <h1 className="text-3xl font-bold text-red-600">
+              Email không hợp lệ
+            </h1>
+            <p className="text-muted-foreground text-lg">{emailError}</p>
             <p className="text-sm text-muted-foreground">
               Email: <strong className="text-red-600">{email}</strong>
             </p>
@@ -202,19 +209,19 @@ export default function EmailVerificationPage() {
           <div className="space-y-4">
             <Button
               onClick={() => {
-                localStorage.removeItem('pendingEmail');
-                router.push('/register');
+                localStorage.removeItem("pendingEmail");
+                router.push("/register");
               }}
               className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-lg"
             >
               Đăng ký với email khác
             </Button>
-            
+
             <Button
               variant="outline"
               onClick={() => {
-                localStorage.removeItem('pendingEmail');
-                router.push('/login');
+                localStorage.removeItem("pendingEmail");
+                router.push("/login");
               }}
               className="w-full h-12"
             >
@@ -235,7 +242,7 @@ export default function EmailVerificationPage() {
   }
 
   // Only show OTP form if email is valid or unknown (fallback)
-  if (emailStatus !== 'valid' && emailStatus !== 'unknown') {
+  if (emailStatus !== "valid" && emailStatus !== "unknown") {
     return null; // This should not happen due to early returns above
   }
 
@@ -257,7 +264,7 @@ export default function EmailVerificationPage() {
               <p className="text-sm text-muted-foreground">
                 <strong>{email}</strong>
               </p>
-              {emailStatus === 'unknown' && (
+              {emailStatus === "unknown" && (
                 <p className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
                   ⚠️ Không thể xác minh email, vui lòng kiểm tra hộp thư
                 </p>
@@ -281,9 +288,8 @@ export default function EmailVerificationPage() {
             </div>
           )}
 
-
           {/* Verification Form - Only show if email is valid */}
-          {emailStatus === 'valid' && (
+          {emailStatus === "valid" && (
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* OTP Input */}
               <div className="space-y-2">
@@ -321,7 +327,7 @@ export default function EmailVerificationPage() {
           )}
 
           {/* Resend OTP */}
-          {emailStatus === 'valid' && (
+          {emailStatus === "valid" && (
             <div className="text-center space-y-4">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">

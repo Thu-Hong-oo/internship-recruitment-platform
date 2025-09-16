@@ -96,11 +96,17 @@ const uploadAvatar = asyncHandler(async (req, res) => {
 
     // Update user avatar in database
     const user = await User.findByIdAndUpdate(
-      req.file.buffer,
-      { 'profile.avatar': result.url },
-
+      req.user.id,
+      { avatar: result.url },
       { new: true }
     );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'Không tìm thấy người dùng để cập nhật avatar',
+      });
+    }
 
     logger.info(`Avatar uploaded for user: ${user.email}`, {
       userId: user._id,
