@@ -89,7 +89,25 @@ const ensureEmployerProfile = async userId => {
 // GET /api/employers/profile
 const getProfile = asyncHandler(async (req, res) => {
   const profile = await ensureEmployerProfile(req.user.id);
-  res.status(200).json({ success: true, data: profile });
+  res.status(200).json({
+    success: true,
+    data: {
+      company: profile.company,
+      businessInfo: profile.businessInfo,
+      legalRepresentative: profile.legalRepresentative,
+      contact: profile.contact,
+      position: profile.position,
+      officeAddress: profile.officeAddress,
+      stats: profile.stats,
+      status: profile.status,
+      verification: profile.verification,
+      companyMembers: profile.companyMembers,
+      documents: profile.documents || [],
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
+      // Thêm các trường khác nếu cần
+    }
+  });
 });
 
 // PUT /api/employers/profile
