@@ -131,16 +131,106 @@ EmployerProfileSchema.methods.addMember = function (
   return this.save();
 };
 
-EmployerProfileSchema.methods.updateMemberPermissions = function (
-  userId,
-  permissions
-) {
-  const member = this.members.find(m => m.user.toString() === userId);
-  if (member) {
-    Object.assign(member.permissions, permissions);
-    return this.save();
-  }
-  throw new Error('Member not found');
+// Service getters - để access services
+EmployerProfileSchema.methods.getDocumentService = function () {
+  return new EmployerDocumentService(this);
 };
+
+EmployerProfileSchema.methods.getVerificationService = function () {
+  return new EmployerVerificationService(this);
+};
+
+// === STATIC METHODS ===
+EmployerProfileSchema.statics.findVerified = function () {
+  return this.find({
+    'verification.isVerified': true,
+    status: EMPLOYER_PROFILE_STATUS.VERIFIED,
+  });
+};
+
+EmployerProfileSchema.statics.findByIndustry = function (industry) {
+  return this.find({ 'company.industry': { $regex: industry, $options: 'i' } });
+};
+
+EmployerProfileSchema.statics.findCanPostJobs = function () {
+  return this.find({
+    status: {
+      $in: [EMPLOYER_PROFILE_STATUS.VERIFIED, EMPLOYER_PROFILE_STATUS.PENDING],
+    },
+  });
+};
+
+// === PRE-SAVE MIDDLEWARE ===
+EmployerProfileSchema.pre('save', function (next) {
+  try {
+    // 🔧 DEFENSIVE: Ensure verification object exists
+    if (!this.verification) {
+      this.verification = {
+        isVerified: false,
+        steps: {
+          basicInfo: false,
+          businessInfo: false,
+          adminApproved: false,
+        },
+        documents: [],
+        adminNotes: [],
+      };
+    }
+
+    // 🔧 DEFENSIVE: Ensure steps object exists
+    if (!this.verification.steps) {
+      this.verification.steps = {
+        basicInfo: false,
+        businessInfo: false,
+        adminApproved: false,
+      };
+    }
+
+    const steps = this.verification.steps;
+
+    // Update basic info step - with optional chaining
+    if (
+      this.company?.name &&
+      this.company?.industry &&
+      this.company?.size &&
+      this.contact?.name &&
+      this.contact?.phone
+    ) {
+      steps.basicInfo = true;
+    }
+
+    // Update business info step - with optional chaining
+    if (
+      this.businessInfo?.registrationNumber &&
+      this.businessInfo?.taxId &&
+      this.businessInfo?.issueDate &&
+      this.businessInfo?.issuePlace
+    ) {
+      steps.businessInfo = true;
+    }
+
+    // Update status based on steps
+    if (steps.basicInfo && steps.businessInfo) {
+      if (this.status === EMPLOYER_PROFILE_STATUS.DRAFT) {
+        this.status = EMPLOYER_PROFILE_STATUS.PENDING;
+      }
+    }
+
+    if (steps.adminApproved && this.verification.isVerified) {
+      this.status = EMPLOYER_PROFILE_STATUS.VERIFIED;
+    }
+
+    next();
+  } catch (error) {
+    console.error('❌ EmployerProfile pre-save middleware error:', error);
+    console.error('Profile data:', {
+      id: this._id,
+      mainUserId: this.mainUserId,
+      hasVerification: !!this.verification,
+      hasSteps: !!this.verification?.steps,
+    });
+    next(error);
+  }
+});
 
 module.exports = mongoose.model('EmployerProfile', EmployerProfileSchema);
