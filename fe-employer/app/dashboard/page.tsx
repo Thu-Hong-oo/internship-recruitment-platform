@@ -26,8 +26,10 @@ import {
   Circle,
 } from "lucide-react";
 import { User, getUserData } from "@/lib/userStorage";
+import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [timeLeft, setTimeLeft] = useState({
     days: 7,
@@ -63,11 +65,11 @@ export default function DashboardPage() {
   }, []);
 
   const verificationTasks = [
-    { id: 1, text: "Xác thực số điện thoại", completed: false },
-    { id: 2, text: "Cập nhật thông tin công ty", completed: false },
-    { id: 3, text: "Cập nhật Giấy đăng ký doanh nghiệp", completed: false },
+    { id: 0, text: "Cập nhật thông tin cá nhân", completed: false },
+    { id: 1, text: "Cập nhật thông tin công ty", completed: false },
+    { id: 2, text: "Cập nhật Giấy đăng ký doanh nghiệp", completed: false },
     {
-      id: 4,
+      id: 3,
       text: "Đăng tin tuyển dụng đầu tiên",
       completed: false,
       highlight: true,
@@ -200,9 +202,20 @@ export default function DashboardPage() {
                 <Button
                   variant="ghost"
                   className="w-full justify-start text-slate-700 hover:bg-primary/10 hover:text-primary"
+                  onClick={() => router.push("/dashboard")}
                 >
                   <BarChart3 className="w-4 h-4 mr-3" />
                   Bảng tin
+                </Button>
+              </li>
+              <li>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start text-slate-700 hover:bg-primary/10 hover:text-primary"
+                  onClick={() => router.push("/profile")}
+                >
+                  <FileText className="w-4 h-4 mr-3" />
+                  Cập nhật thông tin cá nhân
                 </Button>
               </li>
               <li>
@@ -494,10 +507,22 @@ export default function DashboardPage() {
                   </span>
                   {task.highlight && (
                     <Badge className="bg-primary text-white text-xs ml-auto">
-                      +8 Top Point
+                      Hot
                     </Badge>
                   )}
-                  <ArrowRight className="w-4 h-4 text-primary ml-auto" />
+                  {task.id === 0 && !task.completed && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => router.push("/profile")}
+                      className="ml-auto p-1 h-auto"
+                    >
+                      <ArrowRight className="w-4 h-4 text-primary" />
+                    </Button>
+                  )}
+                  {task.id !== 0 && (
+                    <ArrowRight className="w-4 h-4 text-primary ml-auto" />
+                  )}
                 </div>
               ))}
             </div>
