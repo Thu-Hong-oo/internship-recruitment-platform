@@ -278,12 +278,20 @@ const logout = asyncHandler(async (req, res) => {
     token = req.cookies.token;
   }
 
+
+
   // Clear cookie if exists
   if (req.cookies && req.cookies.token) {
     res.clearCookie('token');
   }
 
-  res.status(200).json({ success: true, message: SUCCESS.LOGOUT });
+  // TODO: Add token to blacklist if using Redis
+  // await addToBlacklist(token);
+
+  res.status(200).json({
+    success: true,
+    message: 'Đăng xuất thành công'
+  });
 });
 
 // @desc    Forgot password

@@ -99,6 +99,7 @@ Thumbs.db
 # Uploads
 uploads/
 public/uploads/
+package-lock.json
 
 # Temporary files
 tmp/
