@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { saveUserData, saveToken } from "@/lib/userStorage";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -44,8 +45,12 @@ export default function LoginPage() {
       const data = await res.json().catch(() => ({}));
 
       if (data?.success) {
-        if (data?.token && typeof window !== "undefined") {
-          localStorage.setItem("token", data.token);
+        // Lưu token và user data sử dụng utility functions
+        if (data?.token) {
+          saveToken(data.token);
+        }
+        if (data?.user) {
+          saveUserData(data.user);
         }
         setSuccess("Đăng nhập thành công! Đang chuyển hướng...");
         setTimeout(() => router.push("/dashboard"), 1000);
