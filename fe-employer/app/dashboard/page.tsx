@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Bell,
   ShoppingCart,
@@ -25,8 +25,10 @@ import {
   CheckCircle,
   Circle,
 } from "lucide-react";
+import { User, getUserData } from "@/lib/userStorage";
 
 export default function DashboardPage() {
+  const [user, setUser] = useState<User | null>(null);
   const [timeLeft, setTimeLeft] = useState({
     days: 7,
     hours: 11,
@@ -34,6 +36,16 @@ export default function DashboardPage() {
   });
 
   useEffect(() => {
+    // Load user data from localStorage
+    const loadUserData = () => {
+      const userData = getUserData();
+      if (userData) {
+        setUser(userData);
+      }
+    };
+
+    loadUserData();
+
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev.minutes > 0) {
@@ -73,7 +85,9 @@ export default function DashboardPage() {
               <Menu className="w-4 h-4" />
             </Button>
             <div className="flex items-center gap-1">
-              <span className="text-xl font-bold text-primary">InternBridge</span>
+              <span className="text-xl font-bold text-primary">
+                InternBridge
+              </span>
             </div>
           </div>
 
@@ -127,8 +141,11 @@ export default function DashboardPage() {
               </Badge>
             </div>
             <Avatar className="w-8 h-8">
+              {user?.avatar ? (
+                <AvatarImage src={user.avatar} alt={user.fullName} />
+              ) : null}
               <AvatarFallback className="bg-white text-slate-800 text-sm">
-                NM
+                {user?.fullName ? user.fullName.charAt(0).toUpperCase() : "U"}
               </AvatarFallback>
             </Avatar>
             <ChevronDown className="w-4 h-4 text-white" />
@@ -143,21 +160,35 @@ export default function DashboardPage() {
           <div className="p-4 border-b">
             <div className="flex items-center gap-3">
               <Avatar className="w-10 h-10">
+                {user?.avatar ? (
+                  <AvatarImage src={user.avatar} alt={user.fullName} />
+                ) : null}
                 <AvatarFallback className="bg-primary/10 text-primary">
-                  NM
+                  {user?.fullName ? user.fullName.charAt(0).toUpperCase() : "U"}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <h3 className="font-semibold text-slate-800">Nướng Mực</h3>
-                <p className="text-sm text-slate-500">Employer</p>
+                <h3 className="font-semibold text-slate-800">
+                  {user?.fullName || "User"}
+                </h3>
+                <p className="text-sm text-slate-500 capitalize">
+                  {user?.role || "Employer"}
+                </p>
               </div>
             </div>
             <div className="mt-3 flex items-center gap-2">
               <span className="text-sm text-slate-600">
                 Tài khoản xác thực:
               </span>
-              <Badge variant="outline" className="text-primary border-primary">
-                Cấp 1/3
+              <Badge
+                variant={user?.isEmailVerified ? "default" : "outline"}
+                className={
+                  user?.isEmailVerified
+                    ? "bg-green-500 text-white"
+                    : "text-primary border-primary"
+                }
+              >
+                {user?.isEmailVerified ? "Đã xác thực" : "Chưa xác thực"}
               </Badge>
             </div>
           </div>
@@ -402,7 +433,8 @@ export default function DashboardPage() {
           {/* Welcome Message */}
           <div className="mb-6">
             <h2 className="text-xl font-bold text-slate-800 mb-2">
-              Xin chào, <span className="text-primary">Nướng Mực</span>
+              Xin chào,{" "}
+              <span className="text-primary">{user?.fullName || "User"}</span>
             </h2>
             <p className="text-slate-600 text-sm">
               Hãy thực hiện các bước sau để gia tăng tính bảo mật cho tài khoản
