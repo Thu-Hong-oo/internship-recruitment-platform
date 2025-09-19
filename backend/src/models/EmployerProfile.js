@@ -158,41 +158,75 @@ EmployerProfileSchema.statics.findCanPostJobs = function () {
 
 // === PRE-SAVE MIDDLEWARE ===
 EmployerProfileSchema.pre('save', function (next) {
-  const steps = this.verification.steps;
-
-  // Update basic info step
-  if (
-    this.company.name &&
-    this.company.industry &&
-    this.company.size &&
-    this.contact.name &&
-    this.contact.phone
-  ) {
-    steps.basicInfo = true;
-  }
-
-  // Update business info step
-  if (
-    this.businessInfo.registrationNumber &&
-    this.businessInfo.taxId &&
-    this.businessInfo.issueDate &&
-    this.businessInfo.issuePlace
-  ) {
-    steps.businessInfo = true;
-  }
-
-  // Update status based on steps
-  if (steps.basicInfo && steps.businessInfo) {
-    if (this.status === EMPLOYER_PROFILE_STATUS.DRAFT) {
-      this.status = EMPLOYER_PROFILE_STATUS.PENDING;
+  try {
+    // 🔧 DEFENSIVE: Ensure verification object exists
+    if (!this.verification) {
+      this.verification = {
+        isVerified: false,
+        steps: {
+          basicInfo: false,
+          businessInfo: false,
+          adminApproved: false,
+        },
+        documents: [],
+        adminNotes: [],
+      };
     }
-  }
 
-  if (steps.adminApproved && this.verification.isVerified) {
-    this.status = EMPLOYER_PROFILE_STATUS.VERIFIED;
-  }
+    // 🔧 DEFENSIVE: Ensure steps object exists
+    if (!this.verification.steps) {
+      this.verification.steps = {
+        basicInfo: false,
+        businessInfo: false,
+        adminApproved: false,
+      };
+    }
 
-  next();
+    const steps = this.verification.steps;
+
+    // Update basic info step - with optional chaining
+    if (
+      this.company?.name &&
+      this.company?.industry &&
+      this.company?.size &&
+      this.contact?.name &&
+      this.contact?.phone
+    ) {
+      steps.basicInfo = true;
+    }
+
+    // Update business info step - with optional chaining
+    if (
+      this.businessInfo?.registrationNumber &&
+      this.businessInfo?.taxId &&
+      this.businessInfo?.issueDate &&
+      this.businessInfo?.issuePlace
+    ) {
+      steps.businessInfo = true;
+    }
+
+    // Update status based on steps
+    if (steps.basicInfo && steps.businessInfo) {
+      if (this.status === EMPLOYER_PROFILE_STATUS.DRAFT) {
+        this.status = EMPLOYER_PROFILE_STATUS.PENDING;
+      }
+    }
+
+    if (steps.adminApproved && this.verification.isVerified) {
+      this.status = EMPLOYER_PROFILE_STATUS.VERIFIED;
+    }
+
+    next();
+  } catch (error) {
+    console.error('❌ EmployerProfile pre-save middleware error:', error);
+    console.error('Profile data:', {
+      id: this._id,
+      mainUserId: this.mainUserId,
+      hasVerification: !!this.verification,
+      hasSteps: !!this.verification?.steps,
+    });
+    next(error);
+  }
 });
 
 module.exports = mongoose.model('EmployerProfile', EmployerProfileSchema);
