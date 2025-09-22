@@ -39,24 +39,38 @@ const getPendingVerifications = asyncHandler(async (req, res) => {
 
   const total = await EmployerProfile.countDocuments(filter);
   const verifications = await EmployerProfile.find(filter)
-    .populate('mainUserId', 'email fullName phone createdAt')
+    .populate('owner', 'email fullName phone createdAt')
     .select('company verification status createdAt updatedAt')
     .sort({ createdAt: -1 })
     .skip(startIndex)
     .limit(limit);
 
-  // Enhanced data processing
+
+  // Chuẩn hóa dữ liệu trả về cho từng bản ghi
   const processedData = verifications.map(profile => {
     const documents = profile.verification?.documents || [];
     const verifiedDocs = documents.filter(doc => doc.verified === true);
     const steps = profile.verification?.steps || {};
-
     const completedSteps = Object.values(steps).filter(Boolean).length;
     const progressPercentage = Math.round((completedSteps / 3) * 100);
 
+    // Chuẩn hóa user object (nếu populate thành công)
+    let userObj = null;
+    let userId = null;
+    if (profile.owner && typeof profile.owner === 'object') {
+      userObj = {
+        _id: profile.owner._id,
+        email: profile.owner.email,
+        fullName: profile.owner.fullName,
+        phone: profile.owner.phone,
+        createdAt: profile.owner.createdAt,
+      };
+      userId = profile.owner._id;
+    }
+
     return {
       _id: profile._id,
-      user: profile.mainUserId,
+      userId: userId,
       company: {
         name: profile.company?.name || 'Chưa cập nhật',
         industry: profile.company?.industry || 'unknown',
@@ -75,8 +89,6 @@ const getPendingVerifications = asyncHandler(async (req, res) => {
       },
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt,
-
-      // Quick action indicators
       actionNeeded: {
         hasDocuments: documents.length > 0,
         pendingDocs: documents.length - verifiedDocs.length,
@@ -125,8 +137,8 @@ const getEmployerVerificationDetails = asyncHandler(async (req, res) => {
   }
 
   // TÌM BẰNG USER ID thay vì EmployerProfile ID để thống nhất
-  const employerProfile = await EmployerProfile.findOne({ mainUserId: id })
-    .populate('mainUserId', 'email fullName phone')
+  const employerProfile = await EmployerProfile.findOne({ owner: id })
+    .populate('owner', 'email fullName phone')
     .populate('verification.documents.verifiedBy', 'fullName email')
     .populate('verification.adminNotes.addedBy', 'fullName email');
 
@@ -159,7 +171,7 @@ const getEmployerVerificationDetails = asyncHandler(async (req, res) => {
     data: {
       // Basic info
       _id: employerProfile._id,
-      user: employerProfile.mainUserId,
+      user: employerProfile.owner,
       status: employerProfile.status,
       createdAt: employerProfile.createdAt,
       updatedAt: employerProfile.updatedAt,
@@ -206,7 +218,7 @@ const getEmployerVerificationDetails = asyncHandler(async (req, res) => {
         pendingDocuments: pendingDocs.map(doc => ({
           _id: doc._id,
           documentType: doc.documentType,
-          verifyEndpoint: `/admin/employers/${employerProfile.mainUserId._id}/documents/${doc._id}/verify`,
+          verifyEndpoint: `/admin/employers/${employerProfile.owner._id}/documents/${doc._id}/verify`,
         })),
       },
     },
@@ -227,8 +239,8 @@ const verifyEmployer = asyncHandler(async (req, res) => {
   }
 
   const employerProfile = await EmployerProfile.findOne({
-    mainUserId: req.params.id,
-  }).populate('mainUserId', 'email fullName');
+    owner: req.params.id,
+  }).populate('owner', 'email fullName');
 
   if (!employerProfile) {
     return res.status(404).json({
@@ -290,7 +302,7 @@ const verifyEmployer = asyncHandler(async (req, res) => {
     employerProfile.status = EMPLOYER_PROFILE_STATUS.VERIFIED;
 
     logger.info(
-      `Admin approved employer: ${employerProfile.mainUserId.email}`,
+      `Admin approved employer: ${employerProfile.owner.email}`,
       {
         adminId: req.user.id,
         employerId: employerProfile._id,
@@ -312,7 +324,7 @@ const verifyEmployer = asyncHandler(async (req, res) => {
     employerProfile.verification.rejectedBy = req.user.id;
 
     logger.warn(
-      `Admin rejected employer: ${employerProfile.mainUserId.email}`,
+      `Admin rejected employer: ${employerProfile.owner.email}`,
       {
         adminId: req.user.id,
         employerId: employerProfile._id,
@@ -330,7 +342,7 @@ const verifyEmployer = asyncHandler(async (req, res) => {
     } hồ sơ nhà tuyển dụng`,
     data: {
       _id: employerProfile._id,
-      user: employerProfile.mainUserId,
+      user: employerProfile.owner,
       status: employerProfile.status,
       verification: {
         isVerified: employerProfile.verification.isVerified,
@@ -352,7 +364,7 @@ const verifyEmployerDocument = asyncHandler(async (req, res) => {
   const { verified, rejectionReason, notes } = req.body;
 
   const employerProfile = await EmployerProfile.findOne({
-    mainUserId: employerId,
+    owner: employerId,
   });
 
   if (!employerProfile) {

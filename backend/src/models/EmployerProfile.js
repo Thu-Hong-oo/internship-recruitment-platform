@@ -4,16 +4,18 @@ const {
   EMPLOYER_PROFILE_STATUS,
 } = require('../constants/common.constants');
 
+
 // Giữ nguyên sub-schemas nhưng tối ưu
 const CompanyInfoSchema = require('./schemas/CompanyInfoSchema');
 const BusinessInfoSchema = require('./schemas/BusinessInfoSchema');
 const VerificationSchema = require('./schemas/VerificationSchema');
+const EmployerDocumentService = require('../services/EmployerDocumentService');
+const EmployerVerificationService = require('../services/EmployerVerificationService');
 
 const EmployerProfileSchema = new mongoose.Schema(
   {
     // Chủ tài khoản
     owner: {
-      // Đổi từ mainUserId cho rõ ràng
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
@@ -25,6 +27,13 @@ const EmployerProfileSchema = new mongoose.Schema(
 
     // Thông tin pháp lý (CẦN THIẾT tại VN)
     businessInfo: BusinessInfoSchema,
+
+    // Vị trí cá nhân của nhà tuyển dụng (HR, Manager, ...)
+    position: {
+      title: { type: String, default: '' },
+      level: { type: String, default: '' },
+      department: { type: String, default: '' }
+    },
 
     // Người đại diện pháp luật (BẮT BUỘC theo luật)
     legalRepresentative: {
