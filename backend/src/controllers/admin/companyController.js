@@ -45,7 +45,7 @@ const getCompanies = asyncHandler(async (req, res) => {
 
   const total = await EmployerProfile.countDocuments(filter);
   const employerProfiles = await EmployerProfile.find(filter)
-    .populate('mainUserId', 'email fullName')
+    .populate('owner', 'email fullName')
     .select('company businessInfo verification status createdAt updatedAt')
     .sort({ createdAt: -1 })
     .limit(limit)
@@ -67,7 +67,7 @@ const getCompanies = asyncHandler(async (req, res) => {
     businessInfo: profile.businessInfo,
     verification: profile.verification,
     status: profile.status,
-    createdBy: profile.mainUserId,
+    createdBy: profile.owner,
     createdAt: profile.createdAt,
     updatedAt: profile.updatedAt,
   }));
@@ -107,7 +107,7 @@ const getCompany = asyncHandler(async (req, res) => {
   }
 
   const employerProfile = await EmployerProfile.findById(id)
-    .populate('mainUserId', 'email fullName phone')
+    .populate('owner', 'email fullName phone')
     .populate('verification.documents.verifiedBy', 'fullName email');
 
   if (!employerProfile) {
@@ -137,7 +137,7 @@ const getCompany = asyncHandler(async (req, res) => {
     verification: employerProfile.verification,
     status: employerProfile.status,
     stats: employerProfile.stats,
-    createdBy: employerProfile.mainUserId,
+    createdBy: employerProfile.owner,
     createdAt: employerProfile.createdAt,
     updatedAt: employerProfile.updatedAt,
   };
@@ -189,7 +189,7 @@ const updateCompany = asyncHandler(async (req, res) => {
   const employerProfile = await EmployerProfile.findByIdAndUpdate(id, update, {
     new: true,
     runValidators: true,
-  }).populate('mainUserId', 'email fullName');
+  }).populate('owner', 'email fullName');
 
   if (!employerProfile) {
     return res.status(404).json({
@@ -241,7 +241,7 @@ const deleteCompany = asyncHandler(async (req, res) => {
 
   // Check if employer has active jobs
   const activeJobs = await Job.find({
-    createdBy: employerProfile.mainUserId,
+    createdBy: employerProfile.owner,
     status: { $in: ['active', 'draft'] },
   });
 
@@ -294,7 +294,7 @@ const getCompanyJobs = asyncHandler(async (req, res) => {
   }
 
   // Build filter for jobs
-  const filter = { createdBy: employerProfile.mainUserId };
+  const filter = { createdBy: employerProfile.owner };
   if (req.query.status) filter.status = req.query.status;
 
   const total = await Job.countDocuments(filter);
@@ -352,7 +352,7 @@ const getCompanyApplications = asyncHandler(async (req, res) => {
   }
 
   // Get all jobs of this employer first
-  const jobs = await Job.find({ createdBy: employerProfile.mainUserId }).select(
+  const jobs = await Job.find({ createdBy: employerProfile.owner }).select(
     '_id'
   );
   const jobIds = jobs.map(job => job._id);
@@ -417,7 +417,7 @@ const updateCompanyStatus = asyncHandler(async (req, res) => {
     id,
     { status },
     { new: true, runValidators: true }
-  ).populate('mainUserId', 'email fullName');
+  ).populate('owner', 'email fullName');
 
   if (!employerProfile) {
     return res
@@ -438,7 +438,7 @@ const updateCompanyStatus = asyncHandler(async (req, res) => {
       _id: employerProfile._id,
       company: employerProfile.company,
       status: employerProfile.status,
-      user: employerProfile.mainUserId,
+      user: employerProfile.owner,
     },
     message: 'Cập nhật trạng thái employer profile thành công',
   });

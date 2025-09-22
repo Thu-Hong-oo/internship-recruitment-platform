@@ -1,4 +1,9 @@
 const mongoose = require('mongoose');
+const {
+  JOB_TYPES,
+  JOB_STATUS,
+  WORK_TYPES,
+} = require('../constants/job.constants');
 
 
 const JobSchema = new mongoose.Schema({
