@@ -1,5 +1,4 @@
 const Job = require('../models/Job');
-const Company = require('../models/Company');
 const Application = require('../models/Application');
 const CandidateProfile = require('../models/CandidateProfile');
 const { logger } = require('../utils/logger');
@@ -12,109 +11,41 @@ const getAllJobs = async (req, res) => {
     const {
       page = 1,
       limit = 10,
-      // Search parameters
       q, // Text search query
-      // Filter parameters
-      category,
-      subCategory,
       location,
-      district,
-      type, // location type: onsite, remote, hybrid
-      remote,
       skills,
-      company,
-      salaryMin,
-      salaryMax,
-      yearOfStudy,
-      majors,
-      isPaid,
-      internshipType,
-      workEnvironment,
-      genderRequirement,
-      level,
-      hiringCount,
-      tags,
-      status = 'active',
+      employer,
+      status,
       sortBy = 'createdAt',
       sortOrder = 'desc',
     } = req.query;
 
-    const query = {};
 
-    // Text search (if query provided)
+    const query = {};
     if (q) {
       query.$text = { $search: q };
     }
-
-    // Build filter query
-    if (category) query['category'] = category;
-    if (subCategory) query['subCategories'] = { $in: subCategory.split(',') };
-    if (location) query['location.city'] = { $regex: location, $options: 'i' };
-    if (district)
-      query['location.district'] = { $regex: district, $options: 'i' };
-    if (type) query['location.type'] = type;
-    if (remote) query['location.type'] = { $in: ['remote', 'hybrid'] };
-    if (company) query['companyId'] = company;
-    if (status) query['status'] = status;
-    if (isPaid !== undefined) query['internship.isPaid'] = isPaid === 'true';
-    if (internshipType) query['internship.type'] = internshipType;
-    if (workEnvironment) query['workEnvironment'] = workEnvironment;
-    if (genderRequirement)
-      query['requirements.genderRequirement'] = genderRequirement;
-    if (level) query['requirements.level'] = level;
-    if (hiringCount) query['hiringCount'] = { $gte: parseInt(hiringCount) };
-
-    // Salary range filter
-    if (salaryMin || salaryMax) {
-      query['internship.salary.amount'] = {};
-      if (salaryMin)
-        query['internship.salary.amount']['$gte'] = parseInt(salaryMin);
-      if (salaryMax)
-        query['internship.salary.amount']['$lte'] = parseInt(salaryMax);
+    if (location) {
+      query['location'] = { $regex: location, $options: 'i' };
     }
-
-    // Year of study filter
-    if (yearOfStudy) {
-      const years = yearOfStudy.split(',').map(year => year.trim());
-      query['requirements.yearOfStudy'] = { $in: years };
-    }
-
-    // Majors filter
-    if (majors) {
-      const majorArray = majors.split(',').map(major => major.trim());
-      query['requirements.majors'] = { $in: majorArray };
-    }
-
-    // Skills filter
     if (skills) {
       const skillArray = skills.split(',').map(skill => skill.trim());
-      query['requirements.skills'] = { $in: skillArray };
+      query['skills'] = { $in: skillArray };
     }
-
-    // Tags filter
-    if (tags) {
-      const tagArray = tags.split(',').map(tag => tag.trim());
-      query['tags'] = { $in: tagArray };
+    if (employer) {
+      query['employer'] = employer;
+    }
+    if (status) {
+      query['status'] = status;
     }
 
     const skip = (page - 1) * limit;
-
-    // Build sort object
     const sortObj = {};
-    if (sortBy === 'salary') {
-      sortObj['internship.salary.amount'] = sortOrder === 'desc' ? -1 : 1;
-    } else if (sortBy === 'views') {
-      sortObj['stats.views'] = sortOrder === 'desc' ? -1 : 1;
-    } else if (sortBy === 'applications') {
-      sortObj['stats.applications'] = sortOrder === 'desc' ? -1 : 1;
-    } else if (sortBy === 'startDate') {
-      sortObj['internship.startDate'] = sortOrder === 'desc' ? -1 : 1;
-    } else {
-      sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
-    }
+    sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
     const jobs = await Job.find(query)
-      .populate('companyId', 'name logo industry description')
+      .populate('employer', 'name logo industry description')
+      .populate('postedBy', 'fullName name email avatar')
       .sort(sortObj)
       .skip(skip)
       .limit(parseInt(limit));
@@ -134,24 +65,10 @@ const getAllJobs = async (req, res) => {
         appliedFilters: Object.keys(query).length,
         searchQuery: q || null,
         availableFilters: {
-          category: !!category,
-          subCategory: !!subCategory,
           location: !!location,
-          district: !!district,
-          type: !!type,
-          remote: !!remote,
           skills: !!skills,
-          company: !!company,
-          salaryRange: !!(salaryMin || salaryMax),
-          yearOfStudy: !!yearOfStudy,
-          majors: !!majors,
-          isPaid: isPaid !== undefined,
-          internshipType: !!internshipType,
-          workEnvironment: !!workEnvironment,
-          genderRequirement: !!genderRequirement,
-          level: !!level,
-          hiringCount: !!hiringCount,
-          tags: !!tags,
+          employer: !!employer,
+          status: !!status,
         },
       },
     });
@@ -171,8 +88,8 @@ const getAllJobs = async (req, res) => {
 const getJob = async (req, res) => {
   try {
     const job = await Job.findById(req.params.id)
-      .populate('companyId', 'name logo industry description')
-      .populate('postedBy', 'fullName name email profile googleProfile avatar');
+      .populate('employer', 'name logo industry description')
+      .populate('postedBy', 'fullName name email avatar');
 
     if (!job) {
       return res.status(404).json({
@@ -215,76 +132,38 @@ const getJob = async (req, res) => {
 // @access  Private (Employer)
 const createJob = async (req, res) => {
   try {
-    // Check if employer has a company
-    const company = await Company.findByOwner(req.user.id);
-
-    if (!company) {
-      return res.status(400).json({
-        success: false,
-        message: 'Bạn cần tạo thông tin công ty trước khi đăng job',
-      });
-    }
-
-    // Check if company is approved
-    if (company.status !== 'active') {
-      return res.status(400).json({
-        success: false,
-        message:
-          'Công ty của bạn chưa được duyệt. Vui lòng chờ admin duyệt trước khi đăng job.',
-      });
-    }
-
     const jobData = req.body;
-    jobData.companyId = company._id;
+    jobData.employer = req.body.employer; // phải truyền employer từ client
     jobData.postedBy = req.user.id;
-    // Default: employer creates as draft; must submit for review to move to pending
     if (req.user.role !== 'admin') {
       jobData.status = 'draft';
     }
 
-    // Validate subCategories (max 2)
-    if (jobData.subCategories && jobData.subCategories.length > 2) {
+    // Kiểm tra trạng thái xác thực của employer
+    const EmployerProfile = require('../models/EmployerProfile');
+    const employerProfile = await EmployerProfile.findById(jobData.employer);
+    if (!employerProfile) {
       return res.status(400).json({
         success: false,
-        message: 'Chỉ được chọn tối đa 2 ngành nghề phụ',
+        message: 'Không tìm thấy hồ sơ employer',
       });
     }
-
-    // Validate reasonsToApply (max 3)
-    if (jobData.reasonsToApply && jobData.reasonsToApply.length > 3) {
-      return res.status(400).json({
+    if (!employerProfile.verification?.isVerified && employerProfile.status !== 'verified') {
+      return res.status(403).json({
         success: false,
-        message: 'Chỉ được nhập tối đa 3 lý do nên ứng tuyển',
+        message: 'Tài khoản employer chưa xác thực, không thể tạo job mới. Vui lòng hoàn thành xác thực doanh nghiệp.',
       });
     }
 
     const job = await Job.create(jobData);
-
-    // Populate company info
-    await job.populate('companyId', 'name logo industry description');
-    await job.populate('postedBy', 'fullName name email profile googleProfile avatar');
-
-    const jobObj = job.toObject();
-    if (jobObj.postedBy) {
-      const pb = jobObj.postedBy;
-      const computedFullName =
-        pb.fullName ||
-        pb.name ||
-        (pb.profile && `${pb.profile.firstName || ''} ${pb.profile.lastName || ''}`.trim()) ||
-        (pb.googleProfile && pb.googleProfile.name) ||
-        pb.email?.split('@')[0] ||
-        'Chưa cập nhật';
-      jobObj.postedBy = {
-        ...pb,
-        fullName: computedFullName,
-      };
-    }
+    await job.populate('employer', 'name logo industry description');
+    await job.populate('postedBy', 'fullName name email avatar');
 
     res.status(201).json({
       success: true,
-      data: jobObj,
+      data: job,
       message:
-        jobObj.status === 'active'
+        job.status === 'open'
           ? 'Đăng job thành công'
           : 'Tạo job thành công, chờ admin duyệt',
     });
@@ -312,52 +191,16 @@ const updateJob = async (req, res) => {
       });
     }
 
-    // Check if employer has a company
-    const company = await Company.findByOwner(req.user.id);
-
-    if (!company) {
-      return res.status(400).json({
-        success: false,
-        message: 'Bạn cần tạo thông tin công ty trước khi quản lý job',
-      });
-    }
-
-    // Check ownership
-    if (job.companyId.toString() !== company._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'Không có quyền chỉnh sửa công việc này',
-      });
-    }
-
     const updateData = req.body;
-    // Employers cannot directly change status to active/closed/filled
     if (updateData.status && req.user.role !== 'admin') {
       delete updateData.status;
     }
-
-    // Validate subCategories (max 2)
-    if (updateData.subCategories && updateData.subCategories.length > 2) {
-      return res.status(400).json({
-        success: false,
-        message: 'Chỉ được chọn tối đa 2 ngành nghề phụ',
-      });
-    }
-
-    // Validate reasonsToApply (max 3)
-    if (updateData.reasonsToApply && updateData.reasonsToApply.length > 5) {
-      return res.status(400).json({
-        success: false,
-        message: 'Chỉ được nhập tối đa 3 lý do nên ứng tuyển',
-      });
-    }
-
     const updatedJob = await Job.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
       runValidators: true,
     })
-      .populate('companyId', 'name logo industry description')
-      .populate('postedBy', 'name email');
+      .populate('employer', 'name logo industry description')
+      .populate('postedBy', 'fullName name email avatar');
 
     res.status(200).json({
       success: true,
@@ -387,26 +230,7 @@ const deleteJob = async (req, res) => {
       });
     }
 
-    // Check if employer has a company
-    const company = await Company.findByOwner(req.user.id);
-
-    if (!company) {
-      return res.status(400).json({
-        success: false,
-        message: 'Bạn cần tạo thông tin công ty trước khi quản lý job',
-      });
-    }
-
-    // Check ownership
-    if (job.companyId.toString() !== company._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'Không có quyền xóa công việc này',
-      });
-    }
-
     await job.deleteOne();
-
     res.status(200).json({
       success: true,
       message: 'Xóa công việc thành công',
@@ -500,24 +324,6 @@ const getJobApplications = async (req, res) => {
       });
     }
 
-    // Check if employer has a company
-    const company = await Company.findByOwner(req.user.id);
-
-    if (!company) {
-      return res.status(400).json({
-        success: false,
-        message: 'Bạn cần tạo thông tin công ty trước khi quản lý job',
-      });
-    }
-
-    // Check ownership
-    if (job.companyId.toString() !== company._id.toString()) {
-      return res.status(403).json({
-        success: false,
-        message: 'Không có quyền xem ứng viên của công việc này',
-      });
-    }
-
     const query = { jobId: id };
     if (status) query.status = status;
 
@@ -525,7 +331,7 @@ const getJobApplications = async (req, res) => {
 
     const applications = await Application.find(query)
       .populate('candidateId', 'name email avatar')
-      .populate('jobId', 'title companyId')
+      .populate('jobId', 'title employer')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -558,9 +364,9 @@ const getJobBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
 
-    const job = await Job.findOne({ slug, status: 'active' })
-      .populate('companyId', 'name logo industry description')
-      .populate('postedBy', 'name email');
+    const job = await Job.findOne({ slug, status: 'open' })
+      .populate('employer', 'name logo industry description')
+      .populate('postedBy', 'fullName name email avatar');
 
     if (!job) {
       return res.status(404).json({
@@ -592,7 +398,7 @@ const incrementJobViews = async (req, res) => {
 
     const job = await Job.findByIdAndUpdate(
       id,
-      { $inc: { 'stats.views': 1 } },
+      { $inc: { views: 1 } },
       { new: true }
     );
 
@@ -624,16 +430,12 @@ const getRecentJobs = async (req, res) => {
   try {
     const { limit = 10, category } = req.query;
 
-    const query = { status: 'active' };
-    if (category) query.category = category;
-
+    const query = { status: 'open' };
     const total = await Job.countDocuments(query);
-
     const jobs = await Job.find(query)
-      .populate('companyId', 'name logo industry description')
+      .populate('employer', 'name logo industry description')
       .sort({ createdAt: -1 })
       .limit(parseInt(limit));
-
     res.status(200).json({
       success: true,
       data: jobs,
@@ -659,21 +461,19 @@ const getJobCompany = async (req, res) => {
     const { id } = req.params;
 
     const job = await Job.findById(id).populate(
-      'companyId',
-      'name logo industry description website size foundedYear headquarters'
+      'employer',
+      'name logo industry description'
     );
-
     if (!job) {
       return res.status(404).json({
         success: false,
         message: 'Không tìm thấy công việc',
       });
     }
-
     res.status(200).json({
       success: true,
       data: {
-        company: job.companyId,
+        company: job.employer,
         jobTitle: job.title,
         jobId: job._id,
       },
@@ -703,12 +503,8 @@ const getJobStats = async (req, res) => {
     }
 
     const stats = {
-      views: job.stats?.views || 0,
-      applications: job.stats?.applications || 0,
-      daysLeft: job.daysLeft,
-      isExpired: job.isExpired,
+      views: job.views || 0,
     };
-
     res.status(200).json({
       success: true,
       data: stats,
@@ -734,19 +530,11 @@ const submitJobForReview = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Không tìm thấy công việc' });
     }
 
-    // Check company ownership
-    const company = await Company.findByOwner(req.user.id);
-    if (!company || job.companyId.toString() !== company._id.toString()) {
-      return res.status(403).json({ success: false, message: 'Không có quyền gửi duyệt công việc này' });
-    }
-
     if (job.status !== 'draft') {
       return res.status(400).json({ success: false, message: 'Chỉ có thể gửi duyệt job ở trạng thái draft' });
     }
-
-    job.status = 'pending';
+    job.status = 'open';
     await job.save();
-
     res.status(200).json({ success: true, data: job, message: 'Đã gửi duyệt. Vui lòng chờ admin phê duyệt' });
   } catch (error) {
     logger.error('Error submitting job for review:', error);
@@ -766,5 +554,6 @@ module.exports = {
   incrementJobViews,
   getJobCompany,
   getJobStats,
+  getRecentJobs,
   submitJobForReview,
 };

@@ -24,15 +24,23 @@ const { otpCooldownService } = require('../config/initializeServices');
 
 // Helpers: check user đã có employer profile chưa, nếu chưa thì tạo profile mặc định với các placeholders
 const ensureEmployerProfile = async userId => {
-  let profile = await EmployerProfile.findOne({ mainUserId: userId });
+  // Only use owner for lookup, not mainUserId
+  let profile = await EmployerProfile.findOne({ owner: userId });
   if (!profile) {
     profile = await EmployerProfile.create({
-      mainUserId: userId,
+      owner: userId,
       company: {
         name: 'Chưa cập nhật',
         industry: 'unknown',
         size: 'small',
         email: 'temp@example.com',
+        officeAddress: {
+          street: 'Chưa cập nhật',
+          ward: 'Chưa cập nhật',
+          district: 'Chưa cập nhật',
+          city: 'Chưa cập nhật',
+          country: 'Vietnam',
+        },
       },
       position: {
         title: 'Chưa cập nhật',
@@ -43,14 +51,6 @@ const ensureEmployerProfile = async userId => {
         name: 'Chưa cập nhật',
         phone: 'Chưa cập nhật',
         email: 'temp@example.com',
-      },
-      officeAddress: {
-        street: 'Chưa cập nhật',
-        ward: 'Chưa cập nhật',
-        district: 'Chưa cập nhật',
-        city: 'Chưa cập nhật',
-        country: 'Vietnam',
-        postalCode: '000000',
       },
       legalRepresentative: {
         fullName: 'Chưa cập nhật',
@@ -72,24 +72,37 @@ const ensureEmployerProfile = async userId => {
         },
       },
     });
-
-    // Update User reference
     await User.findByIdAndUpdate(userId, { employerProfile: profile._id });
   }
-
-  // Ensure all nested objects exist even for existing profiles
-  if (!profile.company) profile.company = {};
-  if (!profile.position) profile.position = {};
-  if (!profile.contact) profile.contact = {};
-  if (!profile.officeAddress) profile.officeAddress = {};
-
+  profile = await EmployerProfile.findOne({ owner: userId });
+  if (profile.company === undefined || profile.company === null) profile.company = {};
+  if (profile.position === undefined || profile.position === null) profile.position = {};
+  if (profile.contact === undefined || profile.contact === null) profile.contact = {};
+  // Không còn officeAddress ngoài cùng
   return profile;
 };
 
 // GET /api/employers/profile
 const getProfile = asyncHandler(async (req, res) => {
   const profile = await ensureEmployerProfile(req.user.id);
-  res.status(200).json({ success: true, data: profile });
+  res.status(200).json({
+    success: true,
+    data: {
+      _id: profile._id,
+      company: profile.company,
+      businessInfo: profile.businessInfo,
+      legalRepresentative: profile.legalRepresentative,
+      contact: profile.contact,
+      position: profile.position,
+      stats: profile.stats,
+      status: profile.status,
+      verification: profile.verification,
+      companyMembers: profile.companyMembers,
+      documents: profile.documents || [],
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
+    }
+  });
 });
 
 // PUT /api/employers/profile
@@ -98,118 +111,88 @@ const updateProfile = asyncHandler(async (req, res) => {
   try {
     const profile = await ensureEmployerProfile(req.user.id);
 
-    // Initialize nested objects if they don't exist
+    // Khởi tạo object nếu chưa có
     if (!profile.position) profile.position = {};
     if (!profile.contact) profile.contact = {};
-    if (!profile.officeAddress) profile.officeAddress = {};
 
-    // Validate input - only allow personal fields
-    const allowedFields = ['position', 'contact', 'officeAddress'];
+    // Chỉ cho phép 2 trường này
+    const allowedFields = ['position', 'contact'];
     const invalidFields = Object.keys(req.body).filter(
       field => !allowedFields.includes(field)
     );
-
     if (invalidFields.length > 0) {
       return res.status(400).json({
         success: false,
         error: 'Endpoint này chỉ cho phép cập nhật thông tin cá nhân',
         message: `Các trường không được phép: ${invalidFields.join(', ')}`,
-        allowedFields: allowedFields,
+        allowedFields,
         note: 'Để cập nhật thông tin công ty, sử dụng PUT /employers/company',
       });
     }
 
     let hasUpdates = false;
-
-    // Update position info if provided
-    if (req.body.position) {
-      const positionFields = ['title', 'level', 'department'];
-      const positionData = {};
-
-      for (const field of positionFields) {
-        if (req.body.position[field] !== undefined) {
-          positionData[field] = sanitizeInput(req.body.position[field]);
-        }
+    // Validate & update position
+    if (req.body.position !== undefined) {
+      if (typeof req.body.position !== 'object' || Array.isArray(req.body.position)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Trường position phải là object',
+        });
       }
-
-      if (Object.keys(positionData).length > 0) {
-        Object.assign(profile.position, positionData);
+      const pos = {
+        title: sanitizeInput(req.body.position.title || ''),
+        level: sanitizeInput(req.body.position.level || ''),
+        department: sanitizeInput(req.body.position.department || '')
+      };
+      profile.set('position', pos);
+      hasUpdates = true;
+    }
+    // Validate & update contact
+    if (req.body.contact !== undefined) {
+      if (typeof req.body.contact !== 'object' || Array.isArray(req.body.contact)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Trường contact phải là object',
+        });
+      }
+      const contact = {};
+      if (req.body.contact.name !== undefined) contact.name = sanitizeInput(req.body.contact.name);
+      if (req.body.contact.phone !== undefined) contact.phone = sanitizeInput(req.body.contact.phone);
+      if (req.body.contact.email !== undefined) contact.email = sanitizeInput(req.body.contact.email);
+      if (Object.keys(contact).length > 0) {
+        profile.set('contact', contact);
         hasUpdates = true;
       }
     }
-
-    // Update contact info if provided
-    if (req.body.contact) {
-      const contactFields = ['name', 'phone', 'email'];
-      const contactData = {};
-
-      for (const field of contactFields) {
-        if (req.body.contact[field] !== undefined) {
-          contactData[field] = sanitizeInput(req.body.contact[field]);
-        }
-      }
-
-      if (Object.keys(contactData).length > 0) {
-        Object.assign(profile.contact, contactData);
-      }
-    }
-
-    // Update office address if provided
-    if (req.body.officeAddress) {
-      const addressFields = [
-        'street',
-        'ward',
-        'district',
-        'city',
-        'country',
-        'postalCode',
-      ];
-      const addressData = {};
-
-      for (const field of addressFields) {
-        if (req.body.officeAddress[field] !== undefined) {
-          addressData[field] = sanitizeInput(req.body.officeAddress[field]);
-        }
-      }
-
-      if (Object.keys(addressData).length > 0) {
-        Object.assign(profile.officeAddress, addressData);
-        hasUpdates = true;
-      }
-    }
-
+    // Không cho phép cập nhật companyOfficeAddress ở đây nữa
     if (!hasUpdates) {
       return res.status(400).json({
         success: false,
         error: 'Không có dữ liệu hợp lệ để cập nhật',
-        allowedFields: ['position', 'contact', 'officeAddress'],
+        allowedFields,
       });
     }
-
-    // Save with validation disabled to avoid required field errors for incomplete profile
+    // Lưu lại
     await profile.save({ validateBeforeSave: false });
-
-    // Update User model if contact info changed
+    // Update User nếu contact thay đổi
     if (req.body.contact?.name || req.body.contact?.phone) {
       const userUpdates = {};
       if (req.body.contact.name) userUpdates.fullName = req.body.contact.name;
       if (req.body.contact.phone) userUpdates.phone = req.body.contact.phone;
-
       await User.findByIdAndUpdate(req.user.id, userUpdates);
     }
-
     logger.info('Personal profile updated', {
       userId: req.user.id,
       updatedSections: Object.keys(req.body),
     });
-
+    // Trả về đúng các trường
     res.status(200).json({
       success: true,
       message: 'Cập nhật thông tin cá nhân thành công',
       data: {
-        position: profile.position,
-        contact: profile.contact,
-        officeAddress: profile.officeAddress,
+        _id: profile._id,
+        position: profile.position || {},
+        contact: profile.contact || {},
         updatedFields: Object.keys(req.body),
       },
     });
@@ -219,8 +202,6 @@ const updateProfile = asyncHandler(async (req, res) => {
       userId: req.user?.id,
       stack: error.stack,
     });
-
-    // Handle validation errors
     if (error.name === 'ValidationError') {
       const validationErrors = Object.values(error.errors).map(
         err => err.message
@@ -231,7 +212,6 @@ const updateProfile = asyncHandler(async (req, res) => {
         details: validationErrors,
       });
     }
-
     res.status(500).json({
       success: false,
       error: 'Cập nhật hồ sơ thất bại',
@@ -1060,6 +1040,7 @@ const updateCompanyInfo = asyncHandler(async (req, res) => {
       success: true,
       message: 'Cập nhật thông tin công ty thành công',
       data: {
+        _id: profile._id,
         company: {
           name: profile.company.name,
           industry: profile.company.industry,
@@ -1126,6 +1107,18 @@ const updateCompanyInfo = asyncHandler(async (req, res) => {
       });
     }
 
+    // Handle duplicate key error for taxId
+    if (
+      error.code === 11000 &&
+      error.keyPattern &&
+      (error.keyPattern['businessInfo.taxId'] || error.message.includes('businessInfo.taxId'))
+    ) {
+      return res.status(409).json({
+        success: false,
+        error: 'Mã số thuế đã tồn tại trong hệ thống',
+        message: 'Vui lòng kiểm tra lại mã số thuế (taxId) và đảm bảo không trùng lặp.'
+      });
+    }
     res.status(500).json({
       success: false,
       error: 'Cập nhật thông tin công ty thất bại',
@@ -1341,6 +1334,7 @@ const getCompanyInfo = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     data: {
+      _id: profile._id,
       company: profile.company,
       stats: profile.stats,
       hiring: profile.hiring,
