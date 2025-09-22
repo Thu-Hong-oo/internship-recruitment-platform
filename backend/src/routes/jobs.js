@@ -1,48 +1,43 @@
+
 const express = require('express');
 const { protect, authorize } = require('../middleware/auth');
 const {
-  createJob,
-  getJobs,
+  getAllJobs,
   getJob,
+  createJob,
   updateJob,
   deleteJob,
   applyForJob,
-  saveJob,
-  unsaveJob,
-  getSimilarJobs,
-  getJobCategories,
-  getTrendingJobs,
-  getJobStats,
-  searchJobs,
   getJobApplications,
-  updateJobStatus,
-  getJobAnalytics,
+  getJobBySlug,
+  incrementJobViews,
+  getJobCompany,
+  getJobStats,
+  getRecentJobs,
+  submitJobForReview,
 } = require('../controllers/jobController');
 
 const router = express.Router();
 
 // Public routes
-router.get('/', getJobs);
-router.get('/search', searchJobs);
-router.get('/categories', getJobCategories);
-router.get('/trending', getTrendingJobs);
-router.get('/:id', getJob);
-router.get('/:id/similar', getSimilarJobs);
+router.get('/', getAllJobs); // GET /api/jobs
+router.get('/recent', getRecentJobs); // GET /api/jobs/recent
+router.get('/slug/:slug', getJobBySlug); // GET /api/jobs/slug/:slug
+router.get('/:id', getJob); // GET /api/jobs/:id
+router.get('/:id/company', getJobCompany); // GET /api/jobs/:id/company
+router.get('/:id/stats', getJobStats); // GET /api/jobs/:id/stats
 
 // Protected routes - Employer only
-router.post('/', protect, authorize('employer'), createJob);
-router.put('/:id', protect, authorize('employer'), updateJob);
-router.delete('/:id', protect, authorize('employer'), deleteJob);
-router.get('/:id/applications', protect, authorize('employer'), getJobApplications);
-router.put('/:id/status', protect, authorize('employer'), updateJobStatus);
-router.get('/:id/analytics', protect, authorize('employer'), getJobAnalytics);
+router.post('/', protect, authorize('employer'), createJob); // POST /api/jobs
+router.put('/:id', protect, authorize('employer'), updateJob); // PUT /api/jobs/:id
+router.delete('/:id', protect, authorize('employer'), deleteJob); // DELETE /api/jobs/:id
+router.get('/:id/applications', protect, authorize('employer'), getJobApplications); // GET /api/jobs/:id/applications
+router.post('/employer/:id/submit', protect, authorize('employer'), submitJobForReview); // POST /api/jobs/employer/:id/submit
 
-// Protected routes - Intern only
-router.post('/:id/apply', protect, authorize('intern'), applyForJob);
-router.post('/:id/save', protect, authorize('intern'), saveJob);
-router.delete('/:id/save', protect, authorize('intern'), unsaveJob);
+// Protected routes - Candidate only
+router.post('/:id/apply', protect, authorize('candidate'), applyForJob); // POST /api/jobs/:id/apply
 
-// Protected routes - Any authenticated user
-router.get('/:id/stats', protect, getJobStats);
+// Public route for incrementing views
+router.post('/:id/view', incrementJobViews); // POST /api/jobs/:id/view
 
 module.exports = router;
