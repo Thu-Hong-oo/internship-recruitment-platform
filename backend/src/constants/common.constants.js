@@ -269,6 +269,7 @@ module.exports = {
     PENDING: 'pending',
     VERIFIED: 'verified',
     REJECTED: 'rejected',
+    SUSPENDED: 'suspended',// tạm khóa. đình chỉ 
   },
 
   // Roadmap status
