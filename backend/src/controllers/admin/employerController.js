@@ -36,13 +36,13 @@ const getEmployers = asyncHandler(async (req, res) => {
   // Get employer profiles for these users
   const userIds = users.map(user => user._id);
   const employerProfiles = await EmployerProfile.find({
-    mainUserId: { $in: userIds },
-  }).select('mainUserId company verification status createdAt updatedAt');
+    owner: { $in: userIds },
+  }).select('owner company verification status createdAt updatedAt');
 
   // Create map for quick lookup
   const profileMap = new Map();
   employerProfiles.forEach(profile => {
-    profileMap.set(profile.mainUserId.toString(), profile);
+    profileMap.set(profile.owner.toString(), profile);
   });
 
   // Process and combine data

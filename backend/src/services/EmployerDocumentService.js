@@ -1,6 +1,4 @@
-/**
- * Service để quản lý document của EmployerProfile
- */
+// Service để quản lý document của EmployerProfile
 class EmployerDocumentService {
   constructor(employerProfile) {
     this.profile = employerProfile;

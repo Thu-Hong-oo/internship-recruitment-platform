@@ -4,32 +4,38 @@ const {
   EMPLOYER_PROFILE_STATUS,
 } = require('../constants/common.constants');
 
-// Import sub-schemas
+
+// Giữ nguyên sub-schemas nhưng tối ưu
 const CompanyInfoSchema = require('./schemas/CompanyInfoSchema');
 const BusinessInfoSchema = require('./schemas/BusinessInfoSchema');
 const VerificationSchema = require('./schemas/VerificationSchema');
-
-// Import services
 const EmployerDocumentService = require('../services/EmployerDocumentService');
 const EmployerVerificationService = require('../services/EmployerVerificationService');
 
 const EmployerProfileSchema = new mongoose.Schema(
   {
     // Chủ tài khoản
-    mainUserId: {
+    owner: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
       unique: true,
     },
 
-    // Thông tin công ty - sử dụng sub-schema
+    // Thông tin công ty
     company: CompanyInfoSchema,
 
-    // Thông tin pháp lý - sử dụng sub-schema
+    // Thông tin pháp lý (CẦN THIẾT tại VN)
     businessInfo: BusinessInfoSchema,
 
-    // Người đại diện pháp luật - simplified
+    // Vị trí cá nhân của nhà tuyển dụng (HR, Manager, ...)
+    position: {
+      title: { type: String, default: '' },
+      level: { type: String, default: '' },
+      department: { type: String, default: '' }
+    },
+
+    // Người đại diện pháp luật (BẮT BUỘC theo luật)
     legalRepresentative: {
       fullName: { type: String, required: true },
       position: { type: String, required: true },
@@ -39,13 +45,11 @@ const EmployerProfileSchema = new mongoose.Schema(
         type: {
           type: String,
           enum: ['CMND', 'CCCD', 'Passport'],
-          required: false,
+          required: false, // không Bắt buộc
         },
-        number: { type: String, required: false },
-        issueDate: { type: Date, required: false },
+        number: { type: String, required: false }, // không Bắt buộc
+        issueDate: { type: Date, required: false }, // không Bắt buộc
         issuePlace: { type: String, required: false },
-        required: { type: Boolean, default: false },
-        requiredReason: String,
       },
     },
 
@@ -53,34 +57,35 @@ const EmployerProfileSchema = new mongoose.Schema(
     contact: {
       name: { type: String, required: true },
       phone: { type: String, required: true },
-      email: { type: String, lowercase: true },
+      email: { type: String, required: true, lowercase: true },
     },
 
-    // Thành viên công ty - simplified
-    companyMembers: [
+    // Team members (CẦN THIẾT cho company)
+    members: [
       {
-        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
         role: {
           type: String,
-          enum: Object.values(USER_ROLES),
-          default: USER_ROLES.RECRUITER,
+          enum: ['admin', 'hr', 'recruiter', 'manager'],
+          default: 'recruiter',
         },
         permissions: {
-          canPostJobs: { type: Boolean, default: false },
-          canViewApplications: { type: Boolean, default: false },
+          canPostJobs: { type: Boolean, default: true },
+          canViewApplications: { type: Boolean, default: true },
           canEditProfile: { type: Boolean, default: false },
           canManageTeam: { type: Boolean, default: false },
         },
         status: {
           type: String,
-          enum: ['active', 'inactive'],
-          default: 'active',
+          enum: ['active', 'inactive', 'pending'],
+          default: 'pending',
         },
-        addedAt: { type: Date, default: Date.now },
+        invitedAt: { type: Date, default: Date.now },
+        joinedAt: Date,
       },
     ],
 
-    // Xác thực - sử dụng sub-schema
+    // Verification process (CẦN THIẾT)
     verification: VerificationSchema,
 
     // Status
@@ -90,9 +95,9 @@ const EmployerProfileSchema = new mongoose.Schema(
       default: EMPLOYER_PROFILE_STATUS.DRAFT,
     },
 
-    // Thống kê
+    // Stats
     stats: {
-      totalJobsPosted: { type: Number, default: 0 },
+      totalJobs: { type: Number, default: 0 },
       activeJobs: { type: Number, default: 0 },
       totalApplications: { type: Number, default: 0 },
       successfulHires: { type: Number, default: 0 },
@@ -103,27 +108,35 @@ const EmployerProfileSchema = new mongoose.Schema(
   }
 );
 
-// === INDEXES ===
-EmployerProfileSchema.index({ 'company.name': 1 });
+// Tối ưu indexes
+EmployerProfileSchema.index({ owner: 1 }, { unique: true });
+EmployerProfileSchema.index({ 'company.name': 'text' });
 EmployerProfileSchema.index({ 'company.industry': 1 });
 EmployerProfileSchema.index({ 'businessInfo.taxId': 1 }, { unique: true });
-EmployerProfileSchema.index({ status: 1 });
-EmployerProfileSchema.index({ 'verification.isVerified': 1 });
+EmployerProfileSchema.index({ status: 1, 'verification.isVerified': 1 });
 
-// === VIRTUALS ===
-EmployerProfileSchema.virtual('isHiring').get(function () {
-  return this.stats.activeJobs > 0;
+// Virtuals hữu ích
+EmployerProfileSchema.virtual('isVerified').get(function () {
+  return (
+    this.verification.isVerified &&
+    this.status === EMPLOYER_PROFILE_STATUS.VERIFIED
+  );
 });
 
-EmployerProfileSchema.virtual('verificationProgress').get(function () {
-  const service = new EmployerVerificationService(this);
-  return service.getVerificationProgress();
+EmployerProfileSchema.virtual('canPostJobs').get(function () {
+  return ['verified', 'pending'].includes(this.status);
 });
 
-// === ESSENTIAL METHODS ONLY ===
-EmployerProfileSchema.methods.updateStats = function (totalJobs, activeJobs) {
-  this.stats.totalJobsPosted = totalJobs;
-  this.stats.activeJobs = activeJobs;
+// Methods cần thiết
+EmployerProfileSchema.methods.addMember = function (
+  userId,
+  role = 'recruiter'
+) {
+  this.members.push({
+    user: userId,
+    role: role,
+    status: 'pending',
+  });
   return this.save();
 };
 
