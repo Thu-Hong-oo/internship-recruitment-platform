@@ -13,9 +13,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Save, User, MapPin, Building } from "lucide-react";
+import { ArrowLeft, Save, User, Building, Edit3 } from "lucide-react";
 import { User as UserType, getUserData, getToken } from "@/lib/userStorage";
-import { useVietnamAddress } from "@/hooks/useVietnamAddress";
+import { EMPLOYER_LEVEL_LABEL } from "@/lib/labels";
+import { getEmployerProfile } from "@/lib/api";
 
 interface ProfileData {
   contact: {
@@ -28,13 +29,6 @@ interface ProfileData {
     level: string;
     department: string;
   };
-  officeAddress: {
-    street: string;
-    ward: string;
-    district: string;
-    city: string;
-    country: string;
-  };
 }
 
 export default function ProfilePage() {
@@ -43,6 +37,8 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const levelLabel = EMPLOYER_LEVEL_LABEL;
 
   // Form data
   const [formData, setFormData] = useState<ProfileData>({
@@ -56,27 +52,9 @@ export default function ProfilePage() {
       level: "",
       department: "",
     },
-    officeAddress: {
-      street: "",
-      ward: "",
-      district: "",
-      city: "",
-      country: "Vietnam",
-    },
   });
 
-  // Address hook
-  const {
-    cities,
-    districts,
-    wards,
-    loading: loadingAddress,
-    error: addressError,
-    loadDistricts,
-    loadWards,
-    resetDistricts,
-    resetWards,
-  } = useVietnamAddress();
+  // Address section removed
 
   // Load user data and initialize form
   useEffect(() => {
@@ -95,39 +73,42 @@ export default function ProfilePage() {
     }
   }, []);
 
-  // Load districts when city changes
+  // Fetch employer profile and prefill form if available
   useEffect(() => {
-    if (formData.officeAddress.city) {
-      // city now stores province code
-      loadDistricts(formData.officeAddress.city);
-      // Reset district and ward when city changes
-      setFormData((prev) => ({
-        ...prev,
-        officeAddress: {
-          ...prev.officeAddress,
-          district: "",
-          ward: "",
-        },
-      }));
-      resetWards();
-    }
-  }, [formData.officeAddress.city, loadDistricts, resetWards]);
+    const fetchProfile = async () => {
+      try {
+        const token = getToken();
+        if (!token) return;
 
-  // Load wards when district changes
-  useEffect(() => {
-    if (formData.officeAddress.city && formData.officeAddress.district) {
-      // district now stores district code
-      loadWards(formData.officeAddress.district);
-      // Reset ward when district changes
-      setFormData((prev) => ({
-        ...prev,
-        officeAddress: {
-          ...prev.officeAddress,
-          ward: "",
-        },
-      }));
-    }
-  }, [formData.officeAddress.district, loadWards]);
+        const json = await getEmployerProfile(token);
+
+        const profile = json?.data || json?.profile || null;
+        if (!profile) return;
+
+        const apiContact = profile.contact || {};
+        const apiPosition = profile.position || {};
+        setFormData((prev) => ({
+          ...prev,
+          contact: {
+            name: apiContact.name ?? prev.contact.name,
+            phone: apiContact.phone ?? prev.contact.phone,
+            email: apiContact.email ?? prev.contact.email,
+          },
+          position: {
+            title: apiPosition.title ?? prev.position.title,
+            level: apiPosition.level ?? prev.position.level,
+            department: apiPosition.department ?? prev.position.department,
+          },
+        }));
+      } catch (err) {
+        // Silent fail for initial prefill; detailed errors shown on submit flow.
+      }
+    };
+
+    fetchProfile();
+  }, []);
+
+  // Removed provinces preselect and load effects
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => {
@@ -166,7 +147,10 @@ export default function ProfilePage() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify(formData),
+          body: JSON.stringify({
+            contact: formData.contact,
+            position: formData.position,
+          }),
         }
       );
 
@@ -203,254 +187,204 @@ export default function ProfilePage() {
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-4xl mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.back()}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Quay lại
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-800">
-                Cập nhật thông tin cá nhân
-              </h1>
-              <p className="text-slate-600">
-                Quản lý thông tin liên hệ và vị trí công việc của bạn
-              </p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.back()}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Quay lại
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold text-slate-800">
+                  Cập nhật thông tin cá nhân
+                </h1>
+                <p className="text-slate-600">
+                  Quản lý thông tin liên hệ và vị trí công việc của bạn
+                </p>
+              </div>
             </div>
+            {!isEditing && (
+              <Button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="bg-primary text-white hover:brightness-110 shadow-sm px-4"
+              >
+                <Edit3 className="w-4 h-4 mr-2" /> Chỉnh sửa
+              </Button>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-6 py-8">
+      <div className="max-w-6xl mx-auto px-6 py-10">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Contact Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="w-5 h-5 text-primary" />
-                Thông tin liên hệ
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="contact.name">Họ và tên *</Label>
-                  <Input
-                    id="contact.name"
-                    value={formData.contact.name}
-                    onChange={(e) =>
-                      handleInputChange("contact.name", e.target.value)
-                    }
-                    placeholder="Nhập họ và tên"
-                    required
-                  />
+          <div className="grid gap-8 md:grid-cols-2">
+            {/* Contact Information */}
+            <Card className="border border-slate-200 shadow-sm hover:shadow transition-shadow h-full">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="w-5 h-5 text-primary" />
+                  Thông tin liên hệ
+                </CardTitle>
+                <p className="text-sm text-slate-500">
+                  Các thông tin để chúng tôi liên hệ với bạn.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="contact.name">Họ và tên *</Label>
+                    {isEditing ? (
+                      <Input
+                        id="contact.name"
+                        value={formData.contact.name}
+                        onChange={(e) =>
+                          handleInputChange("contact.name", e.target.value)
+                        }
+                        placeholder="Nhập họ và tên"
+                        required
+                      />
+                    ) : (
+                      <div className="mt-1 text-base font-medium text-slate-900">
+                        {formData.contact.name || "Chưa cập nhật"}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="contact.phone">Số điện thoại *</Label>
+                    {isEditing ? (
+                      <Input
+                        id="contact.phone"
+                        value={formData.contact.phone}
+                        onChange={(e) =>
+                          handleInputChange("contact.phone", e.target.value)
+                        }
+                        placeholder="Nhập số điện thoại"
+                        required
+                      />
+                    ) : (
+                      <div className="mt-1 text-base font-medium text-slate-900">
+                        {formData.contact.phone || "Chưa cập nhật"}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div>
-                  <Label htmlFor="contact.phone">Số điện thoại *</Label>
-                  <Input
-                    id="contact.phone"
-                    value={formData.contact.phone}
-                    onChange={(e) =>
-                      handleInputChange("contact.phone", e.target.value)
-                    }
-                    placeholder="Nhập số điện thoại"
-                    required
-                  />
+                  <Label htmlFor="contact.email">Email *</Label>
+                  {isEditing ? (
+                    <Input
+                      id="contact.email"
+                      type="email"
+                      value={formData.contact.email}
+                      onChange={(e) =>
+                        handleInputChange("contact.email", e.target.value)
+                      }
+                      placeholder="Nhập email"
+                      required
+                    />
+                  ) : (
+                    <div className="mt-1 text-base font-medium text-slate-900">
+                      {formData.contact.email || "Chưa cập nhật"}
+                    </div>
+                  )}
                 </div>
-              </div>
-              <div>
-                <Label htmlFor="contact.email">Email *</Label>
-                <Input
-                  id="contact.email"
-                  type="email"
-                  value={formData.contact.email}
-                  onChange={(e) =>
-                    handleInputChange("contact.email", e.target.value)
-                  }
-                  placeholder="Nhập email"
-                  required
-                />
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {/* Position Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building className="w-5 h-5 text-primary" />
-                Thông tin vị trí công việc
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="position.title">Chức vụ *</Label>
-                  <Input
-                    id="position.title"
-                    value={formData.position.title}
-                    onChange={(e) =>
-                      handleInputChange("position.title", e.target.value)
-                    }
-                    placeholder="VD: Senior HR Manager"
-                    required
-                  />
+            {/* Position Information */}
+            <Card className="border border-slate-200 shadow-sm hover:shadow transition-shadow h-full">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Building className="w-5 h-5 text-primary" />
+                  Vị trí công việc
+                </CardTitle>
+                <p className="text-sm text-slate-500">
+                  Mô tả vị trí và cấp bậc hiện tại.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="position.title">Chức vụ *</Label>
+                    {isEditing ? (
+                      <Input
+                        id="position.title"
+                        value={formData.position.title}
+                        onChange={(e) =>
+                          handleInputChange("position.title", e.target.value)
+                        }
+                        placeholder="VD: Senior HR Manager"
+                        required
+                      />
+                    ) : (
+                      <div className="mt-1 text-base font-medium text-slate-900">
+                        {formData.position.title || "Chưa cập nhật"}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="position.level">Cấp bậc *</Label>
+                    {isEditing ? (
+                      <Select
+                        value={formData.position.level}
+                        onValueChange={(value) =>
+                          handleInputChange("position.level", value)
+                        }
+                        required
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Chọn cấp bậc" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="intern">Thực tập sinh</SelectItem>
+                          <SelectItem value="junior">Nhân viên</SelectItem>
+                          <SelectItem value="middle">Chuyên viên</SelectItem>
+                          <SelectItem value="senior">
+                            Chuyên viên cao cấp
+                          </SelectItem>
+                          <SelectItem value="lead">Trưởng nhóm</SelectItem>
+                          <SelectItem value="manager">Quản lý</SelectItem>
+                          <SelectItem value="director">Giám đốc</SelectItem>
+                          <SelectItem value="ceo">Tổng giám đốc</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="mt-1 text-base font-medium text-slate-900">
+                        {levelLabel[formData.position.level] || "Chưa cập nhật"}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="position.department">Phòng ban *</Label>
+                    {isEditing ? (
+                      <Input
+                        id="position.department"
+                        value={formData.position.department}
+                        onChange={(e) =>
+                          handleInputChange(
+                            "position.department",
+                            e.target.value
+                          )
+                        }
+                        placeholder="VD: Human Resources"
+                        required
+                      />
+                    ) : (
+                      <div className="mt-1 text-base font-medium text-slate-900">
+                        {formData.position.department || "Chưa cập nhật"}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="position.level">Cấp bậc *</Label>
-                  <Select
-                    value={formData.position.level}
-                    onValueChange={(value) =>
-                      handleInputChange("position.level", value)
-                    }
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn cấp bậc" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="intern">Thực tập sinh</SelectItem>
-                      <SelectItem value="junior">Nhân viên</SelectItem>
-                      <SelectItem value="middle">Chuyên viên</SelectItem>
-                      <SelectItem value="senior">
-                        Chuyên viên cao cấp
-                      </SelectItem>
-                      <SelectItem value="lead">Trưởng nhóm</SelectItem>
-                      <SelectItem value="manager">Quản lý</SelectItem>
-                      <SelectItem value="director">Giám đốc</SelectItem>
-                      <SelectItem value="ceo">Tổng giám đốc</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="position.department">Phòng ban *</Label>
-                  <Input
-                    id="position.department"
-                    value={formData.position.department}
-                    onChange={(e) =>
-                      handleInputChange("position.department", e.target.value)
-                    }
-                    placeholder="VD: Human Resources"
-                    required
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
 
-          {/* Office Address */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-primary" />
-                Địa chỉ văn phòng
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="officeAddress.street">Địa chỉ chi tiết *</Label>
-                <Input
-                  id="officeAddress.street"
-                  value={formData.officeAddress.street}
-                  onChange={(e) =>
-                    handleInputChange("officeAddress.street", e.target.value)
-                  }
-                  placeholder="VD: 57 Huỳnh Thúc Kháng"
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="officeAddress.city">Tỉnh/Thành phố *</Label>
-                  <Select
-                    value={formData.officeAddress.city}
-                    onValueChange={(value) =>
-                      handleInputChange("officeAddress.city", value)
-                    }
-                    disabled={loadingAddress}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn tỉnh/thành phố" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {cities.map((city) => (
-                        <SelectItem key={city.value} value={city.value}>
-                          {city.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="officeAddress.district">Quận/Huyện *</Label>
-                  <Select
-                    value={formData.officeAddress.district}
-                    onValueChange={(value) =>
-                      handleInputChange("officeAddress.district", value)
-                    }
-                    disabled={!formData.officeAddress.city || loadingAddress}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn quận/huyện" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {districts.map((district) => (
-                        <SelectItem key={district.value} value={district.value}>
-                          {district.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="officeAddress.ward">Phường/Xã *</Label>
-                  <Select
-                    value={formData.officeAddress.ward}
-                    onValueChange={(value) =>
-                      handleInputChange("officeAddress.ward", value)
-                    }
-                    disabled={
-                      !formData.officeAddress.district || loadingAddress
-                    }
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Chọn phường/xã" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {wards.map((ward) => (
-                        <SelectItem key={ward.value} value={ward.value}>
-                          {ward.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="officeAddress.country">Quốc gia</Label>
-                <Input
-                  id="officeAddress.country"
-                  value={formData.officeAddress.country}
-                  onChange={(e) =>
-                    handleInputChange("officeAddress.country", e.target.value)
-                  }
-                  placeholder="Vietnam"
-                  readOnly
-                />
-              </div>
-            </CardContent>
-          </Card>
+          {/* Đã xóa phần Địa chỉ văn phòng */}
 
           {/* Error/Success Messages */}
           {error && (
@@ -459,11 +393,7 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {addressError && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <p className="text-yellow-800">{addressError}</p>
-            </div>
-          )}
+          {/* Đã xóa cảnh báo địa chỉ */}
 
           {success && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -471,24 +401,26 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {/* Submit Button */}
-          <div className="flex justify-end gap-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => router.back()}
-            >
-              Hủy
-            </Button>
-            <Button
-              type="submit"
-              disabled={loading}
-              className="flex items-center gap-2"
-            >
-              <Save className="w-4 h-4" />
-              {loading ? "Đang lưu..." : "Lưu thông tin"}
-            </Button>
-          </div>
+          {/* Floating action bar when editing */}
+          {isEditing && (
+            <div className="fixed bottom-6 right-6 z-40 flex items-center gap-3 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 border border-slate-200 shadow-lg rounded-full px-4 py-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditing(false)}
+              >
+                Hủy
+              </Button>
+              <Button
+                type="submit"
+                disabled={loading}
+                className="flex items-center gap-2"
+              >
+                <Save className="w-4 h-4" />
+                {loading ? "Đang lưu..." : "Lưu thông tin"}
+              </Button>
+            </div>
+          )}
         </form>
       </div>
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,16 +14,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Save,
-  Building2,
-  FileText,
-  UserCircle2,
-  MapPin,
-  ArrowLeft,
-} from "lucide-react";
+import { Save, Building2, UserCircle2, ArrowLeft, Edit3 } from "lucide-react";
 import { getToken } from "@/lib/userStorage";
 import { useVietnamAddress } from "@/hooks/useVietnamAddress";
+import { AddressOption, findOptionByLabelLoose } from "@/lib/addressUtils";
 
 interface CompanyFormData {
   company: {
@@ -43,9 +37,9 @@ interface CompanyFormData {
     issuePlace: string;
     address: {
       street: string;
-      ward: string; // name
-      district: string; // name
-      city: string; // name
+      ward: string;
+      district: string;
+      city: string;
       country: string;
     };
   };
@@ -62,21 +56,8 @@ export default function CompanyPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-
-  const {
-    cities,
-    districts,
-    wards,
-    loading: loadingAddr,
-    error: addrError,
-    loadDistricts,
-    loadWards,
-    resetWards,
-  } = useVietnamAddress();
-
-  // Track selected codes for address cascading
-  const [selectedProvinceCode, setSelectedProvinceCode] = useState<string>("");
-  const [selectedDistrictCode, setSelectedDistrictCode] = useState<string>("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [companyView, setCompanyView] = useState<any>(null);
 
   const [formData, setFormData] = useState<CompanyFormData>({
     company: {
@@ -122,37 +103,123 @@ export default function CompanyPage() {
     });
   };
 
-  // When province changes, load districts and clear lower levels
+  // Vietnam address dropdowns
+  const {
+    cities,
+    districts,
+    wards,
+    loadDistricts,
+    loadWards,
+    resetDistricts,
+    resetWards,
+  } = useVietnamAddress();
+
+  const [selectedCityKey, setSelectedCityKey] = useState<string>("");
+  const [selectedDistrictCode, setSelectedDistrictCode] = useState<string>("");
+  const [selectedWardCode, setSelectedWardCode] = useState<string>("");
+
+  // When city changes, load districts and set city label
   useEffect(() => {
-    if (selectedProvinceCode) {
-      loadDistricts(selectedProvinceCode);
+    if (!selectedCityKey) {
+      resetDistricts();
       setSelectedDistrictCode("");
-      setField(
-        "businessInfo.address.city",
-        cities.find((c) => c.value === selectedProvinceCode)?.label || ""
-      );
-      setField("businessInfo.address.district", "");
-      setField("businessInfo.address.ward", "");
+      setSelectedWardCode("");
       resetWards();
+      return;
     }
-  }, [selectedProvinceCode, loadDistricts, resetWards, cities]);
+    const selected = cities.find((c) => c.value === selectedCityKey);
+    setField("businessInfo.address.city", selected?.label || "");
+    loadDistricts(selectedCityKey);
+    setSelectedDistrictCode("");
+    setSelectedWardCode("");
+    resetWards();
+  }, [selectedCityKey]);
 
-  // When district changes, load wards and clear ward
+  // When district changes, load wards and set district label
   useEffect(() => {
-    if (selectedDistrictCode) {
-      loadWards(selectedDistrictCode);
-      setField(
-        "businessInfo.address.district",
-        districts.find((d) => d.value === selectedDistrictCode)?.label || ""
-      );
-      setField("businessInfo.address.ward", "");
+    if (!selectedDistrictCode) {
+      setSelectedWardCode("");
+      resetWards();
+      return;
     }
-  }, [selectedDistrictCode, loadWards, districts]);
+    const selected = districts.find((d) => d.value === selectedDistrictCode);
+    setField("businessInfo.address.district", selected?.label || "");
+    loadWards(selectedDistrictCode);
+  }, [selectedDistrictCode]);
 
-  // Derive current ward name when selected
-  const wardNameByCode = useMemo(() => {
-    return (code: string) => wards.find((w) => w.value === code)?.label || "";
-  }, [wards]);
+  // When ward changes, set ward label
+  useEffect(() => {
+    if (!selectedWardCode) return;
+    const selected = wards.find((w) => w.value === selectedWardCode);
+    setField("businessInfo.address.ward", selected?.label || "");
+  }, [selectedWardCode]);
+
+  // Prefill from GET /employers/company
+  useEffect(() => {
+    const fetchCompany = async () => {
+      try {
+        const token = getToken();
+        if (!token) return;
+        const res = await fetch("http://localhost:3000/api/employers/company", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json();
+        const data = json?.data;
+        if (!data?.company) return;
+        setCompanyView(data);
+        const c = data.company;
+        setFormData((prev) => ({
+          ...prev,
+          company: {
+            ...prev.company,
+            name: c.name || "",
+            industry: c.industry || prev.company.industry,
+            size: c.size || prev.company.size,
+            email: c.email || "",
+            website: c.website || "",
+            description: c.description || "",
+            foundedYear: c.foundedYear ?? "",
+            employeesCount: c.employeesCount ?? "",
+          },
+          businessInfo: {
+            ...prev.businessInfo,
+            address: {
+              ...prev.businessInfo.address,
+              street: c.officeAddress?.street || "",
+              ward: c.officeAddress?.ward || "",
+              district: c.officeAddress?.district || "",
+              city: c.officeAddress?.city || "",
+              country: c.officeAddress?.country || "Vietnam",
+            },
+          },
+        }));
+
+        // Sync dropdown selection by matching labels to options
+        const cityOpt = (cities || []).find(
+          (o) => o.label === c.officeAddress?.city
+        );
+        if (cityOpt) {
+          setSelectedCityKey(cityOpt.value);
+          await loadDistricts(cityOpt.value);
+          const districtOpt = (districts || []).find(
+            (o) => o.label === c.officeAddress?.district
+          );
+          if (districtOpt) {
+            setSelectedDistrictCode(districtOpt.value);
+            await loadWards(districtOpt.value);
+            const wardOpt = (wards || []).find(
+              (o) => o.label === c.officeAddress?.ward
+            );
+            if (wardOpt) setSelectedWardCode(wardOpt.value);
+          }
+        }
+      } catch (e) {
+        // silent
+      }
+    };
+
+    if (cities.length) fetchCompany();
+  }, [cities]);
 
   const industryOptions = [
     { value: "technology", label: "Công nghệ" },
@@ -184,16 +251,18 @@ export default function CompanyPage() {
         return;
       }
 
-      const body: CompanyFormData = {
-        ...formData,
-        // Ensure ward name is set from selected wards list if needed
+      const body = {
+        company: formData.company,
         businessInfo: {
-          ...formData.businessInfo,
-          address: {
-            ...formData.businessInfo.address,
-            // city/district already set to human-readable in effects
-          },
+          registrationNumber: formData.businessInfo.registrationNumber,
+          taxId: formData.businessInfo.taxId,
+          issueDate: formData.businessInfo.issueDate
+            ? new Date(formData.businessInfo.issueDate).toISOString()
+            : "",
+          issuePlace: formData.businessInfo.issuePlace,
+          address: formData.businessInfo.address,
         },
+        legalRepresentative: formData.legalRepresentative,
       };
 
       const res = await fetch("http://localhost:3000/api/employers/company", {
@@ -221,29 +290,185 @@ export default function CompanyPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow-sm border-b">
-        <div className="max-w-5xl mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.back()}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" /> Quay lại
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-slate-800">
-                Cập nhật thông tin công ty
-              </h1>
-              <p className="text-slate-600">
-                Thông tin chung, pháp lý và người đại diện
-              </p>
+        <div className="max-w-6xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.back()}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" /> Quay lại
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold text-slate-800">
+                  Cập nhật thông tin công ty
+                </h1>
+                <p className="text-slate-600">
+                  Thông tin công ty và người đại diện
+                </p>
+              </div>
             </div>
+            {!isEditing && (
+              <Button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="bg-primary text-white hover:brightness-110 shadow-sm px-4"
+              >
+                <Edit3 className="w-4 h-4 mr-2" /> Chỉnh sửa
+              </Button>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-8">
+      <div className="max-w-6xl mx-auto px-6 py-8">
+        {!isEditing && (
+          <div className="space-y-6">
+            {/* View Mode - Company visuals */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Hình ảnh công ty</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Logo</Label>
+                    <div className="mt-2">
+                      {companyView?.company?.logo?.url ? (
+                        <img
+                          src={companyView.company.logo.url}
+                          alt="Logo"
+                          className="h-16 w-16 rounded object-cover border"
+                        />
+                      ) : (
+                        <div className="text-slate-500">Chưa có logo</div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Ảnh bìa</Label>
+                    <div className="mt-2">
+                      {companyView?.company?.coverImage?.url ? (
+                        <img
+                          src={companyView.company.coverImage.url}
+                          alt="Cover"
+                          className="h-28 w-full max-w-md rounded object-cover border"
+                        />
+                      ) : (
+                        <div className="text-slate-500">Chưa có ảnh bìa</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Thông tin công ty</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-slate-900">
+                  <div>
+                    <span className="text-slate-500">Tên:</span>{" "}
+                    {formData.company.name || "Chưa cập nhật"}
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Ngành:</span>{" "}
+                    {formData.company.industry}
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Quy mô:</span>{" "}
+                    {formData.company.size}
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Email:</span>{" "}
+                    {formData.company.email || "Chưa cập nhật"}
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Website:</span>{" "}
+                    {formData.company.website || "Chưa cập nhật"}
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Năm thành lập:</span>{" "}
+                    {formData.company.foundedYear || "Chưa cập nhật"}
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Số nhân sự:</span>{" "}
+                    {formData.company.employeesCount || "Chưa cập nhật"}
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Mô tả:</span>
+                    <div className="mt-1 whitespace-pre-line">
+                      {formData.company.description || "Chưa cập nhật"}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Địa chỉ văn phòng</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-slate-900">
+                  <div>
+                    <span className="text-slate-500">Địa chỉ:</span>{" "}
+                    {formData.businessInfo.address.street || "Chưa cập nhật"}
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Phường/Xã:</span>{" "}
+                    {formData.businessInfo.address.ward || "Chưa cập nhật"}
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Quận/Huyện:</span>{" "}
+                    {formData.businessInfo.address.district || "Chưa cập nhật"}
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Tỉnh/Thành phố:</span>{" "}
+                    {formData.businessInfo.address.city || "Chưa cập nhật"}
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Quốc gia:</span>{" "}
+                    {formData.businessInfo.address.country || "Chưa cập nhật"}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Thống kê</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                <div>
+                  <div className="text-2xl font-bold">
+                    {companyView?.stats?.totalJobs ?? 0}
+                  </div>
+                  <div className="text-slate-500">Tổng tin</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">
+                    {companyView?.stats?.activeJobs ?? 0}
+                  </div>
+                  <div className="text-slate-500">Đang hoạt động</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">
+                    {companyView?.stats?.totalApplications ?? 0}
+                  </div>
+                  <div className="text-slate-500">Ứng tuyển</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">
+                    {companyView?.stats?.successfulHires ?? 0}
+                  </div>
+                  <div className="text-slate-500">Tuyển thành công</div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Company Info */}
           <Card>
@@ -377,15 +602,13 @@ export default function CompanyPage() {
           {/* Business Info */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-primary" /> Thông tin pháp lý
-              </CardTitle>
+              <CardTitle>Thông tin pháp lý</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="businessInfo.registrationNumber">
-                    Mã ĐKKD *
+                    Số ĐKKD *
                   </Label>
                   <Input
                     id="businessInfo.registrationNumber"
@@ -400,7 +623,7 @@ export default function CompanyPage() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="businessInfo.taxId">MST *</Label>
+                  <Label htmlFor="businessInfo.taxId">Mã số thuế *</Label>
                   <Input
                     id="businessInfo.taxId"
                     value={formData.businessInfo.taxId}
@@ -410,6 +633,8 @@ export default function CompanyPage() {
                     required
                   />
                 </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="businessInfo.issueDate">Ngày cấp *</Label>
                   <Input
@@ -422,35 +647,39 @@ export default function CompanyPage() {
                     required
                   />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="businessInfo.issuePlace">Nơi cấp</Label>
+                  <Label htmlFor="businessInfo.issuePlace">Nơi cấp *</Label>
                   <Input
                     id="businessInfo.issuePlace"
                     value={formData.businessInfo.issuePlace}
                     onChange={(e) =>
                       setField("businessInfo.issuePlace", e.target.value)
                     }
+                    required
                   />
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-primary" /> Địa chỉ ĐKKD
-                </Label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Address */}
+              <div>
+                <Label>Địa chỉ</Label>
+                <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <Input
+                      placeholder="Số nhà, tên đường"
+                      value={formData.businessInfo.address.street}
+                      onChange={(e) =>
+                        setField("businessInfo.address.street", e.target.value)
+                      }
+                    />
+                  </div>
                   <div>
-                    <Label>Tỉnh/Thành *</Label>
                     <Select
-                      value={selectedProvinceCode}
-                      onValueChange={(v) => setSelectedProvinceCode(v)}
-                      disabled={loadingAddr}
+                      value={selectedCityKey}
+                      onValueChange={(v) => setSelectedCityKey(v)}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Chọn tỉnh/thành" />
+                        <SelectValue placeholder="Tỉnh/Thành phố" />
                       </SelectTrigger>
                       <SelectContent>
                         {cities.map((c) => (
@@ -462,14 +691,13 @@ export default function CompanyPage() {
                     </Select>
                   </div>
                   <div>
-                    <Label>Quận/Huyện *</Label>
                     <Select
                       value={selectedDistrictCode}
                       onValueChange={(v) => setSelectedDistrictCode(v)}
-                      disabled={!selectedProvinceCode || loadingAddr}
+                      disabled={!selectedCityKey}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Chọn quận/huyện" />
+                        <SelectValue placeholder="Quận/Huyện" />
                       </SelectTrigger>
                       <SelectContent>
                         {districts.map((d) => (
@@ -481,23 +709,13 @@ export default function CompanyPage() {
                     </Select>
                   </div>
                   <div>
-                    <Label>Phường/Xã *</Label>
                     <Select
-                      value={
-                        formData.businessInfo.address.ward
-                          ? wards.find(
-                              (w) =>
-                                w.label === formData.businessInfo.address.ward
-                            )?.value || ""
-                          : ""
-                      }
-                      onValueChange={(v) =>
-                        setField("businessInfo.address.ward", wardNameByCode(v))
-                      }
-                      disabled={!selectedDistrictCode || loadingAddr}
+                      value={selectedWardCode}
+                      onValueChange={(v) => setSelectedWardCode(v)}
+                      disabled={!selectedDistrictCode}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Chọn phường/xã" />
+                        <SelectValue placeholder="Phường/Xã" />
                       </SelectTrigger>
                       <SelectContent>
                         {wards.map((w) => (
@@ -508,27 +726,8 @@ export default function CompanyPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="businessInfo.address.street">
-                      Số nhà, đường *
-                    </Label>
                     <Input
-                      id="businessInfo.address.street"
-                      value={formData.businessInfo.address.street}
-                      onChange={(e) =>
-                        setField("businessInfo.address.street", e.target.value)
-                      }
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="businessInfo.address.country">
-                      Quốc gia
-                    </Label>
-                    <Input
-                      id="businessInfo.address.country"
                       value={formData.businessInfo.address.country}
                       readOnly
                     />
@@ -608,12 +807,6 @@ export default function CompanyPage() {
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
               <p className="text-red-800">{error}</p>
-            </div>
-          )}
-
-          {addrError && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <p className="text-yellow-800">{addrError}</p>
             </div>
           )}
 

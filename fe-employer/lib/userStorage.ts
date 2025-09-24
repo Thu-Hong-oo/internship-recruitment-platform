@@ -31,46 +31,52 @@ export interface User {
   employerProfile: string;
 }
 
-// Lưu user data vào localStorage
-export const saveUserData = (user: User): void => {
+// Lưu user data vào storage (localStorage nếu remember=true, ngược lại sessionStorage)
+export const saveUserData = (user: User, remember: boolean = true): void => {
   if (typeof window !== "undefined") {
     try {
-      localStorage.setItem("user", JSON.stringify(user));
+      const storage = remember ? localStorage : sessionStorage;
+      storage.setItem("user", JSON.stringify(user));
     } catch (error) {
       console.error("Error saving user data:", error);
     }
   }
 };
 
-// Lấy user data từ localStorage
+// Lấy user data từ storage (ưu tiên sessionStorage rồi tới localStorage để hỗ trợ phiên tạm)
 export const getUserData = (): User | null => {
   if (typeof window === "undefined") return null;
 
   try {
-    const userData = localStorage.getItem("user");
-    return userData ? JSON.parse(userData) : null;
+    const sessionUser = sessionStorage.getItem("user");
+    if (sessionUser) return JSON.parse(sessionUser);
+    const persistedUser = localStorage.getItem("user");
+    return persistedUser ? JSON.parse(persistedUser) : null;
   } catch (error) {
     console.error("Error getting user data:", error);
     return null;
   }
 };
 
-// Lưu token vào localStorage
-export const saveToken = (token: string): void => {
+// Lưu token vào storage (localStorage nếu remember=true, ngược lại sessionStorage)
+export const saveToken = (token: string, remember: boolean = true): void => {
   if (typeof window !== "undefined") {
     try {
-      localStorage.setItem("token", token);
+      const storage = remember ? localStorage : sessionStorage;
+      storage.setItem("token", token);
     } catch (error) {
       console.error("Error saving token:", error);
     }
   }
 };
 
-// Lấy token từ localStorage
+// Lấy token từ storage (ưu tiên sessionStorage rồi tới localStorage)
 export const getToken = (): string | null => {
   if (typeof window === "undefined") return null;
 
   try {
+    const sessionToken = sessionStorage.getItem("token");
+    if (sessionToken) return sessionToken;
     return localStorage.getItem("token");
   } catch (error) {
     console.error("Error getting token:", error);
@@ -78,10 +84,12 @@ export const getToken = (): string | null => {
   }
 };
 
-// Xóa tất cả user data (logout)
+// Xóa tất cả user data (logout) ở cả sessionStorage và localStorage
 export const clearUserData = (): void => {
   if (typeof window !== "undefined") {
     try {
+      sessionStorage.removeItem("user");
+      sessionStorage.removeItem("token");
       localStorage.removeItem("user");
       localStorage.removeItem("token");
     } catch (error) {
