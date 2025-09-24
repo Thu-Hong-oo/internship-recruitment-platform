@@ -22,6 +22,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [remember, setRemember] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<string | null>(null);
@@ -47,10 +48,10 @@ export default function LoginPage() {
       if (data?.success) {
         // Lưu token và user data sử dụng utility functions
         if (data?.token) {
-          saveToken(data.token);
+          saveToken(data.token, remember);
         }
         if (data?.user) {
-          saveUserData(data.user);
+          saveUserData(data.user, remember);
         }
         setSuccess("Đăng nhập thành công! Đang chuyển hướng...");
         setTimeout(() => router.push("/dashboard"), 1000);
@@ -235,14 +236,25 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* Forgot Password */}
+          {/* Remember Me + Forgot Password */}
           <div className="text-right mb-6">
-            <Link
-              href="/forgot-password"
-              className="text-primary hover:brightness-110 text-sm"
-            >
-              Quên mật khẩu
-            </Link>
+            <div className="flex items-center justify-between">
+              <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                  className="h-4 w-4 accent-primary"
+                />
+                Ghi nhớ đăng nhập
+              </label>
+              <Link
+                href="/forgot-password"
+                className="text-primary hover:brightness-110 text-sm"
+              >
+                Quên mật khẩu
+              </Link>
+            </div>
           </div>
 
           {/* Login Button */}

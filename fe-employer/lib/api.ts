@@ -71,6 +71,27 @@ export async function resendEmailVerification(email: string): Promise<{
   }
 }
 
+export async function getEmployerProfile(token: string): Promise<{
+  success: boolean;
+  data?: any;
+  profile?: any;
+  error?: string;
+}> {
+  try {
+    const res = await fetch("http://localhost:3000/api/employers/profile", {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const json = await res.json().catch(() => ({}));
+    return json as any;
+  } catch (e) {
+    return { success: false, error: "Không thể kết nối máy chủ" } as any;
+  }
+}
+
 export async function getUnverifiedAccount(email: string): Promise<{
   success: boolean;
   data?: any;
