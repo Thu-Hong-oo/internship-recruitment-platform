@@ -2,6 +2,7 @@ const Job = require('../models/Job');
 const Application = require('../models/Application');
 const CandidateProfile = require('../models/CandidateProfile');
 const { logger } = require('../utils/logger');
+const { JOB_STATUS } = require('../constants/common.constants');
 
 // @desc    Get all jobs with filtering and pagination (supports text search)
 // @route   GET /api/jobs
@@ -35,7 +36,10 @@ const getAllJobs = async (req, res) => {
     if (employer) {
       query['employer'] = employer;
     }
-    if (status) {
+    // Mặc định chỉ lấy job open cho user thường
+    if (req.user?.role !== 'admin' && !status) {
+      query['status'] = JOB_STATUS.OPEN || JOB_STATUS.ACTIVE;
+    } else if (status) {
       query['status'] = status;
     }
 
@@ -133,15 +137,9 @@ const getJob = async (req, res) => {
 const createJob = async (req, res) => {
   try {
     const jobData = req.body;
-    jobData.employer = req.body.employer; // phải truyền employer từ client
-    jobData.postedBy = req.user.id;
-    if (req.user.role !== 'admin') {
-      jobData.status = 'draft';
-    }
-
-    // Kiểm tra trạng thái xác thực của employer
+    // Tìm employer profile theo owner là user đang đăng nhập
     const EmployerProfile = require('../models/EmployerProfile');
-    const employerProfile = await EmployerProfile.findById(jobData.employer);
+    const employerProfile = await EmployerProfile.findOne({ owner: req.user.id });
     if (!employerProfile) {
       return res.status(400).json({
         success: false,
@@ -154,6 +152,10 @@ const createJob = async (req, res) => {
         message: 'Tài khoản employer chưa xác thực, không thể tạo job mới. Vui lòng hoàn thành xác thực doanh nghiệp.',
       });
     }
+  jobData.employer = employerProfile._id;
+  jobData.postedBy = req.user.id;
+  // Luôn tạo job ở trạng thái 'draft' (bản nháp)
+  jobData.status = JOB_STATUS.DRAFT;
 
     const job = await Job.create(jobData);
     await job.populate('employer', 'name logo industry description');
@@ -163,9 +165,9 @@ const createJob = async (req, res) => {
       success: true,
       data: job,
       message:
-        job.status === 'open'
+        job.status === JOB_STATUS.OPEN || job.status === JOB_STATUS.ACTIVE
           ? 'Đăng job thành công'
-          : 'Tạo job thành công, chờ admin duyệt',
+          : 'Tạo job thành công, đang ở trạng thái nháp',
     });
   } catch (error) {
     logger.error('Error creating job:', error);
@@ -183,17 +185,23 @@ const createJob = async (req, res) => {
 const updateJob = async (req, res) => {
   try {
     const job = await Job.findById(req.params.id);
-
     if (!job) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy công việc',
-      });
+      return res.status(404).json({ success: false, message: 'Không tìm thấy công việc' });
     }
-
+    // Chỉ employer tạo job hoặc admin mới được sửa
+    if (req.user.role !== 'admin' && String(job.postedBy) !== String(req.user.id)) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền sửa job này' });
+    }
     const updateData = req.body;
+    // Chỉ admin mới được đổi status
     if (updateData.status && req.user.role !== 'admin') {
       delete updateData.status;
+    }
+    // Ensure status is always a valid JOB_STATUS value if present
+    if (updateData.status && req.user.role === 'admin') {
+      if (!Object.values(JOB_STATUS).includes(updateData.status)) {
+        return res.status(400).json({ success: false, message: 'Trạng thái job không hợp lệ' });
+      }
     }
     const updatedJob = await Job.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
@@ -201,11 +209,7 @@ const updateJob = async (req, res) => {
     })
       .populate('employer', 'name logo industry description')
       .populate('postedBy', 'fullName name email avatar');
-
-    res.status(200).json({
-      success: true,
-      data: updatedJob,
-    });
+    res.status(200).json({ success: true, data: updatedJob });
   } catch (error) {
     logger.error('Error updating job:', error);
     res.status(500).json({
@@ -222,19 +226,41 @@ const updateJob = async (req, res) => {
 const deleteJob = async (req, res) => {
   try {
     const job = await Job.findById(req.params.id);
-
     if (!job) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy công việc',
-      });
+      return res.status(404).json({ success: false, message: 'Không tìm thấy công việc' });
     }
-
-    await job.deleteOne();
-    res.status(200).json({
-      success: true,
-      message: 'Xóa công việc thành công',
-    });
+    // Nếu job đã bị ẩn/xóa rồi thì không cho xóa lại nữa
+    if (job.status === JOB_STATUS.CLOSED) {
+      return res.status(400).json({ success: false, message: 'Công việc đã bị xóa/ẩn trước đó' });
+    }
+    // Chỉ admin, người đăng job, chủ employer, hoặc thành viên có quyền mới được xóa
+    let canDelete = false;
+    if (req.user.role === 'admin') {
+      canDelete = true;
+    } else if (String(job.postedBy) === String(req.user.id)) {
+      canDelete = true;
+    } else {
+      // Kiểm tra chủ employer hoặc thành viên có quyền
+      const EmployerProfile = require('../models/EmployerProfile');
+      const employerProfile = await EmployerProfile.findById(job.employer);
+      if (employerProfile) {
+        if (String(employerProfile.owner) === String(req.user.id)) {
+          canDelete = true;
+        } else if (Array.isArray(employerProfile.members)) {
+          const member = employerProfile.members.find(m => String(m.user) === String(req.user.id) && m.permissions?.canPostJobs);
+          if (member) {
+            canDelete = true;
+          }
+        }
+      }
+    }
+    if (!canDelete) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền xóa job này' });
+    }
+    // Soft delete: chuyển trạng thái sang CLOSED (ẩn job, không xóa khỏi DB)
+    job.status = JOB_STATUS.CLOSED;
+    await job.save();
+    res.status(200).json({ success: true, message: 'Đã xóa công việc thành công' });
   } catch (error) {
     logger.error('Error deleting job:', error);
     res.status(500).json({
@@ -254,51 +280,32 @@ const applyForJob = async (req, res) => {
 
     const job = await Job.findById(id);
     if (!job) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy công việc',
-      });
+      return res.status(404).json({ success: false, message: 'Không tìm thấy công việc' });
     }
-
+    // Chỉ cho ứng tuyển khi job open
+    if (job.status !== JOB_STATUS.OPEN && job.status !== JOB_STATUS.ACTIVE) {
+      return res.status(400).json({ success: false, message: 'Công việc chưa được mở ứng tuyển' });
+    }
     // Check if already applied
-    const existingApplication = await Application.findOne({
-      jobId: id,
-      candidateId: req.user.id,
-    });
-
+    const existingApplication = await Application.findOne({ jobId: id, candidateId: req.user.id });
     if (existingApplication) {
-      return res.status(400).json({
-        success: false,
-        message: 'Bạn đã ứng tuyển cho công việc này',
-      });
+      return res.status(400).json({ success: false, message: 'Bạn đã ứng tuyển cho công việc này' });
     }
-
     // Check application deadline
-    if (job.application.deadline && new Date() > job.application.deadline) {
-      return res.status(400).json({
-        success: false,
-        message: 'Đã hết hạn ứng tuyển',
-      });
+    if (job.deadline && new Date() > job.deadline) {
+      return res.status(400).json({ success: false, message: 'Đã hết hạn ứng tuyển' });
     }
-
     const application = await Application.create({
       jobId: id,
       candidateId: req.user.id,
       coverLetter,
       resumeUrl,
       portfolioUrl,
-      status: 'pending',
+  status: JOB_STATUS.PENDING,
     });
-
     // Update job stats
-    await Job.findByIdAndUpdate(id, {
-      $inc: { 'stats.applications': 1 },
-    });
-
-    res.status(201).json({
-      success: true,
-      data: application,
-    });
+    await Job.findByIdAndUpdate(id, { $inc: { 'stats.applications': 1 } });
+    res.status(201).json({ success: true, data: application });
   } catch (error) {
     logger.error('Error applying for job:', error);
     res.status(500).json({
@@ -318,26 +325,22 @@ const getJobApplications = async (req, res) => {
 
     const job = await Job.findById(id);
     if (!job) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy công việc',
-      });
+      return res.status(404).json({ success: false, message: 'Không tìm thấy công việc' });
     }
-
+    // Chỉ employer của job hoặc admin mới được xem
+    if (req.user.role !== 'admin' && String(job.postedBy) !== String(req.user.id)) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền xem danh sách ứng viên của job này' });
+    }
     const query = { jobId: id };
     if (status) query.status = status;
-
     const skip = (page - 1) * limit;
-
     const applications = await Application.find(query)
       .populate('candidateId', 'name email avatar')
       .populate('jobId', 'title employer')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
-
     const total = await Application.countDocuments(query);
-
     res.status(200).json({
       success: true,
       data: applications,
@@ -364,7 +367,7 @@ const getJobBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
 
-    const job = await Job.findOne({ slug, status: 'open' })
+  const job = await Job.findOne({ slug, status: JOB_STATUS.OPEN })
       .populate('employer', 'name logo industry description')
       .populate('postedBy', 'fullName name email avatar');
 
@@ -430,7 +433,7 @@ const getRecentJobs = async (req, res) => {
   try {
     const { limit = 10, category } = req.query;
 
-    const query = { status: 'open' };
+  const query = { status: JOB_STATUS.OPEN };
     const total = await Job.countDocuments(query);
     const jobs = await Job.find(query)
       .populate('employer', 'name logo industry description')
@@ -530,10 +533,10 @@ const submitJobForReview = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Không tìm thấy công việc' });
     }
 
-    if (job.status !== 'draft') {
-      return res.status(400).json({ success: false, message: 'Chỉ có thể gửi duyệt job ở trạng thái draft' });
+    if (job.status !== JOB_STATUS.DRAFT) {
+      return res.status(400).json({ success: false, message: 'Chỉ có thể gửi duyệt job ở trạng thái nháp' });
     }
-    job.status = 'open';
+    job.status = JOB_STATUS.PENDING;
     await job.save();
     res.status(200).json({ success: true, data: job, message: 'Đã gửi duyệt. Vui lòng chờ admin phê duyệt' });
   } catch (error) {

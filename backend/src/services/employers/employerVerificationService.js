@@ -1,4 +1,4 @@
-const { EMPLOYER_PROFILE_STATUS } = require('../constants/common.constants');
+const { EMPLOYER_PROFILE_STATUS } = require('../../constants/common.constants');
 
 /**
  * Service để quản lý verification của EmployerProfile
