@@ -10,7 +10,10 @@ const protect = asyncHandler(async (req, res, next) => {
   let token;
 
   // Get token from header
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+  if (
+    req.headers.authorization &&
+    req.headers.authorization.startsWith('Bearer')
+  ) {
     token = req.headers.authorization.split(' ')[1];
   }
 
@@ -32,9 +35,12 @@ const protect = asyncHandler(async (req, res, next) => {
       throw new Error('User not found');
     }
 
-    if (!req.user.isActive) {
-      res.status(401);
-      throw new Error('User account is deactivated');
+    // Nếu tài khoản bị vô hiệu hóa, chỉ cho phép truy cập /api/users/reactivate
+    if (!req.user.isActive && req.originalUrl !== '/api/users/reactivate') {
+      return res.status(403).json({
+        success: false,
+        error: 'Tài khoản đã bị tạm ngưng, không thể thực hiện thao tác này.',
+      });
     }
 
     next();
@@ -51,7 +57,9 @@ const authorize = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.role)) {
       res.status(403);
-      throw new Error(`Role ${req.user.role} is not authorized to access this route`);
+      throw new Error(
+        `Role ${req.user.role} is not authorized to access this route`
+      );
     }
     next();
   };
@@ -59,5 +67,5 @@ const authorize = (...roles) => {
 
 module.exports = {
   protect,
-  authorize
+  authorize,
 };

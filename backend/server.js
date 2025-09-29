@@ -31,6 +31,7 @@ const userRoutes = require('./src/routes/users');
 const adminRoutes = require('./src/routes/admin');
 const employerRoutes = require('./src/routes/employerProfiles');
 const jobRoutes = require('./src/routes/jobs');
+const candidateRoutes = require('./src/routes/candidateProfiles');
 
 // Middleware & Utils
 const errorHandler = require('./src/middleware/errorHandler');
@@ -224,6 +225,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/employers', employerRoutes);
 app.use('/api/jobs', jobRoutes);
+app.use('/api/candidates', candidateRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
