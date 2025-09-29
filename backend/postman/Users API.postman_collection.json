@@ -1,32 +1,18 @@
 {
   "info": {
-    "_postman_id": "8ea09979-6a15-433a-b99e-250d5037b51c",
-    "name": "Users API",
-    "description": "User management and profile endpoints (standardized responses)",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    "_postman_id": "8ea09979-6a15-433a-b99e-250d5037b51c", 
+    "name": "Users API - Complete Collection",
+    "description": "Complete user management endpoints with all routes from userController",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "38146107"
   },
   "item": [
     {
-      "name": "Get User Profile",
-      "request": {
-        "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
-          }
-        ],
-        "url": {
-          "raw": "{{api_url}}/users/profile",
-          "host": ["{{api_url}}"],
-          "path": ["users", "profile"]
-        }
-      },
-      "response": [
+      "name": "Profile Management",
+      "item": [
         {
-          "name": "Success",
-          "originalRequest": {
+          "name": "Get User Profile",
+          "request": {
             "method": "GET",
             "header": [
               {
@@ -39,41 +25,13 @@
               "raw": "{{api_url}}/users/profile",
               "host": ["{{api_url}}"],
               "path": ["users", "profile"]
-            }
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [{ "key": "Content-Type", "value": "application/json" }],
-          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"user\": {\n      \"id\": \"68be3577ba6d60a6c2751f51\",\n      \"email\": \"john@example.com\",\n      \"fullName\": \"John Doe\",\n      \"role\": \"candidate\",\n      \"authMethod\": \"local\",\n      \"isEmailVerified\": true,\n      \"isActive\": true,\n      \"avatar\": \"https://ui-avatars.com/api/...\",\n      \"createdAt\": \"2024-01-15T10:30:00.000Z\",\n      \"updatedAt\": \"2024-01-15T10:30:00.000Z\"\n    },\n    \"profile\": {}\n  }\n}"
-        }
-      ]
-    },
-    {
-      "name": "Update Profile",
-      "request": {
-        "method": "PUT",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
-          },
-          { "key": "Content-Type", "value": "application/json", "type": "text" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"fullName\": \"John Doe\",\n  \"email\": \"john@example.com\"\n}"
+            },
+            "description": "Get current user's full profile data"
+          }
         },
-        "url": {
-          "raw": "{{api_url}}/users/profile",
-          "host": ["{{api_url}}"],
-          "path": ["users", "profile"]
-        }
-      },
-      "response": [
         {
-          "name": "Success",
-          "originalRequest": {
+          "name": "Update Profile", 
+          "request": {
             "method": "PUT",
             "header": [
               {
@@ -89,48 +47,19 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"John Doe\",\n  \"email\": \"john@example.com\"\n}"
+              "raw": "{\n  \"fullName\": \"John Doe Updated\",\n  \"email\": \"john.updated@example.com\",\n  \"phone\": \"+84901234567\",\n  \"dateOfBirth\": \"1995-05-15T00:00:00.000Z\",\n  \"gender\": \"male\",\n  \"location\": {\n    \"city\": \"Ho Chi Minh City\",\n    \"country\": \"Vietnam\"\n  },\n  \"education.university.name\": \"University of Technology\",\n  \"education.university.degree\": \"Bachelor of Computer Science\",\n  \"education.university.graduationYear\": 2020,\n  \"skills.technical\": [\n    {\"name\": \"JavaScript\", \"level\": \"advanced\"},\n    {\"name\": \"React\", \"level\": \"intermediate\"}\n  ],\n  \"preferences.locations\": [\"Ho Chi Minh City\", \"Ha Noi\"],\n  \"preferences.internshipTypes\": [\"full-time\", \"remote\"]\n}"
             },
             "url": {
               "raw": "{{api_url}}/users/profile",
               "host": ["{{api_url}}"],
               "path": ["users", "profile"]
-            }
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [{ "key": "Content-Type", "value": "application/json" }],
-          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"68be3577ba6d60a6c2751f51\",\n    \"email\": \"john@example.com\",\n    \"fullName\": \"John Doe\",\n    \"role\": \"candidate\",\n    \"authMethod\": \"local\",\n    \"isEmailVerified\": true,\n    \"isActive\": true,\n    \"avatar\": \"https://ui-avatars.com/api/...\"\n  }\n}"
-        }
-      ]
-    },
-    {
-      "name": "Upload Avatar",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
+            },
+            "description": "Update user profile with nested field support"
           }
-        ],
-        "body": {
-          "mode": "formdata",
-          "formdata": [
-            { "key": "avatar", "type": "file", "src": "/path/to/avatar.jpg" }
-          ]
         },
-        "url": {
-          "raw": "{{api_url}}/users/avatar",
-          "host": ["{{api_url}}"],
-          "path": ["users", "avatar"]
-        }
-      },
-      "response": [
         {
-          "name": "Success",
-          "originalRequest": {
+          "name": "Upload Avatar",
+          "request": {
             "method": "POST",
             "header": [
               {
@@ -145,7 +74,8 @@
                 {
                   "key": "avatar",
                   "type": "file",
-                  "src": "/path/to/avatar.jpg"
+                  "src": "/path/to/avatar.jpg",
+                  "description": "Avatar image file (max 5MB, images only)"
                 }
               ]
             },
@@ -153,41 +83,13 @@
               "raw": "{{api_url}}/users/avatar",
               "host": ["{{api_url}}"],
               "path": ["users", "avatar"]
-            }
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [{ "key": "Content-Type", "value": "application/json" }],
-          "body": "{\n  \"success\": true,\n  \"message\": \"Upload avatar thành công\",\n  \"data\": {\n    \"avatar\": {\n      \"publicId\": \"internbridge/avatars/abc123\",\n      \"url\": \"https://res.cloudinary.com/...\",\n      \"size\": 12345,\n      \"format\": \"jpg\",\n      \"dimensions\": { \"width\": 200, \"height\": 200 }\n    },\n    \"user\": {\n      \"id\": \"68be3577ba6d60a6c2751f51\",\n      \"email\": \"john@example.com\",\n      \"fullName\": \"John Doe\",\n      \"role\": \"candidate\",\n      \"authMethod\": \"local\",\n      \"isEmailVerified\": true,\n      \"isActive\": true,\n      \"avatar\": \"https://ui-avatars.com/api/...\"\n    }\n  }\n}"
-        }
-      ]
-    },
-    {
-      "name": "Change Password",
-      "request": {
-        "method": "PUT",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
-          },
-          { "key": "Content-Type", "value": "application/json", "type": "text" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"currentPassword\": \"oldpassword123\",\n  \"newPassword\": \"newpassword123\"\n}"
+            },
+            "description": "Upload user avatar image"
+          }
         },
-        "url": {
-          "raw": "{{api_url}}/users/password",
-          "host": ["{{api_url}}"],
-          "path": ["users", "password"]
-        }
-      },
-      "response": [
         {
-          "name": "Success",
-          "originalRequest": {
+          "name": "Change Password",
+          "request": {
             "method": "PUT",
             "header": [
               {
@@ -209,41 +111,18 @@
               "raw": "{{api_url}}/users/password",
               "host": ["{{api_url}}"],
               "path": ["users", "password"]
-            }
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [{ "key": "Content-Type", "value": "application/json" }],
-          "body": "{\n  \"success\": true,\n  \"token\": \"eyJ...\"\n}"
+            },
+            "description": "Change user password"
+          }
         }
       ]
     },
     {
-      "name": "Link Google Account",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
-          },
-          { "key": "Content-Type", "value": "application/json", "type": "text" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"idToken\": \"google_id_token_here\"\n}"
-        },
-        "url": {
-          "raw": "{{api_url}}/users/link-google",
-          "host": ["{{api_url}}"],
-          "path": ["users", "link-google"]
-        }
-      },
-      "response": [
+      "name": "Account Management",
+      "item": [
         {
-          "name": "Success",
-          "originalRequest": {
+          "name": "Link Google Account",
+          "request": {
             "method": "POST",
             "header": [
               {
@@ -265,36 +144,13 @@
               "raw": "{{api_url}}/users/link-google",
               "host": ["{{api_url}}"],
               "path": ["users", "link-google"]
-            }
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [{ "key": "Content-Type", "value": "application/json" }],
-          "body": "{\n  \"success\": true,\n  \"message\": \"Liên kết tài khoản Google thành công\",\n  \"user\": {\n    \"id\": \"68be3577ba6d60a6c2751f51\",\n    \"email\": \"john@example.com\",\n    \"fullName\": \"John Doe\",\n    \"role\": \"candidate\",\n    \"authMethod\": \"hybrid\",\n    \"isEmailVerified\": true,\n    \"isActive\": true,\n    \"avatar\": \"https://ui-avatars.com/api/...\"\n  }\n}"
-        }
-      ]
-    },
-    {
-      "name": "Unlink Google Account",
-      "request": {
-        "method": "DELETE",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
+            },
+            "description": "Link Google account to existing account"
           }
-        ],
-        "url": {
-          "raw": "{{api_url}}/users/unlink-google",
-          "host": ["{{api_url}}"],
-          "path": ["users", "unlink-google"]
-        }
-      },
-      "response": [
+        },
         {
-          "name": "Success",
-          "originalRequest": {
+          "name": "Unlink Google Account",
+          "request": {
             "method": "DELETE",
             "header": [
               {
@@ -307,209 +163,13 @@
               "raw": "{{api_url}}/users/unlink-google",
               "host": ["{{api_url}}"],
               "path": ["users", "unlink-google"]
-            }
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [{ "key": "Content-Type", "value": "application/json" }],
-          "body": "{\n  \"success\": true,\n  \"message\": \"Hủy liên kết tài khoản Google thành công\",\n  \"user\": {\n    \"id\": \"68be3577ba6d60a6c2751f51\",\n    \"email\": \"john@example.com\",\n    \"fullName\": \"John Doe\",\n    \"role\": \"candidate\",\n    \"authMethod\": \"local\",\n    \"isEmailVerified\": true,\n    \"isActive\": true,\n    \"avatar\": \"https://ui-avatars.com/api/...\"\n  }\n}"
-        }
-      ]
-    },
-    {
-      "name": "Get User by ID",
-      "request": {
-        "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
+            },
+            "description": "Unlink Google account from user account"
           }
-        ],
-        "url": {
-          "raw": "{{api_url}}/users/{{user_id}}",
-          "host": ["{{api_url}}"],
-          "path": ["users", "{{user_id}}"]
-        }
-      },
-      "response": [
-        {
-          "name": "Success",
-          "originalRequest": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{api_url}}/users/{{user_id}}",
-              "host": ["{{api_url}}"],
-              "path": ["users", "{{user_id}}"]
-            }
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [{ "key": "Content-Type", "value": "application/json" }],
-          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"68be3577ba6d60a6c2751f51\",\n    \"email\": \"john@example.com\",\n    \"fullName\": \"John Doe\",\n    \"role\": \"candidate\",\n    \"authMethod\": \"local\",\n    \"isEmailVerified\": true,\n    \"isActive\": true,\n    \"avatar\": \"https://ui-avatars.com/api/...\"\n  }\n}"
-        }
-      ]
-    },
-    {
-      "name": "Get Public User Profile",
-      "request": {
-        "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
-          }
-        ],
-        "url": {
-          "raw": "{{api_url}}/users/{{user_id}}/public-profile",
-          "host": ["{{api_url}}"],
-          "path": ["users", "{{user_id}}", "public-profile"]
-        }
-      },
-      "response": [
-        {
-          "name": "Success",
-          "originalRequest": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{api_url}}/users/{{user_id}}/public-profile",
-              "host": ["{{api_url}}"],
-              "path": ["users", "{{user_id}}", "public-profile"]
-            }
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [{ "key": "Content-Type", "value": "application/json" }],
-          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"68be3577ba6d60a6c2751f51\",\n    \"fullName\": \"John Doe\",\n    \"role\": \"candidate\",\n    \"avatar\": \"https://ui-avatars.com/api/...\",\n    \"isActive\": true,\n    \"createdAt\": \"2024-01-15T10:30:00.000Z\"\n  }\n}"
-        }
-      ]
-    },
-    {
-      "name": "Search Users",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{api_url}}/users/search?q=john&role=candidate&page=1&limit=10",
-          "host": ["{{api_url}}"],
-          "path": ["users", "search"],
-          "query": [
-            { "key": "q", "value": "john" },
-            { "key": "role", "value": "candidate" },
-            { "key": "page", "value": "1" },
-            { "key": "limit", "value": "10" }
-          ]
-        }
-      },
-      "response": [
-        {
-          "name": "Success",
-          "originalRequest": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{api_url}}/users/search?q=john&role=candidate&page=1&limit=10",
-              "host": ["{{api_url}}"],
-              "path": ["users", "search"],
-              "query": [
-                { "key": "q", "value": "john" },
-                { "key": "role", "value": "candidate" },
-                { "key": "page", "value": "1" },
-                { "key": "limit", "value": "10" }
-              ]
-            }
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [{ "key": "Content-Type", "value": "application/json" }],
-          "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"id\": \"68be3577ba6d60a6c2751f51\",\n      \"fullName\": \"John Doe\",\n      \"role\": \"candidate\",\n      \"avatar\": \"https://ui-avatars.com/api/...\",\n      \"isActive\": true,\n      \"createdAt\": \"2024-01-15T10:30:00.000Z\"\n    }\n  ],\n  \"pagination\": {\n    \"current\": 1,\n    \"pages\": 1,\n    \"total\": 1,\n    \"hasNext\": false,\n    \"hasPrev\": false\n  }\n}"
-        }
-      ]
-    },
-    {
-      "name": "Get User Statistics",
-      "request": {
-        "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
-          }
-        ],
-        "url": {
-          "raw": "{{api_url}}/users/stats",
-          "host": ["{{api_url}}"],
-          "path": ["users", "stats"]
-        }
-      },
-      "response": [
-        {
-          "name": "Success",
-          "originalRequest": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{api_url}}/users/stats",
-              "host": ["{{api_url}}"],
-              "path": ["users", "stats"]
-            }
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [{ "key": "Content-Type", "value": "application/json" }],
-          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"profileCompletion\": 85,\n    \"lastActive\": \"2024-01-15T10:30:00.000Z\"\n  }\n}"
-        }
-      ]
-    },
-    {
-      "name": "Update User Preferences",
-      "request": {
-        "method": "PUT",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
-          },
-          { "key": "Content-Type", "value": "application/json", "type": "text" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"notifications\": {\n    \"email\": true\n  },\n  \"privacy\": {\n    \"profileVisibility\": \"public\"\n  },\n  \"language\": \"vi\",\n  \"timezone\": \"Asia/Ho_Chi_Minh\"\n}"
         },
-        "url": {
-          "raw": "{{api_url}}/users/preferences",
-          "host": ["{{api_url}}"],
-          "path": ["users", "preferences"]
-        }
-      },
-      "response": [
         {
-          "name": "Success",
-          "originalRequest": {
+          "name": "Update User Preferences",
+          "request": {
             "method": "PUT",
             "header": [
               {
@@ -525,47 +185,133 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"notifications\": {\n    \"email\": true\n  },\n  \"privacy\": {\n    \"profileVisibility\": \"public\"\n  },\n  \"language\": \"vi\",\n  \"timezone\": \"Asia/Ho_Chi_Minh\"\n}"
+              "raw": "{\n  \"notifications\": {\n    \"emailNotifications\": true,\n    \"pushNotifications\": false,\n    \"jobAlerts\": true,\n    \"applicationUpdates\": true\n  },\n  \"privacy\": {\n    \"profileVisibility\": \"public\",\n    \"showEmail\": false,\n    \"showPhone\": false\n  },\n  \"language\": \"vi\",\n  \"timezone\": \"Asia/Ho_Chi_Minh\"\n}"
             },
             "url": {
               "raw": "{{api_url}}/users/preferences",
               "host": ["{{api_url}}"],
               "path": ["users", "preferences"]
-            }
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [{ "key": "Content-Type", "value": "application/json" }],
-          "body": "{\n  \"success\": true,\n  \"data\": {\n    \"privacy\": { \"profileVisibility\": \"public\" },\n    \"notifications\": { \"email\": true },\n    \"language\": \"vi\",\n    \"timezone\": \"Asia/Ho_Chi_Minh\"\n  }\n}"
+            },
+            "description": "Update user preferences and privacy settings"
+          }
+        },
+        {
+          "name": "Deactivate Account",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Taking a break from job searching\"\n}"
+            },
+            "url": {
+              "raw": "{{api_url}}/users/deactivate",
+              "host": ["{{api_url}}"],
+              "path": ["users", "deactivate"]
+            },
+            "description": "Temporarily deactivate user account"
+          }
+        },
+        {
+          "name": "Reactivate Account",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/users/reactivate",
+              "host": ["{{api_url}}"],
+              "path": ["users", "reactivate"]
+            },
+            "description": "Reactivate previously deactivated account"
+          }
         }
       ]
     },
     {
-      "name": "Get User Notifications",
-      "request": {
-        "method": "GET",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
-          }
-        ],
-        "url": {
-          "raw": "{{api_url}}/users/notifications?page=1&limit=20&unreadOnly=false",
-          "host": ["{{api_url}}"],
-          "path": ["users", "notifications"],
-          "query": [
-            { "key": "page", "value": "1" },
-            { "key": "limit", "value": "20" },
-            { "key": "unreadOnly", "value": "false" }
-          ]
-        }
-      },
-      "response": [
+      "name": "User Information",
+      "item": [
         {
-          "name": "Success",
-          "originalRequest": {
+          "name": "Get User Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/users/stats",
+              "host": ["{{api_url}}"],
+              "path": ["users", "stats"]
+            },
+            "description": "Get user statistics (applications, profile completion, etc.)"
+          }
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/users/{{user_id}}",
+              "host": ["{{api_url}}"],
+              "path": ["users", "{{user_id}}"]
+            },
+            "description": "Get basic user information by ID"
+          }
+        },
+        {
+          "name": "Get Public User Profile (Employer Only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{employer_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/users/{{candidate_id}}/public-profile",
+              "host": ["{{api_url}}"],
+              "path": ["users", "{{candidate_id}}", "public-profile"]
+            },
+            "description": "Get public profile of a candidate (employer only)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Get User Notifications",
+          "request": {
             "method": "GET",
             "header": [
               {
@@ -579,40 +325,29 @@
               "host": ["{{api_url}}"],
               "path": ["users", "notifications"],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "limit", "value": "20" },
-                { "key": "unreadOnly", "value": "false" }
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Items per page"
+                },
+                {
+                  "key": "unreadOnly",
+                  "value": "false",
+                  "description": "Show only unread notifications"
+                }
               ]
-            }
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [{ "key": "Content-Type", "value": "application/json" }],
-          "body": "{\n  \"success\": true,\n  \"data\": [ { \"id\": \"68be...\", \"title\": \"New Job Match\", \"type\": \"job_match\", \"isRead\": false } ],\n  \"pagination\": { \"current\": 1, \"pages\": 1, \"total\": 1, \"hasNext\": false, \"hasPrev\": false }\n}"
-        }
-      ]
-    },
-    {
-      "name": "Mark Notification as Read",
-      "request": {
-        "method": "PUT",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
+            },
+            "description": "Get user notifications with pagination"
           }
-        ],
-        "url": {
-          "raw": "{{api_url}}/users/notifications/{{notification_id}}/read",
-          "host": ["{{api_url}}"],
-          "path": ["users", "notifications", "{{notification_id}}", "read"]
-        }
-      },
-      "response": [
+        },
         {
-          "name": "Success",
-          "originalRequest": {
+          "name": "Mark Notification as Read",
+          "request": {
             "method": "PUT",
             "header": [
               {
@@ -625,36 +360,13 @@
               "raw": "{{api_url}}/users/notifications/{{notification_id}}/read",
               "host": ["{{api_url}}"],
               "path": ["users", "notifications", "{{notification_id}}", "read"]
-            }
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [{ "key": "Content-Type", "value": "application/json" }],
-          "body": "{\n  \"success\": true,\n  \"data\": { \"id\": \"68be...\", \"isRead\": true }\n}"
-        }
-      ]
-    },
-    {
-      "name": "Mark All Notifications as Read",
-      "request": {
-        "method": "PUT",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
+            },
+            "description": "Mark a specific notification as read"
           }
-        ],
-        "url": {
-          "raw": "{{api_url}}/users/notifications/read-all",
-          "host": ["{{api_url}}"],
-          "path": ["users", "notifications", "read-all"]
-        }
-      },
-      "response": [
+        },
         {
-          "name": "Success",
-          "originalRequest": {
+          "name": "Mark All Notifications as Read",
+          "request": {
             "method": "PUT",
             "header": [
               {
@@ -667,36 +379,13 @@
               "raw": "{{api_url}}/users/notifications/read-all",
               "host": ["{{api_url}}"],
               "path": ["users", "notifications", "read-all"]
-            }
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [{ "key": "Content-Type", "value": "application/json" }],
-          "body": "{\n  \"success\": true,\n  \"message\": \"Đã đánh dấu tất cả thông báo là đã đọc\"\n}"
-        }
-      ]
-    },
-    {
-      "name": "Delete Notification",
-      "request": {
-        "method": "DELETE",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
+            },
+            "description": "Mark all notifications as read"
           }
-        ],
-        "url": {
-          "raw": "{{api_url}}/users/notifications/{{notification_id}}",
-          "host": ["{{api_url}}"],
-          "path": ["users", "notifications", "{{notification_id}}"]
-        }
-      },
-      "response": [
+        },
         {
-          "name": "Success",
-          "originalRequest": {
+          "name": "Delete Notification",
+          "request": {
             "method": "DELETE",
             "header": [
               {
@@ -709,112 +398,127 @@
               "raw": "{{api_url}}/users/notifications/{{notification_id}}",
               "host": ["{{api_url}}"],
               "path": ["users", "notifications", "{{notification_id}}"]
-            }
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [{ "key": "Content-Type", "value": "application/json" }],
-          "body": "{\n  \"success\": true,\n  \"message\": \"Đã xóa thông báo\"\n}"
-        }
-      ]
-    },
-    {
-      "name": "Deactivate Account",
-      "request": {
-        "method": "PUT",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
-          },
-          { "key": "Content-Type", "value": "application/json", "type": "text" }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"reason\": \"Taking a break\"\n}"
-        },
-        "url": {
-          "raw": "{{api_url}}/users/deactivate",
-          "host": ["{{api_url}}"],
-          "path": ["users", "deactivate"]
-        }
-      },
-      "response": [
-        {
-          "name": "Success",
-          "originalRequest": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}",
-                "type": "text"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"reason\": \"Taking a break\"\n}"
             },
-            "url": {
-              "raw": "{{api_url}}/users/deactivate",
-              "host": ["{{api_url}}"],
-              "path": ["users", "deactivate"]
-            }
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [{ "key": "Content-Type", "value": "application/json" }],
-          "body": "{\n  \"success\": true,\n  \"message\": \"Tài khoản đã được tạm ngưng\"\n}"
+            "description": "Delete a specific notification"
+          }
         }
       ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
     },
     {
-      "name": "Reactivate Account",
-      "request": {
-        "method": "PUT",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{token}}",
-            "type": "text"
-          }
-        ],
-        "url": {
-          "raw": "{{api_url}}/users/reactivate",
-          "host": ["{{api_url}}"],
-          "path": ["users", "reactivate"]
-        }
-      },
-      "response": [
-        {
-          "name": "Success",
-          "originalRequest": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{token}}",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{api_url}}/users/reactivate",
-              "host": ["{{api_url}}"],
-              "path": ["users", "reactivate"]
-            }
-          },
-          "status": "OK",
-          "code": 200,
-          "header": [{ "key": "Content-Type", "value": "application/json" }],
-          "body": "{\n  \"success\": true,\n  \"message\": \"Tài khoản đã được kích hoạt lại\"\n}"
-        }
-      ]
+      "key": "api_url",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string",
+      "description": "User ID for testing"
+    },
+    {
+      "key": "candidate_id",
+      "value": "",
+      "type": "string",
+      "description": "Candidate User ID for public profile"
+    },
+    {
+      "key": "notification_id",
+      "value": "",
+      "type": "string",
+      "description": "Notification ID for testing"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string",
+      "description": "JWT token for authentication"
+    },
+    {
+      "key": "employer_token",
+      "value": "",
+      "type": "string",
+      "description": "JWT token for employer authentication"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Log current request for debugging",
+          "console.log('Request URL:', pm.request.url.toString());",
+          "console.log('Request method:', pm.request.method);",
+          "",
+          "// Validate token exists for protected routes",
+          "if (pm.request.auth && pm.request.auth.type === 'bearer') {",
+          "    const token = pm.environment.get('token') || pm.collectionVariables.get('token');",
+          "    if (!token) {",
+          "        console.warn('Warning: No authentication token found');",
+          "    }",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Common tests for all requests",
+          "pm.test('Response time is less than 5000ms', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+          "});",
+          "",
+          "pm.test('Response should be JSON', function () {",
+          "    pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+          "});",
+          "",
+          "// Test success response structure",
+          "if (pm.response.code >= 200 && pm.response.code < 300) {",
+          "    pm.test('Success response has correct structure', function () {",
+          "        const response = pm.response.json();",
+          "        pm.expect(response).to.have.property('success');",
+          "        pm.expect(response.success).to.be.true;",
+          "    });",
+          "}",
+          "",
+          "// Auto-extract user_id from profile response",
+          "if (pm.request.url.toString().includes('/users/profile') && pm.request.method === 'GET') {",
+          "    const response = pm.response.json();",
+          "    if (response.success && response.data && response.data.user && response.data.user.id) {",
+          "        pm.environment.set('user_id', response.data.user.id);",
+          "        console.log('Auto-extracted user_id:', response.data.user.id);",
+          "    }",
+          "}",
+          "",
+          "// Auto-extract notification_id from notifications list",
+          "if (pm.request.url.toString().includes('/users/notifications') && pm.request.method === 'GET') {",
+          "    const response = pm.response.json();",
+          "    if (response.success && response.data && response.data.length > 0) {",
+          "        pm.environment.set('notification_id', response.data[0].id);",
+          "        console.log('Auto-extracted notification_id:', response.data[0].id);",
+          "    }",
+          "}"
+        ]
+      }
     }
   ]
 }
