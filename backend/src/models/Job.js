@@ -1,10 +1,5 @@
 const mongoose = require('mongoose');
-const {
-  JOB_TYPES,
-  JOB_STATUS,
-  WORK_TYPES,
-} = require('../constants/job.constants');
-
+const {JOB_STATUS} = require('../constants/common.constants');
 
 const JobSchema = new mongoose.Schema({
   employer: { type: mongoose.Schema.Types.ObjectId, ref: 'EmployerProfile', required: true }, // công ty
@@ -19,7 +14,7 @@ const JobSchema = new mongoose.Schema({
   location: { type: String },
   positions: { type: Number },
   deadline: { type: Date },
-  status: { type: String, enum: ['draft', 'open', 'closed'], default: 'draft' },
+  status: { type: String, enum: Object.values(JOB_STATUS), default: JOB_STATUS.DRAFT },
   views: { type: Number, default: 0 },
   ai: {
     keywords: [String],

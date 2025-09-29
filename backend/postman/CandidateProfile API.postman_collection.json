@@ -1,0 +1,102 @@
+{
+  "info": {
+    "name": "CandidateProfile API",
+    "description": "Postman collection for CandidateProfile controller routes",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get Candidate Profile",
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}", "type": "text"}],
+        "url": {"raw": "{{baseUrl}}/api/candidate-profiles/:userId", "host": ["{{baseUrl}}"], "path": ["api", "candidate-profiles", ":userId"]}
+      }
+    },
+    {
+      "name": "Update Candidate Profile",
+      "request": {
+        "method": "PUT",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}", "type": "text"}, {"key": "Content-Type", "value": "application/json", "type": "text"}],
+        "body": {"mode": "raw", "raw": "{\n  \"fullName\": \"Nguyen Van A\",\n  \"phone\": \"0123456789\"\n}"},
+        "url": {"raw": "{{baseUrl}}/api/candidate-profiles/:userId", "host": ["{{baseUrl}}"], "path": ["api", "candidate-profiles", ":userId"]}
+      }
+    },
+    {
+      "name": "Upload CV",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}", "type": "text"}],
+        "body": {"mode": "formdata", "formdata": [{"key": "cv", "type": "file", "src": ""}]},
+        "url": {"raw": "{{baseUrl}}/api/candidate-profiles/:userId/cv", "host": ["{{baseUrl}}"], "path": ["api", "candidate-profiles", ":userId", "cv"]}
+      }
+    },
+    {
+      "name": "Get CV Analysis",
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}", "type": "text"}],
+        "url": {"raw": "{{baseUrl}}/api/candidate-profiles/:userId/cv/analysis", "host": ["{{baseUrl}}"], "path": ["api", "candidate-profiles", ":userId", "cv", "analysis"]}
+      }
+    },
+    {
+      "name": "Verify Skill",
+      "request": {
+        "method": "PUT",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}", "type": "text"}, {"key": "Content-Type", "value": "application/json", "type": "text"}],
+        "body": {"mode": "raw", "raw": "{\n  \"skillName\": \"Node.js\"\n}"},
+        "url": {"raw": "{{baseUrl}}/api/candidate-profiles/:userId/skills/verify", "host": ["{{baseUrl}}"], "path": ["api", "candidate-profiles", ":userId", "skills", "verify"]}
+      }
+    },
+    {
+      "name": "Increment Profile Views",
+      "request": {
+        "method": "POST",
+        "url": {"raw": "{{baseUrl}}/api/candidate-profiles/:userId/view", "host": ["{{baseUrl}}"], "path": ["api", "candidate-profiles", ":userId", "view"]}
+      }
+    },
+    {
+      "name": "Get Analytics",
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}", "type": "text"}],
+        "url": {"raw": "{{baseUrl}}/api/candidate-profiles/:userId/analytics", "host": ["{{baseUrl}}"], "path": ["api", "candidate-profiles", ":userId", "analytics"]}
+      }
+    },
+    {
+      "name": "Update Experience",
+      "request": {
+        "method": "PUT",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}", "type": "text"}, {"key": "Content-Type", "value": "application/json", "type": "text"}],
+        "body": {"mode": "raw", "raw": "{\n  \"internships\": [],\n  \"projects\": []\n}"},
+        "url": {"raw": "{{baseUrl}}/api/candidate-profiles/:userId/experience", "host": ["{{baseUrl}}"], "path": ["api", "candidate-profiles", ":userId", "experience"]}
+      }
+    },
+    {
+      "name": "Update Education",
+      "request": {
+        "method": "PUT",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}", "type": "text"}, {"key": "Content-Type", "value": "application/json", "type": "text"}],
+        "body": {"mode": "raw", "raw": "{\n  \"university\": \"HCMUT\",\n  \"certifications\": []\n}"},
+        "url": {"raw": "{{baseUrl}}/api/candidate-profiles/:userId/education", "host": ["{{baseUrl}}"], "path": ["api", "candidate-profiles", ":userId", "education"]}
+      }
+    },
+    {
+      "name": "Update Preferences",
+      "request": {
+        "method": "PUT",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}", "type": "text"}, {"key": "Content-Type", "value": "application/json", "type": "text"}],
+        "body": {"mode": "raw", "raw": "{\n  \"jobType\": \"internship\",\n  \"location\": \"HCM\"\n}"},
+        "url": {"raw": "{{baseUrl}}/api/candidate-profiles/:userId/preferences", "host": ["{{baseUrl}}"], "path": ["api", "candidate-profiles", ":userId", "preferences"]}
+      }
+    },
+    {
+      "name": "Get Profile Progress",
+      "request": {
+        "method": "GET",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}", "type": "text"}],
+        "url": {"raw": "{{baseUrl}}/api/candidate-profiles/:userId/progress", "host": ["{{baseUrl}}"], "path": ["api", "candidate-profiles", ":userId", "progress"]}
+      }
+    }
+  ]
+}

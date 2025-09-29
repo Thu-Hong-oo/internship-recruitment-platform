@@ -605,10 +605,17 @@ const verifyEmail = asyncHandler(async (req, res) => {
 
   // Create verified user in MongoDB
   try {
+
     const user = await User.create({
       ...userData,
       isEmailVerified: true,
     });
+
+    // Nếu role là candidate, tạo CandidateProfile rỗng
+    if (user.role === 'candidate') {
+      const CandidateProfile = require('../models/CandidateProfile');
+      await CandidateProfile.create({ userId: user._id });
+    }
 
     // Clean up Redis data
     await otpService.delete(`user_registration:${email}`);
