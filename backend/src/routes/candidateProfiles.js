@@ -1,7 +1,8 @@
+// Xóa CV khỏi lịch sử
 const express = require('express');
 const { protect, authorize } = require('../middleware/auth');
 const multer = require('multer');
-const upload = multer({ dest: 'uploads/cv/' });
+const upload = multer({ storage: multer.memoryStorage() });
 const candidateProfileController = require('../controllers/candidateProfileController');
 
 const router = express.Router();
@@ -28,5 +29,7 @@ router.put('/:userId/education', protect, authorize('candidate'), candidateProfi
 router.put('/:userId/preferences', protect, authorize('candidate'), candidateProfileController.updatePreferences);
 // Lấy tiến độ hoàn thiện hồ sơ
 router.get('/:userId/progress', protect, authorize('candidate'), candidateProfileController.getProgress);
+
+router.delete('/:userId/cv/:cvIndex', protect, authorize('candidate'), candidateProfileController.deleteCV);
 
 module.exports = router;
