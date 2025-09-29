@@ -14,6 +14,9 @@ const { uploadImage } = require('../services/imageUploadService');
 const { getAvatarUrl } = require('../utils/avatarUtils');
 const { getIO } = require('../config/socket');
 const googleAuthService = require('../services/googleAuth');
+const UnifiedProfileService = require('../services/unifiedProfileService');
+
+
 
 // Resolve display name consistently
 const resolveFullName = user => {
@@ -134,150 +137,26 @@ const uploadAvatar = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Update user profile
+// @desc    Update user profile (Universal - works for both candidate & employer)
 // @route   PUT /api/users/profile
 // @access  Private
 const updateProfile = asyncHandler(async (req, res) => {
-  let user = await User.findById(req.user.id);
+  try {
+    const result = await UnifiedProfileService.updateProfile(
+      req.user.id,
+      req.body,
+      { role: req.user.role }
+    );
 
-  // Basic profile fields on User
-  const fieldsToUpdate = {
-    fullName: req.body.fullName,
-    email: req.body.email,
-  };
-  //nêu trường nào không có trong request thì xóa khỏi object
-  Object.keys(fieldsToUpdate).forEach(
-    key => fieldsToUpdate[key] === undefined && delete fieldsToUpdate[key]
-  );
-  if (Object.keys(fieldsToUpdate).length > 0) {
-    user = await User.findByIdAndUpdate(req.user.id, fieldsToUpdate, {
-      new: true,
-      runValidators: true,
+    UnifiedProfileService.successResponse(res, 'Cập nhật hồ sơ thành công', {
+      user: result.user || UnifiedProfileService.formatUserResponse(req.user),
+      profile: result.profile,
+      updated: result.updatedFields,
     });
+  } catch (error) {
+    UnifiedProfileService.handleError(error, res, 'Cập nhật hồ sơ');
   }
-
-  // Normalize dot-path updates for profile documents
-  const normalizeProfileUpdate = (body, role) => {
-    const update = {};
-    const changed = [];
-    for (const [key, value] of Object.entries(body)) {
-      if (value === undefined) continue;
-      const isCandidateKey =
-        key.startsWith('education.') ||
-        key.startsWith('skills.') ||
-        key.startsWith('preferences.') ||
-        key.startsWith('resume.');
-      const isEmployerKey =
-        key.startsWith('company.') ||
-        key.startsWith('position.') ||
-        key.startsWith('contact.');
-
-      if (
-        (role === 'candidate' && isCandidateKey) ||
-        (role === 'employer' && isEmployerKey)
-      ) {
-        update[key] = value;
-        changed.push(key);
-      }
-    }
-    return { update, changed };
-  };
-
-  let profileDoc = null;
-  let changedFields = [];
-
-  if (user.role === 'candidate') {
-    const { update, changed } = normalizeProfileUpdate(req.body, 'candidate');
-    changedFields = changed;
-
-    // Ensure legacy shape compatibility: university may be stored as string
-    let existing = await CandidateProfile.findOne({ userId: user._id });
-    if (!existing) {
-      existing = await CandidateProfile.create({ userId: user._id });
-    }
-
-    // If we are updating nested fields under education.university and current value is a string
-    const hasUniversityNested = Object.keys(update).some(k =>
-      k.startsWith('education.university.')
-    );
-    if (
-      hasUniversityNested &&
-      existing.education &&
-      typeof existing.education.university === 'string'
-    ) {
-      const currentName = existing.education.university;
-      existing.education.university = { name: currentName };
-      await existing.save();
-    }
-
-    // Consolidate any dot fields under education.university into one object to avoid Mongo error
-    if (hasUniversityNested) {
-      const consolidated = { ...(existing.education?.university || {}) };
-      for (const [k, v] of Object.entries(update)) {
-        if (k.startsWith('education.university.')) {
-          const subKey = k.substring('education.university.'.length);
-          consolidated[subKey] = v;
-          delete update[k];
-        }
-      }
-      update['education.university'] = consolidated;
-    }
-
-    profileDoc = await CandidateProfile.findOneAndUpdate(
-      { userId: user._id },
-      Object.keys(update).length ? { $set: update } : {},
-      { new: true }
-    );
-  } else if (user.role === 'employer') {
-    const { update, changed } = normalizeProfileUpdate(req.body, 'employer');
-    changedFields = changed;
-    // Sửa lại trong updateProfile:
-    profileDoc = await EmployerProfile.findOneAndUpdate(
-      { owner: user._id }, // ✅ Dùng 'owner' thay vì 'userId'
-      Object.keys(update).length ? { $set: update } : {},
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
-  }
-
-  logger.info(`User profile updated: ${user.email}`, {
-    userId: user._id,
-    changedFields,
-  });
-
-  // Build profile data for response
-  let profileData = {};
-  if (user.role === 'candidate' && profileDoc) {
-    profileData = {
-      education: profileDoc.education,
-      skills: profileDoc.skills,
-      preferences: profileDoc.preferences,
-      resume: profileDoc.resume,
-    };
-  } else if (user.role === 'employer' && profileDoc) {
-    profileData = {
-      company: profileDoc.company,
-      position: profileDoc.position,
-      contact: profileDoc.contact,
-    };
-  }
-
-  // if (user.role === 'candidate' && profileDoc) {
-  //   profileData = profileDoc; // Trả về toàn bộ document CandidateProfile
-  // } else if (user.role === 'employer' && profileDoc) {
-  //   profileData = profileDoc; // Trả về toàn bộ document EmployerProfile
-  // }
-
-  res.status(200).json({
-    success: true,
-    message: 'Cập nhật hồ sơ thành công',
-    updated: { fields: changedFields, count: changedFields.length },
-    data: {
-      user: baseUserResponse(user),
-      profile: profileData,
-    },
-  });
 });
-
 // @desc    Change user password
 // @route   PUT /api/users/password
 // @access  Private
@@ -450,41 +329,15 @@ const unlinkGoogleAccount = asyncHandler(async (req, res) => {
 // @route   GET /api/users/profile
 // @access  Private
 const getUserProfile = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.user.id).select('-password');
-
-  let profileData = {};
-  if (user.role === 'candidate') {
-    let candidate = await CandidateProfile.findOne({ userId: user._id });
-    if (!candidate) {
-      profileData = {};
-    } else {
-      profileData = {
-        education: candidate.education,
-        skills: candidate.skills,
-        preferences: candidate.preferences,
-        resume: candidate.resume,
-      };
-    }
-  } else if (user.role === 'employer') {
-    let employerProfile = await EmployerProfile.findOne({ owner: user._id });
-    if (!employerProfile) {
-      profileData = {};
-    } else {
-      profileData = {
-        company: employerProfile.company,
-        position: employerProfile.position,
-        contact: employerProfile.contact,
-      };
-    }
+  try {
+    const result = await UnifiedProfileService.getCompleteProfile(
+      req.user.id,
+      req.user.role
+    );
+    UnifiedProfileService.successResponse(res, null, result);
+  } catch (error) {
+    UnifiedProfileService.handleError(error, res, 'Lấy thông tin hồ sơ');
   }
-
-  res.status(200).json({
-    success: true,
-    data: {
-      user: baseUserResponse(user),
-      profile: profileData,
-    },
-  });
 });
 
 // @desc    Get public user profile (for employers to view candidates)

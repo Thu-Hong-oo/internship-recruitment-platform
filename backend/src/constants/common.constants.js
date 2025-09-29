@@ -123,9 +123,10 @@ module.exports = {
 
   // Skill levels
   SKILL_LEVELS: {
-    BEGINNER: 'beginner',
-    INTERMEDIATE: 'intermediate',
-    ADVANCED: 'advanced',
+    BEGINNER: 'beginner', // Mới học, ít kinh nghiệm
+    INTERMEDIATE: 'intermediate', // Có kiến thức, làm được task thường
+    ADVANCED: 'advanced', // Chuyên sâu, làm việc độc lập
+    EXPERT: 'expert', // Rất giỏi, dẫn dắt team, định hướng
   },
 
   // Internship types
@@ -135,7 +136,6 @@ module.exports = {
     REMOTE: 'remote',
     HYBRID: 'hybrid',
   },
-
 
   // Job status
   JOB_STATUS: {
@@ -269,7 +269,7 @@ module.exports = {
     PENDING: 'pending',
     VERIFIED: 'verified',
     REJECTED: 'rejected',
-    SUSPENDED: 'suspended',// tạm khóa. đình chỉ 
+    SUSPENDED: 'suspended', // tạm khóa. đình chỉ
   },
 
   // Roadmap status

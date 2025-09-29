@@ -9,8 +9,8 @@ const {
 const CompanyInfoSchema = require('./schemas/CompanyInfoSchema');
 const BusinessInfoSchema = require('./schemas/BusinessInfoSchema');
 const VerificationSchema = require('./schemas/VerificationSchema');
-const EmployerDocumentService = require('../services/EmployerDocumentService');
-const EmployerVerificationService = require('../services/EmployerVerificationService');
+const EmployerDocumentService = require('../services/employers/employerDocumentService');
+const EmployerVerificationService = require('../services/employers/employerVerificationService');
 
 const EmployerProfileSchema = new mongoose.Schema(
   {
