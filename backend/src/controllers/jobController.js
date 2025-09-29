@@ -17,10 +17,19 @@ const getAllJobs = async (req, res) => {
       skills,
       employer,
       status,
+      jobType,
+      industry,
+      category,
+      salaryMin,
+      salaryMax,
+      createdFrom,
+      createdTo,
+      deadlineFrom,
+      deadlineTo,
+      tags,
       sortBy = 'createdAt',
       sortOrder = 'desc',
     } = req.query;
-
 
     const query = {};
     if (q) {
@@ -36,19 +45,57 @@ const getAllJobs = async (req, res) => {
     if (employer) {
       query['employer'] = employer;
     }
-    // Mặc định chỉ lấy job open cho user thường
-    if (req.user?.role !== 'admin' && !status) {
-      query['status'] = JOB_STATUS.OPEN || JOB_STATUS.ACTIVE;
-    } else if (status) {
+    if (status) {
       query['status'] = status;
+    } else if (req.user?.role !== 'admin') {
+      query['status'] = { $in: [JOB_STATUS.OPEN, JOB_STATUS.ACTIVE] };
     }
+    if (jobType) {
+      query['jobType'] = jobType;
+    }
+    if (industry) {
+      query['industry'] = { $regex: industry, $options: 'i' };
+    }
+    if (category) {
+      query['category'] = { $regex: category, $options: 'i' };
+    }
+    if (salaryMin || salaryMax) {
+      query['salaryMin'] = salaryMin ? { $gte: Number(salaryMin) } : undefined;
+      query['salaryMax'] = salaryMax ? { $lte: Number(salaryMax) } : undefined;
+    }
+    if (createdFrom || createdTo) {
+      query['createdAt'] = {};
+      if (createdFrom) query['createdAt'].$gte = new Date(createdFrom);
+      if (createdTo) query['createdAt'].$lte = new Date(createdTo);
+    }
+    if (deadlineFrom || deadlineTo) {
+      query['deadline'] = {};
+      if (deadlineFrom) query['deadline'].$gte = new Date(deadlineFrom);
+      if (deadlineTo) query['deadline'].$lte = new Date(deadlineTo);
+    }
+    if (tags) {
+      const tagArray = tags.split(',').map(tag => tag.trim());
+      query['tags'] = { $in: tagArray };
+    }
+    // Xóa các filter undefined
+    Object.keys(query).forEach(key => {
+      if (
+        query[key] === undefined ||
+        (typeof query[key] === 'object' && Object.keys(query[key]).length === 0)
+      ) {
+        delete query[key];
+      }
+    });
 
     const skip = (page - 1) * limit;
     const sortObj = {};
     sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
     const jobs = await Job.find(query)
-      .populate('employer', 'name logo industry description')
+      .populate(
+        'employer',
+        'company.name company.logo company.industry company.description company.website company.size company.officeAddress'
+      )
       .populate('postedBy', 'fullName name email avatar')
       .sort(sortObj)
       .skip(skip)
@@ -73,6 +120,16 @@ const getAllJobs = async (req, res) => {
           skills: !!skills,
           employer: !!employer,
           status: !!status,
+          jobType: !!jobType,
+          industry: !!industry,
+          category: !!category,
+          salaryMin: !!salaryMin,
+          salaryMax: !!salaryMax,
+          createdFrom: !!createdFrom,
+          createdTo: !!createdTo,
+          deadlineFrom: !!deadlineFrom,
+          deadlineTo: !!deadlineTo,
+          tags: !!tags,
         },
       },
     });
@@ -84,7 +141,6 @@ const getAllJobs = async (req, res) => {
     });
   }
 };
-
 
 // @desc    Get single job
 // @route   GET /api/jobs/:id
@@ -108,7 +164,10 @@ const getJob = async (req, res) => {
       const computedFullName =
         pb.fullName ||
         pb.name ||
-        (pb.profile && `${pb.profile.firstName || ''} ${pb.profile.lastName || ''}`.trim()) ||
+        (pb.profile &&
+          `${pb.profile.firstName || ''} ${
+            pb.profile.lastName || ''
+          }`.trim()) ||
         (pb.googleProfile && pb.googleProfile.name) ||
         pb.email?.split('@')[0] ||
         'Chưa cập nhật';
@@ -139,23 +198,29 @@ const createJob = async (req, res) => {
     const jobData = req.body;
     // Tìm employer profile theo owner là user đang đăng nhập
     const EmployerProfile = require('../models/EmployerProfile');
-    const employerProfile = await EmployerProfile.findOne({ owner: req.user.id });
+    const employerProfile = await EmployerProfile.findOne({
+      owner: req.user.id,
+    });
     if (!employerProfile) {
       return res.status(400).json({
         success: false,
         message: 'Không tìm thấy hồ sơ employer',
       });
     }
-    if (!employerProfile.verification?.isVerified && employerProfile.status !== 'verified') {
+    if (
+      !employerProfile.verification?.isVerified &&
+      employerProfile.status !== 'verified'
+    ) {
       return res.status(403).json({
         success: false,
-        message: 'Tài khoản employer chưa xác thực, không thể tạo job mới. Vui lòng hoàn thành xác thực doanh nghiệp.',
+        message:
+          'Tài khoản employer chưa xác thực, không thể tạo job mới. Vui lòng hoàn thành xác thực doanh nghiệp.',
       });
     }
-  jobData.employer = employerProfile._id;
-  jobData.postedBy = req.user.id;
-  // Luôn tạo job ở trạng thái 'draft' (bản nháp)
-  jobData.status = JOB_STATUS.DRAFT;
+    jobData.employer = employerProfile._id;
+    jobData.postedBy = req.user.id;
+    // Luôn tạo job ở trạng thái 'draft' (bản nháp)
+    jobData.status = JOB_STATUS.DRAFT;
 
     const job = await Job.create(jobData);
     await job.populate('employer', 'name logo industry description');
@@ -186,11 +251,18 @@ const updateJob = async (req, res) => {
   try {
     const job = await Job.findById(req.params.id);
     if (!job) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy công việc' });
+      return res
+        .status(404)
+        .json({ success: false, message: 'Không tìm thấy công việc' });
     }
     // Chỉ employer tạo job hoặc admin mới được sửa
-    if (req.user.role !== 'admin' && String(job.postedBy) !== String(req.user.id)) {
-      return res.status(403).json({ success: false, message: 'Bạn không có quyền sửa job này' });
+    if (
+      req.user.role !== 'admin' &&
+      String(job.postedBy) !== String(req.user.id)
+    ) {
+      return res
+        .status(403)
+        .json({ success: false, message: 'Bạn không có quyền sửa job này' });
     }
     const updateData = req.body;
     // Chỉ admin mới được đổi status
@@ -200,7 +272,9 @@ const updateJob = async (req, res) => {
     // Ensure status is always a valid JOB_STATUS value if present
     if (updateData.status && req.user.role === 'admin') {
       if (!Object.values(JOB_STATUS).includes(updateData.status)) {
-        return res.status(400).json({ success: false, message: 'Trạng thái job không hợp lệ' });
+        return res
+          .status(400)
+          .json({ success: false, message: 'Trạng thái job không hợp lệ' });
       }
     }
     const updatedJob = await Job.findByIdAndUpdate(req.params.id, updateData, {
@@ -227,11 +301,15 @@ const deleteJob = async (req, res) => {
   try {
     const job = await Job.findById(req.params.id);
     if (!job) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy công việc' });
+      return res
+        .status(404)
+        .json({ success: false, message: 'Không tìm thấy công việc' });
     }
     // Nếu job đã bị ẩn/xóa rồi thì không cho xóa lại nữa
     if (job.status === JOB_STATUS.CLOSED) {
-      return res.status(400).json({ success: false, message: 'Công việc đã bị xóa/ẩn trước đó' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Công việc đã bị xóa/ẩn trước đó' });
     }
     // Chỉ admin, người đăng job, chủ employer, hoặc thành viên có quyền mới được xóa
     let canDelete = false;
@@ -247,7 +325,11 @@ const deleteJob = async (req, res) => {
         if (String(employerProfile.owner) === String(req.user.id)) {
           canDelete = true;
         } else if (Array.isArray(employerProfile.members)) {
-          const member = employerProfile.members.find(m => String(m.user) === String(req.user.id) && m.permissions?.canPostJobs);
+          const member = employerProfile.members.find(
+            m =>
+              String(m.user) === String(req.user.id) &&
+              m.permissions?.canPostJobs
+          );
           if (member) {
             canDelete = true;
           }
@@ -255,12 +337,16 @@ const deleteJob = async (req, res) => {
       }
     }
     if (!canDelete) {
-      return res.status(403).json({ success: false, message: 'Bạn không có quyền xóa job này' });
+      return res
+        .status(403)
+        .json({ success: false, message: 'Bạn không có quyền xóa job này' });
     }
     // Soft delete: chuyển trạng thái sang CLOSED (ẩn job, không xóa khỏi DB)
     job.status = JOB_STATUS.CLOSED;
     await job.save();
-    res.status(200).json({ success: true, message: 'Đã xóa công việc thành công' });
+    res
+      .status(200)
+      .json({ success: true, message: 'Đã xóa công việc thành công' });
   } catch (error) {
     logger.error('Error deleting job:', error);
     res.status(500).json({
@@ -280,20 +366,34 @@ const applyForJob = async (req, res) => {
 
     const job = await Job.findById(id);
     if (!job) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy công việc' });
+      return res
+        .status(404)
+        .json({ success: false, message: 'Không tìm thấy công việc' });
     }
     // Chỉ cho ứng tuyển khi job open
     if (job.status !== JOB_STATUS.OPEN && job.status !== JOB_STATUS.ACTIVE) {
-      return res.status(400).json({ success: false, message: 'Công việc chưa được mở ứng tuyển' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Công việc chưa được mở ứng tuyển' });
     }
     // Check if already applied
-    const existingApplication = await Application.findOne({ jobId: id, candidateId: req.user.id });
+    const existingApplication = await Application.findOne({
+      jobId: id,
+      candidateId: req.user.id,
+    });
     if (existingApplication) {
-      return res.status(400).json({ success: false, message: 'Bạn đã ứng tuyển cho công việc này' });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: 'Bạn đã ứng tuyển cho công việc này',
+        });
     }
     // Check application deadline
     if (job.deadline && new Date() > job.deadline) {
-      return res.status(400).json({ success: false, message: 'Đã hết hạn ứng tuyển' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Đã hết hạn ứng tuyển' });
     }
     const application = await Application.create({
       jobId: id,
@@ -301,7 +401,7 @@ const applyForJob = async (req, res) => {
       coverLetter,
       resumeUrl,
       portfolioUrl,
-  status: JOB_STATUS.PENDING,
+      status: JOB_STATUS.PENDING,
     });
     // Update job stats
     await Job.findByIdAndUpdate(id, { $inc: { 'stats.applications': 1 } });
@@ -325,11 +425,21 @@ const getJobApplications = async (req, res) => {
 
     const job = await Job.findById(id);
     if (!job) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy công việc' });
+      return res
+        .status(404)
+        .json({ success: false, message: 'Không tìm thấy công việc' });
     }
     // Chỉ employer của job hoặc admin mới được xem
-    if (req.user.role !== 'admin' && String(job.postedBy) !== String(req.user.id)) {
-      return res.status(403).json({ success: false, message: 'Bạn không có quyền xem danh sách ứng viên của job này' });
+    if (
+      req.user.role !== 'admin' &&
+      String(job.postedBy) !== String(req.user.id)
+    ) {
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: 'Bạn không có quyền xem danh sách ứng viên của job này',
+        });
     }
     const query = { jobId: id };
     if (status) query.status = status;
@@ -367,7 +477,7 @@ const getJobBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
 
-  const job = await Job.findOne({ slug, status: JOB_STATUS.OPEN })
+    const job = await Job.findOne({ slug, status: JOB_STATUS.OPEN })
       .populate('employer', 'name logo industry description')
       .populate('postedBy', 'fullName name email avatar');
 
@@ -390,7 +500,6 @@ const getJobBySlug = async (req, res) => {
     });
   }
 };
-
 
 // @desc    Increment job views
 // @route   POST /api/jobs/:id/view
@@ -425,7 +534,6 @@ const incrementJobViews = async (req, res) => {
   }
 };
 
-
 // @desc    Get recent jobs
 // @route   GET /api/jobs/recent
 // @access  Public
@@ -433,7 +541,7 @@ const getRecentJobs = async (req, res) => {
   try {
     const { limit = 10, category } = req.query;
 
-  const query = { status: JOB_STATUS.OPEN };
+    const query = { status: JOB_STATUS.OPEN };
     const total = await Job.countDocuments(query);
     const jobs = await Job.find(query)
       .populate('employer', 'name logo industry description')
@@ -454,7 +562,6 @@ const getRecentJobs = async (req, res) => {
     });
   }
 };
-
 
 // @desc    Get company info for job display
 // @route   GET /api/jobs/:id/company
@@ -530,15 +637,28 @@ const submitJobForReview = async (req, res) => {
 
     const job = await Job.findById(id);
     if (!job) {
-      return res.status(404).json({ success: false, message: 'Không tìm thấy công việc' });
+      return res
+        .status(404)
+        .json({ success: false, message: 'Không tìm thấy công việc' });
     }
 
     if (job.status !== JOB_STATUS.DRAFT) {
-      return res.status(400).json({ success: false, message: 'Chỉ có thể gửi duyệt job ở trạng thái nháp' });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: 'Chỉ có thể gửi duyệt job ở trạng thái nháp',
+        });
     }
     job.status = JOB_STATUS.PENDING;
     await job.save();
-    res.status(200).json({ success: true, data: job, message: 'Đã gửi duyệt. Vui lòng chờ admin phê duyệt' });
+    res
+      .status(200)
+      .json({
+        success: true,
+        data: job,
+        message: 'Đã gửi duyệt. Vui lòng chờ admin phê duyệt',
+      });
   } catch (error) {
     logger.error('Error submitting job for review:', error);
     res.status(500).json({ success: false, message: 'Lỗi khi gửi duyệt job' });
