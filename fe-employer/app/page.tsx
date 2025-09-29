@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { saveUserData, saveToken } from "@/lib/userStorage";
+import { saveUserData, saveToken, getToken } from "@/lib/userStorage";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -27,6 +27,16 @@ export default function LoginPage() {
   const [warning, setWarning] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Auto-redirect to dashboard if already logged in
+  // Runs once on mount
+  if (typeof window !== "undefined") {
+    // Using lazy check outside useEffect to avoid brief flash on very fast loads
+    const existingToken = getToken();
+    if (existingToken) {
+      router.replace("/dashboard");
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
