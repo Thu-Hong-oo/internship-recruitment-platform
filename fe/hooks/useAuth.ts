@@ -18,7 +18,12 @@ interface AuthContextType {
   verifyEmail: (email: string, otp: string) => Promise<AuthResponse>;
   getStoredEmail: () => string | null;
   needsEmailVerification: () => boolean;
-  uploadAvatar: (file: File) => Promise<{ success: boolean; avatar?: string; error?: string; user?: User }>;
+  uploadAvatar: (file: File) => Promise<{
+    success: boolean;
+    avatar?: string;
+    error?: string;
+    user?: User;
+  }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);

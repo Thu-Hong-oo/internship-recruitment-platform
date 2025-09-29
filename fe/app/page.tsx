@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { PageLayout } from "@/components/layout";
+import Link from "next/link";
 import HeroSection from "@/components/layout/hero-section";
 import { useEffect, useState } from "react";
 import { jobsAPI, JobItem } from "@/lib/api";
@@ -179,17 +180,17 @@ export default function HomePage({ onSearch }: HomePageProps) {
                     <Row gutter={[16, 16]}>
                       {jobs.map((job) => (
                         <Col xs={24} sm={12} lg={8} key={job.id}>
-                          <Card className="card-hover border-border h-full shadow-sm hover:shadow-md transition-shadow">
+                          <Card
+                            className="card-hover border-border h-full shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                            onClick={() => router.push(`/jobs/${job.id}`)}
+                          >
                             <CardContent className="p-4">
                               {/* Top section with logo and badges */}
                               <div className="flex items-start justify-between mb-3">
                                 <div className="relative">
                                   <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center overflow-hidden border-2 border-gray-200">
                                     <img
-                                      src={
-                                        job.companyId?.logo?.url ||
-                                        "/placeholder-logo.png"
-                                      }
+                                      src={job.companyId?.logo?.url}
                                       alt={job.companyId?.name || "logo"}
                                       className="w-full h-full object-contain"
                                     />
@@ -217,7 +218,9 @@ export default function HomePage({ onSearch }: HomePageProps) {
                               {/* Job title and company */}
                               <div className="mb-3">
                                 <h3 className="font-semibold text-gray-900 hover:text-primary cursor-pointer line-clamp-2 text-sm mb-1">
-                                  {job.title}
+                                  <Link href={`/jobs/${job.id}`}>
+                                    {job.title}
+                                  </Link>
                                 </h3>
                                 <p className="text-xs text-gray-600 line-clamp-1">
                                   {job.companyId?.name || "Nhà tuyển dụng"}
@@ -236,7 +239,12 @@ export default function HomePage({ onSearch }: HomePageProps) {
 
                               {/* Bottom section with save button */}
                               <div className="flex justify-end">
-                                <button className="w-8 h-8 rounded-full bg-green-50 border border-green-200 flex items-center justify-center hover:bg-green-100 transition-colors">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                  }}
+                                  className="w-8 h-8 rounded-full bg-green-50 border border-green-200 flex items-center justify-center hover:bg-green-100 transition-colors"
+                                >
                                   <svg
                                     className="w-4 h-4 text-green-600"
                                     fill="none"

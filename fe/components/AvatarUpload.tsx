@@ -14,11 +14,11 @@ interface AvatarUploadProps {
   className?: string;
 }
 
-export default function AvatarUpload({ 
-  currentAvatar, 
-  userName, 
+export default function AvatarUpload({
+  currentAvatar,
+  userName,
   onAvatarChange,
-  className = "" 
+  className = "",
 }: AvatarUploadProps) {
   const { user } = useAuth();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -32,19 +32,19 @@ export default function AvatarUpload({
     if (!file) return;
 
     // Validate file type
-    if (!file.type.startsWith('image/')) {
-      setError('Vui lòng chọn file hình ảnh');
+    if (!file.type.startsWith("image/")) {
+      setError("Vui lòng chọn file hình ảnh");
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      setError('File quá lớn. Vui lòng chọn file nhỏ hơn 5MB');
+      setError("File quá lớn. Vui lòng chọn file nhỏ hơn 5MB");
       return;
     }
 
     setError(null);
-    
+
     // Create preview URL
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
@@ -58,28 +58,28 @@ export default function AvatarUpload({
 
     try {
       const response = await uploadAvatar(fileInputRef.current.files[0]);
-      
+
       if (response.success && response.user) {
         // Clear preview
         if (previewUrl) {
           URL.revokeObjectURL(previewUrl);
           setPreviewUrl(null);
         }
-        
+
         // Call callback if provided
         if (response.user.profile?.avatar) {
           onAvatarChange?.(response.user.profile.avatar);
         }
-        
+
         // Reset file input
         if (fileInputRef.current) {
-          fileInputRef.current.value = '';
+          fileInputRef.current.value = "";
         }
       } else {
-        setError(response.error || 'Upload thất bại');
+        setError(response.error || "Upload thất bại");
       }
     } catch (err) {
-      setError('Có lỗi xảy ra khi upload avatar');
+      setError("Có lỗi xảy ra khi upload avatar");
     } finally {
       setIsUploading(false);
     }
@@ -91,14 +91,17 @@ export default function AvatarUpload({
       setPreviewUrl(null);
     }
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
     setError(null);
   };
 
   const getInitials = () => {
-    const names = userName.split(' ');
-    return names.map(name => name[0]).join('').toUpperCase();
+    const names = userName.split(" ");
+    return names
+      .map((name) => name[0])
+      .join("")
+      .toUpperCase();
   };
 
   return (
@@ -107,14 +110,19 @@ export default function AvatarUpload({
       <div className="relative">
         <Avatar className="w-24 h-24">
           <AvatarImage
-            src={previewUrl || currentAvatar || getUserAvatar(user) || "/placeholder-user.jpg"}
+            src={
+              previewUrl ||
+              currentAvatar ||
+              getUserAvatar(user) ||
+              "/placeholder-user.jpg"
+            }
             alt="User avatar"
           />
           <AvatarFallback className="text-2xl font-semibold">
             {getInitials()}
           </AvatarFallback>
         </Avatar>
-        
+
         {/* Upload Button Overlay */}
         <button
           onClick={() => fileInputRef.current?.click()}

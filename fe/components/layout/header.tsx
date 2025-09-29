@@ -415,15 +415,18 @@ export default function Header() {
                       <button className="flex items-center space-x-2">
                         <Avatar>
                           <AvatarImage
-
-                            src={(session?.user?.image as string | undefined) || (user ? getUserAvatar(user) : undefined) || "/placeholder-user.jpg"}
+                            src={
+                              (session?.user?.image as string | undefined) ||
+                              (user ? getUserAvatar(user) : undefined) ||
+                              "/placeholder-user.jpg"
+                            }
                             alt="User avatar"
                             referrerPolicy="no-referrer"
                           />
                           <AvatarFallback>
-                            {(session?.user?.name?.[0] as string | undefined) || user?.firstName?.[0]}
+                            {(session?.user?.name?.[0] as string | undefined) ||
+                              user?.firstName?.[0]}
                             {user?.lastName?.[0]}
-
                           </AvatarFallback>
                         </Avatar>
                       </button>
@@ -432,27 +435,34 @@ export default function Header() {
                       <div className="p-4 border-b border-border flex items-center space-x-3">
                         <Avatar>
                           <AvatarImage
-
-                            src={(session?.user?.image as string | undefined) || (user ? getUserAvatar(user) : undefined) || "/placeholder-user.jpg"}
+                            src={
+                              (session?.user?.image as string | undefined) ||
+                              (user ? getUserAvatar(user) : undefined) ||
+                              "/placeholder-user.jpg"
+                            }
                             alt="User avatar"
                             referrerPolicy="no-referrer"
                           />
                           <AvatarFallback>
-                            {(session?.user?.name?.[0] as string | undefined) || user?.firstName?.[0]}
+                            {(session?.user?.name?.[0] as string | undefined) ||
+                              user?.firstName?.[0]}
                             {user?.lastName?.[0]}
-
                           </AvatarFallback>
                         </Avatar>
                         <div>
                           <div className="font-semibold text-foreground">
-                            {session?.user?.name || user?.fullName || `${user?.firstName ?? ""} ${user?.lastName ?? ""}`}
+                            {session?.user?.name ||
+                              user?.fullName ||
+                              `${user?.firstName ?? ""} ${
+                                user?.lastName ?? ""
+                              }`}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {session?.user
                               ? "Đăng nhập bằng Google (đã xác thực)"
                               : user?.isEmailVerified
-                                ? "Tài khoản đã xác thực"
-                                : "Chưa xác thực email"}
+                              ? "Tài khoản đã xác thực"
+                              : "Chưa xác thực email"}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {session?.user?.email || user?.email}

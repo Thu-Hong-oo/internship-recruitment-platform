@@ -21,22 +21,26 @@ export const useGoogleAuth = () => {
 
       // Check if Google Client ID is configured
       const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-      if (!clientId ) {
-        throw new Error("Google Client ID chưa được cấu hình. Vui lòng thêm NEXT_PUBLIC_GOOGLE_CLIENT_ID vào .env.local");
+      if (!clientId) {
+        throw new Error(
+          "Google Client ID chưa được cấu hình. Vui lòng thêm NEXT_PUBLIC_GOOGLE_CLIENT_ID vào .env.local"
+        );
       }
 
       // Check if Google Identity Services is loaded
       if (!window.google) {
         // Load Google Identity Services script
         await loadGoogleScript();
-        
+
         // Wait a bit for Google to initialize
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
 
       // Double check Google is available
       if (!window.google?.accounts?.id) {
-        throw new Error("Google Identity Services chưa sẵn sàng. Vui lòng thử lại.");
+        throw new Error(
+          "Google Identity Services chưa sẵn sàng. Vui lòng thử lại."
+        );
       }
 
       // If Google origin is not allowed, fallback to backend redirect flow
@@ -82,7 +86,7 @@ export const useGoogleAuth = () => {
 
       if (result.success && result.user) {
         setUser(result.user);
-        
+
         // Redirect based on user role
         if (result.isNew) {
           // New user - redirect to profile setup
@@ -116,7 +120,7 @@ export const useGoogleAuth = () => {
       script.src = "https://accounts.google.com/gsi/client";
       script.async = true;
       script.defer = true;
-      
+
       script.onload = () => {
         console.log("Google Identity Services loaded successfully");
         resolve();
@@ -125,7 +129,11 @@ export const useGoogleAuth = () => {
         console.error("Failed to load Google Identity Services:", error);
         // Common local dev issue: CORS shown for <script> loads if crossOrigin was set or extensions interfered
         // Fallback: instruct caller to use backend OAuth redirect flow
-        reject(new Error("Không thể tải Google Identity Services. Vui lòng thử lại hoặc dùng nút Đăng nhập Google (redirect)."));
+        reject(
+          new Error(
+            "Không thể tải Google Identity Services. Vui lòng thử lại hoặc dùng nút Đăng nhập Google (redirect)."
+          )
+        );
       };
 
       document.head.appendChild(script);
