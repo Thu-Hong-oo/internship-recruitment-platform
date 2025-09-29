@@ -96,10 +96,8 @@ const uploadAvatar = asyncHandler(async (req, res) => {
 
     // Update user avatar in database
     const user = await User.findByIdAndUpdate(
-
-      req.file.buffer,
-      { 'profile.avatar': result.url },
-
+      req.user.id,
+      { avatar: result.url },
       { new: true }
     );
 
@@ -233,8 +231,9 @@ const updateProfile = asyncHandler(async (req, res) => {
   } else if (user.role === 'employer') {
     const { update, changed } = normalizeProfileUpdate(req.body, 'employer');
     changedFields = changed;
+    // Sửa lại trong updateProfile:
     profileDoc = await EmployerProfile.findOneAndUpdate(
-      { userId: user._id },
+      { owner: user._id }, // ✅ Dùng 'owner' thay vì 'userId'
       Object.keys(update).length ? { $set: update } : {},
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
@@ -261,6 +260,12 @@ const updateProfile = asyncHandler(async (req, res) => {
       contact: profileDoc.contact,
     };
   }
+
+  // if (user.role === 'candidate' && profileDoc) {
+  //   profileData = profileDoc; // Trả về toàn bộ document CandidateProfile
+  // } else if (user.role === 'employer' && profileDoc) {
+  //   profileData = profileDoc; // Trả về toàn bộ document EmployerProfile
+  // }
 
   res.status(200).json({
     success: true,
@@ -451,24 +456,26 @@ const getUserProfile = asyncHandler(async (req, res) => {
   if (user.role === 'candidate') {
     let candidate = await CandidateProfile.findOne({ userId: user._id });
     if (!candidate) {
-      candidate = await CandidateProfile.create({ userId: user._id });
+      profileData = {};
+    } else {
+      profileData = {
+        education: candidate.education,
+        skills: candidate.skills,
+        preferences: candidate.preferences,
+        resume: candidate.resume,
+      };
     }
-    profileData = {
-      education: candidate.education,
-      skills: candidate.skills,
-      preferences: candidate.preferences,
-      resume: candidate.resume,
-    };
   } else if (user.role === 'employer') {
-    let employerProfile = await EmployerProfile.findOne({ userId: user._id });
+    let employerProfile = await EmployerProfile.findOne({ owner: user._id });
     if (!employerProfile) {
-      employerProfile = await EmployerProfile.create({ userId: user._id });
+      profileData = {};
+    } else {
+      profileData = {
+        company: employerProfile.company,
+        position: employerProfile.position,
+        contact: employerProfile.contact,
+      };
     }
-    profileData = {
-      company: employerProfile.company,
-      position: employerProfile.position,
-      contact: employerProfile.contact,
-    };
   }
 
   res.status(200).json({
@@ -605,63 +612,70 @@ const getUserStats = asyncHandler(async (req, res) => {
   if (user.role === 'candidate') {
     // Intern stats
     const internProfile = await CandidateProfile.findOne({ userId });
-    const applications = await Application.find({
-      internId: internProfile._id,
-    });
-    const currentRoadmap = await SkillRoadmap.findOne({
-      internId: internProfile._id,
-      status: 'in_progress',
-    });
+    if (internProfile) {
+      const applications = await Application.find({
+        internId: internProfile._id,
+      });
+      const currentRoadmap = await SkillRoadmap.findOne({
+        internId: internProfile._id,
+        status: 'in_progress',
+      });
 
-    stats = {
-      ...stats,
-      applications: {
-        total: applications.length,
-        pending: applications.filter(app => app.status === 'pending').length,
-        interviewing: applications.filter(app => app.status === 'interview')
-          .length,
-        accepted: applications.filter(app => app.status === 'accepted').length,
-      },
-      skills: {
-        verified: internProfile.skills.technical.filter(s => s.verified).length,
-        total: internProfile.skills.technical.length,
-      },
-      roadmap: currentRoadmap
-        ? {
-            progress: currentRoadmap.progress.overallProgress,
-            completedMilestones: currentRoadmap.progress.completedMilestones,
-            totalMilestones: currentRoadmap.progress.totalMilestones,
-          }
-        : null,
-    };
+      stats = {
+        ...stats,
+        applications: {
+          total: applications.length,
+          pending: applications.filter(app => app.status === 'pending').length,
+          interviewing: applications.filter(app => app.status === 'interview')
+            .length,
+          accepted: applications.filter(app => app.status === 'accepted')
+            .length,
+        },
+        skills: {
+          verified:
+            internProfile.skills?.technical?.filter(s => s.verified).length ||
+            0,
+          total: internProfile.skills?.technical?.length || 0,
+        },
+        roadmap: currentRoadmap
+          ? {
+              progress: currentRoadmap.progress.overallProgress,
+              completedMilestones: currentRoadmap.progress.completedMilestones,
+              totalMilestones: currentRoadmap.progress.totalMilestones,
+            }
+          : null,
+      };
+    }
   } else if (user.role === 'employer') {
     // Employer stats
-    const employerProfile = await EmployerProfile.findOne({ userId });
-    const totalApplications = await Application.countDocuments({
-      'job.employer': employerProfile._id,
-    });
+    const employerProfile = await EmployerProfile.findOne({ owner: userId });
+    if (employerProfile) {
+      const totalApplications = await Application.countDocuments({
+        'job.employer': employerProfile._id,
+      });
 
-    stats = {
-      ...stats,
-      jobPostings: {
-        active: await Job.countDocuments({
-          employer: employerProfile._id,
-          status: 'active',
-        }),
-        total: await Job.countDocuments({ employer: employerProfile._id }),
-      },
-      applications: {
-        total: totalApplications,
-        pending: await Application.countDocuments({
-          'job.employer': employerProfile._id,
-          status: 'pending',
-        }),
-        interviewing: await Application.countDocuments({
-          'job.employer': employerProfile._id,
-          status: 'interview',
-        }),
-      },
-    };
+      stats = {
+        ...stats,
+        jobPostings: {
+          active: await Job.countDocuments({
+            employer: employerProfile._id,
+            status: 'active',
+          }),
+          total: await Job.countDocuments({ employer: employerProfile._id }),
+        },
+        applications: {
+          total: totalApplications,
+          pending: await Application.countDocuments({
+            'job.employer': employerProfile._id,
+            status: 'pending',
+          }),
+          interviewing: await Application.countDocuments({
+            'job.employer': employerProfile._id,
+            status: 'interview',
+          }),
+        },
+      };
+    }
   }
 
   res.status(200).json({
@@ -703,6 +717,7 @@ const updateUserPreferences = asyncHandler(async (req, res) => {
 const getUserNotifications = asyncHandler(async (req, res) => {
   const { page = 1, limit = 20, unreadOnly = false } = req.query;
 
+  // Đảm bảo chỉ dùng req.user.id, không dùng req.params.id
   const query = { user: req.user.id };
 
   if (unreadOnly === 'true') {
@@ -714,8 +729,8 @@ const getUserNotifications = asyncHandler(async (req, res) => {
 
   const notifications = await Notification.find(query)
     .sort({ createdAt: -1 })
-    .limit(limit)
-    .skip(startIndex);
+    .limit(Number(limit))
+    .skip(Number(startIndex));
 
   const total = await Notification.countDocuments(query);
 

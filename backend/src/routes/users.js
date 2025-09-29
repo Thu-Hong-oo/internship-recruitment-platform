@@ -51,7 +51,8 @@ router.put('/reactivate', protect, reactivateAccount);
 
 // User info
 router.get('/stats', protect, getUserStats);
-router.get('/:id', protect, getUser);
+        router.get('/notifications', protect, getUserNotifications); // Đúng cho notifications
+        router.get('/:id', protect, getUser); // Đặt sau /notifications để không bị Express nhầm lẫn
 router.get(
   '/:id/public-profile',
   protect,
@@ -61,8 +62,9 @@ router.get(
 
 // Notifications
 router.get('/notifications', protect, getUserNotifications);
-router.put('/notifications/:id/read', protect, markNotificationAsRead);
-router.put('/notifications/read-all', protect, markAllNotificationsAsRead);
-router.delete('/notifications/:id', protect, deleteNotification);
+  // Removed the :id from notifications
+  router.put('/notifications/read-all', protect, markAllNotificationsAsRead);
+  router.put('/notifications/read', protect, markNotificationAsRead); // Changed to not use :id
+  router.delete('/notifications', protect, deleteNotification); // Changed to not use :id
 
 module.exports = router;
