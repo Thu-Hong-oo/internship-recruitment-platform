@@ -37,7 +37,7 @@ const getApplications = asyncHandler(async (req, res) => {
     const total = await Application.countDocuments(filter);
     const applications = await Application.find(filter)
       .populate('jobId', 'title status')
-      .populate('internId', 'userId')
+      .populate('candidateId', 'userId')
       .sort({ createdAt: -1 })
       .skip(startIndex)
       .limit(limit);
