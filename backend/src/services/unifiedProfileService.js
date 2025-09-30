@@ -6,7 +6,6 @@ const { logger } = require('../utils/logger');
 const { sanitizeInput } = require('../utils/verificationValidation');
 
 class UnifiedProfileService {
-  
   // ============= SHARED UTILITIES =============
   static sanitizeInput(input) {
     if (typeof input !== 'string') return input;
@@ -28,7 +27,9 @@ class UnifiedProfileService {
     });
 
     if (error.name === 'ValidationError') {
-      const validationErrors = Object.values(error.errors).map(err => err.message);
+      const validationErrors = Object.values(error.errors).map(
+        err => err.message
+      );
       return res.status(400).json({
         success: false,
         error: 'Dữ liệu không hợp lệ',
@@ -65,11 +66,11 @@ class UnifiedProfileService {
    * Handles both User fields and role-specific profile fields
    */
   static async updateProfile(userId, updates, options = {}) {
-    const { 
-      role, 
-      restrictFields = [], 
+    const {
+      role,
+      restrictFields = [],
       allowedSections = [],
-      updateUser = true 
+      updateUser = true,
     } = options;
 
     try {
@@ -79,7 +80,9 @@ class UnifiedProfileService {
           field => !restrictFields.includes(field)
         );
         if (invalidFields.length > 0) {
-          throw new Error(`Các trường không được phép: ${invalidFields.join(', ')}`);
+          throw new Error(
+            `Các trường không được phép: ${invalidFields.join(', ')}`
+          );
         }
       }
 
@@ -89,7 +92,9 @@ class UnifiedProfileService {
           section => !allowedSections.includes(section)
         );
         if (invalidSections.length > 0) {
-          throw new Error(`Các section không được phép: ${invalidSections.join(', ')}`);
+          throw new Error(
+            `Các section không được phép: ${invalidSections.join(', ')}`
+          );
         }
       }
 
@@ -115,23 +120,28 @@ class UnifiedProfileService {
           throw new Error('Số điện thoại không hợp lệ');
         }
 
-        updatedUser = await User.findByIdAndUpdate(
-          userId,
-          userUpdates,
-          { new: true, runValidators: true }
-        ).select('-password');
+        updatedUser = await User.findByIdAndUpdate(userId, userUpdates, {
+          new: true,
+          runValidators: true,
+        }).select('-password');
       }
 
       // ===== PROFILE MODEL UPDATES =====
       if (role === 'candidate') {
         profileUpdates = this.extractCandidateFields(updates);
         if (Object.keys(profileUpdates).length > 0) {
-          updatedProfile = await this.updateCandidateProfile(userId, profileUpdates);
+          updatedProfile = await this.updateCandidateProfile(
+            userId,
+            profileUpdates
+          );
         }
       } else if (role === 'employer') {
         profileUpdates = this.extractEmployerFields(updates);
         if (Object.keys(profileUpdates).length > 0) {
-          updatedProfile = await this.updateEmployerProfile(userId, profileUpdates);
+          updatedProfile = await this.updateEmployerProfile(
+            userId,
+            profileUpdates
+          );
         }
       }
 
@@ -151,7 +161,6 @@ class UnifiedProfileService {
           profile: Object.keys(profileUpdates),
         },
       };
-
     } catch (error) {
       logger.error('Unified profile update failed:', {
         error: error.message,
@@ -166,10 +175,19 @@ class UnifiedProfileService {
   // ============= CANDIDATE SPECIFIC =============
   static extractCandidateFields(updates) {
     const candidateFields = [
-      'education', 'skills', 'preferences', 'resume', 'experience',
-      'address', 'dob', 'gender', 'avatar', 'summary', 'socialLinks'
+      'education',
+      'skills',
+      'preferences',
+      'resume',
+      'experience',
+      'address',
+      'dob',
+      'gender',
+      'avatar',
+      'summary',
+      'socialLinks',
     ];
-    
+
     const extracted = {};
     candidateFields.forEach(field => {
       if (updates[field] !== undefined) {
@@ -179,10 +197,12 @@ class UnifiedProfileService {
 
     // Handle dot-notation fields từ userController
     Object.keys(updates).forEach(key => {
-      if (key.startsWith('education.') || 
-          key.startsWith('skills.') || 
-          key.startsWith('preferences.') ||
-          key.startsWith('resume.')) {
+      if (
+        key.startsWith('education.') ||
+        key.startsWith('skills.') ||
+        key.startsWith('preferences.') ||
+        key.startsWith('resume.')
+      ) {
         extracted[key] = updates[key];
       }
     });
@@ -219,10 +239,12 @@ class UnifiedProfileService {
       const hasUniversityNested = Object.keys(dotNotationUpdates).some(k =>
         k.startsWith('education.university.')
       );
-      
-      if (hasUniversityNested && 
-          profile.education && 
-          typeof profile.education.university === 'string') {
+
+      if (
+        hasUniversityNested &&
+        profile.education &&
+        typeof profile.education.university === 'string'
+      ) {
         const currentName = profile.education.university;
         profile.education.university = { name: currentName };
       }
@@ -259,10 +281,14 @@ class UnifiedProfileService {
   // ============= EMPLOYER SPECIFIC =============
   static extractEmployerFields(updates) {
     const employerFields = [
-      'company', 'position', 'contact', 'businessInfo', 
-      'legalRepresentative', 'documents'
+      'company',
+      'position',
+      'contact',
+      'businessInfo',
+      'legalRepresentative',
+      'documents',
     ];
-    
+
     const extracted = {};
     employerFields.forEach(field => {
       if (updates[field] !== undefined) {
@@ -272,11 +298,13 @@ class UnifiedProfileService {
 
     // Handle dot-notation fields từ userController
     Object.keys(updates).forEach(key => {
-      if (key.startsWith('company.') || 
-          key.startsWith('position.') || 
-          key.startsWith('contact.') ||
-          key.startsWith('businessInfo.') ||
-          key.startsWith('legalRepresentative.')) {
+      if (
+        key.startsWith('company.') ||
+        key.startsWith('position.') ||
+        key.startsWith('contact.') ||
+        key.startsWith('businessInfo.') ||
+        key.startsWith('legalRepresentative.')
+      ) {
         extracted[key] = updates[key];
       }
     });
@@ -288,6 +316,17 @@ class UnifiedProfileService {
     let profile = await EmployerProfile.findOne({ owner: userId });
     if (!profile) {
       profile = await this.ensureEmployerProfile(userId);
+    }
+
+    // --- BỔ SUNG KIỂM TRA TRÙNG TAXID KHI UPDATE ---
+    if (updates.businessInfo && updates.businessInfo.taxId) {
+      const exists = await EmployerProfile.findOne({
+        'businessInfo.taxId': updates.businessInfo.taxId,
+        owner: { $ne: userId },
+      });
+      if (exists) {
+        throw new Error('Mã số thuế đã tồn tại ở một hồ sơ khác');
+      }
     }
 
     // Initialize nested objects if needed
@@ -311,12 +350,16 @@ class UnifiedProfileService {
 
     // Apply direct updates with sanitization
     Object.keys(directUpdates).forEach(key => {
-      if (typeof directUpdates[key] === 'object' && directUpdates[key] !== null) {
+      if (
+        typeof directUpdates[key] === 'object' &&
+        directUpdates[key] !== null
+      ) {
         // For nested objects, sanitize string values
         const sanitizedObject = {};
         Object.keys(directUpdates[key]).forEach(subKey => {
           const value = directUpdates[key][subKey];
-          sanitizedObject[subKey] = typeof value === 'string' ? this.sanitizeInput(value) : value;
+          sanitizedObject[subKey] =
+            typeof value === 'string' ? this.sanitizeInput(value) : value;
         });
         profile[key] = { ...profile[key], ...sanitizedObject };
       } else {
@@ -326,9 +369,10 @@ class UnifiedProfileService {
 
     // Apply dot-notation updates
     Object.keys(dotNotationUpdates).forEach(key => {
-      const value = typeof dotNotationUpdates[key] === 'string' 
-        ? this.sanitizeInput(dotNotationUpdates[key]) 
-        : dotNotationUpdates[key];
+      const value =
+        typeof dotNotationUpdates[key] === 'string'
+          ? this.sanitizeInput(dotNotationUpdates[key])
+          : dotNotationUpdates[key];
       profile.set(key, value);
     });
 
