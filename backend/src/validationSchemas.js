@@ -12,19 +12,20 @@ const companySchema = Joi.object({
   foundedYear: Joi.number().integer().min(1900).max(new Date().getFullYear()).optional(), 
 });
 
-// Business info validation
+
+
 const businessInfoSchema = Joi.object({
-  registrationNumber: Joi.string().min(5).max(50).required(), 
-  taxId: Joi.string().min(5).max(50).required(),
+  registrationNumber: Joi.string().required(),
+  taxId: Joi.string().required(),
+  issueDate: Joi.date().iso().required(), // Thêm dòng này!
+  issuePlace: Joi.string().required(),
   address: Joi.object({
     street: Joi.string().required(),
     ward: Joi.string().required(),
     district: Joi.string().required(),
     city: Joi.string().required(),
-    country: Joi.string().required(),
+    country: Joi.string().default('Vietnam'),
   }).required(),
-  establishedDate: Joi.date().optional(), 
-  registrationDate: Joi.date().optional(), 
 });
 
 // Legal representative validation
