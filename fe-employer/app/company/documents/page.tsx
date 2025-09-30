@@ -1,13 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Save, FileUp, ArrowLeft } from "lucide-react";
-import { getToken } from "@/lib/userStorage";
+import { Badge } from "@/components/ui/badge";
+import {
+  Save,
+  FileUp,
+  ArrowLeft,
+  CheckCircle,
+  XCircle,
+  Download,
+  Trash2,
+  Eye,
+  Edit,
+} from "lucide-react";
+import {
+  getDocumentTypes,
+  uploadDocument,
+  updateDocument,
+  deleteDocument,
+  type DocumentType,
+  type UploadedDocument,
+  type DocumentTypesResponse,
+} from "@/lib/documentAPI";
 
 interface DocState {
   document: File | null;
@@ -15,130 +34,257 @@ interface DocState {
   issueDate: string; // yyyy-mm-dd
   issuePlace?: string; // only for business-license
   validUntil?: string;
+  reportYear?: string; // for financial-statement
+  reportPeriod?: string; // for financial-statement
 }
-
-const upload = async (
-  path: string,
-  fields: Record<string, any>,
-  token: string
-): Promise<{ success: boolean; message?: string; error?: string }> => {
-  const form = new FormData();
-  Object.entries(fields).forEach(([k, v]) => {
-    if (v !== undefined && v !== null && v !== "") {
-      form.append(k, v as any);
-    }
-  });
-
-  const res = await fetch(`http://localhost:3000/api${path}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-    body: form,
-  });
-
-  try {
-    const data = await res.json();
-    return {
-      success: !!data?.success,
-      message: data?.message,
-      error: data?.error,
-    };
-  } catch (e) {
-    return {
-      success: res.ok,
-      message: res.ok ? "Thành công" : undefined,
-      error: res.ok ? undefined : "Tải lên thất bại",
-    };
-  }
-};
 
 export default function DocumentsPage() {
   const router = useRouter();
 
-  const [bl, setBL] = useState<DocState>({
-    document: null,
-    documentNumber: "",
-    issueDate: "",
-    issuePlace: "",
-    validUntil: "",
-  });
-  const [tc, setTC] = useState<DocState>({
-    document: null,
-    documentNumber: "",
-    issueDate: "",
-    validUntil: "",
-  });
-
-  const [loadingBL, setLoadingBL] = useState(false);
-  const [loadingTC, setLoadingTC] = useState(false);
+  const [documentTypes, setDocumentTypes] =
+    useState<DocumentTypesResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState<string | null>(null);
+  const [updating, setUpdating] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [success, setSuccess] = useState("");
   const [error, setError] = useState("");
 
-  const handleSubmitBL = async (e: React.FormEvent) => {
+  // State cho form upload
+  const [uploadForm, setUploadForm] = useState<Record<string, DocState>>({});
+
+  // State cho chế độ cập nhật
+  const [updateMode, setUpdateMode] = useState<Record<string, boolean>>({});
+
+  // Load document types khi component mount
+  useEffect(() => {
+    const loadDocumentTypes = async () => {
+      try {
+        setLoading(true);
+        const data = await getDocumentTypes();
+        setDocumentTypes(data);
+
+        // Initialize upload form state
+        const initialForm: Record<string, DocState> = {};
+        const initialUpdateMode: Record<string, boolean> = {};
+        [...data.data.required, ...data.data.optional].forEach((docType) => {
+          initialForm[docType.id] = {
+            document: null,
+            documentNumber: "",
+            issueDate: "",
+            issuePlace: "",
+            validUntil: "",
+            reportYear: "",
+            reportPeriod: "",
+          };
+          initialUpdateMode[docType.id] = false;
+        });
+        setUploadForm(initialForm);
+        setUpdateMode(initialUpdateMode);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Không thể tải thông tin tài liệu"
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDocumentTypes();
+  }, []);
+
+  // Handle upload document
+  const handleUpload = async (docTypeId: string, e: React.FormEvent) => {
     e.preventDefault();
     setSuccess("");
     setError("");
-    setLoadingBL(true);
+    setUploading(docTypeId);
+
     try {
-      const token = getToken();
-      if (!token) {
-        setError("Vui lòng đăng nhập lại");
+      const formData = uploadForm[docTypeId];
+      if (!formData.document) {
+        setError("Vui lòng chọn tệp tài liệu");
         return;
       }
-      if (!bl.document) {
-        setError("Vui lòng chọn tệp Giấy phép đăng ký kinh doanh");
-        return;
-      }
-      const result = await upload(
-        "/employers/documents/business-license",
-        {
-          document: bl.document,
-          documentNumber: bl.documentNumber,
-          issueDate: bl.issueDate,
-          issuePlace: bl.issuePlace,
-          validUntil: bl.validUntil,
-        },
-        token
+
+      const metadata: Record<string, any> = {
+        documentNumber: formData.documentNumber,
+        issueDate: formData.issueDate,
+        issuePlace: formData.issuePlace,
+        validUntil: formData.validUntil,
+        reportYear: formData.reportYear,
+        reportPeriod: formData.reportPeriod,
+      };
+
+      const result = await uploadDocument(
+        docTypeId,
+        formData.document,
+        metadata
       );
-      if (result.success) setSuccess(result.message || "Tải lên thành công");
-      else setError(result.error || "Tải lên thất bại");
+
+      if (result.success) {
+        setSuccess(result.message || "Tải lên thành công");
+        // Reload document types to get updated data
+        const updatedData = await getDocumentTypes();
+        setDocumentTypes(updatedData);
+        // Reset form
+        setUploadForm((prev) => ({
+          ...prev,
+          [docTypeId]: {
+            document: null,
+            documentNumber: "",
+            issueDate: "",
+            issuePlace: "",
+            validUntil: "",
+            reportYear: "",
+            reportPeriod: "",
+          },
+        }));
+      } else {
+        setError(result.error || "Tải lên thất bại");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Tải lên thất bại");
     } finally {
-      setLoadingBL(false);
+      setUploading(null);
     }
   };
 
-  const handleSubmitTC = async (e: React.FormEvent) => {
+  // Handle update document
+  const handleUpdate = async (
+    docTypeId: string,
+    documentId: string,
+    e: React.FormEvent
+  ) => {
     e.preventDefault();
     setSuccess("");
     setError("");
-    setLoadingTC(true);
+    setUpdating(documentId);
+
     try {
-      const token = getToken();
-      if (!token) {
-        setError("Vui lòng đăng nhập lại");
+      const formData = uploadForm[docTypeId];
+      if (!formData.document) {
+        setError("Vui lòng chọn tệp tài liệu mới để cập nhật");
         return;
       }
-      if (!tc.document) {
-        setError("Vui lòng chọn tệp Giấy chứng nhận đăng ký thuế");
-        return;
-      }
-      const result = await upload(
-        "/employers/documents/tax-certificate",
-        {
-          document: tc.document,
-          documentNumber: tc.documentNumber,
-          issueDate: tc.issueDate,
-          validUntil: tc.validUntil,
-        },
-        token
+
+      const metadata: Record<string, any> = {
+        documentNumber: formData.documentNumber,
+        issueDate: formData.issueDate,
+        issuePlace: formData.issuePlace,
+        validUntil: formData.validUntil,
+        reportYear: formData.reportYear,
+        reportPeriod: formData.reportPeriod,
+      };
+
+      const result = await updateDocument(
+        documentId,
+        formData.document,
+        metadata
       );
-      if (result.success) setSuccess(result.message || "Tải lên thành công");
-      else setError(result.error || "Tải lên thất bại");
+
+      if (result.success) {
+        setSuccess(result.message || "Cập nhật thành công");
+        // Reload document types to get updated data
+        const updatedData = await getDocumentTypes();
+        setDocumentTypes(updatedData);
+        // Reset form and exit update mode
+        setUploadForm((prev) => ({
+          ...prev,
+          [docTypeId]: {
+            document: null,
+            documentNumber: "",
+            issueDate: "",
+            issuePlace: "",
+            validUntil: "",
+            reportYear: "",
+            reportPeriod: "",
+          },
+        }));
+        setUpdateMode((prev) => ({
+          ...prev,
+          [docTypeId]: false,
+        }));
+      } else {
+        setError(result.error || "Cập nhật thất bại");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Cập nhật thất bại");
     } finally {
-      setLoadingTC(false);
+      setUpdating(null);
     }
   };
+
+  // Handle delete document
+  const handleDelete = async (documentId: string) => {
+    if (!confirm("Bạn có chắc chắn muốn xóa tài liệu này?")) return;
+
+    setSuccess("");
+    setError("");
+    setDeleting(documentId);
+
+    try {
+      const result = await deleteDocument(documentId);
+
+      if (result.success) {
+        setSuccess(result.message || "Xóa thành công");
+        // Reload document types to get updated data
+        const updatedData = await getDocumentTypes();
+        setDocumentTypes(updatedData);
+      } else {
+        setError(result.error || "Xóa thất bại");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Xóa thất bại");
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  // Get uploaded document by type
+  const getUploadedDocument = (
+    docTypeId: string
+  ): UploadedDocument | undefined => {
+    return documentTypes?.data.uploadedDocuments.find(
+      (doc) => doc.documentType === docTypeId
+    );
+  };
+
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("vi-VN");
+  };
+
+  // Get file size in MB
+  const getFileSize = (bytes: number) => {
+    return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Đang tải thông tin tài liệu...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!documentTypes) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600">Không thể tải thông tin tài liệu</p>
+          <Button onClick={() => window.location.reload()} className="mt-4">
+            Thử lại
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -155,11 +301,10 @@ export default function DocumentsPage() {
             </Button>
             <div>
               <h1 className="text-2xl font-bold text-slate-800">
-                Giấy phép & Thuế
+                Tài liệu công ty
               </h1>
               <p className="text-slate-600">
-                Tải lên giấy phép đăng ký kinh doanh và giấy chứng nhận đăng ký
-                thuế
+                Quản lý và tải lên các tài liệu cần thiết cho công ty
               </p>
             </div>
           </div>
@@ -167,146 +312,687 @@ export default function DocumentsPage() {
       </div>
 
       <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
-        {/* Business License */}
+        {/* Progress Overview */}
         <Card>
           <CardHeader>
-            <CardTitle>Giấy phép đăng ký kinh doanh</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              Tiến độ hoàn thành
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmitBL} className="space-y-4">
-              <div>
-                <Label>Tệp giấy phép *</Label>
-                <Input
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={(e) =>
-                    setBL({ ...bl, document: e.target.files?.[0] || null })
-                  }
-                />
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Tài liệu bắt buộc</span>
+                <span className="text-sm text-gray-600">
+                  {documentTypes.data.progress.uploadedRequired}/
+                  {documentTypes.data.progress.totalRequired}
+                </span>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Số giấy phép *</Label>
-                  <Input
-                    value={bl.documentNumber}
-                    onChange={(e) =>
-                      setBL({ ...bl, documentNumber: e.target.value })
-                    }
-                    required
-                  />
-                </div>
-                <div>
-                  <Label>Ngày cấp *</Label>
-                  <Input
-                    type="date"
-                    value={bl.issueDate}
-                    onChange={(e) =>
-                      setBL({ ...bl, issueDate: e.target.value })
-                    }
-                    required
-                  />
-                </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                  style={{
+                    width: `${documentTypes.data.progress.percentage}%`,
+                  }}
+                ></div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Nơi cấp</Label>
-                  <Input
-                    value={bl.issuePlace}
-                    onChange={(e) =>
-                      setBL({ ...bl, issuePlace: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <Label>Giá trị đến</Label>
-                  <Input
-                    type="date"
-                    value={bl.validUntil}
-                    onChange={(e) =>
-                      setBL({ ...bl, validUntil: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end">
-                <Button
-                  type="submit"
-                  disabled={loadingBL}
-                  className="flex items-center gap-2"
-                >
-                  <FileUp className="w-4 h-4" />{" "}
-                  {loadingBL ? "Đang tải..." : "Tải lên"}
-                </Button>
-              </div>
-            </form>
+              <p className="text-sm text-gray-600">
+                {documentTypes.data.progress.percentage}% hoàn thành
+              </p>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Tax Certificate */}
-        <Card>
+        {/* Required Documents */}
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold text-slate-800">
+            Tài liệu bắt buộc
+          </h2>
+          {documentTypes.data.required.map((docType) => {
+            const uploadedDoc = getUploadedDocument(docType.id);
+            const formData = uploadForm[docType.id] || {};
+            const isUpdating = uploadedDoc
+              ? updating === uploadedDoc._id
+              : false;
+
+            return (
+              <Card key={docType.id}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CardTitle className="text-lg">{docType.name}</CardTitle>
+                      {uploadedDoc ? (
+                        <Badge
+                          variant="default"
+                          className="bg-green-100 text-green-800"
+                        >
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          Đã tải lên
+                        </Badge>
+                      ) : (
+                        <Badge variant="destructive">
+                          <XCircle className="w-3 h-3 mr-1" />
+                          Chưa tải lên
+                        </Badge>
+                      )}
+                    </div>
+                    {uploadedDoc && (
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(uploadedDoc.url, "_blank")}
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          Xem
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(uploadedDoc.url, "_blank")}
+                        >
+                          <Download className="w-4 h-4 mr-1" />
+                          Tải xuống
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            // Pre-fill form with existing data
+                            setUploadForm((prev) => ({
+                              ...prev,
+                              [docType.id]: {
+                                document: null,
+                                documentNumber:
+                                  uploadedDoc.metadata.documentNumber || "",
+                                issueDate: uploadedDoc.metadata.issueDate || "",
+                                issuePlace:
+                                  uploadedDoc.metadata.issuePlace || "",
+                                validUntil:
+                                  uploadedDoc.metadata.validUntil || "",
+                                reportYear:
+                                  uploadedDoc.metadata.reportYear || "",
+                                reportPeriod:
+                                  uploadedDoc.metadata.reportPeriod || "",
+                              },
+                            }));
+                            // Enter update mode
+                            setUpdateMode((prev) => ({
+                              ...prev,
+                              [docType.id]: true,
+                            }));
+                            // Scroll to form
+                            const formElement = document.getElementById(
+                              `form-${docType.id}`
+                            );
+                            if (formElement) {
+                              formElement.scrollIntoView({
+                                behavior: "smooth",
+                              });
+                            }
+                          }}
+                        >
+                          <Edit className="w-4 h-4 mr-1" />
+                          Cập nhật
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-600">{docType.description}</p>
+                </CardHeader>
+                <CardContent>
+                  {uploadedDoc && !updateMode[docType.id] ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium">Tên tệp:</span>
+                          <p className="text-gray-600">
+                            {uploadedDoc.metadata.originalName}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-medium">Kích thước:</span>
+                          <p className="text-gray-600">
+                            {getFileSize(uploadedDoc.metadata.size)}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-medium">Ngày tải lên:</span>
+                          <p className="text-gray-600">
+                            {formatDate(uploadedDoc.uploadedAt)}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="font-medium">Trạng thái:</span>
+                          <p className="text-gray-600">
+                            {uploadedDoc.verified
+                              ? "Đã xác minh"
+                              : "Chờ xác minh"}
+                          </p>
+                        </div>
+                      </div>
+                      {uploadedDoc.metadata.documentNumber && (
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="font-medium">Số tài liệu:</span>
+                            <p className="text-gray-600">
+                              {uploadedDoc.metadata.documentNumber}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="font-medium">Ngày cấp:</span>
+                            <p className="text-gray-600">
+                              {formatDate(uploadedDoc.metadata.issueDate!)}
+                            </p>
+                          </div>
+                          {uploadedDoc.metadata.issuePlace && (
+                            <div>
+                              <span className="font-medium">Nơi cấp:</span>
+                              <p className="text-gray-600">
+                                {uploadedDoc.metadata.issuePlace}
+                              </p>
+                            </div>
+                          )}
+                          {uploadedDoc.metadata.validUntil && (
+                            <div>
+                              <span className="font-medium">Giá trị đến:</span>
+                              <p className="text-gray-600">
+                                {formatDate(uploadedDoc.metadata.validUntil)}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <form
+                      id={`form-${docType.id}`}
+                      onSubmit={(e) =>
+                        uploadedDoc
+                          ? handleUpdate(docType.id, uploadedDoc._id, e)
+                          : handleUpload(docType.id, e)
+                      }
+                      className="space-y-4"
+                    >
+                      {updateMode[docType.id] && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                          <div className="flex items-center gap-2">
+                            <Edit className="w-4 h-4 text-blue-600" />
+                            <span className="text-sm font-medium text-blue-800">
+                              Chế độ cập nhật tài liệu
+                            </span>
+                          </div>
+                          <p className="text-xs text-blue-600 mt-1">
+                            Bạn đang cập nhật tài liệu hiện tại. Vui lòng chọn
+                            tệp mới và cập nhật thông tin.
+                          </p>
+                        </div>
+                      )}
+                      <div>
+                        <Label>Tệp tài liệu *</Label>
+                        <Input
+                          type="file"
+                          accept={docType.validation.fileTypes
+                            .map((type) => `.${type}`)
+                            .join(",")}
+                          onChange={(e) =>
+                            setUploadForm((prev) => ({
+                              ...prev,
+                              [docType.id]: {
+                                ...prev[docType.id],
+                                document: e.target.files?.[0] || null,
+                              },
+                            }))
+                          }
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Định dạng: {docType.validation.fileTypes.join(", ")} |
+                          Tối đa: {docType.validation.maxSize}
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {docType.validation.metadataRequired.includes(
+                          "documentNumber"
+                        ) && (
+                          <div>
+                            <Label>Số tài liệu *</Label>
+                            <Input
+                              value={formData.documentNumber || ""}
+                              onChange={(e) =>
+                                setUploadForm((prev) => ({
+                                  ...prev,
+                                  [docType.id]: {
+                                    ...prev[docType.id],
+                                    documentNumber: e.target.value,
+                                  },
+                                }))
+                              }
+                              required
+                            />
+                          </div>
+                        )}
+                        {docType.validation.metadataRequired.includes(
+                          "issueDate"
+                        ) && (
+                          <div>
+                            <Label>Ngày cấp *</Label>
+                            <Input
+                              type="date"
+                              value={formData.issueDate || ""}
+                              onChange={(e) =>
+                                setUploadForm((prev) => ({
+                                  ...prev,
+                                  [docType.id]: {
+                                    ...prev[docType.id],
+                                    issueDate: e.target.value,
+                                  },
+                                }))
+                              }
+                              required
+                            />
+                          </div>
+                        )}
+                        {docType.validation.metadataRequired.includes(
+                          "issuePlace"
+                        ) && (
+                          <div>
+                            <Label>Nơi cấp *</Label>
+                            <Input
+                              value={formData.issuePlace || ""}
+                              onChange={(e) =>
+                                setUploadForm((prev) => ({
+                                  ...prev,
+                                  [docType.id]: {
+                                    ...prev[docType.id],
+                                    issuePlace: e.target.value,
+                                  },
+                                }))
+                              }
+                              required
+                            />
+                          </div>
+                        )}
+                        {docType.validation.metadataRequired.includes(
+                          "reportYear"
+                        ) && (
+                          <div>
+                            <Label>Năm báo cáo *</Label>
+                            <Input
+                              type="number"
+                              value={formData.reportYear || ""}
+                              onChange={(e) =>
+                                setUploadForm((prev) => ({
+                                  ...prev,
+                                  [docType.id]: {
+                                    ...prev[docType.id],
+                                    reportYear: e.target.value,
+                                  },
+                                }))
+                              }
+                              required
+                            />
+                          </div>
+                        )}
+                        {docType.validation.metadataRequired.includes(
+                          "reportPeriod"
+                        ) && (
+                          <div>
+                            <Label>Kỳ báo cáo *</Label>
+                            <Input
+                              value={formData.reportPeriod || ""}
+                              onChange={(e) =>
+                                setUploadForm((prev) => ({
+                                  ...prev,
+                                  [docType.id]: {
+                                    ...prev[docType.id],
+                                    reportPeriod: e.target.value,
+                                  },
+                                }))
+                              }
+                              required
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex justify-end gap-2">
+                        {updateMode[docType.id] && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              // Reset form and exit update mode
+                              setUploadForm((prev) => ({
+                                ...prev,
+                                [docType.id]: {
+                                  document: null,
+                                  documentNumber: "",
+                                  issueDate: "",
+                                  issuePlace: "",
+                                  validUntil: "",
+                                  reportYear: "",
+                                  reportPeriod: "",
+                                },
+                              }));
+                              setUpdateMode((prev) => ({
+                                ...prev,
+                                [docType.id]: false,
+                              }));
+                            }}
+                          >
+                            Hủy
+                          </Button>
+                        )}
+                        <Button
+                          type="submit"
+                          disabled={uploading === docType.id || isUpdating}
+                          className="flex items-center gap-2"
+                        >
+                          <FileUp className="w-4 h-4" />
+                          {uploading === docType.id
+                            ? "Đang tải..."
+                            : isUpdating
+                            ? "Đang cập nhật..."
+                            : updateMode[docType.id]
+                            ? "Cập nhật"
+                            : "Tải lên"}
+                        </Button>
+                      </div>
+                    </form>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Optional Documents */}
+        {/* {documentTypes.data.optional.length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold text-slate-800">
+              Tài liệu tùy chọn
+            </h2>
+            {documentTypes.data.optional.map((docType) => {
+              const uploadedDoc = getUploadedDocument(docType.id);
+              const formData = uploadForm[docType.id] || {};
+
+              return (
+                <Card key={docType.id}>
           <CardHeader>
-            <CardTitle>Giấy chứng nhận đăng ký thuế</CardTitle>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CardTitle className="text-lg">
+                          {docType.name}
+                        </CardTitle>
+                        {uploadedDoc ? (
+                          <Badge
+                            variant="default"
+                            className="bg-green-100 text-green-800"
+                          >
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Đã tải lên
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">Tùy chọn</Badge>
+                        )}
+                      </div>
+                      {uploadedDoc && (
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              window.open(uploadedDoc.url, "_blank")
+                            }
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            Xem
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              window.open(uploadedDoc.url, "_blank")
+                            }
+                          >
+                            <Download className="w-4 h-4 mr-1" />
+                            Tải xuống
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDelete(uploadedDoc._id)}
+                            disabled={deleting === uploadedDoc._id}
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            {deleting === uploadedDoc._id
+                              ? "Đang xóa..."
+                              : "Xóa"}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      {docType.description}
+                    </p>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmitTC} className="space-y-4">
+                    {uploadedDoc ? (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="font-medium">Tên tệp:</span>
+                            <p className="text-gray-600">
+                              {uploadedDoc.metadata.originalName}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="font-medium">Kích thước:</span>
+                            <p className="text-gray-600">
+                              {getFileSize(uploadedDoc.metadata.size)}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="font-medium">Ngày tải lên:</span>
+                            <p className="text-gray-600">
+                              {formatDate(uploadedDoc.uploadedAt)}
+                            </p>
+                          </div>
+                          <div>
+                            <span className="font-medium">Trạng thái:</span>
+                            <p className="text-gray-600">
+                              {uploadedDoc.verified
+                                ? "Đã xác minh"
+                                : "Chờ xác minh"}
+                            </p>
+                          </div>
+                        </div>
+                        {uploadedDoc.metadata.documentNumber && (
+                          <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                              <span className="font-medium">Số tài liệu:</span>
+                              <p className="text-gray-600">
+                                {uploadedDoc.metadata.documentNumber}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="font-medium">Ngày cấp:</span>
+                              <p className="text-gray-600">
+                                {formatDate(uploadedDoc.metadata.issueDate!)}
+                              </p>
+                            </div>
+                            {uploadedDoc.metadata.issuePlace && (
+                              <div>
+                                <span className="font-medium">Nơi cấp:</span>
+                                <p className="text-gray-600">
+                                  {uploadedDoc.metadata.issuePlace}
+                                </p>
+                              </div>
+                            )}
+                            {uploadedDoc.metadata.validUntil && (
+                              <div>
+                                <span className="font-medium">
+                                  Giá trị đến:
+                                </span>
+                                <p className="text-gray-600">
+                                  {formatDate(uploadedDoc.metadata.validUntil)}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                    <form
+                      id={`form-${docType.id}`}
+                      onSubmit={(e) => uploadedDoc ? handleUpdate(docType.id, uploadedDoc._id, e) : handleUpload(docType.id, e)}
+                      className="space-y-4"
+                    >
               <div>
-                <Label>Tệp giấy chứng nhận *</Label>
+                          <Label>Tệp tài liệu</Label>
                 <Input
                   type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
+                            accept={docType.validation.fileTypes
+                              .map((type) => `.${type}`)
+                              .join(",")}
                   onChange={(e) =>
-                    setTC({ ...tc, document: e.target.files?.[0] || null })
-                  }
-                />
+                              setUploadForm((prev) => ({
+                                ...prev,
+                                [docType.id]: {
+                                  ...prev[docType.id],
+                                  document: e.target.files?.[0] || null,
+                                },
+                              }))
+                            }
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Định dạng: {docType.validation.fileTypes.join(", ")}{" "}
+                            | Tối đa: {docType.validation.maxSize}
+                          </p>
               </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {docType.validation.metadataRequired.includes(
+                            "documentNumber"
+                          ) && (
                 <div>
-                  <Label>Số giấy tờ *</Label>
+                              <Label>Số tài liệu</Label>
                   <Input
-                    value={tc.documentNumber}
+                                value={formData.documentNumber || ""}
                     onChange={(e) =>
-                      setTC({ ...tc, documentNumber: e.target.value })
-                    }
-                    required
+                                  setUploadForm((prev) => ({
+                                    ...prev,
+                                    [docType.id]: {
+                                      ...prev[docType.id],
+                                      documentNumber: e.target.value,
+                                    },
+                                  }))
+                                }
                   />
                 </div>
+                          )}
+                          {docType.validation.metadataRequired.includes(
+                            "issueDate"
+                          ) && (
                 <div>
-                  <Label>Ngày cấp *</Label>
+                              <Label>Ngày cấp</Label>
                   <Input
                     type="date"
-                    value={tc.issueDate}
+                                value={formData.issueDate || ""}
+                                onChange={(e) =>
+                                  setUploadForm((prev) => ({
+                                    ...prev,
+                                    [docType.id]: {
+                                      ...prev[docType.id],
+                                      issueDate: e.target.value,
+                                    },
+                                  }))
+                                }
+                              />
+                            </div>
+                          )}
+                          {docType.validation.metadataRequired.includes(
+                            "issuePlace"
+                          ) && (
+                            <div>
+                              <Label>Nơi cấp</Label>
+                              <Input
+                                value={formData.issuePlace || ""}
                     onChange={(e) =>
-                      setTC({ ...tc, issueDate: e.target.value })
-                    }
-                    required
+                                  setUploadForm((prev) => ({
+                                    ...prev,
+                                    [docType.id]: {
+                                      ...prev[docType.id],
+                                      issuePlace: e.target.value,
+                                    },
+                                  }))
+                                }
                   />
                 </div>
+                          )}
+                          {docType.validation.metadataRequired.includes(
+                            "reportYear"
+                          ) && (
+                            <div>
+                              <Label>Năm báo cáo</Label>
+                              <Input
+                                type="number"
+                                value={formData.reportYear || ""}
+                                onChange={(e) =>
+                                  setUploadForm((prev) => ({
+                                    ...prev,
+                                    [docType.id]: {
+                                      ...prev[docType.id],
+                                      reportYear: e.target.value,
+                                    },
+                                  }))
+                                }
+                              />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          )}
+                          {docType.validation.metadataRequired.includes(
+                            "reportPeriod"
+                          ) && (
                 <div>
-                  <Label>Giá trị đến</Label>
+                              <Label>Kỳ báo cáo</Label>
                   <Input
-                    type="date"
-                    value={tc.validUntil}
+                                value={formData.reportPeriod || ""}
                     onChange={(e) =>
-                      setTC({ ...tc, validUntil: e.target.value })
+                                  setUploadForm((prev) => ({
+                                    ...prev,
+                                    [docType.id]: {
+                                      ...prev[docType.id],
+                                      reportPeriod: e.target.value,
+                                    },
+                                  }))
                     }
                   />
                 </div>
+                          )}
               </div>
+
               <div className="flex justify-end">
                 <Button
                   type="submit"
-                  disabled={loadingTC}
+                            disabled={uploading === docType.id}
                   className="flex items-center gap-2"
                 >
-                  <Save className="w-4 h-4" />{" "}
-                  {loadingTC ? "Đang tải..." : "Tải lên"}
+                            <FileUp className="w-4 h-4" />
+                            {uploading === docType.id
+                              ? "Đang tải..."
+                              : "Tải lên"}
                 </Button>
               </div>
             </form>
+                    )}
           </CardContent>
         </Card>
+              );
+            })}
+          </div>
+        )} */}
 
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
