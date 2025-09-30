@@ -1,6 +1,16 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import {
+  MapPin,
+  CalendarDays,
+  Eye,
+  UsersRound,
+  Briefcase,
+  UserCircle2,
+  CheckCircle2,
+} from "lucide-react";
 import { PageLayout } from "@/components/layout";
 import { jobsAPI } from "@/lib/api";
 import { notFound } from "next/navigation";
@@ -24,6 +34,18 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
     return (
       <PageLayout>
         <div className="max-w-6xl mx-auto px-4 py-8">
+          {/* Breadcrumbs */}
+          <div className="text-sm text-muted-foreground mb-4 flex items-center gap-2">
+            <Link href="/" className="hover:underline">
+              Trang chủ
+            </Link>
+            <span>/</span>
+            <Link href="/search" className="hover:underline">
+              Việc làm
+            </Link>
+            <span>/</span>
+            <span className="text-foreground line-clamp-1">{job.title}</span>
+          </div>
           <div className="flex items-start gap-4 mb-6">
             <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center overflow-hidden border">
               {headerImage ? (
@@ -54,24 +76,31 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                 )}
               </div>
               <div className="flex flex-wrap gap-2 mt-3">
-                {job.status && (
-                  <Badge
-                    variant={job.status === "active" ? "default" : "outline"}
-                  >
-                    {job.status}
-                  </Badge>
+                {job.salary && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-muted text-foreground text-xs">
+                    <Briefcase className="w-3 h-3" /> {job.salary}
+                  </span>
                 )}
-                {job.salary && <Badge variant="secondary">{job.salary}</Badge>}
                 {job.location && (
-                  <Badge variant="secondary">{job.location}</Badge>
-                )}
-                {job.deadline && (
-                  <Badge variant="outline">
-                    Hạn nộp: {new Date(job.deadline).toLocaleDateString()}
-                  </Badge>
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-muted text-foreground text-xs">
+                    <MapPin className="w-3 h-3" /> {job.location}
+                  </span>
                 )}
                 {typeof job.positions === "number" && (
-                  <Badge variant="outline">Số lượng: {job.positions}</Badge>
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-muted text-foreground text-xs">
+                    <UsersRound className="w-3 h-3" /> {job.positions} vị trí
+                  </span>
+                )}
+                {job.deadline && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-muted text-foreground text-xs">
+                    <CalendarDays className="w-3 h-3" /> Hạn:{" "}
+                    {new Date(job.deadline).toLocaleDateString()}
+                  </span>
+                )}
+                {job.status && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs">
+                    <CheckCircle2 className="w-3 h-3" /> {job.status}
+                  </span>
                 )}
               </div>
             </div>
@@ -83,6 +112,66 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
             <div className="lg:col-span-2 space-y-6">
+              {/* Tổng quan nhanh */}
+              <Card>
+                <CardContent className="p-6">
+                  <h2 className="font-semibold mb-4">
+                    Chi tiết tin tuyển dụng
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    {job.salary && (
+                      <div className="flex items-center gap-2">
+                        <UsersRound className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">
+                          Mức lương:
+                        </span>
+                        <span className="font-medium text-foreground">
+                          {job.salary}
+                        </span>
+                      </div>
+                    )}
+                    {job.location && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Địa điểm:</span>
+                        <span className="font-medium text-foreground">
+                          {job.location}
+                        </span>
+                      </div>
+                    )}
+                    {typeof job.positions === "number" && (
+                      <div className="flex items-center gap-2">
+                        <UsersRound className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">
+                          Số lượng tuyển:
+                        </span>
+                        <span className="font-medium text-foreground">
+                          {job.positions}
+                        </span>
+                      </div>
+                    )}
+                    {job.deadline && (
+                      <div className="flex items-center gap-2">
+                        <CalendarDays className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Hạn nộp:</span>
+                        <span className="font-medium text-foreground">
+                          {new Date(job.deadline).toLocaleDateString()}
+                        </span>
+                      </div>
+                    )}
+                    {typeof job.views === "number" && (
+                      <div className="flex items-center gap-2">
+                        <Eye className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-muted-foreground">Lượt xem:</span>
+                        <span className="font-medium text-foreground">
+                          {job.views}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardContent className="p-6">
                   <h2 className="font-semibold mb-3">Mô tả công việc</h2>
@@ -95,9 +184,21 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
               <Card>
                 <CardContent className="p-6">
                   <h2 className="font-semibold mb-3">Yêu cầu</h2>
-                  <p className="text-sm leading-6 whitespace-pre-line">
-                    {job.requirements || "Đang cập nhật"}
-                  </p>
+                  {job.requirements ? (
+                    <ul className="list-disc list-inside text-sm leading-6 space-y-1">
+                      {job.requirements
+                        .split("\n")
+                        .map((line) => line.trim())
+                        .filter((line) => line.length > 0)
+                        .map((line, idx) => (
+                          <li key={idx}>{line.replace(/^[-•]\s?/, "")}</li>
+                        ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Đang cập nhật
+                    </p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -119,8 +220,25 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                   )}
                 </CardContent>
               </Card>
+
+              {/* Hướng dẫn nộp hồ sơ */}
+              <Card>
+                <CardContent className="p-6 space-y-3">
+                  <h2 className="font-semibold">Ứng tuyển</h2>
+                  {job.deadline && (
+                    <div className="text-sm text-muted-foreground">
+                      Hạn nộp hồ sơ:{" "}
+                      {new Date(job.deadline).toLocaleDateString()}
+                    </div>
+                  )}
+                  <div className="flex gap-3">
+                    <Button className="font-medium">Ứng tuyển ngay</Button>
+                    <Button variant="outline">Lưu việc làm</Button>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-            <div className="space-y-6">
+            <div className="space-y-6 lg:sticky lg:top-20 h-fit">
               <Card>
                 <CardContent className="p-6 space-y-3">
                   <h3 className="font-semibold">Thông tin chung</h3>
@@ -137,6 +255,33 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                     )}
                     {typeof job.views === "number" && (
                       <div>Lượt xem: {job.views}</div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6 flex items-center gap-3">
+                  {job.postedBy?.avatar ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={job.postedBy.avatar}
+                      alt={job.postedBy.fullName || "Người đăng"}
+                      className="w-12 h-12 rounded-full border"
+                    />
+                  ) : (
+                    <UserCircle2 className="w-12 h-12 text-muted-foreground" />
+                  )}
+                  <div className="text-sm">
+                    <div className="font-medium text-foreground">
+                      {job.postedBy?.fullName || "Người đăng"}
+                    </div>
+                    {job.postedBy?.email && (
+                      <a
+                        className="text-xs text-primary hover:underline"
+                        href={`mailto:${job.postedBy.email}`}
+                      >
+                        {job.postedBy.email}
+                      </a>
                     )}
                   </div>
                 </CardContent>
@@ -185,6 +330,20 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                       {job.experience}
                     </div>
                   )}
+                </CardContent>
+              </Card>
+
+              {/* Mẹo an toàn */}
+              <Card>
+                <CardContent className="p-6 space-y-2">
+                  <h3 className="font-semibold">Bí kíp tìm việc an toàn</h3>
+                  <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
+                    <li>Không chuyển tiền đặt cọc hay phí tuyển dụng.</li>
+                    <li>
+                      Kiểm tra kỹ thông tin nhà tuyển dụng trước khi nộp CV.
+                    </li>
+                    <li>Báo cáo tin tuyển dụng đáng ngờ cho chúng tôi.</li>
+                  </ul>
                 </CardContent>
               </Card>
             </div>
