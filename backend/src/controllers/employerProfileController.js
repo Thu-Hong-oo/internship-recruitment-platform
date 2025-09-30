@@ -90,7 +90,48 @@ const getProfile = asyncHandler(async (req, res) => {
     return error(res, 'Lỗi lấy profile', err);
   }
 });
-
+/**
+ * Public: Lấy thông tin công ty theo id (dùng cho trang công ty, job detail...)
+ * @route GET /api/companies/:id
+ * @access Public
+ */
+// GET /api/companies/:id
+// Trả về thông tin công ty giới hạn cho public (an toàn, không nhạy cảm)
+const getPublicCompanyInfo = asyncHandler(async (req, res) => {
+  try {
+    const EmployerProfile = require('../models/EmployerProfile');
+    const profile = await EmployerProfile.findById(req.params.id);
+    if (!profile || !profile.company) {
+      return res
+        .status(404)
+        .json({ success: false, message: 'Không tìm thấy công ty' });
+    }
+    const c = profile.company;
+    res.status(200).json({
+      success: true,
+      data: {
+        _id: profile._id,
+        name: c.name,
+        logo: c.logo?.url,
+        coverImage: c.coverImage?.url,
+        industry: c.industry,
+        size: c.size,
+        description: c.description,
+        website: c.website,
+        foundedYear: c.foundedYear,
+        employeesCount: c.employeesCount,
+        officeAddress: c.officeAddress,
+        stats: profile.stats,
+        status: profile.status,
+      },
+    });
+  } catch (err) {
+    logger.error('Get public company info failed:', { error: err.message });
+    res
+      .status(500)
+      .json({ success: false, message: 'Lỗi lấy thông tin công ty' });
+  }
+});
 /**
  * Cập nhật thông tin cá nhân employer (position, contact)
  * @route PUT /api/employers/profile
@@ -519,7 +560,7 @@ const removeDocument = asyncHandler(async (req, res) => {
         });
       }
     }
-  await EmployerServices.removeDocument(profile, documentId);
+    await EmployerServices.removeDocument(profile, documentId);
     logger.info('Document removed from employer profile', {
       userId: req.user.id,
       documentId,
@@ -595,18 +636,21 @@ const updateCompanyInfo = asyncHandler(async (req, res) => {
     if (req.body.company) {
       const { error } = companySchema.validate(req.body.company);
       if (error) {
-        return error(res, 'Thông tin công ty không hợp lệ', error, 400);
+        return res.status(400).json({
+          success: false,
+          message: 'Thông tin công ty không hợp lệ',
+          error: error.details || error.message || error,
+        });
       }
     }
     if (req.body.businessInfo) {
       const { error } = businessInfoSchema.validate(req.body.businessInfo);
       if (error) {
-        return error(
-          res,
-          'Thông tin đăng ký kinh doanh không hợp lệ',
-          error,
-          400
-        );
+        return res.status(400).json({
+          success: false,
+          message: 'Thông tin đăng ký kinh doanh không hợp lệ',
+          error: error.details || error.message || error,
+        });
       }
     }
     if (req.body.legalRepresentative) {
@@ -614,12 +658,11 @@ const updateCompanyInfo = asyncHandler(async (req, res) => {
         req.body.legalRepresentative
       );
       if (error) {
-        return error(
-          res,
-          'Thông tin người đại diện pháp luật không hợp lệ',
-          error,
-          400
-        );
+        return res.status(400).json({
+          success: false,
+          message: 'Thông tin người đại diện pháp luật không hợp lệ',
+          error: error.details || error.message || error,
+        });
       }
     }
     // Validate documents nếu có
@@ -630,12 +673,11 @@ const updateCompanyInfo = asyncHandler(async (req, res) => {
           req.body.company?.industry
         );
         if (!docValidation) {
-          return error(
-            res,
-            `Document type không hợp lệ: ${doc.type}`,
-            null,
-            400
-          );
+          return res.status(400).json({
+            success: false,
+            message: `Document type không hợp lệ: ${doc.type}`,
+            error: null,
+          });
         }
       }
     }
@@ -644,12 +686,28 @@ const updateCompanyInfo = asyncHandler(async (req, res) => {
       req.user.id,
       req.body
     );
-    return success(res, 'Cập nhật thông tin công ty thành công', {
-      profile: result.profile,
-      updatedFields: result.updatedFields.profile,
+    return res.status(200).json({
+      success: true,
+      message: 'Cập nhật thông tin công ty thành công',
+      data: {
+        profile: result.profile,
+        updatedFields: result.updatedFields.profile,
+      },
     });
   } catch (err) {
-    return error(res, 'Lỗi cập nhật thông tin công ty', err);
+    // Nếu lỗi trùng mã số thuế thì trả về 409
+    if (err.message && err.message.includes('Mã số thuế đã tồn tại')) {
+      return res.status(409).json({
+        success: false,
+        message: 'Lỗi cập nhật thông tin công ty',
+        error: err.message,
+      });
+    }
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi cập nhật thông tin công ty',
+      error: err.message || err,
+    });
   }
 });
 
@@ -734,7 +792,10 @@ const uploadCoverImage = asyncHandler(async (req, res) => {
         error: 'Không có file nào được upload',
       });
     }
-    const result = await EmployerServices.uploadCoverImage(req.user.id, req.file);
+    const result = await EmployerServices.uploadCoverImage(
+      req.user.id,
+      req.file
+    );
     logger.info('Company cover image upload successful', {
       userId: req.user.id,
       originalName: req.file.originalname,
@@ -806,21 +867,46 @@ const removeLogo = asyncHandler(async (req, res) => {
 });
 
 // GET /api/employers/company
-// Chỉ trả về thông tin công ty (không bao gồm verification, businessInfo...)
+// GET /api/employers/company
+// Trả về đầy đủ thông tin công ty cho employer (nội bộ)
 const getCompanyInfo = asyncHandler(async (req, res) => {
-  const profile = await EmployerServices.getProfile(req.user.id);
-
-  res.status(200).json({
-    success: true,
-    data: {
-      _id: profile._id,
-      company: profile.company,
-      stats: profile.stats,
-      hiring: profile.hiring,
-      preferences: profile.preferences,
-      status: profile.status,
-    },
-  });
+  try {
+    const profile = await EmployerServices.getProfile(req.user.id);
+    const c = profile.company || {};
+    res.status(200).json({
+      success: true,
+      data: {
+        _id: profile._id,
+        name: c.name,
+        logo: c.logo?.url,
+        coverImage: c.coverImage?.url,
+        industry: c.industry,
+        size: c.size,
+        description: c.description,
+        website: c.website,
+        email: c.email,
+        foundedYear: c.foundedYear,
+        employeesCount: c.employeesCount,
+        officeAddress: c.officeAddress,
+        businessInfo: profile.businessInfo,
+        legalRepresentative: profile.legalRepresentative,
+        stats: profile.stats,
+        hiring: profile.hiring,
+        preferences: profile.preferences,
+        status: profile.status,
+        verification: profile.verification,
+        companyMembers: profile.companyMembers,
+        documents: profile.documents || [],
+        createdAt: profile.createdAt,
+        updatedAt: profile.updatedAt,
+      },
+    });
+  } catch (err) {
+    logger.error('Get company info failed:', { error: err.message });
+    res
+      .status(500)
+      .json({ success: false, message: 'Lỗi lấy thông tin công ty' });
+  }
 });
 
 // Remove the duplicated code at the end and fix getRecommendedCandidates export
@@ -833,11 +919,11 @@ module.exports = {
   getProfile, // GET /employers/profile - Lấy toàn bộ thông tin employer profile
   updateProfile, // PUT /employers/profile - Cập nhật thông tin cá nhân (position, contact, officeAddress)
   getCompanyInfo, // GET /employers/company - Lấy thông tin công ty (company, stats, hiring, preferences)
+  updateCompanyInfo, // PUT /employers/company - Cập nhật thông tin công ty và xác thực
 
   // === COMPANY VERIFICATION SYSTEM ===
   getVerificationStatus, // GET /employers/verification-status - Xem tiến độ xác thực
   getDocumentTypes, // GET /employers/document-types - Lấy danh sách loại giấy tờ cần thiết theo ngành
-  updateCompanyInfo, // PUT /employers/company - Cập nhật thông tin công ty và xác thực
 
   // === DOCUMENT UPLOAD (CLEANED UP) ===
   uploadBusinessLicense, // POST /employers/documents/business-license - Upload giấy phép kinh doanh
@@ -858,4 +944,7 @@ module.exports = {
   uploadCoverImage, // POST /employers/upload-cover-image - Upload ảnh bìa
   removeLogo, // DELETE /employers/logo - Xóa logo
   removeCoverImage, // DELETE /employers/cover-image - Xóa ảnh bìa
+
+  // === PUBLIC API ===
+  getPublicCompanyInfo, // GET /api/companies/:id - Public lấy thông tin công ty
 };
