@@ -1,4 +1,3 @@
-
 const CandidateProfile = require('../models/CandidateProfile');
 const User = require('../models/User');
 const asyncHandler = require('express-async-handler');
@@ -114,11 +113,12 @@ exports.uploadCV = asyncHandler(async (req, res) => {
   }
   const uploadResult = await uploadFile('document', req.file.buffer, {
     folder: 'internbridge/cv',
-    resource_type: 'auto',
-    flags: 'attachment:false',
+    resource_type: 'raw',
     allowed_formats: ['pdf', 'doc', 'docx'],
     public_id: publicId,
-    format: 'pdf',
+    use_filename: true,
+    unique_filename: true,
+    overwrite: true,
   });
 
   // Lưu CV mới vào history
@@ -128,28 +128,27 @@ exports.uploadCV = asyncHandler(async (req, res) => {
     filename: req.file.originalname || '',
     format: uploadResult.format || '',
   });
-  // Tạo link xem trước (preview) và link tải về (download)
-  const previewUrl = uploadResult.url;
-  let downloadUrl = uploadResult.url;
-  if (req.file.originalname) {
-    const encodedName = encodeURIComponent(req.file.originalname);
-    downloadUrl = uploadResult.url + '?attachment=' + encodedName;
-  }
-  // Cập nhật CV hiện tại
+  // Cập nhật CV hiện tại (lưu đúng theo schema: url + updatedAt + aiAnalysis)
   profile.resume.current = {
-    previewUrl,
-    downloadUrl,
+    url: uploadResult.url,
     updatedAt: new Date(),
-    filename: req.file.originalname || '',
-    format: uploadResult.format || '',
     aiAnalysis: {}, // Chờ phân tích AI
   };
   await profile.save();
   res.status(200).json({
     success: true,
     data: {
-      previewUrl,
-      downloadUrl,
+      // Dùng để nhúng xem trước trong <iframe>
+      previewUrl:
+        'https://docs.google.com/gview?embedded=1&url=' +
+        encodeURIComponent(uploadResult.url),
+      url: uploadResult.url,
+      // Trả thêm link tải về cho client (không lưu DB)
+      downloadUrl: req.file.originalname
+        ? uploadResult.url +
+          '?attachment=' +
+          encodeURIComponent(req.file.originalname)
+        : uploadResult.url,
       filename: req.file.originalname || '',
       format: uploadResult.format || '',
       updatedAt: profile.resume.current.updatedAt,
@@ -176,6 +175,33 @@ exports.getCVAnalysis = asyncHandler(async (req, res) => {
   res
     .status(200)
     .json({ success: true, data: profile.resume.current.aiAnalysis });
+});
+
+// @desc    Stream current CV inline for viewing
+// @route   GET /api/candidate-profiles/:userId/cv/view
+// @access  Private (Candidate)
+exports.viewCurrentCV = asyncHandler(async (req, res) => {
+  const userId = req.params.userId || req.user.id;
+  const profile = await CandidateProfile.findOne({ userId });
+  const url = profile?.resume?.current?.url;
+  if (!url) {
+    return res
+      .status(404)
+      .json({ success: false, message: 'Chưa có CV hiện tại để xem' });
+  }
+
+  // Stream từ Cloudinary về với header inline để trình duyệt hiển thị
+  const response = await fetch(url);
+  if (!response.ok) {
+    return res
+      .status(502)
+      .json({ success: false, message: 'Không thể tải CV từ Cloudinary' });
+  }
+  const contentType = response.headers.get('content-type') || 'application/pdf';
+  res.setHeader('Content-Type', contentType);
+  res.setHeader('Content-Disposition', 'inline; filename="resume.pdf"');
+  const arrayBuffer = await response.arrayBuffer();
+  res.send(Buffer.from(arrayBuffer));
 });
 
 // @desc    Update skills verification
@@ -334,8 +360,15 @@ exports.deleteCV = asyncHandler(async (req, res) => {
   const userId = req.params.userId || req.user.id;
   const cvIndex = parseInt(req.params.cvIndex, 10);
   const profile = await CandidateProfile.findOne({ userId });
-  if (!profile || !Array.isArray(profile.resume.history) || cvIndex < 0 || cvIndex >= profile.resume.history.length) {
-    return res.status(404).json({ success: false, message: 'Không tìm thấy CV cần xóa' });
+  if (
+    !profile ||
+    !Array.isArray(profile.resume.history) ||
+    cvIndex < 0 ||
+    cvIndex >= profile.resume.history.length
+  ) {
+    return res
+      .status(404)
+      .json({ success: false, message: 'Không tìm thấy CV cần xóa' });
   }
   const cvToDelete = profile.resume.history[cvIndex];
   // Xóa file trên Cloudinary nếu có url
@@ -350,17 +383,28 @@ exports.deleteCV = asyncHandler(async (req, res) => {
       }
     } catch (err) {
       // Không cần throw, chỉ log
-      logger && logger.error && logger.error('Xóa file Cloudinary thất bại:', err);
+      logger &&
+        logger.error &&
+        logger.error('Xóa file Cloudinary thất bại:', err);
     }
   }
   // Xóa khỏi history
   profile.resume.history.splice(cvIndex, 1);
   // Nếu CV hiện tại bị xóa thì cập nhật lại current
   if (profile.resume.current && profile.resume.current.url === cvToDelete.url) {
-    profile.resume.current = profile.resume.history.length > 0
-      ? { ...profile.resume.history[profile.resume.history.length - 1], aiAnalysis: {} }
-      : {};
+    profile.resume.current =
+      profile.resume.history.length > 0
+        ? {
+            ...profile.resume.history[profile.resume.history.length - 1],
+            aiAnalysis: {},
+          }
+        : {};
   }
   await profile.save();
-  res.status(200).json({ success: true, message: 'Đã xóa CV khỏi lịch sử', history: profile.resume.history, current: profile.resume.current });
+  res.status(200).json({
+    success: true,
+    message: 'Đã xóa CV khỏi lịch sử',
+    history: profile.resume.history,
+    current: profile.resume.current,
+  });
 });
