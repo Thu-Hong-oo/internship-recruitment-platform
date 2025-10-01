@@ -188,3 +188,60 @@ html.dark body {
            hover:scale-105 active:scale-95;
   }
 }
+
+@keyframes float-soft {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes glow-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+@keyframes gentle-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
+}
+
+@layer utilities {
+  .animate-float-soft {
+    animation: float-soft 9s ease-in-out infinite;
+  }
+
+  .animate-glow-pulse {
+    animation: glow-pulse 7s ease-in-out infinite;
+  }
+
+  .animate-gentle-shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .animate-gentle-shimmer::after {
+    content: "";
+    position: absolute;
+    inset: -150%;
+    background: linear-gradient(
+      120deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.45) 50%,
+      transparent 100%
+    );
+    animation: gentle-shimmer 6s ease-in-out infinite;
+  }
+}

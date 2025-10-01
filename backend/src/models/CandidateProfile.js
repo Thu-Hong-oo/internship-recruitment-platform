@@ -122,6 +122,10 @@ const CandidateProfileSchema = new mongoose.Schema(
       current: {
         url: String,
         updatedAt: Date,
+        filename: String,
+        displayName: String,
+        format: String,
+        size: Number,
         aiAnalysis: {
           skills: [
             {
@@ -138,6 +142,10 @@ const CandidateProfileSchema = new mongoose.Schema(
         {
           url: String,
           uploadedAt: Date,
+          filename: String,
+          displayName: String,
+          format: String,
+          size: Number,
         },
       ],
     },

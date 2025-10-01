@@ -143,7 +143,11 @@ export default function Header() {
 
   const handleCVFeatureClick = (feature: (typeof cvFeatures)[0]) => {
     console.log(`Clicked on CV feature: ${feature.name}`);
-    // TODO: Navigate to feature page
+    // Navigate to CV management page for specific features
+    if (feature.name === "Quản lý CV" || feature.name === "Tải CV lên") {
+      router.push("/my-cv");
+    }
+    // TODO: Navigate to other feature pages
   };
 
   return (
@@ -517,7 +521,9 @@ export default function Header() {
                             <AccordionContent className="pt-1 pb-2">
                               <div className="space-y-1 text-sm text-muted-foreground">
                                 <Link
-                                  href="/cv"
+
+                                  href="/my-cv"
+
                                   className="flex items-center rounded-md px-2 py-2 hover:bg-muted hover:text-foreground"
                                 >
                                   <span>CV của tôi</span>
