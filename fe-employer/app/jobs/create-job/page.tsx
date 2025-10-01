@@ -2,33 +2,20 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createJob, CreateJobPayload, submitJobForReview } from "@/lib/api";
+import { createJob, CreateJobPayload } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { X, Plus, Send } from "lucide-react";
+import { X, Plus } from "lucide-react";
 
 export default function CreateJobPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [createdJobId, setCreatedJobId] = useState<string | null>(null);
-  const [showSubmitDialog, setShowSubmitDialog] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
 
   const [formData, setFormData] = useState<CreateJobPayload>({
     title: "",
@@ -88,9 +75,9 @@ export default function CreateJobPage() {
       const result = await createJob(formData, token);
 
       if (result.success) {
-        setCreatedJobId(result.data?._id || result.data?.id);
         setSuccess(true);
-        setShowSubmitDialog(true);
+        // chuyển về trang quản lý tin
+        setTimeout(() => router.push("/jobs"), 1500);
       } else {
         setError(result.error || "Có lỗi xảy ra khi tạo bài tuyển dụng");
       }
@@ -101,56 +88,15 @@ export default function CreateJobPage() {
     }
   };
 
-  const handleSubmitForReview = async () => {
-    if (!createdJobId) return;
-
-    try {
-      setSubmitting(true);
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token");
-      if (!token) return;
-
-      const result = await submitJobForReview(
-        createdJobId,
-        token,
-        "Please review this job posting for approval",
-        false
-      );
-
-      if (result.success) {
-        setShowSubmitDialog(false);
-        setTimeout(() => {
-          router.push("/dashboard");
-        }, 1500);
-      } else {
-        setError(result.error || "Không thể gửi duyệt bài tuyển dụng");
-      }
-    } catch (err) {
-      setError("Có lỗi xảy ra khi gửi duyệt bài tuyển dụng");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleSkipSubmit = () => {
-    setShowSubmitDialog(false);
-    setTimeout(() => {
-      router.push("/dashboard");
-    }, 1500);
-  };
-
-  if (success && !showSubmitDialog) {
+  if (success) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-8">
         <Card>
           <CardContent className="p-6 text-center">
             <div className="text-green-600 text-lg font-semibold mb-2">
-              ✅ Tạo bài tuyển dụng thành công!
+              ✅ Tin của bạn đã được lưu nháp!
             </div>
-            <p className="text-gray-600">
-              Bài tuyển dụng đã được tạo và đang chờ duyệt. Bạn sẽ được chuyển
-              về trang dashboard.
-            </p>
+            <p className="text-gray-600">Đang chuyển về trang quản lý tin...</p>
           </CardContent>
         </Card>
       </div>
@@ -365,41 +311,6 @@ export default function CreateJobPage() {
           </Button>
         </div>
       </form>
-
-      {/* Submit for Review Dialog */}
-      <AlertDialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Gửi duyệt bài tuyển dụng</AlertDialogTitle>
-            <AlertDialogDescription>
-              Bài tuyển dụng đã được tạo thành công! Bạn có muốn gửi bài này để
-              duyệt ngay bây giờ không?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleSkipSubmit} disabled={submitting}>
-              Thoát
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleSubmitForReview}
-              disabled={submitting}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              {submitting ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Đang gửi...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Gửi duyệt
-                </>
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

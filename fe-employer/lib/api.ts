@@ -307,20 +307,29 @@ export async function getJobApplications(
 // Submit job for review
 export async function submitJobForReview(
   jobId: string,
-  token: string
+  token: string,
+  notes: string = "Please review this job posting for approval",
+  urgentReview: boolean = false
 ): Promise<{
   success: boolean;
   message?: string;
   error?: string;
 }> {
   try {
-    const res = await fetch(`http://localhost:3000/api/jobs/${jobId}/submit`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const res = await fetch(
+      `http://localhost:3000/api/jobs/employer/${jobId}/submit`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          notes,
+          urgentReview,
+        }),
+      }
+    );
     return (await res.json()) as any;
   } catch (e) {
     return { success: false, error: "Không thể kết nối máy chủ" };

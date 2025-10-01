@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Save, Building2, UserCircle2, ArrowLeft, Edit3 } from "lucide-react";
+import {
+  Save,
+  Building2,
+  UserCircle2,
+  ArrowLeft,
+  Edit3,
+  FileText,
+} from "lucide-react";
 import { getToken } from "@/lib/userStorage";
 import { useVietnamAddress } from "@/hooks/useVietnamAddress";
 import { AddressOption, findOptionByLabelLoose } from "@/lib/addressUtils";
@@ -58,6 +65,89 @@ export default function CompanyPage() {
   const [success, setSuccess] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [companyView, setCompanyView] = useState<any>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
+
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleUploadLogo = async (file: File) => {
+    try {
+      setUploadingLogo(true);
+      const token = getToken();
+      if (!token) {
+        setError("Vui lòng đăng nhập lại");
+        return;
+      }
+      const formData = new FormData();
+      formData.append("logo", file);
+      const res = await fetch(
+        "http://localhost:3000/api/employers/upload-logo",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        }
+      );
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || data?.message || "Tải logo thất bại");
+      }
+      const newUrl =
+        data?.data?.logo?.url || data?.data?.company?.logo?.url || data?.url;
+      setCompanyView((prev: any) => ({
+        ...(prev || {}),
+        logo: newUrl || prev?.logo,
+      }));
+      setSuccess("Tải logo thành công");
+    } catch (e: any) {
+      setError(e?.message || "Không thể tải logo");
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleUploadCover = async (file: File) => {
+    try {
+      setUploadingCover(true);
+      const token = getToken();
+      if (!token) {
+        setError("Vui lòng đăng nhập lại");
+        return;
+      }
+      const formData = new FormData();
+      formData.append("coverImage", file);
+      const res = await fetch(
+        "http://localhost:3000/api/employers/upload-cover-image",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        }
+      );
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || data?.message || "Tải ảnh bìa thất bại");
+      }
+      const newUrl =
+        data?.data?.coverImage?.url ||
+        data?.data?.company?.coverImage?.url ||
+        data?.url;
+      setCompanyView((prev: any) => ({
+        ...(prev || {}),
+        coverImage: newUrl || prev?.coverImage,
+      }));
+      setSuccess("Tải ảnh bìa thành công");
+    } catch (e: any) {
+      setError(e?.message || "Không thể tải ảnh bìa");
+    } finally {
+      setUploadingCover(false);
+    }
+  };
 
   const [formData, setFormData] = useState<CompanyFormData>({
     company: {
@@ -189,7 +279,14 @@ export default function CompanyPage() {
         const json = await res.json();
         const data = json?.data;
         if (!data) return;
-        setCompanyView(data);
+        setCompanyView({
+          ...data,
+          logo: data?.logo || data?.company?.logo?.url || data?.company?.logo,
+          coverImage:
+            data?.coverImage ||
+            data?.company?.coverImage?.url ||
+            data?.company?.coverImage,
+        });
 
         setFormData((prev) => ({
           ...prev,
@@ -384,15 +481,25 @@ export default function CompanyPage() {
                 </p>
               </div>
             </div>
-            {!isEditing && (
+            <div className="flex items-center gap-2">
               <Button
                 type="button"
-                onClick={() => setIsEditing(true)}
-                className="bg-primary text-white hover:brightness-110 shadow-sm px-4"
+                variant="outline"
+                onClick={() => router.push("/company/documents")}
+                className="flex items-center gap-2"
               >
-                <Edit3 className="w-4 h-4 mr-2" /> Chỉnh sửa
+                <FileText className="w-4 h-4" /> Tài liệu công ty
               </Button>
-            )}
+              {!isEditing && (
+                <Button
+                  type="button"
+                  onClick={() => setIsEditing(true)}
+                  className="bg-primary text-white hover:brightness-110 shadow-sm px-4"
+                >
+                  <Edit3 className="w-4 h-4 mr-2" /> Chỉnh sửa
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -410,29 +517,87 @@ export default function CompanyPage() {
                   <div>
                     <Label>Logo</Label>
                     <div className="mt-2">
-                      {companyView?.logo ? (
+                      {companyView?.logo ||
+                      companyView?.company?.logo?.url ||
+                      companyView?.company?.logo ? (
                         <img
-                          src={companyView.logo}
+                          src={
+                            companyView.logo ||
+                            companyView?.company?.logo?.url ||
+                            (companyView?.company?.logo as any)
+                          }
                           alt="Logo"
                           className="h-16 w-16 rounded object-cover border"
                         />
                       ) : (
                         <div className="text-slate-500">Chưa có logo</div>
                       )}
+                      <div className="mt-2">
+                        <input
+                          ref={logoInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleUploadLogo(f);
+                            e.currentTarget.value = "";
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => logoInputRef.current?.click()}
+                          disabled={uploadingLogo}
+                          className="mt-1"
+                        >
+                          {uploadingLogo ? "Đang tải..." : "Thay đổi logo"}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                   <div>
                     <Label>Ảnh bìa</Label>
                     <div className="mt-2">
-                      {companyView?.coverImage ? (
+                      {companyView?.coverImage ||
+                      companyView?.company?.coverImage?.url ||
+                      companyView?.company?.coverImage ? (
                         <img
-                          src={companyView.coverImage}
+                          src={
+                            companyView.coverImage ||
+                            companyView?.company?.coverImage?.url ||
+                            (companyView?.company?.coverImage as any)
+                          }
                           alt="Cover"
                           className="h-28 w-full max-w-md rounded object-cover border"
                         />
                       ) : (
                         <div className="text-slate-500">Chưa có ảnh bìa</div>
                       )}
+                      <div className="mt-2">
+                        <input
+                          ref={coverInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) handleUploadCover(f);
+                            e.currentTarget.value = "";
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => coverInputRef.current?.click()}
+                          disabled={uploadingCover}
+                          className="mt-1"
+                        >
+                          {uploadingCover ? "Đang tải..." : "Thay đổi ảnh bìa"}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
