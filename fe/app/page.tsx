@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PageLayout } from "@/components/layout";
 import Link from "next/link";
 import HeroSection from "@/components/layout/hero-section";
@@ -30,6 +30,45 @@ export default function HomePage({ onSearch }: HomePageProps) {
   const [pageSize, setPageSize] = useState(10);
   const [totalJobs, setTotalJobs] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const searchParams = useSearchParams();
+
+  const buildFiltersFromSearchParams = () => {
+    if (!searchParams) return undefined as any;
+    const get = (k: string) => searchParams.get(k) || undefined;
+    const getList = (k: string) => {
+      const v = searchParams.get(k);
+      return v
+        ? v
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined;
+    };
+    const filters: any = {
+      q: get("q"),
+      location: get("location"),
+      skills: getList("skills"),
+      employer: get("employer"),
+      status: get("status"),
+      jobType: get("jobType"),
+      industry: get("industry"),
+      category: get("category"),
+      salaryMin: get("salaryMin"),
+      salaryMax: get("salaryMax"),
+      createdFrom: get("createdFrom"),
+      createdTo: get("createdTo"),
+      deadlineFrom: get("deadlineFrom"),
+      deadlineTo: get("deadlineTo"),
+      tags: getList("tags"),
+      sortBy: get("sortBy"),
+      sortOrder: (get("sortOrder") as any) || undefined,
+    };
+    // remove undefined keys
+    Object.keys(filters).forEach((k) => {
+      if (filters[k] === undefined) delete filters[k];
+    });
+    return Object.keys(filters).length ? filters : undefined;
+  };
 
   const handleSearch = (keyword: string) => {
     if (onSearch) {
@@ -44,7 +83,11 @@ export default function HomePage({ onSearch }: HomePageProps) {
     try {
       setLoading(true);
       setError(null);
-      const res = await jobsAPI.getJobs(page, limit);
+      const res = await jobsAPI.getJobs(
+        page,
+        limit,
+        buildFiltersFromSearchParams()
+      );
       if (res.success) {
         setJobs(res.data || []);
         setTotalJobs(res.pagination?.total || 0);
@@ -60,8 +103,11 @@ export default function HomePage({ onSearch }: HomePageProps) {
   };
 
   useEffect(() => {
-    fetchJobs();
-  }, []);
+    // re-fetch when URL filters change
+    setCurrentPage(1);
+    fetchJobs(1, pageSize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const handlePageChange = (page: number, size?: number) => {
     setCurrentPage(page);
