@@ -4,6 +4,7 @@ const Application = require('../../models/Application');
 const asyncHandler = require('express-async-handler');
 const { logger } = require('../../utils/logger');
 const mongoose = require('mongoose');
+const { EMPLOYER_PROFILE_STATUS } = require('../../constants/common.constants');
 
 // ========================================
 // COMPANY MANAGEMENT (Using EmployerProfile.company)
@@ -396,9 +397,9 @@ const getCompanyApplications = asyncHandler(async (req, res) => {
 // @route   PUT /api/admin/companies/:id/status
 // @access  Private (Admin only)
 const updateCompanyStatus = asyncHandler(async (req, res) => {
-  const { status } = req.body; // 'active' | 'pending' | 'suspended' | 'inactive'
+  const { status } = req.body; // must be one of EMPLOYER_PROFILE_STATUS
 
-  const allowed = ['active', 'pending', 'suspended', 'inactive'];
+  const allowed = Object.values(EMPLOYER_PROFILE_STATUS);
   if (!allowed.includes(status)) {
     return res
       .status(400)
