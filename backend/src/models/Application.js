@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const ApplicationSchema = new mongoose.Schema(
   {
-    internId: {
+    candidateId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'CandidateProfile',
       required: true,
