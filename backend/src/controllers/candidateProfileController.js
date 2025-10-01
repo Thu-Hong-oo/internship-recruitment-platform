@@ -88,6 +88,114 @@ exports.updateProfile = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Set current CV from history by index
+// @route   PUT /api/candidates/me/cv/current/:cvIndex or /api/candidates/:userId/cv/current/:cvIndex
+// @access  Private (Candidate)
+exports.setCurrentCV = asyncHandler(async (req, res) => {
+  const userId = req.params.userId || req.user.id;
+  const cvIndex = parseInt(req.params.cvIndex, 10);
+
+  const profile = await CandidateProfile.findOne({ userId });
+  if (!profile || !Array.isArray(profile.resume.history)) {
+    return res
+      .status(404)
+      .json({ success: false, message: 'Không tìm thấy hồ sơ ứng viên' });
+  }
+  if (isNaN(cvIndex) || cvIndex < 0 || cvIndex >= profile.resume.history.length) {
+    return res
+      .status(400)
+      .json({ success: false, message: 'Index CV không hợp lệ' });
+  }
+
+  const selected = profile.resume.history[cvIndex] || {};
+  const rawPrevAi =
+    profile && profile.resume && profile.resume.current && profile.resume.current.aiAnalysis
+      ? profile.resume.current.aiAnalysis
+      : undefined;
+  const previousAi = {
+    skills: Array.isArray(rawPrevAi?.skills) ? rawPrevAi.skills : [],
+    suggestions: Array.isArray(rawPrevAi?.suggestions) ? rawPrevAi.suggestions : [],
+    analyzedAt: rawPrevAi?.analyzedAt || undefined,
+  };
+
+  // Cập nhật current từ history, luôn đảm bảo aiAnalysis là object hợp lệ
+  profile.resume.current = {
+    url: selected.url || (profile.resume.current ? profile.resume.current.url : ''),
+    updatedAt: new Date(),
+    filename: selected.filename || (profile.resume.current ? profile.resume.current.filename : ''),
+    displayName: selected.displayName || (profile.resume.current ? profile.resume.current.displayName : ''),
+    format: selected.format || (profile.resume.current ? profile.resume.current.format : 'pdf'),
+    size: selected.size || (profile.resume.current ? profile.resume.current.size : 0),
+    aiAnalysis: previousAi,
+  };
+  await profile.save();
+
+  return res.status(200).json({
+    success: true,
+    message: 'Đã đặt làm CV hiện tại',
+    current: profile.resume.current,
+  });
+});
+
+// @desc    Rename CV display name (current or history)
+// @route   PUT /api/candidates/me/cv/rename or /api/candidates/:userId/cv/rename
+// @access  Private (Candidate)
+exports.renameCV = asyncHandler(async (req, res) => {
+  const userId = req.params.userId || req.user.id;
+  const { scope, index, displayName } = req.body || {};
+
+  if (!displayName || typeof displayName !== 'string' || !displayName.trim()) {
+    return res
+      .status(400)
+      .json({ success: false, message: 'Tên hiển thị không hợp lệ' });
+  }
+
+  const profile = await CandidateProfile.findOne({ userId });
+  if (!profile) {
+    return res
+      .status(404)
+      .json({ success: false, message: 'Không tìm thấy hồ sơ ứng viên' });
+  }
+
+  if (scope === 'current') {
+    if (!profile.resume.current || !profile.resume.current.url) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'Chưa có CV hiện tại để đổi tên' });
+    }
+    profile.resume.current.displayName = displayName.trim();
+  } else if (scope === 'history') {
+    const idx = parseInt(index, 10);
+    if (
+      isNaN(idx) ||
+      !Array.isArray(profile.resume.history) ||
+      idx < 0 ||
+      idx >= profile.resume.history.length
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'Index CV không hợp lệ' });
+    }
+    profile.resume.history[idx].displayName = displayName.trim();
+
+    // Nếu history item này cũng đang là current theo url, cập nhật luôn current
+    if (
+      profile.resume.current &&
+      profile.resume.current.url &&
+      profile.resume.current.url === profile.resume.history[idx].url
+    ) {
+      profile.resume.current.displayName = displayName.trim();
+    }
+  } else {
+    return res
+      .status(400)
+      .json({ success: false, message: 'Phạm vi đổi tên không hợp lệ' });
+  }
+
+  await profile.save();
+  return res.status(200).json({ success: true, message: 'Đổi tên CV thành công', current: profile.resume.current, history: profile.resume.history });
+});
+
 // @desc    Upload CV
 // @route   POST /api/candidates/:userId/cv
 // @access  Private (Candidate)
@@ -108,6 +216,13 @@ exports.uploadCV = asyncHandler(async (req, res) => {
   // Tạo public_id giữ nguyên đuôi file gốc
   let publicId = undefined;
   let fileExtension = '';
+  const originalFilename = req.file.originalname || 'cv';
+  const baseName = originalFilename.replace(/\.[^.]+$/, '');
+  const requestedDisplayName =
+    typeof req.body?.displayName === 'string'
+      ? req.body.displayName.trim()
+      : '';
+  const displayName = requestedDisplayName || baseName || 'CV mới';
   
   if (req.file.originalname) {
     const name = req.file.originalname.replace(/\s+/g, '_');
@@ -130,16 +245,25 @@ exports.uploadCV = asyncHandler(async (req, res) => {
   });
 
   // Lưu CV mới vào history
+  const uploadedAt = new Date();
+
   profile.resume.history.push({
     url: uploadResult.url,
-    uploadedAt: new Date(),
-    filename: req.file.originalname || '',
+    uploadedAt,
+    filename: originalFilename,
+    displayName,
     format: uploadResult.format || fileExtension.replace('.', ''),
+    size: req.file.size,
   });
   // Cập nhật CV hiện tại (lưu đúng theo schema: url + updatedAt + aiAnalysis)
   profile.resume.current = {
     url: uploadResult.url,
-    updatedAt: new Date(),
+    updatedAt: uploadedAt,
+    uploadedAt,
+    filename: originalFilename,
+    displayName,
+    format: uploadResult.format || fileExtension.replace('.', ''),
+    size: req.file.size,
     aiAnalysis: {}, // Chờ phân tích AI
   };
   await profile.save();
@@ -163,8 +287,10 @@ exports.uploadCV = asyncHandler(async (req, res) => {
       downloadUrl: req.file.originalname
         ? finalUrl + '?attachment=' + encodeURIComponent(req.file.originalname)
         : finalUrl,
-      filename: req.file.originalname || '',
+      filename: originalFilename,
+      displayName,
       format: uploadResult.format || fileExtension.replace('.', ''),
+      size: req.file.size,
       updatedAt: profile.resume.current.updatedAt,
       aiAnalysis: profile.resume.current.aiAnalysis,
     },
@@ -239,6 +365,75 @@ exports.viewCurrentCV = asyncHandler(async (req, res) => {
     res.send(Buffer.from(arrayBuffer));
   } catch (error) {
     console.error('Error streaming CV:', error);
+    return res
+      .status(500)
+      .json({ success: false, message: 'Lỗi khi tải CV' });
+  }
+});
+
+// @desc    Stream history CV inline for viewing by index
+// @route   GET /api/candidate-profiles/me/cv/view/:cvIndex
+// @access  Private (Candidate)
+exports.viewHistoryCV = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const cvIndex = parseInt(req.params.cvIndex);
+  
+  const profile = await CandidateProfile.findOne({ userId });
+  
+  if (!profile?.resume?.history || profile.resume.history.length === 0) {
+    return res
+      .status(404)
+      .json({ success: false, message: 'Không có CV trong lịch sử' });
+  }
+  
+  if (cvIndex < 0 || cvIndex >= profile.resume.history.length) {
+    return res
+      .status(400)
+      .json({ success: false, message: 'Index CV không hợp lệ' });
+  }
+  
+  const cv = profile.resume.history[cvIndex];
+  const url = cv.url;
+  
+  if (!url) {
+    return res
+      .status(404)
+      .json({ success: false, message: 'Không tìm thấy URL của CV' });
+  }
+
+  try {
+    // Stream từ Cloudinary về với header inline để trình duyệt hiển thị
+    const response = await fetch(url);
+    if (!response.ok) {
+      return res
+        .status(502)
+        .json({ success: false, message: 'Không thể tải CV từ Cloudinary' });
+    }
+    
+    const filename = cv.filename || 'resume.pdf';
+    const format = cv.format || 'pdf';
+    
+    // Set content type dựa trên format - QUAN TRỌNG để browser hiển thị đúng
+    let contentType = 'application/pdf';
+    if (format.toLowerCase() === 'pdf') {
+      contentType = 'application/pdf';
+    } else if (format.toLowerCase() === 'doc') {
+      contentType = 'application/msword';
+    } else if (format.toLowerCase() === 'docx') {
+      contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    }
+    
+    // Set headers để browser hiển thị INLINE thay vì download
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN'); // Cho phép iframe từ cùng origin
+    
+    const arrayBuffer = await response.arrayBuffer();
+    res.send(Buffer.from(arrayBuffer));
+  } catch (error) {
+    console.error('Error streaming history CV:', error);
     return res
       .status(500)
       .json({ success: false, message: 'Lỗi khi tải CV' });
