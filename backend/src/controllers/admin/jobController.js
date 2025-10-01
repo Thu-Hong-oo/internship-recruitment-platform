@@ -5,6 +5,7 @@ const EmployerProfile = require('../../models/EmployerProfile');
 const asyncHandler = require('express-async-handler');
 const { logger } = require('../../utils/logger');
 const mongoose = require('mongoose');
+const { JOB_STATUS } = require('../../constants/common.constants');
 
 // ========================================
 // JOB MODERATION & ADMINISTRATION
@@ -21,7 +22,11 @@ const getJobsAdmin = asyncHandler(async (req, res) => {
   // Build filter
   const filter = {};
 
+  // Exclude draft jobs from admin view (employers manage drafts separately)
+  filter.status = { $ne: JOB_STATUS.DRAFT };
+
   if (req.query.status) {
+    // If specific status is requested, override the draft exclusion
     filter.status = req.query.status;
   }
 
@@ -67,29 +72,27 @@ const getJobsAdmin = asyncHandler(async (req, res) => {
     ];
   }
 
-  // Flagged or problematic jobs filter
+  // Filter for jobs that need attention (no moderation fields yet)
   if (req.query.flagged === 'true') {
     filter.$or = [
-      { reportCount: { $gt: 0 } },
-      { status: 'flagged' },
-      { 'moderation.flags.0': { $exists: true } },
+      { status: JOB_STATUS.REJECTED },
+      { deadline: { $lt: new Date() } }, // Past deadline
     ];
   }
 
   const total = await Job.countDocuments(filter);
 
   const jobs = await Job.find(filter)
-    .populate('employerId', 'company.name mainUserId')
+    .populate('employer', 'company.name owner')
     .populate({
-      path: 'employerId',
+      path: 'employer',
       populate: {
-        path: 'mainUserId',
+        path: 'owner',
         select: 'email fullName',
       },
     })
-    .populate('skills', 'name category')
     .select(
-      'title company location salary status level jobType createdAt updatedAt applicationCount viewCount reportCount moderation'
+      'title location salary status level jobType skills createdAt updatedAt views stats'
     )
     .sort({ createdAt: -1 })
     .skip(startIndex)
@@ -109,9 +112,9 @@ const getJobsAdmin = asyncHandler(async (req, res) => {
         title: job.title,
         company: job.company,
         employer: {
-          _id: job.employerId._id,
-          name: job.employerId?.company?.name || 'Unknown Company',
-          email: job.employerId?.mainUserId?.email,
+          _id: job.employer._id,
+          name: job.employer?.company?.name || 'Unknown Company',
+          email: job.employer?.owner?.email,
         },
         location: job.location,
         salary: job.salary,
@@ -126,26 +129,26 @@ const getJobsAdmin = asyncHandler(async (req, res) => {
         analytics: {
           applications: applications,
           activeApplications: activeApplications,
-          views: job.viewCount || 0,
-          reports: job.reportCount || 0,
+          views: job.views || 0,
+          reports: 0, // No reports field in schema yet
         },
 
-        // Moderation info
-        moderation: {
-          flags: job.moderation?.flags || [],
-          flagCount: job.moderation?.flags?.length || 0,
-          isModerated: !!job.moderation?.moderatedBy,
-          moderatedAt: job.moderation?.moderatedAt,
-          notes: job.moderation?.adminNotes?.length || 0,
+        // Basic info only (no moderation fields in schema)
+        metadata: {
+          isActive: job.status === JOB_STATUS.ACTIVE,
+          hasDeadline: !!job.deadline,
+          isPastDeadline: job.deadline && new Date() > job.deadline,
         },
 
         // Quick action indicators
         needsAttention: {
-          hasReports: job.reportCount > 0,
-          hasFlags: job.moderation?.flags?.length > 0,
-          lowApplications: applications < 5 && job.status === 'active',
-          expired: job.status === 'expired',
-          flagged: job.status === 'flagged',
+          hasReports: false, // No reports field yet
+          hasFlags: false, // No moderation in schema yet
+          lowApplications: applications < 5 && job.status === JOB_STATUS.ACTIVE,
+          isPastDeadline: job.deadline && new Date() > job.deadline,
+          isInactive:
+            job.status === JOB_STATUS.PAUSED ||
+            job.status === JOB_STATUS.CLOSED,
         },
       };
     })
@@ -194,17 +197,14 @@ const getJobAdmin = asyncHandler(async (req, res) => {
   }
 
   const job = await Job.findById(id)
-    .populate('employerId', 'company mainUserId verification')
+    .populate('employer', 'company owner verification')
     .populate({
-      path: 'employerId',
+      path: 'employer',
       populate: {
-        path: 'mainUserId',
+        path: 'owner',
         select: 'email fullName phone createdAt',
       },
-    })
-    .populate('skills', 'name category')
-    .populate('moderation.moderatedBy', 'fullName email')
-    .populate('moderation.adminNotes.addedBy', 'fullName email');
+    });
 
   if (!job) {
     return res.status(404).json({
@@ -258,11 +258,11 @@ const getJobAdmin = asyncHandler(async (req, res) => {
 
       // Employer info
       employer: {
-        _id: job.employerId._id,
-        company: job.employerId.company,
-        user: job.employerId.mainUserId,
-        verification: job.employerId.verification,
-        isVerified: job.employerId.verification?.isVerified || false,
+        _id: job.employer._id,
+        company: job.employer.company,
+        user: job.employer.owner,
+        verification: job.employer.verification,
+        isVerified: job.employer.verification?.isVerified || false,
       },
 
       // Analytics
@@ -280,14 +280,13 @@ const getJobAdmin = asyncHandler(async (req, res) => {
         },
       },
 
-      // Moderation details
-      moderation: {
-        flags: job.moderation?.flags || [],
-        isModerated: !!job.moderation?.moderatedBy,
-        moderatedBy: job.moderation?.moderatedBy,
-        moderatedAt: job.moderation?.moderatedAt,
-        adminNotes: job.moderation?.adminNotes || [],
-        autoFlags: job.moderation?.autoFlags || [],
+      // Admin management info (basic)
+      management: {
+        canEdit: true,
+        canDelete: true,
+        canChangeStatus: true,
+        lastModified: job.updatedAt,
+        postedBy: job.postedBy,
       },
 
       // Recent applications for quick review
@@ -305,8 +304,8 @@ const getJobAdmin = asyncHandler(async (req, res) => {
           appliedAt: app.createdAt,
         })),
 
-      // Reports if any
-      reports: reports,
+      // No reports collection yet
+      reports: [],
     },
   });
 });
@@ -319,12 +318,13 @@ const updateJobStatus = asyncHandler(async (req, res) => {
   const { status, reason, adminNote } = req.body;
 
   const validStatuses = [
-    'active',
-    'inactive',
-    'expired',
-    'flagged',
-    'rejected',
-    'approved',
+    JOB_STATUS.ACTIVE,
+    JOB_STATUS.PAUSED,
+    JOB_STATUS.CLOSED,
+    JOB_STATUS.FILLED,
+    JOB_STATUS.REJECTED,
+    // Also allow pending for admin approval workflow
+    JOB_STATUS.PENDING,
   ];
 
   if (!validStatuses.includes(status)) {
@@ -335,7 +335,7 @@ const updateJobStatus = asyncHandler(async (req, res) => {
     });
   }
 
-  const job = await Job.findById(id).populate('employerId', 'mainUserId');
+  const job = await Job.findById(id).populate('employer', 'owner');
 
   if (!job) {
     return res.status(404).json({
@@ -347,47 +347,20 @@ const updateJobStatus = asyncHandler(async (req, res) => {
   const oldStatus = job.status;
   job.status = status;
 
-  // Initialize moderation if not exists
-  if (!job.moderation) {
-    job.moderation = {
-      flags: [],
-      adminNotes: [],
-      autoFlags: [],
-    };
-  }
-
-  // Add admin note if provided
-  if (adminNote) {
-    job.moderation.adminNotes.push({
-      note: adminNote,
-      addedBy: req.user.id,
-      addedAt: new Date(),
-      action: `Status changed from ${oldStatus} to ${status}`,
-    });
-  }
-
-  // Set moderation info
-  job.moderation.moderatedBy = req.user.id;
-  job.moderation.moderatedAt = new Date();
-
   // Handle specific status changes
-  if (status === 'rejected' && !reason) {
+  if (status === JOB_STATUS.REJECTED && !reason) {
     return res.status(400).json({
       success: false,
       error: 'Phải cung cấp lý do từ chối',
     });
   }
 
-  if (status === 'rejected') {
-    job.moderation.rejectionReason = reason;
-  }
-
-  if (status === 'flagged') {
-    job.moderation.flags.push({
-      reason: reason || 'Flagged by admin',
-      flaggedBy: req.user.id,
-      flaggedAt: new Date(),
-      type: 'admin',
+  // For now, just log admin actions since no moderation schema exists
+  if (adminNote) {
+    logger.info(`Admin note: ${adminNote}`, {
+      jobId: id,
+      adminId: req.user.id,
+      action: `Status changed from ${oldStatus} to ${status}`,
     });
   }
 
@@ -396,7 +369,7 @@ const updateJobStatus = asyncHandler(async (req, res) => {
   logger.info(`Admin updated job status: ${oldStatus} → ${status}`, {
     jobId: id,
     adminId: req.user.id,
-    employerId: job.employerId._id,
+    employerId: job.employer._id,
     reason,
   });
 
@@ -408,8 +381,8 @@ const updateJobStatus = asyncHandler(async (req, res) => {
       title: job.title,
       oldStatus,
       newStatus: status,
-      moderatedBy: req.user.id,
-      moderatedAt: job.moderation.moderatedAt,
+      updatedBy: req.user.id,
+      updatedAt: new Date(),
     },
   });
 });
@@ -421,7 +394,7 @@ const deleteJobAdmin = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { reason, notifyEmployer = true } = req.body;
 
-  const job = await Job.findById(id).populate('employerId', 'mainUserId');
+  const job = await Job.findById(id).populate('employer', 'owner');
 
   if (!job) {
     return res.status(404).json({
@@ -444,7 +417,7 @@ const deleteJobAdmin = asyncHandler(async (req, res) => {
   logger.warn('Admin deleted job', {
     jobId: id,
     title: job.title,
-    employerId: job.employerId._id,
+    employerId: job.employer._id,
     applicationCount,
     adminId: req.user.id,
     reason,
@@ -457,7 +430,7 @@ const deleteJobAdmin = asyncHandler(async (req, res) => {
       deletedJob: {
         _id: job._id,
         title: job.title,
-        employer: job.employerId,
+        employer: job.employer,
       },
       deletedApplications: applicationCount,
       deletedBy: req.user.id,

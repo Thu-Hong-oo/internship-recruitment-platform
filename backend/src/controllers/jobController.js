@@ -651,6 +651,152 @@ const getJobStats = async (req, res) => {
   }
 };
 
+// @desc    Get all jobs posted by current employer (including drafts)
+// @route   GET /api/jobs/employer
+// @access  Private (Employer only)
+const getEmployerJobs = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      status,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = req.query;
+
+    // Tìm employer profile của user hiện tại
+    const EmployerProfile = require('../models/EmployerProfile');
+    const employerProfile = await EmployerProfile.findOne({
+      owner: req.user.id,
+    });
+
+    if (!employerProfile) {
+      return res.status(400).json({
+        success: false,
+        message: 'Không tìm thấy hồ sơ employer',
+      });
+    }
+
+    const query = { employer: employerProfile._id };
+
+    // Filter theo status nếu có
+    if (status) {
+      query.status = status;
+    }
+
+    const skip = (page - 1) * limit;
+    const sortObj = {};
+    sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+    const jobs = await Job.find(query)
+      .populate(
+        'employer',
+        'company.name company.logo company.industry company.description'
+      )
+      .populate('postedBy', 'fullName name email avatar')
+      .sort(sortObj)
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Job.countDocuments(query);
+
+    // Thống kê theo status
+    const statusCounts = await Job.aggregate([
+      { $match: { employer: employerProfile._id } },
+      { $group: { _id: '$status', count: { $sum: 1 } } },
+    ]);
+
+    const statusStats = {};
+    statusCounts.forEach(item => {
+      statusStats[item._id] = item.count;
+    });
+
+    res.status(200).json({
+      success: true,
+      data: jobs,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit),
+      },
+      statistics: {
+        total,
+        byStatus: statusStats,
+      },
+    });
+  } catch (error) {
+    logger.error('Error getting employer jobs:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách job của employer',
+    });
+  }
+};
+
+// @desc    Get draft jobs by current employer
+// @route   GET /api/jobs/drafts
+// @access  Private (Employer only)
+const getDraftJobs = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      sortBy = 'updatedAt',
+      sortOrder = 'desc',
+    } = req.query;
+
+    // Tìm employer profile của user hiện tại
+    const EmployerProfile = require('../models/EmployerProfile');
+    const employerProfile = await EmployerProfile.findOne({
+      owner: req.user.id,
+    });
+
+    if (!employerProfile) {
+      return res.status(400).json({
+        success: false,
+        message: 'Không tìm thấy hồ sơ employer',
+      });
+    }
+
+    const query = {
+      employer: employerProfile._id,
+      status: JOB_STATUS.DRAFT,
+    };
+
+    const skip = (page - 1) * limit;
+    const sortObj = {};
+    sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+    const jobs = await Job.find(query)
+      .populate('employer', 'company.name company.logo company.industry')
+      .populate('postedBy', 'fullName name email avatar')
+      .sort(sortObj)
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Job.countDocuments(query);
+
+    res.status(200).json({
+      success: true,
+      data: jobs,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit),
+      },
+      message: `Tìm thấy ${total} job nháp`,
+    });
+  } catch (error) {
+    logger.error('Error getting draft jobs:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách job nháp',
+    });
+  }
+};
+
 // @desc    Submit job for admin review (draft -> pending)
 // @route   POST /api/jobs/employer/:id/submit
 // @access  Private (Employer)
@@ -698,4 +844,6 @@ module.exports = {
   getJobStats,
   getRecentJobs,
   submitJobForReview,
+  getEmployerJobs,
+  getDraftJobs,
 };

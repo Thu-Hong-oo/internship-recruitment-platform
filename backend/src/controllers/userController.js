@@ -16,8 +16,6 @@ const { getIO } = require('../config/socket');
 const googleAuthService = require('../services/googleAuth');
 const UnifiedProfileService = require('../services/unifiedProfileService');
 
-
-
 // Resolve display name consistently
 const resolveFullName = user => {
   if (user?.fullName && user.fullName.trim().length > 0) return user.fullName;
@@ -343,6 +341,7 @@ const getUserProfile = asyncHandler(async (req, res) => {
     );
     UnifiedProfileService.successResponse(res, null, result);
   } catch (error) {
+    console.error('getUserProfile Error:', error);
     UnifiedProfileService.handleError(error, res, 'Lấy thông tin hồ sơ');
   }
 });
@@ -729,6 +728,134 @@ const reactivateAccount = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Debug token information
+// @route   GET /api/users/debug-token
+// @access  Private
+const debugToken = asyncHandler(async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.split(' ')[1];
+
+    // Decode token without verification to see payload
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.decode(token);
+
+    const dbUser = await User.findById(req.user.id).select(
+      'role email fullName isActive'
+    );
+
+    res.json({
+      success: true,
+      debug: {
+        rawToken: token?.substring(0, 50) + '...',
+        tokenPayload: decoded,
+        requestUser: {
+          id: req.user.id,
+          role: req.user.role,
+          email: req.user.email,
+          isActive: req.user.isActive,
+        },
+        databaseUser: dbUser,
+        timestamp: new Date().toISOString(),
+        matches: {
+          id: req.user.id === dbUser._id.toString(),
+          role: req.user.role === dbUser.role,
+          email: req.user.email === dbUser.email,
+        },
+        tokenAge: decoded
+          ? {
+              issuedAt: new Date(decoded.iat * 1000),
+              expiresAt: new Date(decoded.exp * 1000),
+              ageInMinutes: Math.floor(
+                (Date.now() - decoded.iat * 1000) / (1000 * 60)
+              ),
+            }
+          : null,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Debug failed',
+      details: error.message,
+    });
+  }
+});
+
+// @desc    Compare different profile methods
+// @route   GET /api/users/compare-profiles
+// @access  Private
+const compareProfiles = asyncHandler(async (req, res) => {
+  try {
+    console.log('=== PROFILE COMPARISON ===');
+    console.log('User from token:', {
+      id: req.user.id,
+      role: req.user.role,
+      email: req.user.email,
+    });
+
+    // Method 1: UnifiedProfileService
+    const unifiedResult = await UnifiedProfileService.getCompleteProfile(
+      req.user.id,
+      req.user.role
+    );
+
+    // Method 2: Direct queries
+    const directUser = await User.findById(req.user.id).select('-password');
+    let directProfile = {};
+
+    if (req.user.role === 'candidate') {
+      const candidateProfile = await CandidateProfile.findOne({
+        userId: req.user.id,
+      });
+      directProfile = candidateProfile;
+    } else if (req.user.role === 'employer') {
+      const employerProfile = await EmployerProfile.findOne({
+        owner: req.user.id,
+      });
+      directProfile = employerProfile;
+    }
+
+    res.json({
+      success: true,
+      comparison: {
+        tokenUser: {
+          id: req.user.id,
+          role: req.user.role,
+          email: req.user.email,
+        },
+        unifiedService: {
+          user: unifiedResult.user,
+          profile: unifiedResult.profile,
+          profileKeys: Object.keys(unifiedResult.profile || {}),
+        },
+        directQuery: {
+          user: directUser
+            ? {
+                id: directUser._id,
+                role: directUser.role,
+                email: directUser.email,
+              }
+            : null,
+          profile: directProfile,
+          profileKeys: Object.keys(directProfile || {}),
+        },
+        matches: {
+          userIdMatch: req.user.id === directUser?._id?.toString(),
+          roleMatch: req.user.role === directUser?.role,
+          emailMatch: req.user.email === directUser?.email,
+        },
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Comparison failed',
+      details: error.message,
+    });
+  }
+});
+
 module.exports = {
   getUser, //get nhanh thông tin cơ bản của user
   uploadAvatar, //upload avatar của user
@@ -746,4 +873,6 @@ module.exports = {
   deleteNotification,
   deactivateAccount,
   reactivateAccount,
+  debugToken, // Debug endpoint
+  compareProfiles, // Compare endpoint
 };

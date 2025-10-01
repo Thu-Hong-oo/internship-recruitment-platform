@@ -1,6 +1,10 @@
 const express = require('express');
 const multer = require('multer');
 const { protect, authorize } = require('../middleware/auth');
+const {
+  requireEmployerProfile,
+  requireVerifiedEmployer,
+} = require('../middleware/employerVerification');
 const { validateFileUpload } = require('../middleware/fileValidation');
 const {
   verificationRateLimit,
@@ -65,18 +69,37 @@ const uploadDocument = multer({
 // ========================================
 // EMPLOYER PROFILE ROUTES
 // ========================================
-// All routes are protected for employers only
+// All routes require employer authentication and profile existence
 
-// Profile & Verification
-router.get('/profile', protect, authorize('employer'), getProfile);
-router.get('/company', protect, authorize('employer'), getCompanyInfo);
-router.put('/profile', protect, authorize('employer'), updateProfile);
+// Profile & Verification (basic profile required)
+router.get(
+  '/profile',
+  protect,
+  authorize('employer'),
+  requireEmployerProfile,
+  getProfile
+);
+router.get(
+  '/company',
+  protect,
+  authorize('employer'),
+  requireEmployerProfile,
+  getCompanyInfo
+);
+router.put(
+  '/profile',
+  protect,
+  authorize('employer'),
+  requireEmployerProfile,
+  updateProfile
+);
 
-// Image Management
+// Image Management (basic profile required)
 router.post(
   '/upload-logo',
   protect,
   authorize('employer'),
+  requireEmployerProfile,
   uploadImage.single('logo'),
   validateFileUpload({
     allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
@@ -90,6 +113,7 @@ router.post(
   '/upload-cover-image',
   protect,
   authorize('employer'),
+  requireEmployerProfile,
   uploadImage.single('coverImage'),
   validateFileUpload({
     allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
@@ -99,29 +123,42 @@ router.post(
   uploadCoverImage
 );
 
-router.delete('/logo', protect, authorize('employer'), removeLogo);
-router.delete('/cover-image', protect, authorize('employer'), removeCoverImage);
-// REMOVED: POST /verify endpoint - use specific document upload endpoints instead
-// router.post('/verify', protect, authorize('employer'), verificationRateLimit, submitVerification);
-router.get(
-  '/verification-status',
-  //    Kiểm tra tiến độ xác thực
-  // Xem hồ sơ đã được duyệt chưa
-  // Kiểm tra bước nào còn thiếu
-  // Theo dõi tiến độ verification
+router.delete(
+  '/logo',
   protect,
   authorize('employer'),
+  requireEmployerProfile,
+  removeLogo
+);
+router.delete(
+  '/cover-image',
+  protect,
+  authorize('employer'),
+  requireEmployerProfile,
+  removeCoverImage
+);
+
+// Verification (basic profile required)
+router.get(
+  '/verification-status',
+  protect,
+  authorize('employer'),
+  requireEmployerProfile,
   getVerificationStatus
 );
-router.get('/document-types', protect, authorize('employer'), getDocumentTypes);
-// DEPRECATED: Generic document upload removed - use specific endpoints instead
-// router.post('/documents', protect, authorize('employer'), uploadDocument.single('document'), addDocument);
-
-// Specific document type uploads - Frontend chỉ cần upload file + metadata
+router.get(
+  '/document-types',
+  protect,
+  authorize('employer'),
+  requireEmployerProfile,
+  getDocumentTypes
+);
+// Document uploads (basic profile required)
 router.post(
   '/documents/business-license',
   protect,
   authorize('employer'),
+  requireEmployerProfile,
   uploadDocument.single('document'),
   uploadBusinessLicense
 );
@@ -130,6 +167,7 @@ router.post(
   '/documents/tax-certificate',
   protect,
   authorize('employer'),
+  requireEmployerProfile,
   uploadDocument.single('document'),
   uploadTaxCertificate
 );
@@ -138,29 +176,50 @@ router.delete(
   '/documents/:documentId',
   protect,
   authorize('employer'),
+  requireEmployerProfile,
   removeDocument
 );
-// DEPRECATED: Email verification moved to User model
-// router.post('/verify-company-email', protect, authorize('employer'), emailRateLimit, verifyCompanyEmail);
-// router.post('/resend-verification-email', protect, authorize('employer'), emailRateLimit, resendVerificationEmail);
-// DEPRECATED: updateBusinessInfo merged into updateCompanyInfo
-// router.put('/verification/business-info', protect, authorize('employer'), verificationRateLimit, updateBusinessInfo);
 
-// Jobs & Applications
-router.get('/jobs', protect, authorize('employer'), getPostedJobs);
-router.get('/applications', protect, authorize('employer'), getApplications);
+// Jobs & Applications (verification required for sensitive operations)
+router.get(
+  '/jobs',
+  protect,
+  authorize('employer'),
+  requireEmployerProfile,
+  getPostedJobs
+);
+router.get(
+  '/applications',
+  protect,
+  authorize('employer'),
+  requireVerifiedEmployer,
+  getApplications
+);
 router.get(
   '/recommended-candidates',
   protect,
   authorize('employer'),
+  requireVerifiedEmployer,
   getRecommendedCandidates
 );
 
-// Company Management
-router.put('/company', protect, authorize('employer'), updateCompanyInfo);
+// Company Management (basic profile required)
+router.put(
+  '/company',
+  protect,
+  authorize('employer'),
+  requireEmployerProfile,
+  updateCompanyInfo
+);
 
-// Analytics & Dashboard (merged)
-router.get('/analytics', protect, authorize('employer'), getAnalytics);
+// Analytics & Dashboard (verification required)
+router.get(
+  '/analytics',
+  protect,
+  authorize('employer'),
+  requireVerifiedEmployer,
+  getAnalytics
+);
 // DEPRECATED: getDashboardStats merged into getAnalytics
 // router.get('/dashboard', protect, authorize('employer'), getDashboardStats);
 // DEPRECATED: updatePreferences not supported in schema
