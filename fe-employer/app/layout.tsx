@@ -5,6 +5,10 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import AuthGate from "@/components/auth/AuthGate";
+import dynamic from "next/dynamic";
+const AppHeader = dynamic(() => import("@/components/layout/AppHeader"), {
+  ssr: false,
+});
 
 export const metadata: Metadata = {
   title: "InternBridge- Nhà tuyển dụng",
@@ -18,6 +22,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
+        <AppHeader />
         <AuthGate>{children}</AuthGate>
         <Toaster />
         <Analytics />
