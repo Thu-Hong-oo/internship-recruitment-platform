@@ -49,6 +49,30 @@ router.get(
   candidateProfileController.viewCurrentCV
 );
 
+// Xem history CV của chính mình trực tiếp (inline) theo index
+router.get(
+  '/me/cv/view/:cvIndex',
+  protect,
+  authorize('candidate'),
+  candidateProfileController.viewHistoryCV
+);
+
+// Đặt CV trong lịch sử làm CV hiện tại
+router.put(
+  '/me/cv/current/:cvIndex',
+  protect,
+  authorize('candidate'),
+  candidateProfileController.setCurrentCV
+);
+
+// Đổi tên CV (current hoặc history)
+router.put(
+  '/me/cv/rename',
+  protect,
+  authorize('candidate'),
+  candidateProfileController.renameCV
+);
+
 // Xóa CV khỏi lịch sử của chính mình
 router.delete(
   '/me/cv/:cvIndex',
@@ -142,6 +166,22 @@ router.get(
   protect,
   authorize('candidate'),
   candidateProfileController.viewCurrentCV
+);
+
+// Đặt CV trong lịch sử làm CV hiện tại (by userId)
+router.put(
+  '/:userId/cv/current/:cvIndex',
+  protect,
+  authorize('candidate'),
+  candidateProfileController.setCurrentCV
+);
+
+// Đổi tên CV (by userId)
+router.put(
+  '/:userId/cv/rename',
+  protect,
+  authorize('candidate'),
+  candidateProfileController.renameCV
 );
 // Xác thực kỹ năng
 router.put(
