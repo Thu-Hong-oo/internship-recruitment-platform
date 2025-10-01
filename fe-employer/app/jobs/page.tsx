@@ -171,7 +171,12 @@ export default function JobsPage() {
         localStorage.getItem("token") || sessionStorage.getItem("token");
       if (!token) return;
 
-      const result = await submitJobForReview(submitJobId, token);
+      const result = await submitJobForReview(
+        submitJobId,
+        token,
+        "Please review this job posting for approval",
+        false
+      );
       if (result.success) {
         setJobs(
           jobs.map((job) =>
@@ -417,54 +422,63 @@ export default function JobsPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => router.push(`/jobs/${job._id}`)}
+                      <div className="flex items-center gap-2">
+                        {job.status === "draft" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSubmitJobId(job._id)}
+                            disabled={actionLoading === job._id}
                           >
-                            <Eye className="h-4 w-4 mr-2" />
-                            Xem chi tiết
-                          </DropdownMenuItem>
-                          {job.status === "draft" && (
+                            {actionLoading === job._id ? (
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current mr-1"></div>
+                            ) : (
+                              <Send className="h-3 w-3 mr-1" />
+                            )}
+                            Gửi duyệt
+                          </Button>
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => router.push(`/jobs/${job._id}`)}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              Xem chi tiết
+                            </DropdownMenuItem>
+                            {job.status === "draft" && (
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  router.push(`/jobs/${job._id}/edit`)
+                                }
+                              >
+                                <Edit className="h-4 w-4 mr-2" />
+                                Chỉnh sửa
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
                               onClick={() =>
-                                router.push(`/jobs/${job._id}/edit`)
+                                router.push(`/jobs/${job._id}/applications`)
                               }
                             >
-                              <Edit className="h-4 w-4 mr-2" />
-                              Chỉnh sửa
+                              <Users className="h-4 w-4 mr-2" />
+                              Xem ứng viên
                             </DropdownMenuItem>
-                          )}
-                          {job.status === "draft" && (
                             <DropdownMenuItem
-                              onClick={() => setSubmitJobId(job._id)}
+                              onClick={() => setDeleteJobId(job._id)}
+                              className="text-red-600"
                             >
-                              <Send className="h-4 w-4 mr-2" />
-                              Gửi duyệt
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Xóa
                             </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            onClick={() =>
-                              router.push(`/jobs/${job._id}/applications`)
-                            }
-                          >
-                            <Users className="h-4 w-4 mr-2" />
-                            Xem ứng viên
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => setDeleteJobId(job._id)}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Xóa
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
