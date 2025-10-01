@@ -146,6 +146,7 @@ module.exports = {
     CLOSED: 'closed',
     FILLED: 'filled',
     REJECTED: 'rejected',
+    DELETED: 'deleted', // Soft delete status
   },
 
   // Posted by types
