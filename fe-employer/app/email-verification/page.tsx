@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Mail,
   CheckCircle,
@@ -10,12 +12,13 @@ import {
   ArrowLeft,
   RefreshCw,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { useAuth } from "@/hooks/useAuth";
-import { authAPI } from "@/lib/api";
+import {
+  verifyEmail as employerVerifyEmail,
+  resendEmailVerification as employerResendEmailVerification,
+  getUnverifiedAccount as employerGetUnverifiedAccount,
+} from "@/lib/api";
 
-export default function EmailVerificationPage() {
+export default function EmployerEmailVerificationPage() {
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -27,112 +30,72 @@ export default function EmailVerificationPage() {
   >("checking");
   const [emailError, setEmailError] = useState("");
 
-  const { verifyEmail, getStoredEmail } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    // Lấy email từ localStorage khi component mount
-    const storedEmail = getStoredEmail();
+    const storedEmail =
+      typeof window !== "undefined"
+        ? localStorage.getItem("pendingEmail")
+        : null;
     if (storedEmail) {
       setEmail(storedEmail);
-      // Kiểm tra tài khoản chưa xác thực với email từ localStorage
       checkUnverifiedAccount(storedEmail);
     } else {
-      // Nếu không có email, redirect về trang đăng ký
-      router.push("/register");
+      router.push("/");
     }
-  }, [getStoredEmail, router]);
+  }, [router]);
 
   const checkUnverifiedAccount = async (emailToCheck: string) => {
     try {
-      const data = await authAPI.getUnverifiedAccount(emailToCheck);
-
+      const data = await employerGetUnverifiedAccount(emailToCheck);
       if (data.success && data.data) {
-        // Tài khoản chưa xác thực tồn tại
         setEmailStatus("valid");
-
-        // // Hiển thị thông tin tài khoản với fallback tên
-        // const displayName = (
-        //   (data.data.firstName || data.data.lastName)
-        //     ? `${data.data.firstName || ''} ${data.data.lastName || ''}`.trim()
-        //     : (data.data.profile?.firstName || data.data.profile?.lastName)
-        //       ? `${data.data.profile?.firstName || ''} ${data.data.profile?.lastName || ''}`.trim()
-        //       : (email ? email.split('@')[0] : 'bạn')
-        // );
-        // setSuccess(`Tìm thấy tài khoản chưa xác thực cho ${displayName}`);
       } else if (data.expired) {
-        // Mã xác thực đã hết hạn
         setEmailStatus("invalid");
         setEmailError("Mã xác thực đã hết hạn. Vui lòng đăng ký lại.");
       } else {
-        // Không tìm thấy tài khoản chưa xác thực
         setEmailStatus("unknown");
         setEmailError("Không tìm thấy tài khoản chưa xác thực với email này.");
       }
-    } catch (error) {
-      console.error("Error checking unverified account:", error);
+    } catch (e) {
       setEmailStatus("unknown");
       setEmailError("Lỗi khi kiểm tra tài khoản. Vui lòng thử lại.");
     }
   };
 
-  const checkEmailStatus = async (emailToCheck: string) => {
-    try {
-      // Fallback function - not used in current flow
-      setEmailStatus("unknown");
-    } catch (error) {
-      console.error("Error checking email status:", error);
-      setEmailStatus("unknown");
-    }
-  };
-
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: any;
     if (countdown > 0) {
       timer = setTimeout(() => setCountdown(countdown - 1), 1000);
     }
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  const handleInputChange = (value: string) => {
-    setOtp(value);
-    if (error) setError("");
-    if (success) setSuccess("");
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!otp.trim()) {
       setError("Vui lòng nhập mã OTP");
       return;
     }
-
     if (!email) {
       setError("Không tìm thấy email");
       return;
     }
-
     setLoading(true);
     setError("");
     setSuccess("");
-
     try {
-      const response = await verifyEmail(email, otp);
-
-      if (response.success) {
-        setSuccess(response.message || "Xác thực email thành công!");
-        // Redirect to login page after 2 seconds since backend doesn't return new token
+      const resp = await employerVerifyEmail(email, otp);
+      if (resp.success) {
+        setSuccess(resp.message || "Xác thực email thành công!");
         setTimeout(() => {
-          router.push("/login");
+          router.push("/");
         }, 2000);
       } else {
-        setError(
-          response.error || response.message || "Xác thực email thất bại"
-        );
+        setError(resp.error || resp.message || "Xác thực email thất bại");
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Xác thực email thất bại");
+    } catch (e: any) {
+      setError(e?.message || "Xác thực email thất bại");
     } finally {
       setLoading(false);
     }
@@ -140,37 +103,29 @@ export default function EmailVerificationPage() {
 
   const handleResendOTP = async () => {
     if (!email) return;
-
-    setCountdown(60); // 60 seconds cooldown
+    setCountdown(60);
     setError("");
     setSuccess("");
-
     try {
-      const response = await authAPI.resendEmailVerification(email);
-
-      if (response.success) {
-        setSuccess(response.message || "Mã OTP đã được gửi lại!");
+      const resp = await employerResendEmailVerification(email);
+      if (resp.success) {
+        setSuccess(resp.message || "Mã OTP đã được gửi lại!");
       } else {
-        setError(
-          response.error || response.message || "Không thể gửi lại mã OTP"
-        );
+        setError(resp.error || resp.message || "Không thể gửi lại mã OTP");
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể gửi lại mã OTP");
+    } catch (e: any) {
+      setError(e?.message || "Không thể gửi lại mã OTP");
     }
   };
 
   if (!email) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p>Đang tải...</p>
-        </div>
+        <div>Đang tải...</div>
       </div>
     );
   }
 
-  // Show loading while checking email status
   if (emailStatus === "checking") {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -187,7 +142,6 @@ export default function EmailVerificationPage() {
     );
   }
 
-  // Show error if email is invalid
   if (emailStatus === "invalid") {
     return (
       <div className="min-h-screen flex items-center justify-center p-8">
@@ -195,7 +149,6 @@ export default function EmailVerificationPage() {
           <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center">
             <AlertCircle className="w-8 h-8 text-red-600" />
           </div>
-
           <div className="space-y-3">
             <h1 className="text-3xl font-bold text-red-600">
               Email không hợp lệ
@@ -205,22 +158,22 @@ export default function EmailVerificationPage() {
               Email: <strong className="text-red-600">{email}</strong>
             </p>
           </div>
-
           <div className="space-y-4">
             <Button
               onClick={() => {
-                localStorage.removeItem("pendingEmail");
+                if (typeof window !== "undefined")
+                  localStorage.removeItem("pendingEmail");
                 router.push("/register");
               }}
               className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-lg"
             >
               Đăng ký với email khác
             </Button>
-
             <Button
               variant="outline"
               onClick={() => {
-                localStorage.removeItem("pendingEmail");
+                if (typeof window !== "undefined")
+                  localStorage.removeItem("pendingEmail");
                 router.push("/login");
               }}
               className="w-full h-12"
@@ -228,30 +181,19 @@ export default function EmailVerificationPage() {
               Quay lại đăng nhập
             </Button>
           </div>
-
-          <div className="text-center text-sm text-muted-foreground">
-            <p>
-              Bạn gặp khó khăn? Vui lòng gọi tới số{" "}
-              <span className="text-primary font-medium">(024) 6680 5588</span>{" "}
-              (giờ hành chính).
-            </p>
-          </div>
         </div>
       </div>
     );
   }
 
-  // Only show OTP form if email is valid or unknown (fallback)
   if (emailStatus !== "valid" && emailStatus !== "unknown") {
-    return null; // This should not happen due to early returns above
+    return null;
   }
 
   return (
     <div className="min-h-screen flex">
-      {/* Left Section - Verification Form */}
       <div className="flex-[3] flex items-center justify-center p-8 bg-background">
         <div className="w-full max-w-md space-y-8">
-          {/* Header */}
           <div className="text-center space-y-3">
             <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
               <Mail className="w-8 h-8 text-primary" />
@@ -272,15 +214,12 @@ export default function EmailVerificationPage() {
             </div>
           </div>
 
-          {/* Success Message */}
           {success && (
             <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-center">
               <CheckCircle className="w-5 h-5 mr-2" />
               {success}
             </div>
           )}
-
-          {/* Error Message */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center">
               <AlertCircle className="w-5 h-5 mr-2" />
@@ -288,10 +227,8 @@ export default function EmailVerificationPage() {
             </div>
           )}
 
-          {/* Verification Form - Only show if email is valid */}
           {emailStatus === "valid" && (
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* OTP Input */}
               <div className="space-y-2">
                 <label
                   htmlFor="otp"
@@ -304,7 +241,7 @@ export default function EmailVerificationPage() {
                   type="text"
                   placeholder="Nhập mã OTP 6 số"
                   value={otp}
-                  onChange={(e) => handleInputChange(e.target.value)}
+                  onChange={(e) => setOtp(e.target.value)}
                   className="h-12 text-center text-lg font-mono tracking-widest border-border focus:ring-2 focus:ring-primary/20 focus:border-primary"
                   maxLength={6}
                   required
@@ -314,8 +251,6 @@ export default function EmailVerificationPage() {
                   Nhập mã 6 số được gửi đến email của bạn
                 </p>
               </div>
-
-              {/* Verify Button */}
               <Button
                 type="submit"
                 className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-lg rounded-lg transition-colors duration-200"
@@ -326,7 +261,6 @@ export default function EmailVerificationPage() {
             </form>
           )}
 
-          {/* Resend OTP */}
           {emailStatus === "valid" && (
             <div className="text-center space-y-4">
               <div className="relative">
@@ -339,7 +273,6 @@ export default function EmailVerificationPage() {
                   </span>
                 </div>
               </div>
-
               <Button
                 variant="outline"
                 onClick={handleResendOTP}
@@ -358,7 +291,6 @@ export default function EmailVerificationPage() {
             </div>
           )}
 
-          {/* Back to Register */}
           <div className="text-center">
             <Link
               href="/register"
@@ -368,26 +300,10 @@ export default function EmailVerificationPage() {
               Quay lại trang đăng ký
             </Link>
           </div>
-
-          {/* Support Contact */}
-          <div className="text-center text-sm text-muted-foreground">
-            <p>
-              Bạn gặp khó khăn? Vui lòng gọi tới số{" "}
-              <span className="text-primary font-medium">(024) 6680 5588</span>{" "}
-              (giờ hành chính).
-            </p>
-          </div>
-
-          {/* Copyright */}
-          <div className="text-center text-xs text-muted-foreground pt-4">
-            <p>© 2024. All Rights Reserved. InternBridge Vietnam JSC.</p>
-          </div>
         </div>
       </div>
 
-      {/* Right Section - Banner Image */}
       <div className="hidden lg:flex flex-[2] relative overflow-hidden">
-        {/* Banner Image */}
         <div className="absolute inset-0">
           <img
             src="/job-recruitment-celebration.png"
@@ -395,20 +311,13 @@ export default function EmailVerificationPage() {
             className="w-full h-full object-cover"
           />
         </div>
-
-        {/* Overlay with text */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
-
-        {/* Content overlay */}
         <div className="relative z-10 flex flex-col justify-center items-center text-white p-12 text-center">
-          {/* Logo */}
           <div className="mb-8">
             <h1 className="text-4xl font-bold text-white drop-shadow-lg">
               InternBridge
             </h1>
           </div>
-
-          {/* Slogan */}
           <div className="mb-6 space-y-2">
             <h2 className="text-5xl font-bold leading-tight drop-shadow-lg">
               Xác thực email
@@ -417,15 +326,11 @@ export default function EmailVerificationPage() {
               Hoàn tất đăng ký
             </h3>
           </div>
-
-          {/* Description */}
           <p className="text-xl text-white/95 max-w-md leading-relaxed drop-shadow-lg">
             Bước cuối cùng để hoàn tất quá trình đăng ký và bắt đầu hành trình
-            thực tập của bạn
+            tuyển dụng
           </p>
         </div>
-
-        {/* Footer */}
         <div className="absolute bottom-8 right-8 flex items-center space-x-2 text-white/80">
           <CheckCircle className="w-4 h-4" />
           <span className="text-sm">Bảo mật - Điều khoản</span>

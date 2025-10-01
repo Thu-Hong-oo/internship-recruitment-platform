@@ -102,6 +102,13 @@ const uploadAvatar = asyncHandler(async (req, res) => {
       { new: true }
     );
 
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'Không tìm thấy người dùng để cập nhật avatar',
+      });
+    }
+
     logger.info(`Avatar uploaded for user: ${user.email}`, {
       userId: user._id,
       publicId: result.publicId,

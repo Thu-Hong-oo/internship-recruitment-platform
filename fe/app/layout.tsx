@@ -24,7 +24,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="vi" className={`${dmSans.variable} antialiased`}>
+    <html
+      lang="vi"
+      className={`${dmSans.variable} antialiased`}
+      suppressHydrationWarning
+    >
       <body className="font-sans">
         <Providers>{children}</Providers>
       </body>
