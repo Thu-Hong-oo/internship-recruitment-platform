@@ -44,7 +44,7 @@ const UserProfile = () => {
           src={userInfo.profile?.avatar}
           icon={<UserOutlined />}
         />
-        <span className="text-white">
+        <span className="text-foreground">
           {userInfo.fullName || userInfo.email}
         </span>
       </Button>
