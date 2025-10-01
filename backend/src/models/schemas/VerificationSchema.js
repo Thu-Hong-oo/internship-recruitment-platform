@@ -33,6 +33,12 @@ const VerificationSchema = new mongoose.Schema(
       adminApproved: { type: Boolean, default: false },
     },
 
+    // Grace period system for document changes
+    pendingReview: { type: Boolean, default: false },
+    lastDocumentUpdate: Date,
+    reviewDeadline: Date,
+    gracePeriodDays: { type: Number, default: 30 },
+
     // Admin notes for verification process
     adminNotes: [
       {

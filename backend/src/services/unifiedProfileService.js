@@ -430,14 +430,24 @@ class UnifiedProfileService {
 
   // ============= GET PROFILE =============
   static async getCompleteProfile(userId, role) {
+    console.log('=== UnifiedProfileService.getCompleteProfile ===');
+    console.log('Input userId:', userId);
+    console.log('Input role:', role);
+
     const user = await User.findById(userId).select('-password');
     if (!user) {
       throw new Error('Không tìm thấy người dùng');
     }
 
+    console.log('DB User found:', user._id.toString());
+    console.log('DB User role:', user.role);
+    console.log('DB User email:', user.email);
+
     let profile = {};
     if (role === 'candidate') {
+      console.log('Querying CandidateProfile with userId:', userId);
       const candidateProfile = await CandidateProfile.findOne({ userId });
+      console.log('CandidateProfile found:', !!candidateProfile);
       if (candidateProfile) {
         profile = {
           education: candidateProfile.education,
@@ -449,7 +459,9 @@ class UnifiedProfileService {
         };
       }
     } else if (role === 'employer') {
+      console.log('Querying EmployerProfile with owner:', userId);
       const employerProfile = await EmployerProfile.findOne({ owner: userId });
+      console.log('EmployerProfile found:', !!employerProfile);
       if (employerProfile) {
         profile = {
           company: employerProfile.company,
@@ -461,6 +473,9 @@ class UnifiedProfileService {
         };
       }
     }
+
+    console.log('Final profile keys:', Object.keys(profile));
+    console.log('================================================');
 
     return {
       user: this.formatUserResponse(user),

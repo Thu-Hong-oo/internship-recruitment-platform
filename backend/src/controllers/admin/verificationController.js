@@ -4,6 +4,34 @@ const { logger } = require('../../utils/logger');
 const mongoose = require('mongoose');
 const { EMPLOYER_PROFILE_STATUS } = require('../../constants/common.constants');
 
+// Helper function to explain verification status for admin
+const getStatusExplanation = (status, steps, documents, verifiedDocs) => {
+  const hasAllRequiredDocs = documents.length >= 2;
+  const hasVerifiedDocs = verifiedDocs.length >= 2;
+  const pendingDocs = documents.filter(doc => !doc.verified);
+
+  if (status === 'verified' && steps.adminApproved) {
+    if (pendingDocs.length > 0) {
+      return 'Profile đã verified trước đó, nhưng có documents mới cần review';
+    }
+    return 'Profile và documents đã được verified hoàn toàn';
+  }
+
+  if (status === 'pending' && !steps.adminApproved) {
+    if (!hasAllRequiredDocs) {
+      return 'Chưa upload đủ documents bắt buộc';
+    }
+    if (pendingDocs.length > 0) {
+      return 'Documents đã upload, cần admin verify';
+    }
+    if (hasVerifiedDocs) {
+      return 'Documents đã verified, cần admin approve profile';
+    }
+  }
+
+  return 'Trạng thái verification không rõ ràng';
+};
+
 // ========================================
 // EMPLOYER VERIFICATION
 // ========================================
@@ -17,7 +45,17 @@ const getPendingVerifications = asyncHandler(async (req, res) => {
   const startIndex = (page - 1) * limit;
 
   // Build filter
-  const filter = { status: 'pending' };
+  const filter = {};
+
+  // Default to pending, but allow admin to see all statuses
+  if (req.query.status) {
+    if (req.query.status !== 'all') {
+      filter.status = req.query.status;
+    }
+    // If status=all, no filter on status (show all)
+  } else {
+    filter.status = 'pending'; // Default behavior
+  }
 
   if (req.query.industry) {
     filter['company.industry'] = { $regex: req.query.industry, $options: 'i' };
@@ -44,7 +82,6 @@ const getPendingVerifications = asyncHandler(async (req, res) => {
     .sort({ createdAt: -1 })
     .skip(startIndex)
     .limit(limit);
-
 
   // Chuẩn hóa dữ liệu trả về cho từng bản ghi
   const processedData = verifications.map(profile => {
@@ -209,17 +246,38 @@ const getEmployerVerificationDetails = asyncHandler(async (req, res) => {
           })),
         },
         adminNotes: employerProfile.verification.adminNotes || [],
+        // Add review status for admin clarity
+        reviewStatus: {
+          isPending: employerProfile.verification.pendingReview || false,
+          lastDocumentUpdate: employerProfile.verification.lastDocumentUpdate,
+          reviewDeadline: employerProfile.verification.reviewDeadline,
+          hasUnverifiedDocs: pendingDocs.length > 0,
+          needsAdminAction:
+            pendingDocs.length > 0 && steps.basicInfo && steps.businessInfo,
+        },
       },
 
       // Quick actions for admin
       quickActions: {
-        canApprove: verifiedDocs.length >= 2 && steps.businessInfo,
+        canApprove:
+          verifiedDocs.length >= 2 &&
+          steps.businessInfo &&
+          !steps.adminApproved,
         canReject: true,
+        canVerifyDocs: pendingDocs.length > 0,
+        needsDocumentReview: pendingDocs.length > 0 && documents.length >= 2,
         pendingDocuments: pendingDocs.map(doc => ({
           _id: doc._id,
           documentType: doc.documentType,
           verifyEndpoint: `/admin/employers/${employerProfile.owner._id}/documents/${doc._id}/verify`,
         })),
+        // Status explanation for admin
+        statusExplanation: getStatusExplanation(
+          employerProfile.status,
+          steps,
+          documents,
+          verifiedDocs
+        ),
       },
     },
   });
@@ -301,14 +359,11 @@ const verifyEmployer = asyncHandler(async (req, res) => {
     employerProfile.verification.verifiedBy = req.user.id;
     employerProfile.status = EMPLOYER_PROFILE_STATUS.VERIFIED;
 
-    logger.info(
-      `Admin approved employer: ${employerProfile.owner.email}`,
-      {
-        adminId: req.user.id,
-        employerId: employerProfile._id,
-        notes: !!notes,
-      }
-    );
+    logger.info(`Admin approved employer: ${employerProfile.owner.email}`, {
+      adminId: req.user.id,
+      employerId: employerProfile._id,
+      notes: !!notes,
+    });
   } else {
     // Reject the profile
     if (!reason) {
@@ -323,14 +378,11 @@ const verifyEmployer = asyncHandler(async (req, res) => {
     employerProfile.verification.rejectedAt = new Date();
     employerProfile.verification.rejectedBy = req.user.id;
 
-    logger.warn(
-      `Admin rejected employer: ${employerProfile.owner.email}`,
-      {
-        adminId: req.user.id,
-        employerId: employerProfile._id,
-        reason,
-      }
-    );
+    logger.warn(`Admin rejected employer: ${employerProfile.owner.email}`, {
+      adminId: req.user.id,
+      employerId: employerProfile._id,
+      reason,
+    });
   }
 
   await employerProfile.save();
@@ -414,6 +466,11 @@ const verifyEmployerDocument = asyncHandler(async (req, res) => {
     employerProfile.verification.steps.adminApproved = true;
     employerProfile.verification.isVerified = true;
     employerProfile.status = 'verified';
+
+    // Clear pending review when fully verified
+    employerProfile.verification.pendingReview = false;
+    employerProfile.verification.lastDocumentUpdate = undefined;
+    employerProfile.verification.reviewDeadline = undefined;
 
     logger.info('Employer auto-approved after all documents verified', {
       employerId,
