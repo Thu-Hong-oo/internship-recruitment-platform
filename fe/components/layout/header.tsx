@@ -517,7 +517,7 @@ export default function Header() {
                             <AccordionContent className="pt-1 pb-2">
                               <div className="space-y-1 text-sm text-muted-foreground">
                                 <Link
-                                  href="#"
+                                  href="/cv"
                                   className="flex items-center rounded-md px-2 py-2 hover:bg-muted hover:text-foreground"
                                 >
                                   <span>CV của tôi</span>

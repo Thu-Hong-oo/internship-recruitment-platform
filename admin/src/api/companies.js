@@ -43,6 +43,34 @@ export const companiesAPI = {
       raw: response,
     };
   },
+
+  /**
+   * Get company detail by ID
+   */
+  getCompanyDetail: async (companyId) => {
+    const response = await axiosClient.get(`/admin/companies/${companyId}`);
+    return {
+      success: Boolean(response?.success),
+      data: response?.data ?? null,
+      raw: response,
+    };
+  },
+
+  /**
+   * Verify/update company status
+   */
+  updateCompanyStatus: async (companyId, status = "verified") => {
+    const response = await axiosClient.put(
+      `/admin/companies/${companyId}/status`,
+      { status }
+    );
+    return {
+      success: Boolean(response?.success),
+      data: response?.data ?? null,
+      message: response?.message,
+      raw: response,
+    };
+  },
 };
 
 export default companiesAPI;

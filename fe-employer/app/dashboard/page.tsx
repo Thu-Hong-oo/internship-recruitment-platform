@@ -7,6 +7,14 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Bell,
   ShoppingCart,
   BarChart3,
@@ -25,7 +33,8 @@ import {
   CheckCircle,
   Circle,
 } from "lucide-react";
-import { User, getUserData } from "@/lib/userStorage";
+import { User, getUserData, getToken, clearUserData } from "@/lib/userStorage";
+import { logoutEmployer } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
@@ -106,6 +115,7 @@ export default function DashboardPage() {
               variant="ghost"
               size="sm"
               className="text-white hover:text-primary"
+              onClick={() => router.push("/jobs")}
             >
               Đăng tin
             </Button>
@@ -142,15 +152,47 @@ export default function DashboardPage() {
                 0
               </Badge>
             </div>
-            <Avatar className="w-8 h-8">
-              {user?.avatar ? (
-                <AvatarImage src={user.avatar} alt={user.fullName} />
-              ) : null}
-              <AvatarFallback className="bg-white text-slate-800 text-sm">
-                {user?.fullName ? user.fullName.charAt(0).toUpperCase() : "U"}
-              </AvatarFallback>
-            </Avatar>
-            <ChevronDown className="w-4 h-4 text-white" />
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center focus:outline-none">
+                <Avatar className="w-8 h-8 cursor-pointer">
+                  {user?.avatar ? (
+                    <AvatarImage src={user.avatar} alt={user.fullName} />
+                  ) : null}
+                  <AvatarFallback className="bg-white text-slate-800 text-sm">
+                    {user?.fullName
+                      ? user.fullName.charAt(0).toUpperCase()
+                      : "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <ChevronDown className="w-4 h-4 text-white ml-1" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="truncate">
+                  {user?.fullName || "Tài khoản"}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => router.push("/profile")}>
+                  Hồ sơ cá nhân
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push("/company")}>
+                  Công ty của tôi
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-red-600 focus:text-red-700"
+                  onClick={async () => {
+                    const token = getToken();
+                    try {
+                      if (token) await logoutEmployer(token);
+                    } catch {}
+                    clearUserData();
+                    window.location.href = "/";
+                  }}
+                >
+                  Đăng xuất
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
@@ -206,16 +248,6 @@ export default function DashboardPage() {
                 >
                   <BarChart3 className="w-4 h-4 mr-3" />
                   Bảng tin
-                </Button>
-              </li>
-              <li>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-slate-700 hover:bg-primary/10 hover:text-primary"
-                  onClick={() => router.push("/profile")}
-                >
-                  <FileText className="w-4 h-4 mr-3" />
-                  Cập nhật thông tin cá nhân
                 </Button>
               </li>
               <li>
@@ -336,200 +368,8 @@ export default function DashboardPage() {
 
         {/* Main Content */}
         <main className="flex-1 p-6">
-          <div className="max-w-4xl mx-auto">
-            {/* Main Job Posting Card */}
-            <Card className="bg-gradient-to-r from-primary to-primary text-white mb-6">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className="bg-white/20 p-3 rounded-lg">
-                    <Briefcase className="w-8 h-8 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <h2 className="text-xl font-bold mb-2">
-                      Bạn đang tuyển dụng vị trí:
-                    </h2>
-                    <h3 className="text-2xl font-bold mb-4">
-                      Nhân viên Marketing
-                    </h3>
-                    <div className="space-y-2">
-                      <p className="text-white/80">
-                        Đăng tin trên InternBridge ngay
-                      </p>
-                      <p className="text-white/80">
-                        Hiệu quả vượt trội - Đáp ứng nhanh chóng
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <Card className="bg-white">
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="bg-primary/10 p-3 rounded-lg">
-                      <Users className="w-6 h-6 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-slate-800 mb-1">
-                        <span className="text-primary">90.000+</span> lượt ứng
-                        tuyển vị trí{" "}
-                        <span className="text-primary">
-                          Nhân viên marketing
-                        </span>{" "}
-                        mỗi tháng
-                      </h3>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white">
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="bg-primary/10 p-3 rounded-lg">
-                      <Search className="w-6 h-6 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-slate-800 mb-1">
-                        Tiếp cận ứng viên tiềm năng trong{" "}
-                        <span className="text-primary">130.000+</span> hồ sơ
-                        ngành{" "}
-                        <span className="text-primary">
-                          Marketing/Truyền thông/Quảng cáo
-                        </span>
-                      </h3>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Featured Employers */}
-            <Card className="bg-white">
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className="bg-yellow-100 p-3 rounded-lg">
-                    <Star className="w-6 h-6 text-yellow-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-slate-800 mb-2">
-                      Các nhà tuyển dụng tiêu biểu lựa chọn đăng tin cho vị trí{" "}
-                      <span className="text-primary">Nhân viên marketing</span>{" "}
-                      trên InternBridge:
-                    </h3>
-                    <p className="text-slate-600 mb-4">
-                      Techcombank, Panasonic Việt Nam, Yamaha Motor Việt Nam,...
-                    </p>
-                    <div className="flex gap-4">
-                      <div className="w-12 h-12 bg-red-500 rounded flex items-center justify-center text-white font-bold">
-                        T
-                      </div>
-                      <div className="w-12 h-12 bg-blue-600 rounded flex items-center justify-center text-white font-bold">
-                        P
-                      </div>
-                      <div className="w-12 h-12 bg-red-600 rounded flex items-center justify-center text-white font-bold">
-                        Y
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </main>
 
-        {/* Right Sidebar */}
-        <aside className="w-80 bg-white shadow-sm min-h-screen p-6">
-          {/* Welcome Message */}
-          <div className="mb-6">
-            <h2 className="text-xl font-bold text-slate-800 mb-2">
-              Xin chào,{" "}
-              <span className="text-primary">{user?.fullName || "User"}</span>
-            </h2>
-            <p className="text-slate-600 text-sm">
-              Hãy thực hiện các bước sau để gia tăng tính bảo mật cho tài khoản
-              của bạn và nhận ngay{" "}
-              <span className="text-primary font-semibold">+8 Top Point</span>{" "}
-              để đổi quà khủng tin tuyển dụng đầu tiên trong:
-            </p>
-          </div>
-
-          {/* Countdown Timer */}
-          <div className="mb-6">
-            <div className="flex items-center justify-center gap-4 mb-4">
-              <div className="bg-primary text-white px-4 py-2 rounded-lg text-center">
-                <div className="text-2xl font-bold">{timeLeft.days}</div>
-                <div className="text-xs">Ngày</div>
-              </div>
-              <div className="text-2xl font-bold text-slate-400">:</div>
-              <div className="bg-primary text-white px-4 py-2 rounded-lg text-center">
-                <div className="text-2xl font-bold">{timeLeft.hours}</div>
-                <div className="text-xs">Giờ</div>
-              </div>
-              <div className="text-2xl font-bold text-slate-400">:</div>
-              <div className="bg-primary text-white px-4 py-2 rounded-lg text-center">
-                <div className="text-2xl font-bold">{timeLeft.minutes}</div>
-                <div className="text-xs">Phút</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Verification Progress */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-slate-800">
-                Xác thực thông tin
-              </h3>
-              <span className="text-sm text-slate-500">Hoàn thành 0%</span>
-            </div>
-            <Progress value={0} className="mb-4" />
-
-            {/* Verification Tasks */}
-            <div className="space-y-3">
-              {verificationTasks.map((task) => (
-                <div key={task.id} className="flex items-center gap-3">
-                  {task.completed ? (
-                    <CheckCircle className="w-5 h-5 text-primary" />
-                  ) : (
-                    <Circle className="w-5 h-5 text-slate-300" />
-                  )}
-                  <span
-                    className={`text-sm ${
-                      task.completed
-                        ? "text-slate-500 line-through"
-                        : "text-slate-700"
-                    }`}
-                  >
-                    {task.text}
-                  </span>
-                  {task.highlight && (
-                    <Badge className="bg-primary text-white text-xs ml-auto">
-                      Hot
-                    </Badge>
-                  )}
-                  {task.id === 0 && !task.completed && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => router.push("/profile")}
-                      className="ml-auto p-1 h-auto"
-                    >
-                      <ArrowRight className="w-4 h-4 text-primary" />
-                    </Button>
-                  )}
-                  {task.id !== 0 && (
-                    <ArrowRight className="w-4 h-4 text-primary ml-auto" />
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <p className="text-xs text-slate-500 mt-4">Tôi sẽ xác thực sau</p>
-          </div>
-        </aside>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import Icons from "../assets/Icons";
 import Dashboard from "../pages/dashboard";
 import Companies from "../pages/companies";
+import CompanyDetail from "../pages/companies/detail";
 import Jobs from "../pages/jobs";
 import Candidates from "../pages/candidates";
 import Transactions from "../pages/transactions";
@@ -18,6 +19,7 @@ import Experience from "../pages/admin/experience";
 import PostPackages from "../pages/admin/packages/post-packages";
 import ViewPackages from "../pages/admin/packages/view-packages";
 import Posts from "../pages/admin/posts";
+import Employers from "../pages/admin/employers";
 
 const adminMenuConfig = [
   {
@@ -40,13 +42,6 @@ const adminMenuConfig = [
     path: "/admin/users",
     icon: Icons.UserIcon,
     element: <Accounts />,
-  },
-  {
-    key: "user-detail",
-    label: "Chi tiết User",
-    path: "/accounts/detail",
-    icon: Icons.UserIcon,
-    element: <AccountsDetail />,
   },
 
   {
@@ -116,12 +111,20 @@ const adminMenuConfig = [
   },
 
   {
+    key: "employers",
+    label: "Nhà tuyển dụng",
+    path: "/admin/employers",
+    icon: Icons.CompanyIcon,
+    element: <Employers />,
+  },
+  {
     key: "companies",
     label: "Quản lý các công ty",
     path: "/admin/companies",
     icon: Icons.CompanyIcon,
     element: <Companies />,
   },
+
   {
     key: "posts",
     label: "Quản lý bài đăng",
