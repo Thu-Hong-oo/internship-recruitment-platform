@@ -242,7 +242,7 @@ export default function JobsPage() {
             Quản lý các bài đăng tuyển dụng của bạn
           </p>
         </div>
-        <Button onClick={() => router.push("/create-job")}>
+        <Button onClick={() => router.push("/jobs/create-job")}>
           <Plus className="h-4 w-4 mr-2" />
           Tạo tin mới
         </Button>
