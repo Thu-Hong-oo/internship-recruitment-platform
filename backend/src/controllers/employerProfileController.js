@@ -234,10 +234,10 @@ const getVerificationStatus = asyncHandler(async (req, res) => {
     });
   }
 
-  // Overall status
+  // Overall status - FIX: Check both adminApproved AND documents verified
   let overallStatus = 'incomplete';
   if (steps.basicInfo && steps.businessInfo && uploadedDocs.length >= 2) {
-    if (steps.adminApproved) {
+    if (steps.adminApproved && verifiedDocs.length >= 2) {
       overallStatus = 'verified';
     } else if (verifiedDocs.length >= 2) {
       overallStatus = 'pending-approval';
@@ -253,6 +253,7 @@ const getVerificationStatus = asyncHandler(async (req, res) => {
       isVerified: profile.verification.isVerified,
       status: profile.status,
       overallStatus,
+      userId: req.user.id, // Add user ID for admin reference
 
       // Progress tracking
       progress: {
@@ -286,14 +287,52 @@ const getVerificationStatus = asyncHandler(async (req, res) => {
       // Next steps guidance
       nextSteps,
 
+      // Grace period info
+      gracePeriod: profile.verification.pendingReview
+        ? {
+            isPending: true,
+            lastUpdate: profile.verification.lastDocumentUpdate,
+            deadline: profile.verification.reviewDeadline,
+            daysRemaining: profile.verification.reviewDeadline
+              ? Math.max(
+                  0,
+                  Math.ceil(
+                    (profile.verification.reviewDeadline - new Date()) /
+                      (1000 * 60 * 60 * 24)
+                  )
+                )
+              : 0,
+            canStillPost:
+              profile.verification.isVerified &&
+              profile.verification.reviewDeadline &&
+              profile.verification.reviewDeadline > new Date(),
+          }
+        : {
+            isPending: false,
+          },
+
       // User-friendly messages
-      message: getStatusMessage(overallStatus, nextSteps.length),
+      message: getStatusMessage(
+        overallStatus,
+        nextSteps.length,
+        profile.verification.pendingReview
+      ),
+
+      // Admin reference (for support/debugging)
+      adminReference: {
+        profileId: profile._id,
+        detailUrl: `/admin/verifications/${req.user.id}`,
+      },
     },
   });
 });
 
 // Helper function for status messages
-const getStatusMessage = (status, nextStepsCount) => {
+const getStatusMessage = (status, nextStepsCount, pendingReview = false) => {
+  if (pendingReview) {
+    return 'Tài liệu đã thay đổi và đang chờ admin xem xét lại. Bạn vẫn có thể đăng tuyển trong thời gian chờ duyệt.';
+  }
+
   switch (status) {
     case 'verified':
       return 'Tài khoản đã được xác thực thành công! Bạn có thể bắt đầu đăng tuyển.';
@@ -466,39 +505,59 @@ const uploadTaxCertificate = asyncHandler(async (req, res) => {
       });
     }
 
-    // Kiểm tra document cũ để xóa
+    // Remove old document if exists
     const existingDoc = profile.verification.documents.find(
       doc => doc.documentType === documentType
     );
+    let oldCloudinaryId = existingDoc?.metadata?.cloudinaryId || null;
 
-    let oldCloudinaryId = null;
-    if (
-      existingDoc &&
-      existingDoc.metadata &&
-      existingDoc.metadata.cloudinaryId
-    ) {
-      oldCloudinaryId = existingDoc.metadata.cloudinaryId;
+    // Upload new document
+    const uploadResult = await EmployerServices.uploadDocument(
+      req.file,
+      req.user.id,
+      documentType,
+      metadata,
+      profile
+    );
+
+    // Delete old document from Cloudinary if exists
+    if (oldCloudinaryId) {
+      try {
+        await EmployerServices.deleteDocument(oldCloudinaryId);
+      } catch (deleteError) {
+        logger.warn('Failed to delete old tax certificate', {
+          userId: req.user.id,
+          oldCloudinaryId,
+          error: deleteError.message,
+        });
+      }
     }
 
-    // Duplicate inner function removed. Only main uploadTaxCertificate remains.
-    res.status(200).json({
-      success: true,
-      message: 'Xóa tài liệu thành công',
-      data: {
-        uploadedDocuments: profile.verification.documents,
+    logger.info('Tax certificate uploaded successfully', {
+      userId: req.user.id,
+      employerProfileId: profile._id,
+      cloudinaryId: uploadResult.publicId,
+    });
+
+    return success(res, 'Upload giấy chứng nhận thuế thành công', {
+      type: documentType,
+      url: uploadResult.url,
+      cloudinaryId: uploadResult.publicId,
+      filename: uploadResult.originalName,
+      metadata: {
+        ...metadata,
+        originalName: uploadResult.originalName,
+        size: uploadResult.size,
+        mimeType: uploadResult.mimeType,
       },
     });
   } catch (error) {
-    logger.error('Remove document failed:', {
+    logger.error('Upload tax certificate failed:', {
       error: error.message,
       userId: req.user?.id,
-      documentId: req.params.documentId,
       stack: error.stack,
     });
-    res.status(500).json({
-      success: false,
-      error: 'Xóa tài liệu thất bại',
-    });
+    return error(res, 'Lỗi upload giấy chứng nhận thuế', error);
   }
 });
 

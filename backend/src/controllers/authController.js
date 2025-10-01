@@ -278,8 +278,6 @@ const logout = asyncHandler(async (req, res) => {
     token = req.cookies.token;
   }
 
-
-
   // Clear cookie if exists
   if (req.cookies && req.cookies.token) {
     res.clearCookie('token');
@@ -290,7 +288,7 @@ const logout = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    message: 'Đăng xuất thành công'
+    message: 'Đăng xuất thành công',
   });
 });
 
@@ -605,28 +603,79 @@ const verifyEmail = asyncHandler(async (req, res) => {
 
   // Create verified user in MongoDB
   try {
-
     const user = await User.create({
       ...userData,
       isEmailVerified: true,
     });
 
-    // Nếu role là candidate, tạo CandidateProfile rỗng
+    // Tạo profile tương ứng theo role
     if (user.role === 'candidate') {
       const CandidateProfile = require('../models/CandidateProfile');
-      await CandidateProfile.create({ userId: user._id });
+      const candidateProfile = await CandidateProfile.create({
+        userId: user._id,
+      });
+      user.candidateProfile = candidateProfile._id;
+      await user.save();
+    } else if (user.role === 'employer') {
+      const EmployerProfile = require('../models/EmployerProfile');
+      const employerProfile = await EmployerProfile.create({
+        owner: user._id,
+        company: {
+          name: 'Chưa cập nhật',
+          industry: 'unknown',
+          size: 'small',
+          email: user.email,
+        },
+        position: {
+          title: 'Chưa cập nhật',
+          level: 'junior',
+          department: 'Chưa cập nhật',
+        },
+        contact: {
+          name: user.fullName || 'Chưa cập nhật',
+          phone: 'Chưa cập nhật',
+          email: user.email,
+        },
+        legalRepresentative: {
+          fullName: user.fullName || 'Chưa cập nhật',
+          position: 'Chưa cập nhật',
+          phone: 'Chưa cập nhật',
+          email: user.email,
+        },
+        businessInfo: {
+          registrationNumber: `temp_${user._id}`,
+          taxId: `temp_${user._id}_${Date.now()}`,
+          issueDate: new Date(),
+          issuePlace: 'Chưa cập nhật',
+        },
+        verification: {
+          isVerified: false,
+          steps: {
+            businessInfo: false,
+            documents: false,
+          },
+          documents: [],
+        },
+        status: 'pending',
+      });
+      user.employerProfile = employerProfile._id;
+      await user.save();
     }
 
     // Clean up Redis data
     await otpService.delete(`user_registration:${email}`);
 
-    logger.info(`New user registered and verified: ${email}`);
+    logger.info(
+      `New user registered and verified: ${email}, role: ${user.role}`
+    );
 
     res.status(200).json({
       success: true,
       message: SUCCESS.EMAIL_VERIFIED,
       email: user.email,
       isEmailVerified: true,
+      role: user.role,
+      profileCreated: true,
     });
   } catch (error) {
     logger.error('Failed to create verified user', {

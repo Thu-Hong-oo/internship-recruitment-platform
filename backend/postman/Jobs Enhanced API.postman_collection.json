@@ -16,22 +16,104 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{api_url}}/jobs?page=1&limit=10&q=developer&location=Ho Chi Minh&skills=react,nodejs&employer={{employer_id}}&status=open&sortBy=createdAt&sortOrder=desc",
+              "raw": "{{api_url}}/jobs?page=1&limit=10&q=developer&location=Ho Chi Minh&skills=react,nodejs&employer={{employer_id}}&status=active&jobType=internship&industry=technology&category=frontend&salaryMin=8000000&salaryMax=15000000&createdFrom=2024-01-01&createdTo=2024-12-31&deadlineFrom=2024-01-01&deadlineTo=2024-12-31&tags=react,frontend&sortBy=createdAt&sortOrder=desc",
               "host": ["{{api_url}}"],
               "path": ["jobs"],
               "query": [
                 { "key": "page", "value": "1", "description": "Page number" },
-                { "key": "limit", "value": "10", "description": "Items per page" },
-                { "key": "q", "value": "developer", "description": "Search query" },
-                { "key": "location", "value": "Ho Chi Minh", "description": "Job location" },
-                { "key": "skills", "value": "react,nodejs", "description": "Required skills (comma separated)" },
-                { "key": "employer", "value": "{{employer_id}}", "description": "Filter by employer ID" },
-                { "key": "status", "value": "open", "description": "Job status" },
-                { "key": "sortBy", "value": "createdAt", "description": "Sort field" },
-                { "key": "sortOrder", "value": "desc", "description": "Sort order" }
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page"
+                },
+                {
+                  "key": "q",
+                  "value": "developer",
+                  "description": "Text search query (searches in title, description)"
+                },
+                {
+                  "key": "location",
+                  "value": "Ho Chi Minh",
+                  "description": "Job location (case insensitive regex)"
+                },
+                {
+                  "key": "skills",
+                  "value": "react,nodejs",
+                  "description": "Required skills (comma separated, matches any)"
+                },
+                {
+                  "key": "employer",
+                  "value": "{{employer_id}}",
+                  "description": "Filter by employer Profile ID"
+                },
+                {
+                  "key": "status",
+                  "value": "active",
+                  "description": "Job status (draft, pending, active, paused, closed, filled, rejected)"
+                },
+                {
+                  "key": "jobType",
+                  "value": "internship",
+                  "description": "Job type (internship, full-time, part-time, contract, freelance)"
+                },
+                {
+                  "key": "industry",
+                  "value": "technology",
+                  "description": "Industry (case insensitive regex)"
+                },
+                {
+                  "key": "category",
+                  "value": "frontend",
+                  "description": "Job category (case insensitive regex)"
+                },
+                {
+                  "key": "salaryMin",
+                  "value": "8000000",
+                  "description": "Minimum salary filter (jobs with salaryMin >= this value)"
+                },
+                {
+                  "key": "salaryMax",
+                  "value": "15000000",
+                  "description": "Maximum salary filter (jobs with salaryMax <= this value)"
+                },
+                {
+                  "key": "createdFrom",
+                  "value": "2024-01-01",
+                  "description": "Filter jobs created from this date (YYYY-MM-DD)"
+                },
+                {
+                  "key": "createdTo",
+                  "value": "2024-12-31",
+                  "description": "Filter jobs created to this date (YYYY-MM-DD)"
+                },
+                {
+                  "key": "deadlineFrom",
+                  "value": "2024-01-01",
+                  "description": "Filter jobs with deadline from this date (YYYY-MM-DD)"
+                },
+                {
+                  "key": "deadlineTo",
+                  "value": "2024-12-31",
+                  "description": "Filter jobs with deadline to this date (YYYY-MM-DD)"
+                },
+                {
+                  "key": "tags",
+                  "value": "react,frontend",
+                  "description": "Job tags (comma separated, matches any)"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt",
+                  "description": "Sort field (createdAt, updatedAt, title, salary, etc.)"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "desc",
+                  "description": "Sort order (asc, desc)"
+                }
               ]
             },
-            "description": "Get all jobs with filtering and pagination"
+            "description": "Get all jobs with comprehensive filtering and pagination. Public users only see ACTIVE/OPEN jobs, admin can see all statuses."
           }
         },
         {
@@ -44,7 +126,11 @@
               "host": ["{{api_url}}"],
               "path": ["jobs", "recent"],
               "query": [
-                { "key": "limit", "value": "5", "description": "Number of recent jobs to fetch" }
+                {
+                  "key": "limit",
+                  "value": "5",
+                  "description": "Number of recent jobs to fetch"
+                }
               ]
             },
             "description": "Get recently posted jobs"
@@ -130,6 +216,83 @@
       "name": "Employer Routes",
       "item": [
         {
+          "name": "Get All My Jobs (Employer)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{employer_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/jobs/employer?page=1&limit=10&status=draft&sortBy=createdAt&sortOrder=desc",
+              "host": ["{{api_url}}"],
+              "path": ["jobs", "employer"],
+              "query": [
+                { "key": "page", "value": "1", "description": "Page number" },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page"
+                },
+                {
+                  "key": "status",
+                  "value": "draft",
+                  "description": "Filter by job status (draft, pending, active, etc.)"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt",
+                  "description": "Sort field"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "desc",
+                  "description": "Sort order"
+                }
+              ]
+            },
+            "description": "Get all jobs posted by current employer (including drafts and all statuses)"
+          }
+        },
+        {
+          "name": "Get Draft Jobs Only",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{employer_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_url}}/jobs/drafts?page=1&limit=10&sortBy=updatedAt&sortOrder=desc",
+              "host": ["{{api_url}}"],
+              "path": ["jobs", "drafts"],
+              "query": [
+                { "key": "page", "value": "1", "description": "Page number" },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "updatedAt",
+                  "description": "Sort field"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "desc",
+                  "description": "Sort order"
+                }
+              ]
+            },
+            "description": "Get only draft jobs posted by current employer"
+          }
+        },
+        {
           "name": "Create Job",
           "request": {
             "method": "POST",
@@ -145,14 +308,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Frontend Developer Intern\",\n  \"description\": \"Looking for a passionate frontend developer intern to join our dynamic team. You will work on modern web applications using React and Node.js.\",\n  \"skills\": [\"react\", \"javascript\", \"html\", \"css\", \"nodejs\"],\n  \"requirements\": \"- Basic knowledge of React and JavaScript\\n- Understanding of HTML/CSS\\n- Good communication skills\",\n  \"education\": \"Currently pursuing or completed degree in Computer Science or related field\",\n  \"experience\": \"0-1 years of experience or fresh graduate\",\n  \"salary\": \"8000000 - 12000000 VND\",\n  \"location\": \"Ho Chi Minh City\",\n  \"positions\": 2,\n  \"deadline\": \"2024-12-31T23:59:59.000Z\",\n  \"status\": \"draft\"\n}"
+              "raw": "{\n  \"title\": \"Frontend Developer Intern\",\n  \"description\": \"Looking for a passionate frontend developer intern to join our dynamic team. You will work on modern web applications using React and Node.js.\",\n  \"skills\": [\"react\", \"javascript\", \"html\", \"css\", \"nodejs\"],\n  \"requirements\": \"- Basic knowledge of React and JavaScript\\n- Understanding of HTML/CSS\\n- Good communication skills\",\n  \"education\": \"Currently pursuing or completed degree in Computer Science or related field\",\n  \"experience\": \"0-1 years of experience or fresh graduate\",\n  \"salary\": \"8000000 - 12000000 VND\",\n  \"location\": \"Ho Chi Minh City\",\n  \"positions\": 2,\n  \"deadline\": \"2024-12-31T23:59:59.000Z\"\n}"
             },
             "url": {
               "raw": "{{api_url}}/jobs",
               "host": ["{{api_url}}"],
               "path": ["jobs"]
             },
-            "description": "Create a new job posting"
+            "description": "Create a new job posting (automatically set to DRAFT status)"
           }
         },
         {
@@ -171,7 +334,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"title\": \"Senior Frontend Developer\",\n  \"description\": \"Updated job description for senior frontend developer position...\",\n  \"skills\": [\"react\", \"javascript\", \"typescript\", \"css\", \"nodejs\"],\n  \"requirements\": \"- 3+ years experience with React\\n- Strong TypeScript skills\\n- Experience with modern frontend tools\",\n  \"education\": \"Bachelor's degree in Computer Science or related field\",\n  \"experience\": \"3-5 years of frontend development experience\",\n  \"salary\": \"15000000 - 25000000 VND\",\n  \"location\": \"Ho Chi Minh City\",\n  \"positions\": 1,\n  \"deadline\": \"2024-12-31T23:59:59.000Z\",\n  \"status\": \"open\"\n}"
+              "raw": "{\n  \"title\": \"Senior Frontend Developer\",\n  \"description\": \"Updated job description for senior frontend developer position...\",\n  \"skills\": [\"react\", \"javascript\", \"typescript\", \"css\", \"nodejs\"],\n  \"requirements\": \"- 3+ years experience with React\\n- Strong TypeScript skills\\n- Experience with modern frontend tools\",\n  \"education\": \"Bachelor's degree in Computer Science or related field\",\n  \"experience\": \"3-5 years of frontend development experience\",\n  \"salary\": \"15000000 - 25000000 VND\",\n  \"location\": \"Ho Chi Minh City\",\n  \"positions\": 1,\n  \"deadline\": \"2024-12-31T23:59:59.000Z\"\n}"
             },
             "url": {
               "raw": "{{api_url}}/jobs/{{job_id}}",
@@ -215,8 +378,16 @@
               "path": ["jobs", "{{job_id}}", "applications"],
               "query": [
                 { "key": "page", "value": "1", "description": "Page number" },
-                { "key": "limit", "value": "10", "description": "Items per page" },
-                { "key": "status", "value": "pending", "description": "Application status filter" }
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page"
+                },
+                {
+                  "key": "status",
+                  "value": "pending",
+                  "description": "Application status filter"
+                }
               ]
             },
             "description": "Get all applications for a specific job"
@@ -245,7 +416,7 @@
               "host": ["{{api_url}}"],
               "path": ["jobs", "employer", "{{job_id}}", "submit"]
             },
-            "description": "Submit job for admin review and approval"
+            "description": "Submit job for admin review and approval (DRAFT -> PENDING)"
           }
         }
       ]
@@ -312,7 +483,7 @@
     {
       "key": "job_slug",
       "value": "",
-      "type": "string", 
+      "type": "string",
       "description": "Job slug for testing"
     },
     {
@@ -340,7 +511,7 @@
       "description": "JWT token for employer authentication"
     },
     {
-      "key": "candidate_token", 
+      "key": "candidate_token",
       "value": "",
       "type": "string",
       "description": "JWT token for candidate authentication"
@@ -368,7 +539,7 @@
     {
       "listen": "test",
       "script": {
-        "type": "text/javascript", 
+        "type": "text/javascript",
         "exec": [
           "// Common tests for all requests",
           "pm.test('Response time is less than 5000ms', function () {",
