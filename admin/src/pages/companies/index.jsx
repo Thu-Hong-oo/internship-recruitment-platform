@@ -1,5 +1,5 @@
-
 import React, { useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 
 import {
   Card,
@@ -11,7 +11,6 @@ import {
   Tag,
   Avatar,
   Statistic,
-
   Form,
   Select,
   Input,
@@ -24,7 +23,6 @@ import {
   UserOutlined,
   FileTextOutlined,
   StarOutlined,
-
   ReloadOutlined,
 } from "@ant-design/icons";
 import companiesAPI from "../../api/companies";
@@ -41,6 +39,20 @@ const Companies = () => {
     companyType: undefined,
     search: "",
   });
+
+  // Listen to location changes to detect if we come back from detail page
+  const location = useLocation();
+
+  // Helper to check if we need to refresh after returning from detail
+  useEffect(() => {
+    // Check if we're returning from a detail page with refresh flag
+    if (location.pathname === "/admin/companies" && location.state?.refresh) {
+      fetchCompanies(pagination.current, pagination.pageSize, filters);
+      // Clear the refresh state to prevent multiple refreshes
+      window.history.replaceState({}, document.title, location.pathname);
+    }
+    // eslint-disable-next-line
+  }, [location]);
 
   const columns = [
     {
@@ -122,14 +134,17 @@ const Companies = () => {
             : "Tạm khóa"}
         </Tag>
       ),
-
     },
     {
       title: "Hành động",
       key: "action",
-      render: () => (
+      render: (_, record) => (
         <Space size="middle">
-          <Button type="link" icon={<EyeOutlined />}>
+          <Button
+            type="link"
+            href={`/admin/companies/${record.key}`}
+            icon={<EyeOutlined />}
+          >
             Xem
           </Button>
           <Button type="link" icon={<EditOutlined />}>
@@ -143,9 +158,7 @@ const Companies = () => {
     },
   ];
   const stats = useMemo(() => {
-    const verified = companies.filter(
-      (c) => c?.verification?.isVerified
-    ).length;
+    const verified = companies.filter((c) => c?.status === "verified").length;
     const totalCompanies = total || companies.length;
     const pending = totalCompanies - verified;
     return [
@@ -154,7 +167,6 @@ const Companies = () => {
       { title: "Chờ duyệt", value: pending, icon: <FileTextOutlined /> },
     ];
   }, [companies, total]);
-
 
   const fetchCompanies = async (
     page = pagination.current,

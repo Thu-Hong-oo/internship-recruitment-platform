@@ -2,7 +2,16 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Eye, EyeOff, Mail, Lock, CheckCircle, AlertCircle, AlertTriangle, Info } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Mail,
+  Lock,
+  CheckCircle,
+  AlertCircle,
+  AlertTriangle,
+  Info,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
@@ -11,8 +20,8 @@ import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
-  
+  const { login, user, loading } = useAuth();
+
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
@@ -24,6 +33,32 @@ export default function LoginPage() {
   const [errorType, setErrorType] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Redirect if user is already logged in
+  useEffect(() => {
+    if (!loading && user) {
+      router.push("/");
+    }
+  }, [user, loading, router]);
+
+  // Show loading while checking auth status
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">
+            Đang kiểm tra trạng thái đăng nhập...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render the form if user is logged in (will redirect)
+  if (user) {
+    return null;
+  }
+
   // No Google script/init needed with NextAuth
 
   const handleInputChange = (field: string, value: string) => {
@@ -31,7 +66,7 @@ export default function LoginPage() {
       ...prev,
       [field]: value,
     }));
-    
+
     // Clear error/warning/success when user starts typing
     if (error || warning || success) {
       setError(null);
@@ -49,7 +84,7 @@ export default function LoginPage() {
     setErrorType(null);
     setSuccess(null);
     setSubmitting(true);
-    
+
     try {
       const res = await login(formData.email, formData.password);
       if (res.success) {
@@ -59,23 +94,28 @@ export default function LoginPage() {
         }, 1000);
         return;
       }
-      
+
       // Handle email not verified case
-      if (res.errorType === "EMAIL_NOT_VERIFIED" && res.requiresEmailVerification) {
+      if (
+        res.errorType === "EMAIL_NOT_VERIFIED" &&
+        res.requiresEmailVerification
+      ) {
         // Store email for verification
         localStorage.setItem("pendingEmail", formData.email);
         // Redirect to email verification page
         router.push("/email-verification");
         return;
       }
-      
+
       // Handle specific error types
       if (res.errorType === "EMAIL_NOT_REGISTERED") {
         setError("Email này chưa được đăng ký trong hệ thống");
         setWarning("Bạn có thể đăng ký tài khoản mới hoặc kiểm tra lại email");
       } else if (res.errorType === "INVALID_PASSWORD") {
         setError("Mật khẩu không chính xác");
-        setWarning("Vui lòng kiểm tra lại mật khẩu hoặc sử dụng tính năng quên mật khẩu");
+        setWarning(
+          "Vui lòng kiểm tra lại mật khẩu hoặc sử dụng tính năng quên mật khẩu"
+        );
       } else if (res.errorType === "GOOGLE_OAUTH_REQUIRED") {
         setError("Tài khoản này sử dụng Google OAuth");
         setWarning("Vui lòng đăng nhập bằng Google thay vì mật khẩu");
@@ -85,7 +125,7 @@ export default function LoginPage() {
       } else {
         setError(res.error || res.message || "Đăng nhập thất bại");
       }
-      
+
       setErrorType(res.errorType || null);
     } catch (err: any) {
       setError(err?.message || "Đăng nhập thất bại");
@@ -122,7 +162,7 @@ export default function LoginPage() {
                 </div>
               </div>
             )}
-            
+
             {/* Error Message */}
             {error && (
               <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md p-4">
@@ -169,7 +209,7 @@ export default function LoginPage() {
                 </div>
               </div>
             )}
-            
+
             {/* Warning Message (when no error) */}
             {warning && !error && (
               <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-md p-4">
