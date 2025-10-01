@@ -33,6 +33,11 @@ const employerRoutes = require('./src/routes/employerProfiles');
 const jobRoutes = require('./src/routes/jobs');
 const candidateRoutes = require('./src/routes/candidateProfiles');
 
+// Safe Additional Routes (confirmed models exist)
+const notificationRoutes = require('./src/routes/notifications');
+const skillRoutes = require('./src/routes/skills');
+const skillCategoryRoutes = require('./src/routes/skillCategories');
+
 // Middleware & Utils
 const errorHandler = require('./src/middleware/errorHandler');
 const { logger } = require('./src/utils/logger');
@@ -226,6 +231,11 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/employers', employerRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/candidates', candidateRoutes);
+
+// Safe Additional Routes (confirmed models exist)
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/skills', skillRoutes);
+app.use('/api/skill-categories', skillCategoryRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

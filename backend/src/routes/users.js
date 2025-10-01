@@ -19,6 +19,8 @@ const {
   deleteNotification,
   deactivateAccount,
   reactivateAccount,
+  debugToken, // Add debug function
+  compareProfiles, // Add compare function
 } = require('../controllers/userController');
 
 // Configure multer for avatar uploads
@@ -38,6 +40,8 @@ const upload = multer({
 
 // Profile routes
 router.get('/profile', protect, getUserProfile);
+router.get('/debug-token', protect, debugToken); // Debug endpoint
+router.get('/compare-profiles', protect, compareProfiles); // Compare endpoint
 router.put('/profile', protect, updateProfile);
 router.post('/avatar', protect, upload.single('avatar'), uploadAvatar);
 router.put('/password', protect, changePassword);
@@ -51,8 +55,8 @@ router.put('/reactivate', protect, reactivateAccount);
 
 // User info
 router.get('/stats', protect, getUserStats);
-        router.get('/notifications', protect, getUserNotifications); // Đúng cho notifications
-        router.get('/:id', protect, getUser); // Đặt sau /notifications để không bị Express nhầm lẫn
+router.get('/notifications', protect, getUserNotifications); // Đúng cho notifications
+router.get('/:id', protect, getUser); // Đặt sau /notifications để không bị Express nhầm lẫn
 router.get(
   '/:id/public-profile',
   protect,
@@ -62,9 +66,9 @@ router.get(
 
 // Notifications
 router.get('/notifications', protect, getUserNotifications);
-  // Removed the :id from notifications
-  router.put('/notifications/read-all', protect, markAllNotificationsAsRead);
-  router.put('/notifications/read', protect, markNotificationAsRead); // Changed to not use :id
-  router.delete('/notifications', protect, deleteNotification); // Changed to not use :id
+// Removed the :id from notifications
+router.put('/notifications/read-all', protect, markAllNotificationsAsRead);
+router.put('/notifications/read', protect, markNotificationAsRead); // Changed to not use :id
+router.delete('/notifications', protect, deleteNotification); // Changed to not use :id
 
 module.exports = router;
