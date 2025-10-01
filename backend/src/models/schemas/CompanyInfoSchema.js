@@ -33,11 +33,17 @@ const CompanyInfoSchema = new mongoose.Schema(
     logo: {
       url: String,
       filename: String,
+      originalName: String,
+      size: Number,
+      mimeType: String,
       uploadedAt: { type: Date, default: Date.now },
     },
     coverImage: {
       url: String,
       filename: String,
+      originalName: String,
+      size: Number,
+      mimeType: String,
       uploadedAt: { type: Date, default: Date.now },
     },
     // Address

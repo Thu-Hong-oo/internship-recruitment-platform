@@ -7,6 +7,106 @@ const candidateProfileController = require('../controllers/candidateProfileContr
 
 const router = express.Router();
 
+// =============== ROUTES CHO CANDIDATE TỰ QUẢN LÝ (ME) ===============
+// Lấy hồ sơ của chính mình
+router.get(
+  '/me',
+  protect,
+  authorize('candidate'),
+  candidateProfileController.getProfile
+);
+
+// Cập nhật hồ sơ của chính mình
+router.put(
+  '/me',
+  protect,
+  authorize('candidate'),
+  candidateProfileController.updateProfile
+);
+
+// Upload CV cho chính mình
+router.post(
+  '/me/cv',
+  protect,
+  authorize('candidate'),
+  upload.single('cv'),
+  candidateProfileController.uploadCV
+);
+
+// Lấy kết quả phân tích CV của chính mình
+router.get(
+  '/me/cv/analysis',
+  protect,
+  authorize('candidate'),
+  candidateProfileController.getCVAnalysis
+);
+
+// Xem CV của chính mình trực tiếp (inline)
+router.get(
+  '/me/cv/view',
+  protect,
+  authorize('candidate'),
+  candidateProfileController.viewCurrentCV
+);
+
+// Xóa CV khỏi lịch sử của chính mình
+router.delete(
+  '/me/cv/:cvIndex',
+  protect,
+  authorize('candidate'),
+  candidateProfileController.deleteCV
+);
+
+// Cập nhật kinh nghiệm của chính mình
+router.put(
+  '/me/experience',
+  protect,
+  authorize('candidate'),
+  candidateProfileController.updateExperience
+);
+
+// Cập nhật học vấn của chính mình
+router.put(
+  '/me/education',
+  protect,
+  authorize('candidate'),
+  candidateProfileController.updateEducation
+);
+
+// Cập nhật preferences của chính mình
+router.put(
+  '/me/preferences',
+  protect,
+  authorize('candidate'),
+  candidateProfileController.updatePreferences
+);
+
+// Lấy tiến độ hoàn thiện hồ sơ của chính mình
+router.get(
+  '/me/progress',
+  protect,
+  authorize('candidate'),
+  candidateProfileController.getProgress
+);
+
+// Xác thực kỹ năng của chính mình
+router.put(
+  '/me/skills/verify',
+  protect,
+  authorize('candidate'),
+  candidateProfileController.verifySkill
+);
+
+// Lấy analytics của chính mình
+router.get(
+  '/me/analytics',
+  protect,
+  authorize('candidate'),
+  candidateProfileController.getAnalytics
+);
+
+// =============== ROUTES CHO ADMIN/EMPLOYER XEM PROFILE KHÁC ===============
+
 // Lấy hồ sơ ứng viên
 router.get(
   '/:userId',
