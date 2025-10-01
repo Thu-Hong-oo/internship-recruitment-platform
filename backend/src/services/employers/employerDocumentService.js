@@ -1,4 +1,6 @@
 // Service để quản lý document của EmployerProfile
+const { logger } = require('../../utils/logger');
+
 class EmployerDocumentService {
   constructor(employerProfile) {
     this.profile = employerProfile;
@@ -8,6 +10,12 @@ class EmployerDocumentService {
    * Thêm document mới
    */
   async addDocument(url, cloudinaryId, documentType, metadata = {}) {
+    logger.info('Adding document to profile', {
+      profileId: this.profile._id,
+      documentType,
+      existingDocsCount: this.profile.verification.documents.length,
+    });
+
     const existingDoc = this.profile.verification.documents.find(
       doc => doc.documentType === documentType
     );
@@ -22,6 +30,10 @@ class EmployerDocumentService {
       existingDoc.verifiedBy = undefined;
       existingDoc.verifiedAt = undefined;
       existingDoc.rejectionReason = undefined;
+      logger.info('Updated existing document', {
+        profileId: this.profile._id,
+        documentType,
+      });
     } else {
       // Add new document
       this.profile.verification.documents.push({
@@ -31,9 +43,42 @@ class EmployerDocumentService {
         metadata,
         uploadedAt: new Date(),
       });
+      logger.info('Added new document', {
+        profileId: this.profile._id,
+        documentType,
+      });
     }
 
-    return this.profile.save({ validateBeforeSave: false });
+    // FIX: Grace period approach - Don't immediately revoke verification
+    // Company keeps posting rights but documents need re-review
+    if (this.profile.verification.steps.adminApproved) {
+      // Set pending review flag instead of immediate revoke
+      this.profile.verification.pendingReview = true;
+      this.profile.verification.lastDocumentUpdate = new Date();
+
+      // Calculate grace period deadline (30 days)
+      const gracePeriod = new Date();
+      gracePeriod.setDate(gracePeriod.getDate() + 30);
+      this.profile.verification.reviewDeadline = gracePeriod;
+
+      // Keep verification but mark as needs review
+      // this.profile.verification.isVerified = true; // Keep current status
+      // this.profile.status = 'verified'; // Keep posting rights
+    }
+
+    logger.info('About to save profile', {
+      profileId: this.profile._id,
+      documentsCount: this.profile.verification.documents.length,
+    });
+
+    const savedProfile = await this.profile.save({ validateBeforeSave: false });
+
+    logger.info('Profile saved successfully', {
+      profileId: this.profile._id,
+      documentsCount: savedProfile.verification.documents.length,
+    });
+
+    return savedProfile;
   }
 
   /**
@@ -44,6 +89,21 @@ class EmployerDocumentService {
       this.profile.verification.documents.filter(
         doc => doc._id.toString() !== documentMongoId
       );
+
+    // FIX: Grace period approach for document removal
+    if (this.profile.verification.steps.adminApproved) {
+      this.profile.verification.pendingReview = true;
+      this.profile.verification.lastDocumentUpdate = new Date();
+
+      // Calculate grace period deadline (30 days)
+      const gracePeriod = new Date();
+      gracePeriod.setDate(gracePeriod.getDate() + 30);
+      this.profile.verification.reviewDeadline = gracePeriod;
+
+      // Keep verification but mark as needs review
+      // this.profile.verification.isVerified = true; // Keep current status
+    }
+
     return this.profile.save({ validateBeforeSave: false });
   }
 

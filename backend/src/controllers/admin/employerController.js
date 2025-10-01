@@ -290,7 +290,7 @@ const getEmployerJobs = asyncHandler(async (req, res) => {
   }
 
   // Build filter
-  const filter = { createdBy: employer._id };
+  const filter = { postedBy: employer._id }; // FIX: Use postedBy instead of createdBy
   if (req.query.status) filter.status = req.query.status;
   if (req.query.visibility) filter.visibility = req.query.visibility;
 
@@ -299,8 +299,8 @@ const getEmployerJobs = asyncHandler(async (req, res) => {
 
   // Get jobs with pagination
   const jobs = await Job.find(filter)
-    .populate('company', 'name logo')
-    .populate('createdBy', 'email profile')
+    .populate('employer', 'company') // Populate employer profile
+    .populate('postedBy', 'email fullName') // Fix: Use postedBy field
     .sort({ createdAt: -1 })
     .skip(startIndex)
     .limit(limit);
@@ -313,10 +313,24 @@ const getEmployerJobs = asyncHandler(async (req, res) => {
     limit,
   };
 
+  // Add statistics like employer API
+  const allJobs = await Job.find({ postedBy: employer._id });
+  const statistics = {
+    total: allJobs.length,
+    byStatus: {
+      draft: allJobs.filter(job => job.status === 'draft').length,
+      pending: allJobs.filter(job => job.status === 'pending').length,
+      active: allJobs.filter(job => job.status === 'active').length,
+      closed: allJobs.filter(job => job.status === 'closed').length,
+      rejected: allJobs.filter(job => job.status === 'rejected').length,
+    },
+  };
+
   res.status(200).json({
     success: true,
     data: jobs,
     pagination,
+    statistics,
   });
 });
 
