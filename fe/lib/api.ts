@@ -245,6 +245,11 @@ class ApiClient {
     }
   }
 
+  // Candidate profile (for CV)
+  async getUserProfile(): Promise<any> {
+    return this.get<any>("/users/profile");
+  }
+
   async verifyEmail(email: string, otp: string): Promise<AuthResponse> {
     const response = await this.request<AuthResponse>("/auth/verify-email", {
       method: "POST",
