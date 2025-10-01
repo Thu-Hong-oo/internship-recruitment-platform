@@ -107,17 +107,25 @@ exports.uploadCV = asyncHandler(async (req, res) => {
   // Upload file CV lên Cloudinary
   // Tạo public_id giữ nguyên đuôi file gốc
   let publicId = undefined;
+  let fileExtension = '';
+  
   if (req.file.originalname) {
     const name = req.file.originalname.replace(/\s+/g, '_');
-    publicId = name + '_' + Date.now();
+    // Lấy extension từ filename gốc
+    const extensionMatch = req.file.originalname.match(/\.[^.]+$/);
+    fileExtension = extensionMatch ? extensionMatch[0] : '';
+    // Tạo publicId không có extension (Cloudinary sẽ tự thêm)
+    const nameWithoutExt = name.replace(/\.[^.]+$/, '');
+    publicId = nameWithoutExt + '_' + Date.now();
   }
+  
   const uploadResult = await uploadFile('document', req.file.buffer, {
     folder: 'internbridge/cv',
     resource_type: 'raw',
     allowed_formats: ['pdf', 'doc', 'docx'],
     public_id: publicId,
-    use_filename: true,
-    unique_filename: true,
+    use_filename: false, // Không dùng filename gốc để tránh lỗi encoding
+    unique_filename: false, // Dùng publicId đã định nghĩa
     overwrite: true,
   });
 
@@ -126,7 +134,7 @@ exports.uploadCV = asyncHandler(async (req, res) => {
     url: uploadResult.url,
     uploadedAt: new Date(),
     filename: req.file.originalname || '',
-    format: uploadResult.format || '',
+    format: uploadResult.format || fileExtension.replace('.', ''),
   });
   // Cập nhật CV hiện tại (lưu đúng theo schema: url + updatedAt + aiAnalysis)
   profile.resume.current = {
@@ -135,22 +143,28 @@ exports.uploadCV = asyncHandler(async (req, res) => {
     aiAnalysis: {}, // Chờ phân tích AI
   };
   await profile.save();
+  
+  // Đảm bảo URL có đúng extension để browser hiển thị đúng
+  let finalUrl = uploadResult.url;
+  if (fileExtension && !finalUrl.includes(fileExtension)) {
+    // Thêm extension vào cuối URL nếu chưa có
+    finalUrl = uploadResult.url + fileExtension;
+  }
+  
   res.status(200).json({
     success: true,
     data: {
       // Dùng để nhúng xem trước trong <iframe>
       previewUrl:
         'https://docs.google.com/gview?embedded=1&url=' +
-        encodeURIComponent(uploadResult.url),
-      url: uploadResult.url,
+        encodeURIComponent(finalUrl),
+      url: finalUrl,
       // Trả thêm link tải về cho client (không lưu DB)
       downloadUrl: req.file.originalname
-        ? uploadResult.url +
-          '?attachment=' +
-          encodeURIComponent(req.file.originalname)
-        : uploadResult.url,
+        ? finalUrl + '?attachment=' + encodeURIComponent(req.file.originalname)
+        : finalUrl,
       filename: req.file.originalname || '',
-      format: uploadResult.format || '',
+      format: uploadResult.format || fileExtension.replace('.', ''),
       updatedAt: profile.resume.current.updatedAt,
       aiAnalysis: profile.resume.current.aiAnalysis,
     },
@@ -190,18 +204,45 @@ exports.viewCurrentCV = asyncHandler(async (req, res) => {
       .json({ success: false, message: 'Chưa có CV hiện tại để xem' });
   }
 
-  // Stream từ Cloudinary về với header inline để trình duyệt hiển thị
-  const response = await fetch(url);
-  if (!response.ok) {
+  try {
+    // Stream từ Cloudinary về với header inline để trình duyệt hiển thị
+    const response = await fetch(url);
+    if (!response.ok) {
+      return res
+        .status(502)
+        .json({ success: false, message: 'Không thể tải CV từ Cloudinary' });
+    }
+    
+    // Tìm latest CV entry để lấy filename và format
+    const latestCV = profile.resume.history[profile.resume.history.length - 1];
+    const filename = latestCV?.filename || 'resume.pdf';
+    const format = latestCV?.format || 'pdf';
+    
+    // Set content type dựa trên format - QUAN TRỌNG để browser hiển thị đúng
+    let contentType = 'application/pdf';
+    if (format.toLowerCase() === 'pdf') {
+      contentType = 'application/pdf';
+    } else if (format.toLowerCase() === 'doc') {
+      contentType = 'application/msword';
+    } else if (format.toLowerCase() === 'docx') {
+      contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    }
+    
+    // Set headers để browser hiển thị INLINE thay vì download
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN'); // Cho phép iframe từ cùng origin
+    
+    const arrayBuffer = await response.arrayBuffer();
+    res.send(Buffer.from(arrayBuffer));
+  } catch (error) {
+    console.error('Error streaming CV:', error);
     return res
-      .status(502)
-      .json({ success: false, message: 'Không thể tải CV từ Cloudinary' });
+      .status(500)
+      .json({ success: false, message: 'Lỗi khi tải CV' });
   }
-  const contentType = response.headers.get('content-type') || 'application/pdf';
-  res.setHeader('Content-Type', contentType);
-  res.setHeader('Content-Disposition', 'inline; filename="resume.pdf"');
-  const arrayBuffer = await response.arrayBuffer();
-  res.send(Buffer.from(arrayBuffer));
 });
 
 // @desc    Update skills verification

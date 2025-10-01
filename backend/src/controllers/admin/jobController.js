@@ -23,7 +23,7 @@ const getJobsAdmin = asyncHandler(async (req, res) => {
   const filter = {};
 
   // Exclude draft jobs from admin view (employers manage drafts separately)
-  filter.status = { $ne: JOB_STATUS.DRAFT };
+  filter.status = { $ne: JOB_STATUS.DRAFT  };
 
   if (req.query.status) {
     // If specific status is requested, override the draft exclusion
