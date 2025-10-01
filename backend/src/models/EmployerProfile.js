@@ -4,7 +4,6 @@ const {
   EMPLOYER_PROFILE_STATUS,
 } = require('../constants/common.constants');
 
-
 // Giữ nguyên sub-schemas nhưng tối ưu
 const CompanyInfoSchema = require('./schemas/CompanyInfoSchema');
 const BusinessInfoSchema = require('./schemas/BusinessInfoSchema');
@@ -32,7 +31,7 @@ const EmployerProfileSchema = new mongoose.Schema(
     position: {
       title: { type: String, default: '' },
       level: { type: String, default: '' },
-      department: { type: String, default: '' }
+      department: { type: String, default: '' },
     },
 
     // Người đại diện pháp luật (BẮT BUỘC theo luật)
@@ -124,7 +123,10 @@ EmployerProfileSchema.virtual('isVerified').get(function () {
 });
 
 EmployerProfileSchema.virtual('canPostJobs').get(function () {
-  return ['verified', 'pending'].includes(this.status);
+  return [
+    EMPLOYER_PROFILE_STATUS.VERIFIED,
+    EMPLOYER_PROFILE_STATUS.PENDING,
+  ].includes(this.status);
 });
 
 // Methods cần thiết

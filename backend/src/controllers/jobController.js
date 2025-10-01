@@ -2,7 +2,11 @@ const Job = require('../models/Job');
 const Application = require('../models/Application');
 const CandidateProfile = require('../models/CandidateProfile');
 const { logger } = require('../utils/logger');
-const { JOB_STATUS } = require('../constants/common.constants');
+const {
+  JOB_STATUS,
+  EMPLOYER_PROFILE_STATUS,
+  APPLICATION_STATUS,
+} = require('../constants/common.constants');
 
 // @desc    Get all jobs with filtering and pagination (supports text search)
 // @route   GET /api/jobs
@@ -209,7 +213,7 @@ const createJob = async (req, res) => {
     }
     if (
       !employerProfile.verification?.isVerified &&
-      employerProfile.status !== 'verified'
+      employerProfile.status !== EMPLOYER_PROFILE_STATUS.VERIFIED
     ) {
       return res.status(403).json({
         success: false,
@@ -376,18 +380,25 @@ const applyForJob = async (req, res) => {
         .status(400)
         .json({ success: false, message: 'Công việc chưa được mở ứng tuyển' });
     }
-    // Check if already applied
+    // Resolve candidate profile and check existing application
+    const candidateProfile = await CandidateProfile.findOne({
+      userId: req.user.id,
+    });
+    if (!candidateProfile) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bạn cần hoàn thiện hồ sơ ứng viên trước khi ứng tuyển',
+      });
+    }
     const existingApplication = await Application.findOne({
       jobId: id,
-      candidateId: req.user.id,
+      candidateId: candidateProfile._id,
     });
     if (existingApplication) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: 'Bạn đã ứng tuyển cho công việc này',
-        });
+      return res.status(400).json({
+        success: false,
+        message: 'Bạn đã ứng tuyển cho công việc này',
+      });
     }
     // Check application deadline
     if (job.deadline && new Date() > job.deadline) {
@@ -395,13 +406,23 @@ const applyForJob = async (req, res) => {
         .status(400)
         .json({ success: false, message: 'Đã hết hạn ứng tuyển' });
     }
+    // Determine resume url: prefer provided, otherwise current resume in profile
+    let finalResumeUrl = resumeUrl;
+    if (!finalResumeUrl) {
+      finalResumeUrl = candidateProfile?.resume?.current?.url || null;
+    }
+
     const application = await Application.create({
       jobId: id,
-      candidateId: req.user.id,
+      candidateId: candidateProfile._id,
       coverLetter,
-      resumeUrl,
-      portfolioUrl,
-      status: JOB_STATUS.PENDING,
+      attachments: portfolioUrl
+        ? [{ name: 'portfolio', url: portfolioUrl, type: 'link' }]
+        : [],
+      resume: finalResumeUrl
+        ? { url: finalResumeUrl, uploadedAt: new Date() }
+        : undefined,
+      status: APPLICATION_STATUS.PENDING,
     });
     // Update job stats
     await Job.findByIdAndUpdate(id, { $inc: { 'stats.applications': 1 } });
@@ -434,18 +455,20 @@ const getJobApplications = async (req, res) => {
       req.user.role !== 'admin' &&
       String(job.postedBy) !== String(req.user.id)
     ) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: 'Bạn không có quyền xem danh sách ứng viên của job này',
-        });
+      return res.status(403).json({
+        success: false,
+        message: 'Bạn không có quyền xem danh sách ứng viên của job này',
+      });
     }
     const query = { jobId: id };
     if (status) query.status = status;
     const skip = (page - 1) * limit;
     const applications = await Application.find(query)
-      .populate('candidateId', 'name email avatar')
+      .populate({
+        path: 'candidateId',
+        select: 'userId resume education skills',
+        populate: { path: 'userId', select: 'fullName email avatar' },
+      })
       .populate('jobId', 'title employer')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -643,22 +666,18 @@ const submitJobForReview = async (req, res) => {
     }
 
     if (job.status !== JOB_STATUS.DRAFT) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: 'Chỉ có thể gửi duyệt job ở trạng thái nháp',
-        });
+      return res.status(400).json({
+        success: false,
+        message: 'Chỉ có thể gửi duyệt job ở trạng thái nháp',
+      });
     }
     job.status = JOB_STATUS.PENDING;
     await job.save();
-    res
-      .status(200)
-      .json({
-        success: true,
-        data: job,
-        message: 'Đã gửi duyệt. Vui lòng chờ admin phê duyệt',
-      });
+    res.status(200).json({
+      success: true,
+      data: job,
+      message: 'Đã gửi duyệt. Vui lòng chờ admin phê duyệt',
+    });
   } catch (error) {
     logger.error('Error submitting job for review:', error);
     res.status(500).json({ success: false, message: 'Lỗi khi gửi duyệt job' });

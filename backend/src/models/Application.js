@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const ApplicationSchema = new mongoose.Schema(
   {
-    internId: {
+    candidateId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'CandidateProfile',
       required: true,
@@ -108,7 +108,7 @@ const ApplicationSchema = new mongoose.Schema(
 );
 
 // Indexes
-ApplicationSchema.index({ internId: 1, jobId: 1 }, { unique: true });
+ApplicationSchema.index({ candidateId: 1, jobId: 1 }, { unique: true });
 ApplicationSchema.index({ status: 1 });
 ApplicationSchema.index({ 'matchingScore.overall': -1 });
 ApplicationSchema.index({ createdAt: -1 });
@@ -117,7 +117,7 @@ ApplicationSchema.index({ createdAt: -1 });
 ApplicationSchema.pre('save', async function (next) {
   if (this.isNew) {
     this.timeline.push({
-      status: 'pending',
+      status: 'completed',
       note: 'Đơn ứng tuyển được tạo',
     });
   }
