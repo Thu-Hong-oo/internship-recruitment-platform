@@ -52,7 +52,13 @@ const getAllJobs = async (req, res) => {
     if (status) {
       query['status'] = status;
     } else if (req.user?.role !== 'admin') {
+      // Public users chỉ thấy jobs đang mở/active
       query['status'] = { $in: [JOB_STATUS.OPEN, JOB_STATUS.ACTIVE] };
+    } else {
+      // Admin có thể thấy tất cả trừ deleted (trừ khi explicitly request)
+      if (req.query.includeDeleted !== 'true') {
+        query['status'] = { $ne: JOB_STATUS.DELETED };
+      }
     }
     if (jobType) {
       query['jobType'] = jobType;
@@ -309,11 +315,11 @@ const deleteJob = async (req, res) => {
         .status(404)
         .json({ success: false, message: 'Không tìm thấy công việc' });
     }
-    // Nếu job đã bị ẩn/xóa rồi thì không cho xóa lại nữa
-    if (job.status === JOB_STATUS.CLOSED) {
+    // Nếu job đã bị xóa rồi thì không cho xóa lại nữa
+    if (job.status === JOB_STATUS.DELETED) {
       return res
         .status(400)
-        .json({ success: false, message: 'Công việc đã bị xóa/ẩn trước đó' });
+        .json({ success: false, message: 'Công việc đã bị xóa trước đó' });
     }
     // Chỉ admin, người đăng job, chủ employer, hoặc thành viên có quyền mới được xóa
     let canDelete = false;
@@ -345,8 +351,10 @@ const deleteJob = async (req, res) => {
         .status(403)
         .json({ success: false, message: 'Bạn không có quyền xóa job này' });
     }
-    // Soft delete: chuyển trạng thái sang CLOSED (ẩn job, không xóa khỏi DB)
-    job.status = JOB_STATUS.CLOSED;
+    // Soft delete: chuyển trạng thái sang DELETED với metadata
+    job.status = JOB_STATUS.DELETED;
+    job.deletedAt = new Date();
+    job.deletedBy = req.user.id;
     await job.save();
     res
       .status(200)
@@ -682,6 +690,11 @@ const getEmployerJobs = async (req, res) => {
     // Filter theo status nếu có
     if (status) {
       query.status = status;
+    } else {
+      // Mặc định loại trừ jobs đã deleted, trừ khi explicitly request
+      if (req.query.includeDeleted !== 'true') {
+        query.status = { $ne: JOB_STATUS.DELETED };
+      }
     }
 
     const skip = (page - 1) * limit;
@@ -701,8 +714,14 @@ const getEmployerJobs = async (req, res) => {
     const total = await Job.countDocuments(query);
 
     // Thống kê theo status
+    const statusMatchQuery = { employer: employerProfile._id };
+    // Chỉ count deleted jobs nếu explicitly request
+    if (req.query.includeDeleted !== 'true') {
+      statusMatchQuery.status = { $ne: JOB_STATUS.DELETED };
+    }
+
     const statusCounts = await Job.aggregate([
-      { $match: { employer: employerProfile._id } },
+      { $match: statusMatchQuery },
       { $group: { _id: '$status', count: { $sum: 1 } } },
     ]);
 
