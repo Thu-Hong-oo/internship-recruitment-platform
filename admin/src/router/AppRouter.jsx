@@ -11,6 +11,8 @@ import Login from "../pages/login";
 
 import NotFoundPage from "../components/NotFoundPage";
 import AccountsDetail from "../pages/accounts/detail";
+import CompanyDetail from "../pages/companies/detail";
+import AdminJobDetail from "../pages/admin/posts/detail";
 
 // Component để điều hướng dựa trên role
 const RoleBasedRedirect = () => {
@@ -73,6 +75,8 @@ export default function AppRouter() {
         {allRoutes.map((route) => (
           <Route key={route.path} path={route.path} element={route.element} />
         ))}
+        <Route path="/admin/companies/:id" element={<CompanyDetail />} />
+        <Route path="/admin/posts/:id" element={<AdminJobDetail />} />
       </Route>
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
