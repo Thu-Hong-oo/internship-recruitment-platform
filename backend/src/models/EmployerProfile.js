@@ -109,7 +109,10 @@ const EmployerProfileSchema = new mongoose.Schema(
       },
     ],
 
-    verification: VerificationSchema,
+    verification: {
+      type: VerificationSchema,
+      default: () => ({})
+    },
 
     status: {
       type: String,
@@ -245,7 +248,7 @@ EmployerProfileSchema.index({ createdAt: -1 });
 
 EmployerProfileSchema.virtual('isVerified').get(function () {
   return (
-    this.verification.isVerified &&
+    this.verification?.isVerified &&
     this.status === EMPLOYER_PROFILE_STATUS.VERIFIED
   );
 });
