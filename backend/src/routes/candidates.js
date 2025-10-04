@@ -17,20 +17,20 @@ router.use(authorize('candidate'));
 // ============================================
 
 /**
- * @route   GET /api/v2/candidates/me
+ * @route   GET /api/candidates/me
  * @desc    Get candidate profile with flexible includes
  * @access  Private (Candidate only)
  * @query   ?include=education,experience,skills,projects,certifications,resume
- * @example GET /api/v2/candidates/me?include=education,experience,skills
+ * @example GET /api/candidates/me?include=education,experience,skills
  */
 router.get('/me', candidateController.getProfile);
 
 /**
- * @route   PATCH /api/v2/candidates/me
+ * @route   PATCH /api/candidates/me
  * @desc    Update candidate profile by section
  * @access  Private (Candidate only)
  * @body    { section: "profile" | "visibility" | "preferences", data: {...} }
- * @example PATCH /api/v2/candidates/me
+ * @example PATCH /api/candidates/me
  *          Body: { "section": "profile", "data": { "personalInfo": { "fullName": "John Doe" } } }
  */
 router.patch('/me', apiRateLimit, candidateController.updateProfile);
@@ -40,14 +40,14 @@ router.patch('/me', apiRateLimit, candidateController.updateProfile);
 // ============================================
 
 /**
- * @route   POST /api/v2/candidates/me/resume
+ * @route   POST /api/candidates/me/resume
  * @desc    Handle resume operations: upload, parse, generate
  * @access  Private (Candidate only)
  * @upload  FormData with file for upload/parse
  * @body    { action: "upload" | "parse" } or query ?action=generate
- * @example POST /api/v2/candidates/me/resume?action=generate
+ * @example POST /api/candidates/me/resume?action=generate
  *          Body: { "template": "modern", "targetJob": "Software Engineer" }
- * @example POST /api/v2/candidates/me/resume
+ * @example POST /api/candidates/me/resume
  *          FormData: { file: resume.pdf, action: "upload" }
  */
 router.post(
@@ -58,76 +58,99 @@ router.post(
 );
 
 /**
- * @route   GET /api/v2/candidates/me/resume
+ * @route   GET /api/candidates/me/resume
  * @desc    Get resume data with flexible options
  * @access  Private (Candidate only)
- * @query   ?version=all | ?id=xxx&action=download
- * @example GET /api/v2/candidates/me/resume?version=all
- * @example GET /api/v2/candidates/me/resume?id=507f1f77bcf86cd799439011&action=download
+ * @query   ?version=all | ?id=current|ObjectId&action=download
+ * @example GET /api/candidates/me/resume?version=all
+ * @example GET /api/candidates/me/resume?id=current&action=download
+ * @example GET /api/candidates/me/resume?id=507f1f77bcf86cd799439011&action=download
  */
 router.get('/me/resume', candidateController.getResume);
 
 /**
- * @route   GET /api/v2/candidates/me/resume/view
+ * @route   GET /api/candidates/me/resume/view
  * @desc    Stream current CV inline for viewing in browser
  * @access  Private (Candidate only)
- * @example GET /api/v2/candidates/me/resume/view
+ * @example GET /api/candidates/me/resume/view
  * @returns PDF stream with inline headers for browser display
  */
 router.get('/me/resume/view', candidateController.viewCurrentCV);
 
 /**
- * @route   DELETE /api/v2/candidates/me/resume/:id
- * @desc    Delete specific resume version
+ * @route   DELETE /api/candidates/me/resume/:id
+ * @desc    Delete CV by ID (current or history)
  * @access  Private (Candidate only)
- * @param   id - Resume ObjectId
- * @example DELETE /api/v2/candidates/me/resume/507f1f77bcf86cd799439011
+ * @param   id - "current" to delete current CV, or ObjectId to delete from history
+ * @example DELETE /api/candidates/me/resume/current
+ * @example DELETE /api/candidates/me/resume/507f1f77bcf86cd799439011
  */
 router.delete('/me/resume/:id', candidateController.deleteResume);
+
+/**
+ * @route   PUT /api/candidates/me/resume/set-current/:id
+ * @desc    Set CV from history as current by ID (swap current ↔ history)
+ * @access  Private (Candidate only)
+ * @param   id - CV ObjectId from history
+ * @example PUT /api/candidates/me/resume/set-current/507f1f77bcf86cd799439011
+ */
+router.put('/me/resume/set-current/:id', candidateController.setCurrentResume);
+
+/**
+ * @route   PUT /api/candidates/me/resume/rename
+ * @desc    Rename CV display name by ID (current or history)
+ * @access  Private (Candidate only)
+ * @body    { id: string, displayName: string }
+ * @example PUT /api/candidates/me/resume/rename
+ *          Body: { "id": "current", "displayName": "My New CV Name" }
+ * @example PUT /api/candidates/me/resume/rename
+ *          Body: { "id": "507f1f77bcf86cd799439011", "displayName": "Old CV Name" }
+ */
+router.put('/me/resume/rename', candidateController.renameResume);
 
 // ============================================
 // PROFILE SECTIONS CRUD (4 endpoints pattern)
 // ============================================
 
 /**
- * @route   GET /api/v2/candidates/me/:section
+ * @route   GET /api/candidates/me/:section
  * @desc    Get specific profile section
  * @access  Private (Candidate only)
  * @param   section - education | experience | skills | projects | certifications
- * @example GET /api/v2/candidates/me/education
+ * @example GET /api/candidates/me/education
  */
 router.get('/me/:section', candidateController.getSection);
 
 /**
- * @route   POST /api/v2/candidates/me/:section
+ * @route   POST /api/candidates/me/:section
  * @desc    Add new entry to profile section
  * @access  Private (Candidate only)
  * @param   section - education | experience | skills | projects | certifications
  * @body    Section-specific data object
- * @example POST /api/v2/candidates/me/education
+ * @example POST /api/candidates/me/education
  *          Body: { "type": "university", "institution": "Harvard", "degree": "Bachelor" }
  */
 router.post('/me/:section', apiRateLimit, candidateController.addToSection);
 
 /**
- * @route   PATCH /api/v2/candidates/me/:section/:id
+ * @route   PATCH /api/candidates/me/:section/:id
  * @desc    Update specific entry in profile section
  * @access  Private (Candidate only)
  * @param   section - education | experience | skills | projects | certifications
  * @param   id - Entry ObjectId
  * @body    Partial update data
- * @example PATCH /api/v2/candidates/me/education/507f1f77bcf86cd799439011
+ * @example PATCH /api/candidates/me/education/507f1f77bcf86cd799439011
  *          Body: { "degree": "Master", "graduationYear": 2024 }
  */
 router.patch('/me/:section/:id', candidateController.updateSectionEntry);
 
 /**
- * @route   DELETE /api/v2/candidates/me/:section/:id
+ * @route   DELETE /api/candidates/me/:section/:id
  * @desc    Delete specific entry from profile section
  * @access  Private (Candidate only)
  * @param   section - education | experience | skills | projects | certifications
  * @param   id - Entry ObjectId
- * @example DELETE /api/v2/candidates/me/education/507f1f77bcf86cd799439011
+ * @example DELETE /api/candidates/me/education/507f1f77bcf86cd799439011
  */
 router.delete('/me/:section/:id', candidateController.deleteSectionEntry);
 
@@ -136,32 +159,32 @@ router.delete('/me/:section/:id', candidateController.deleteSectionEntry);
 // ============================================
 
 /**
- * @route   GET /api/v2/candidates/applications
+ * @route   GET /api/candidates/applications
  * @desc    Get applications with flexible filtering
  * @access  Private (Candidate only)
  * @query   ?status=pending|reviewing|accepted|rejected&job_id=xxx&page=1&id=xxx
- * @example GET /api/v2/candidates/applications?status=pending&page=1
- * @example GET /api/v2/candidates/applications?id=507f1f77bcf86cd799439011 (for detail)
+ * @example GET /api/candidates/applications?status=pending&page=1
+ * @example GET /api/candidates/applications?id=507f1f77bcf86cd799439011 (for detail)
  */
 router.get('/applications', candidateController.getApplications);
 
 /**
- * @route   POST /api/v2/candidates/applications
+ * @route   POST /api/candidates/applications
  * @desc    Apply for a job
  * @access  Private (Candidate only)
  * @body    { job_id, resume_id?, cover_letter?, answers?: [...] }
- * @example POST /api/v2/candidates/applications
+ * @example POST /api/candidates/applications
  *          Body: { "job_id": "507f1f77bcf86cd799439011", "cover_letter": "I am interested..." }
  */
 router.post('/applications', apiRateLimit, candidateController.applyForJob);
 
 /**
- * @route   PATCH /api/v2/candidates/applications/:id
+ * @route   PATCH /api/candidates/applications/:id
  * @desc    Handle application actions (withdraw)
  * @access  Private (Candidate only)
  * @param   id - Application ObjectId
  * @body    { action: "withdraw" }
- * @example PATCH /api/v2/candidates/applications/507f1f77bcf86cd799439011
+ * @example PATCH /api/candidates/applications/507f1f77bcf86cd799439011
  *          Body: { "action": "withdraw" }
  */
 router.patch('/applications/:id', candidateController.updateApplication);
@@ -171,47 +194,47 @@ router.patch('/applications/:id', candidateController.updateApplication);
 // ============================================
 
 /**
- * @route   GET /api/v2/candidates/jobs
+ * @route   GET /api/candidates/jobs
  * @desc    Unified job search, saved jobs, company jobs
  * @access  Private (Candidate only)
  * @query   ?keyword=&location=&type=saved|following|search&company_id=&page=1&limit=10
- * @example GET /api/v2/candidates/jobs?keyword=developer&location=hanoi&type=search
- * @example GET /api/v2/candidates/jobs?type=saved
- * @example GET /api/v2/candidates/jobs?type=following
+ * @example GET /api/candidates/jobs?keyword=developer&location=hanoi&type=search
+ * @example GET /api/candidates/jobs?type=saved
+ * @example GET /api/candidates/jobs?type=following
  */
 router.get('/jobs', candidateController.getJobs);
 
 /**
- * @route   POST /api/v2/candidates/jobs/:id/action
+ * @route   POST /api/candidates/jobs/:id/action
  * @desc    Handle job actions: save, unsave, apply
  * @access  Private (Candidate only)
  * @param   id - Job ObjectId
  * @body    { action: "save" | "unsave" | "apply", ...additionalData }
- * @example POST /api/v2/candidates/jobs/507f1f77bcf86cd799439011/action
+ * @example POST /api/candidates/jobs/507f1f77bcf86cd799439011/action
  *          Body: { "action": "save" }
- * @example POST /api/v2/candidates/jobs/507f1f77bcf86cd799439011/action
+ * @example POST /api/candidates/jobs/507f1f77bcf86cd799439011/action
  *          Body: { "action": "apply", "cover_letter": "I am interested..." }
  */
 router.post('/jobs/:id/action', candidateController.handleJobAction);
 
 /**
- * @route   POST /api/v2/candidates/companies/:id/action
+ * @route   POST /api/candidates/companies/:id/action
  * @desc    Handle company actions: follow, unfollow
  * @access  Private (Candidate only)
  * @param   id - Company ObjectId
  * @body    { action: "follow" | "unfollow" }
- * @example POST /api/v2/candidates/companies/507f1f77bcf86cd799439011/action
+ * @example POST /api/candidates/companies/507f1f77bcf86cd799439011/action
  *          Body: { "action": "follow" }
  */
 router.post('/companies/:id/action', candidateController.handleCompanyAction);
 
 /**
- * @route   GET /api/v2/candidates/companies
+ * @route   GET /api/candidates/companies
  * @desc    Get companies data: following list or company detail
  * @access  Private (Candidate only)
  * @query   ?type=following | ?id=xxx (for detail)
- * @example GET /api/v2/candidates/companies?type=following
- * @example GET /api/v2/candidates/companies?id=507f1f77bcf86cd799439011
+ * @example GET /api/candidates/companies?type=following
+ * @example GET /api/candidates/companies?id=507f1f77bcf86cd799439011
  */
 router.get('/companies', candidateController.getCompanies);
 

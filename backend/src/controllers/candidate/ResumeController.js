@@ -18,6 +18,8 @@ class ResumeController {
     this.handleResume = this.handleResume.bind(this);
     this.getResume = this.getResume.bind(this);
     this.deleteResume = this.deleteResume.bind(this);
+    this.setCurrentResume = this.setCurrentResume.bind(this);
+    this.renameResume = this.renameResume.bind(this);
     this.viewCurrentCV = this.viewCurrentCV.bind(this);
   }
 
@@ -94,7 +96,9 @@ class ResumeController {
 
   /**
    * DELETE /api/candidates/me/resume/:id
-   * Delete specific resume version
+   * Delete CV by ID (can be current CV or history CV)
+   * If id = "current", delete current CV
+   * Otherwise, delete CV from history by ID
    */
   async deleteResume(req, res, next) {
     try {
@@ -105,52 +109,281 @@ class ResumeController {
         throw new AppError('Candidate profile not found', 404);
       }
 
-      // Delete from cloudinary if exists
-      if (profile.resume.current.publicId) {
-        await uploadService.deleteFile(profile.resume.current.publicId);
+      let cvToDelete = null;
+      let isCurrentCV = false;
+
+      // Check if deleting current CV
+      if (id === 'current') {
+        if (!profile.resume.current || !profile.resume.current.url) {
+          throw new AppError('No current CV to delete', 404);
+        }
+        cvToDelete = profile.resume.current;
+        isCurrentCV = true;
+      } else {
+        // Find CV in history by ID
+        const cvIndex = profile.resume.history.findIndex(
+          cv => cv._id.toString() === id
+        );
+
+        if (cvIndex === -1) {
+          throw new AppError('CV not found', 404);
+        }
+
+        cvToDelete = profile.resume.history[cvIndex];
+
+        // Remove from history
+        profile.resume.history.splice(cvIndex, 1);
       }
 
-      // Clear current resume
-      profile.resume.current = {};
+      // Delete from Cloudinary if exists
+      if (cvToDelete.publicId) {
+        try {
+          await uploadService.deleteFile(cvToDelete.publicId);
+        } catch (deleteError) {
+          console.warn(
+            'Failed to delete file from Cloudinary:',
+            deleteError.message
+          );
+        }
+      }
+
+      if (isCurrentCV) {
+        // Clear current resume
+        profile.resume.current = {};
+      } else {
+        // If deleted CV was also current, set current to empty or latest history
+        if (
+          profile.resume.current &&
+          profile.resume.current.url === cvToDelete.url
+        ) {
+          if (profile.resume.history.length > 0) {
+            // Set latest history as current
+            const latestCV =
+              profile.resume.history[profile.resume.history.length - 1];
+            profile.resume.current = {
+              _id: new mongoose.Types.ObjectId(),
+              url: latestCV.url,
+              publicId: latestCV.publicId,
+              filename: latestCV.filename || 'resume.pdf',
+              displayName:
+                latestCV.displayName || latestCV.filename || 'resume.pdf',
+              format: latestCV.format || 'pdf',
+              size: latestCV.size || 0,
+              mimeType: latestCV.mimeType || 'application/pdf',
+              updatedAt: new Date(),
+              aiAnalysis: profile.resume.current.aiAnalysis || {
+                skills: [],
+                suggestions: [],
+                detailedSkills: [],
+              },
+            };
+          } else {
+            // No history left, clear current
+            profile.resume.current = {};
+          }
+        }
+      }
+
       await profile.save();
 
-      return ApiResponse.success(res, null, 'Resume deleted successfully');
+      return ApiResponse.success(
+        res,
+        {
+          current: profile.resume.current,
+          history: profile.resume.history,
+        },
+        'CV deleted successfully'
+      );
     } catch (error) {
       next(error);
     }
   }
 
   /**
-   * Helper method to fetch file from URL using native Node.js modules
+   * PUT /api/candidates/me/resume/set-current/:id
+   * Set CV from history as current by ID (swap current ↔ history)
    */
-  _fetchFile(url) {
-    return new Promise((resolve, reject) => {
-      // Validate URL
-      if (!url || typeof url !== 'string') {
-        reject(new Error('Invalid URL provided'));
-        return;
+  async setCurrentResume(req, res, next) {
+    try {
+      const { id } = req.params;
+
+      const profile = await CandidateProfile.findOne({ userId: req.user.id });
+      if (!profile) {
+        throw new AppError('Candidate profile not found', 404);
       }
 
-      const client = url.startsWith('https:') ? https : http;
+      if (!profile.resume.history || !Array.isArray(profile.resume.history)) {
+        throw new AppError('No resume history found', 404);
+      }
 
-      client
-        .get(url, response => {
-          if (response.statusCode !== 200) {
-            reject(
-              new Error(
-                `HTTP ${response.statusCode}: ${response.statusMessage}`
-              )
-            );
-            return;
+      // Find CV in history by ID
+      const cvIndex = profile.resume.history.findIndex(
+        cv => cv._id.toString() === id
+      );
+
+      if (cvIndex === -1) {
+        throw new AppError('CV not found in history', 404);
+      }
+
+      const selectedCV = profile.resume.history[cvIndex];
+
+      // Preserve current AI analysis if exists
+      let currentAiAnalysis = {
+        skills: [],
+        suggestions: [],
+        detailedSkills: [],
+      };
+
+      if (profile.resume.current && profile.resume.current.aiAnalysis) {
+        currentAiAnalysis = {
+          skills: profile.resume.current.aiAnalysis.skills || [],
+          suggestions: profile.resume.current.aiAnalysis.suggestions || [],
+          detailedSkills:
+            profile.resume.current.aiAnalysis.detailedSkills || [],
+        };
+      }
+
+      // If current CV exists, move it to history first
+      if (profile.resume.current && profile.resume.current.url) {
+        // Add current CV to history (if not already there)
+        const currentExistsInHistory = profile.resume.history.some(
+          cv => cv.url === profile.resume.current.url
+        );
+
+        if (!currentExistsInHistory) {
+          profile.resume.history.push({
+            url: profile.resume.current.url,
+            publicId: profile.resume.current.publicId,
+            filename: profile.resume.current.filename,
+            displayName: profile.resume.current.displayName,
+            format: profile.resume.current.format,
+            size: profile.resume.current.size,
+            mimeType: profile.resume.current.mimeType,
+            uploadedAt: profile.resume.current.updatedAt,
+          });
+        }
+      }
+
+      // Remove selected CV from history (since it will become current)
+      profile.resume.history.splice(cvIndex, 1);
+
+      // Set selected CV as current
+      profile.resume.current = {
+        _id: new mongoose.Types.ObjectId(), // Add ID for current CV
+        url: selectedCV.url,
+        publicId: selectedCV.publicId,
+        filename: selectedCV.filename || 'resume.pdf',
+        displayName:
+          selectedCV.displayName || selectedCV.filename || 'resume.pdf',
+        format: selectedCV.format || 'pdf',
+        size: selectedCV.size || 0,
+        mimeType: selectedCV.mimeType || 'application/pdf',
+        updatedAt: new Date(),
+        aiAnalysis: currentAiAnalysis,
+      };
+
+      await profile.save();
+
+      return ApiResponse.success(
+        res,
+        {
+          current: profile.resume.current,
+          history: profile.resume.history,
+          message: 'CV đã được đặt làm hiện tại',
+        },
+        'Current CV updated successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * PUT /api/candidates/me/resume/rename
+   * Rename CV display name by ID (current or history)
+   */
+  async renameResume(req, res, next) {
+    try {
+      const { id, displayName } = req.body;
+
+      if (
+        !displayName ||
+        typeof displayName !== 'string' ||
+        !displayName.trim()
+      ) {
+        throw new AppError('Display name is required', 400);
+      }
+
+      if (!id) {
+        throw new AppError('CV ID is required', 400);
+      }
+
+      const profile = await CandidateProfile.findOne({ userId: req.user.id });
+      if (!profile) {
+        throw new AppError('Candidate profile not found', 404);
+      }
+
+      const trimmedDisplayName = displayName.trim();
+      let cvFound = false;
+
+      // Check if it's current CV (by URL match since current might not have ID)
+      if (profile.resume.current && profile.resume.current.url) {
+        // If current CV has ID and matches, or if no ID but we're renaming current
+        if (
+          profile.resume.current._id &&
+          profile.resume.current._id.toString() === id
+        ) {
+          profile.resume.current.displayName = trimmedDisplayName;
+          cvFound = true;
+        } else if (
+          (!profile.resume.current._id ||
+            profile.resume.current._id === null) &&
+          id === 'current'
+        ) {
+          // Handle case where current CV doesn't have ID yet
+          profile.resume.current.displayName = trimmedDisplayName;
+          cvFound = true;
+        }
+      }
+
+      // Check history CVs
+      if (!cvFound && profile.resume.history) {
+        const cvIndex = profile.resume.history.findIndex(
+          cv => cv._id.toString() === id
+        );
+
+        if (cvIndex !== -1) {
+          profile.resume.history[cvIndex].displayName = trimmedDisplayName;
+
+          // If this history item is also current (same URL), update current too
+          if (
+            profile.resume.current &&
+            profile.resume.current.url &&
+            profile.resume.current.url === profile.resume.history[cvIndex].url
+          ) {
+            profile.resume.current.displayName = trimmedDisplayName;
           }
+          cvFound = true;
+        }
+      }
 
-          const chunks = [];
-          response.on('data', chunk => chunks.push(chunk));
-          response.on('end', () => resolve(Buffer.concat(chunks)));
-          response.on('error', reject);
-        })
-        .on('error', reject);
-    });
+      if (!cvFound) {
+        throw new AppError('CV not found', 404);
+      }
+
+      await profile.save();
+
+      return ApiResponse.success(
+        res,
+        {
+          current: profile.resume.current,
+          history: profile.resume.history,
+        },
+        'CV renamed successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
   }
 
   /**
@@ -181,18 +414,9 @@ class ResumeController {
         throw new AppError('Chưa có CV hiện tại để xem', 404);
       }
 
-      console.log('📄 CV URL:', url);
-      console.log('🔑 Public ID:', publicId);
-
       try {
-        // Get accessible URL for viewing (signed URL if needed)
+        // Get accessible URL for viewing
         let accessibleUrl = url;
-
-        // TEMPORARY: Skip signed URLs for testing, use original URL directly
-        console.log(
-          '⚡ Using original URL directly (bypass signed URL for testing)'
-        );
-        accessibleUrl = url;
 
         // Fix HTTPS for Cloudinary URLs
         if (accessibleUrl.startsWith('http://res.cloudinary.com')) {
@@ -200,38 +424,48 @@ class ResumeController {
           console.log('🔒 Fixed to HTTPS:', accessibleUrl);
         }
 
-        // Stream từ Cloudinary về với header inline để trình duyệt hiển thị
-        let response = await fetch(accessibleUrl);
-        console.log(
-          '🌐 Fetch response status:',
-          response.status,
-          response.statusText
-        );
+        // Convert image/upload to raw/upload for PDF files (like old controller)
+        if (url.includes('/image/upload/') && url.includes('.pdf')) {
+          const rawUrl = url.replace('/image/upload/', '/raw/upload/');
+          accessibleUrl = rawUrl;
+        }
 
-        // If signed URL fails with 401, fallback to original URL (like candidateProfileController)
-        if (!response.ok && response.status === 401 && accessibleUrl !== url) {
-          console.log('🔄 Signed URL failed, retrying with original URL...');
-          response = await fetch(url);
+        let fileBuffer;
+
+        try {
+          // Use fetch directly like the old controller
+          const response = await fetch(accessibleUrl);
           console.log(
-            '🌐 Original URL response status:',
+            '🌐 Fetch response status:',
             response.status,
             response.statusText
           );
-          accessibleUrl = url; // Update for logging
-        }
 
-        if (!response.ok) {
-          throw new AppError(
-            `Không thể tải CV từ Cloudinary: ${response.status} ${response.statusText}`,
-            502
-          );
+          // Accept 200 and 401 status codes like old controller
+          if (response.status !== 200 && response.status !== 401) {
+            throw new AppError(
+              `Không thể tải CV từ Cloudinary: ${response.status} ${response.statusText}`,
+              502
+            );
+          }
+
+          const arrayBuffer = await response.arrayBuffer();
+          fileBuffer = Buffer.from(arrayBuffer);
+          console.log('✅ Successfully fetched CV, size:', fileBuffer.length);
+        } catch (fetchError) {
+          console.error('❌ Error fetching CV:', fetchError);
+          throw new AppError('Lỗi khi tải CV', 500);
         }
 
         // Get filename và format từ current resume
         const filename = profile.resume.current.filename || 'resume.pdf';
         const format = profile.resume.current.format || 'pdf';
 
-        console.log('📋 File info:', { filename, format });
+        console.log('📋 File info:', {
+          filename,
+          format,
+          size: fileBuffer.length,
+        });
 
         // Set content type dựa trên format - QUAN TRỌNG để browser hiển thị đúng
         let contentType = 'application/pdf';
@@ -251,12 +485,8 @@ class ResumeController {
         res.setHeader('X-Content-Type-Options', 'nosniff');
         res.setHeader('X-Frame-Options', 'SAMEORIGIN'); // Cho phép iframe từ cùng origin
 
-        const arrayBuffer = await response.arrayBuffer();
-        console.log(
-          '✅ Successfully fetched CV, size:',
-          arrayBuffer.byteLength
-        );
-        res.send(Buffer.from(arrayBuffer));
+        console.log('✅ Successfully fetched CV, size:', fileBuffer.length);
+        res.send(fileBuffer);
       } catch (streamError) {
         console.error('❌ Error streaming CV:', streamError);
         throw new AppError('Lỗi khi tải CV', 500);
@@ -304,13 +534,20 @@ class ResumeController {
     if (profile.resume.current.url) {
       if (!profile.resume.history) profile.resume.history = [];
       profile.resume.history.push({
-        ...profile.resume.current,
+        url: profile.resume.current.url,
+        publicId: profile.resume.current.publicId,
+        filename: profile.resume.current.filename,
+        displayName: profile.resume.current.displayName,
+        format: profile.resume.current.format,
+        size: profile.resume.current.size,
+        mimeType: profile.resume.current.mimeType,
         uploadedAt: profile.resume.current.updatedAt,
       });
     }
 
     // Set new resume as current
     profile.resume.current = {
+      _id: new mongoose.Types.ObjectId(), // Add ID for current CV
       url: result.url,
       publicId: result.publicId,
       filename: req.file.originalname,
@@ -490,11 +727,43 @@ class ResumeController {
    * Download resume helper
    */
   _downloadResume(profile, id, res) {
-    if (!profile.resume.current.url) {
-      throw new AppError('Resume not found', 404);
+    let cvToDownload = null;
+
+    // If id is "current", download current CV
+    if (id === 'current') {
+      if (!profile.resume.current || !profile.resume.current.url) {
+        throw new AppError('Current resume not found', 404);
+      }
+      cvToDownload = profile.resume.current;
+    } else {
+      // Find CV in history by ID
+      if (!profile.resume.history || !Array.isArray(profile.resume.history)) {
+        throw new AppError('Resume history not found', 404);
+      }
+
+      const cvIndex = profile.resume.history.findIndex(
+        cv => cv._id.toString() === id
+      );
+
+      if (cvIndex === -1) {
+        throw new AppError('Resume not found in history', 404);
+      }
+
+      cvToDownload = profile.resume.history[cvIndex];
     }
 
-    res.redirect(profile.resume.current.url);
+    if (!cvToDownload || !cvToDownload.url) {
+      throw new AppError('Resume URL not found', 404);
+    }
+
+    // Set download headers
+    const filename =
+      cvToDownload.filename || cvToDownload.displayName || 'resume.pdf';
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', cvToDownload.mimeType || 'application/pdf');
+
+    // Redirect to Cloudinary URL for download
+    res.redirect(cvToDownload.url);
   }
 
   /**

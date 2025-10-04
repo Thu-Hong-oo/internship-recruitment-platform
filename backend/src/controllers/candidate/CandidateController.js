@@ -33,6 +33,8 @@ class CandidateController {
     this.handleResume = this.resumeController.handleResume;
     this.getResume = this.resumeController.getResume;
     this.deleteResume = this.resumeController.deleteResume;
+    this.setCurrentResume = this.resumeController.setCurrentResume;
+    this.renameResume = this.resumeController.renameResume;
     this.viewCurrentCV = this.resumeController.viewCurrentCV;
 
     // Application management methods
