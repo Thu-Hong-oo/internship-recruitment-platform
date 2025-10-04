@@ -56,6 +56,40 @@ const JobSchema = new mongoose.Schema({
   ai: {
     keywords: [String],
     embedding: [Number],
+
+    // THÊM: Extracted skills với importance và confidence
+    extractedSkills: [
+      {
+        name: String,
+        importance: {
+          type: String,
+          enum: ['required', 'preferred', 'nice-to-have'],
+        },
+        level: String,
+        confidence: Number,
+      },
+    ],
+
+    // THÊM: Job category classification
+    jobCategory: {
+      primary: String,
+      secondary: [String],
+      confidence: Number,
+    },
+
+    // THÊM: Matching pool cho hiệu suất
+    matchingPool: [
+      {
+        candidateId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'CandidateProfile',
+        },
+        matchScore: Number,
+        matchReasons: [String],
+        updatedAt: Date,
+      },
+    ],
+
     suggestedCandidates: [
       {
         candidateId: {
@@ -64,9 +98,15 @@ const JobSchema = new mongoose.Schema({
         },
         score: Number,
         matchingSkills: [String],
+        // THÊM: Chi tiết matching
+        strengthsMatch: [String],
+        weaknessesMatch: [String],
+        recommendations: [String],
       },
     ],
+
     analyzedAt: Date,
+    needsReanalysis: { type: Boolean, default: false },
   },
 
   // Soft delete fields
@@ -86,6 +126,39 @@ JobSchema.index({
   skills: 'text',
   industry: 'text',
   category: 'text',
+});
+
+// THÊM: Indexes cần thiết cho performance
+JobSchema.index({ 'ai.embedding': 1 }); // Cho vector search
+JobSchema.index({ skills: 1, location: 1, status: 1 });
+JobSchema.index({ 'ai.suggestedCandidates.score': -1 });
+JobSchema.index({ status: 1, createdAt: -1 });
+JobSchema.index({ employer: 1, status: 1 });
+JobSchema.index({ deadline: 1 });
+JobSchema.index({ deletedAt: 1 }); // For soft delete queries
+
+// THÊM: Virtual fields hữu ích
+JobSchema.virtual('isExpired').get(function () {
+  return this.deadline && this.deadline < new Date();
+});
+
+JobSchema.virtual('daysUntilDeadline').get(function () {
+  if (!this.deadline) return null;
+  return Math.ceil((this.deadline - new Date()) / (1000 * 60 * 60 * 24));
+});
+
+JobSchema.virtual('isUrgent').get(function () {
+  const days = this.daysUntilDeadline;
+  return days !== null && days <= 7 && days > 0;
+});
+
+JobSchema.virtual('applicationRate').get(function () {
+  if (!this.stats || this.stats.views === 0) return 0;
+  return Math.round((this.stats.applications / this.stats.views) * 100);
+});
+
+JobSchema.virtual('isHot').get(function () {
+  return this.hotScore && this.hotScore > 80;
 });
 
 module.exports = mongoose.model('Job', JobSchema);

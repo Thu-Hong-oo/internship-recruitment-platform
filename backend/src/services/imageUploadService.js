@@ -1,4 +1,4 @@
-const { cloudinary } = require('./cloudinaryService');
+const { cloudinary } = require('../utils/cloudinary');
 
 /**
  * Upload an image to Cloudinary with optimized settings per type

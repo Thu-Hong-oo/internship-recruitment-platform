@@ -7,6 +7,51 @@ const {
 
 const CandidateProfileSchema = new mongoose.Schema(
   {
+    // Profile status management
+    status: {
+      type: String,
+      enum: ['active', 'inactive', 'paused'],
+      default: 'active',
+    },
+    pausedAt: Date,
+    pauseReason: String,
+    autoReactivateAt: Date,
+    deletedAt: Date,
+
+    // Profile visibility settings
+    settings: {
+      visibility: {
+        type: String,
+        enum: ['public', 'private', 'paused'],
+        default: 'public',
+      },
+      searchable: {
+        type: Boolean,
+        default: true,
+      },
+      lastVisibilityChange: Date,
+    },
+
+    personalInfo: {
+      fullName: String,
+      givenName: String,
+      familyName: String,
+      dateOfBirth: Date,
+      gender: {
+        type: String,
+        enum: ['male', 'female', 'other', 'prefer_not_to_say'],
+      },
+      phone: String,
+      address: {
+        street: String,
+        ward: String,
+        district: String,
+        city: String,
+        country: { type: String, default: 'Vietnam' },
+      },
+      bio: { type: String, maxlength: 500 },
+    },
+
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -16,21 +61,37 @@ const CandidateProfileSchema = new mongoose.Schema(
 
     education: {
       university: {
+        _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
+        type: { type: String, default: 'university' },
         name: String,
+        institution: String,
         major: String,
         degree: String,
+        field: String,
+        startDate: Date,
+        endDate: Date,
         graduationYear: Number,
+        currentYear: Number,
         gpa: Number,
         courses: [String],
         achievements: [String],
       },
       certifications: [
         {
+          _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
+          type: { type: String, default: 'certification' },
           name: String,
           issuer: String,
+          institution: String,
+          degree: String,
+          field: String,
+          startDate: Date,
+          endDate: Date,
           issueDate: Date,
           expiryDate: Date,
           credentialUrl: String,
+          gpa: Number,
+          achievements: [String],
         },
       ],
     },
@@ -38,13 +99,14 @@ const CandidateProfileSchema = new mongoose.Schema(
     skills: {
       technical: [
         {
+          _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
           name: String,
           level: { type: String, enum: Object.values(SKILL_LEVELS) },
           verified: {
             type: Boolean,
             default: false,
           },
-          endorsements: Number,
+          endorsements: { type: Number, default: 0 },
           projects: [
             {
               name: String,
@@ -56,15 +118,23 @@ const CandidateProfileSchema = new mongoose.Schema(
       ],
       soft: [
         {
+          _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
           name: String,
-          self_assessment: Number,
+          level: { type: String, enum: Object.values(SKILL_LEVELS) },
+          selfAssessment: { type: Number, min: 1, max: 5 },
+          self_assessment: { type: Number, min: 1, max: 5 },
+          verified: { type: Boolean, default: false },
+          endorsements: { type: Number, default: 0 },
         },
       ],
       languages: [
         {
+          _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
           name: String,
           level: String,
           certificate: String,
+          verified: { type: Boolean, default: false },
+          endorsements: { type: Number, default: 0 },
         },
       ],
     },
@@ -72,6 +142,7 @@ const CandidateProfileSchema = new mongoose.Schema(
     experience: {
       internships: [
         {
+          _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
           company: String,
           position: String,
           startDate: Date,
@@ -89,6 +160,8 @@ const CandidateProfileSchema = new mongoose.Schema(
       ],
       projects: [
         {
+          _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
+          title: String,
           name: String,
           description: String,
           role: String,
@@ -110,7 +183,10 @@ const CandidateProfileSchema = new mongoose.Schema(
       ],
       industries: [String],
       minSalary: Number,
+      maxSalary: Number,
       availableFrom: Date,
+      careerGoals: String,
+      targetRoles: [String],
       duration: {
         min: Number,
         max: Number,
@@ -121,34 +197,58 @@ const CandidateProfileSchema = new mongoose.Schema(
     resume: {
       current: {
         url: String,
-        updatedAt: Date,
+        publicId: String,
         filename: String,
         displayName: String,
         format: String,
         size: Number,
+        mimeType: String,
+        updatedAt: Date,
         aiAnalysis: {
-          skills: [
+          // Extracted raw data from resume
+          extractedData: mongoose.Schema.Types.Mixed,
+
+          // Simple skills array (strings)
+          skills: [String],
+
+          // Detailed skills analysis (objects) - optional
+          detailedSkills: [
             {
               name: String,
               confidence: Number,
               context: String,
+              category: String,
+              level: String,
             },
           ],
+
+          // AI suggestions for improvement
           suggestions: [String],
+
+          // Analysis metadata
           analyzedAt: Date,
+          error: String,
         },
       },
       history: [
         {
           url: String,
-          uploadedAt: Date,
+          publicId: String,
           filename: String,
           displayName: String,
           format: String,
           size: Number,
+          uploadedAt: Date,
         },
       ],
     },
+
+    followedCompanies: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'EmployerProfile',
+      },
+    ],
 
     progress: {
       profileCompletion: {
@@ -177,10 +277,11 @@ const CandidateProfileSchema = new mongoose.Schema(
         default: 0,
       },
       applicationStats: {
-        total: Number,
-        interviews: Number,
-        offers: Number,
-        accepted: Number,
+        total: { type: Number, default: 0 },
+        pending: { type: Number, default: 0 },
+        interviews: { type: Number, default: 0 },
+        offers: { type: Number, default: 0 },
+        accepted: { type: Number, default: 0 },
       },
       skillGrowth: [
         {
@@ -198,6 +299,8 @@ const CandidateProfileSchema = new mongoose.Schema(
   }
 );
 
+// ... rest of the code remains the same
+
 // Indexes
 CandidateProfileSchema.index({ userId: 1 });
 CandidateProfileSchema.index({ 'education.university.name': 1 });
@@ -208,7 +311,7 @@ CandidateProfileSchema.index({ 'analytics.viewCount': -1 });
 // Methods
 CandidateProfileSchema.methods.updateProfileCompletion = function () {
   const requiredFields = [
-    'education.university',
+    'education.university.name', // Check for specific field to avoid auto-creation
     'skills.technical',
     'preferences',
     'resume.current',
@@ -216,7 +319,10 @@ CandidateProfileSchema.methods.updateProfileCompletion = function () {
 
   let completed = 0;
   requiredFields.forEach(field => {
-    if (this.get(field)) completed++;
+    const value = this.get(field);
+    if (value && (Array.isArray(value) ? value.length > 0 : true)) {
+      completed++;
+    }
   });
 
   this.progress.profileCompletion = Math.round(
@@ -241,5 +347,54 @@ CandidateProfileSchema.methods.incrementViews = async function () {
   this.analytics.lastActive = new Date();
   return this.save();
 };
+
+// THÊM: Indexes cần thiết
+CandidateProfileSchema.index({
+  'skills.technical.name': 1,
+  'skills.technical.level': 1,
+});
+CandidateProfileSchema.index({
+  'preferences.locations': 1,
+  'preferences.industries': 1,
+});
+// Index for AI analysis skills (now simple strings)
+CandidateProfileSchema.index({ 'resume.current.aiAnalysis.skills': 1 });
+CandidateProfileSchema.index({
+  'resume.current.aiAnalysis.detailedSkills.name': 1,
+});
+CandidateProfileSchema.index({ userId: 1 }, { unique: true });
+CandidateProfileSchema.index({ 'progress.profileCompletion': -1 });
+
+// THÊM: Virtual fields hữu ích
+CandidateProfileSchema.virtual('skillsCount').get(function () {
+  return (this.skills.technical || []).length;
+});
+
+CandidateProfileSchema.virtual('isProfileComplete').get(function () {
+  return this.progress.profileCompletion >= 80;
+});
+
+CandidateProfileSchema.virtual('topSkills').get(function () {
+  return (this.skills.technical || [])
+    .filter(skill => skill.level === 'advanced')
+    .slice(0, 5);
+});
+
+CandidateProfileSchema.virtual('experienceYears').get(function () {
+  const internships = this.experience.internships || [];
+  if (internships.length === 0) return 0;
+
+  const totalDays = internships.reduce((total, internship) => {
+    if (internship.startDate && internship.endDate) {
+      const days =
+        Math.abs(internship.endDate - internship.startDate) /
+        (1000 * 60 * 60 * 24);
+      return total + days;
+    }
+    return total;
+  }, 0);
+
+  return Math.round((totalDays / 365) * 10) / 10; // Round to 1 decimal
+});
 
 module.exports = mongoose.model('CandidateProfile', CandidateProfileSchema);

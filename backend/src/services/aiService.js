@@ -1,52 +1,179 @@
-const OpenAI = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const natural = require('natural');
 const { logger } = require('../utils/logger');
+require('dotenv').config();
 
-// Initialize OpenAI
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Initialize Gemini with proper model
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Skill dictionary for different domains
-const SKILL_DICTIONARY = {
-  technology: {
-    programming: ['python', 'javascript', 'java', 'c++', 'c#', 'php', 'ruby', 'go', 'rust', 'swift', 'kotlin', 'scala'],
-    web: ['html', 'css', 'react', 'vue', 'angular', 'node.js', 'express', 'django', 'flask', 'spring', 'laravel'],
-    database: ['sql', 'mysql', 'postgresql', 'mongodb', 'redis', 'elasticsearch', 'oracle', 'sqlite'],
-    cloud: ['aws', 'azure', 'gcp', 'docker', 'kubernetes', 'terraform', 'jenkins', 'gitlab'],
-    mobile: ['react native', 'flutter', 'ios', 'android', 'xamarin', 'ionic'],
-    ai_ml: ['tensorflow', 'pytorch', 'scikit-learn', 'pandas', 'numpy', 'matplotlib', 'opencv', 'nlp']
-  },
-  business: {
-    analysis: ['excel', 'powerpoint', 'word', 'power bi', 'tableau', 'sql', 'r', 'python'],
-    management: ['project management', 'agile', 'scrum', 'kanban', 'jira', 'trello', 'asana'],
-    finance: ['financial modeling', 'budgeting', 'forecasting', 'quickbooks', 'sap', 'oracle']
-  },
-  marketing: {
-    digital: ['seo', 'sem', 'google ads', 'facebook ads', 'email marketing', 'content marketing'],
-    analytics: ['google analytics', 'google tag manager', 'facebook pixel', 'hotjar', 'mixpanel'],
-    social: ['social media management', 'instagram', 'facebook', 'linkedin', 'twitter', 'tiktok']
-  },
-  design: {
-    graphic: ['photoshop', 'illustrator', 'figma', 'sketch', 'canva', 'invision'],
-    ui_ux: ['user experience', 'user interface', 'wireframing', 'prototyping', 'usability testing'],
-    video: ['premiere pro', 'after effects', 'final cut pro', 'davinci resolve']
-  }
-};
+// Extended skill dictionary - more comprehensive
+const COMMON_SKILLS = [
+  // Programming languages
+  'javascript',
+  'python',
+  'java',
+  'c++',
+  'c#',
+  'php',
+  'ruby',
+  'go',
+  'rust',
+  'swift',
+  'kotlin',
+  'typescript',
+  'r',
+  'matlab',
+  'scala',
+  'perl',
+
+  // Frontend
+  'react',
+  'vue',
+  'angular',
+  'html',
+  'css',
+  'sass',
+  'tailwind',
+  'bootstrap',
+  'jquery',
+  'next.js',
+  'nuxt.js',
+  'webpack',
+  'vite',
+
+  // Backend
+  'node.js',
+  'express',
+  'django',
+  'flask',
+  'spring',
+  'laravel',
+  'rails',
+  'fastapi',
+  'nest.js',
+  '.net',
+  'asp.net',
+
+  // Databases
+  'sql',
+  'mysql',
+  'postgresql',
+  'mongodb',
+  'redis',
+  'elasticsearch',
+  'oracle',
+  'sqlite',
+  'mariadb',
+  'cassandra',
+  'dynamodb',
+
+  // Cloud & DevOps
+  'aws',
+  'azure',
+  'gcp',
+  'docker',
+  'kubernetes',
+  'jenkins',
+  'gitlab',
+  'github',
+  'terraform',
+  'ansible',
+  'ci/cd',
+  'nginx',
+  'apache',
+
+  // Tools
+  'git',
+  'jira',
+  'confluence',
+  'figma',
+  'photoshop',
+  'illustrator',
+  'sketch',
+
+  // Data & AI
+  'tensorflow',
+  'pytorch',
+  'scikit-learn',
+  'pandas',
+  'numpy',
+  'power bi',
+  'tableau',
+  'excel',
+  'powerpoint',
+  'word',
+
+  // Soft skills (Vietnamese + English)
+  'teamwork',
+  'communication',
+  'leadership',
+  'problem solving',
+  'time management',
+  'giao tiếp',
+  'làm việc nhóm',
+  'lãnh đạo',
+  'quản lý thời gian',
+  'giải quyết vấn đề',
+
+  // Languages
+  'english',
+  'tiếng anh',
+  'vietnamese',
+  'tiếng việt',
+  'chinese',
+  'tiếng trung',
+  'japanese',
+  'tiếng nhật',
+  'korean',
+  'tiếng hàn',
+
+  // Office & Business
+  'tin học văn phòng',
+  'microsoft office',
+  'google workspace',
+  'excel',
+  'word',
+  'powerpoint',
+  'outlook',
+  'ms office',
+
+  // Specialized
+  'xuất nhập khẩu',
+  'export import',
+  'logistics',
+  'supply chain',
+  'customs',
+  'hải quan',
+  'chứng từ',
+  'documents',
+  'kinh doanh quốc tế',
+  'international business',
+  'kế toán',
+  'accounting',
+  'toeic',
+  'ielts',
+];
 
 class AIService {
   constructor() {
     this.tokenizer = new natural.WordTokenizer();
     this.tfidf = new natural.TfIdf();
+    this.lastExtractedText = null;
+
+    // ✅ Use supported Gemini model
+    const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+    this.model = genAI.getGenerativeModel({ model: modelName });
+
+    logger.info('Gemini model initialized:', modelName);
   }
 
   /**
-   * Extract text from CV file
+   * Extract text from CV file with better encoding handling
    */
   async extractTextFromCV(fileBuffer, mimeType) {
     try {
       let text = '';
-      
+
       if (mimeType === 'application/pdf') {
         const pdfParse = require('pdf-parse');
         const pdfData = await pdfParse(fileBuffer);
@@ -55,11 +182,15 @@ class AIService {
         const mammoth = require('mammoth');
         const result = await mammoth.extractRawText({ buffer: fileBuffer });
         text = result.value;
+      } else if (mimeType.includes('text')) {
+        text = fileBuffer.toString('utf-8');
       } else {
-        throw new Error('Unsupported file type');
+        throw new Error('Unsupported file type: ' + mimeType);
       }
 
-      return this.preprocessText(text);
+      // Clean and fix Vietnamese encoding
+      text = this.cleanExtractedText(text);
+      return text;
     } catch (error) {
       logger.error('Error extracting text from CV:', error);
       throw error;
@@ -67,124 +198,815 @@ class AIService {
   }
 
   /**
-   * Preprocess text for analysis
+   * Clean extracted text - fix Vietnamese encoding and formatting
    */
-  preprocessText(text) {
-    return text
-      .toLowerCase()
-      .replace(/[^\w\s]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+  cleanExtractedText(text) {
+    // Remove excessive whitespace between characters
+    text = text.replace(
+      /([a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])\s+(?=[a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])/gi,
+      '$1'
+    );
+
+    // Fix common Vietnamese name patterns
+    const namePatterns = {
+      'nguy n': 'Nguyễn',
+      'tr n': 'Trần',
+      'l ': 'Lê',
+      'ph m': 'Phạm',
+      'hu nh': 'Huỳnh',
+      'v ': 'Vũ',
+      'v ': 'Võ',
+      'ng ': 'Ngô',
+      'd ng': 'Dương',
+      ' ng': 'Đặng',
+      'b i': 'Bùi',
+      ' ': 'Đỗ',
+      'h ': 'Hồ',
+      phan: 'Phan',
+      mai: 'Mai',
+      cao: 'Cao',
+    };
+
+    // Fix Vietnamese location names
+    const locationPatterns = {
+      'tp h ch minh': 'TP. Hồ Chí Minh',
+      'h ch minh': 'Hồ Chí Minh',
+      'tp hcm': 'TP. Hồ Chí Minh',
+      hcm: 'Hồ Chí Minh',
+      'ha n i': 'Hà Nội',
+      'ha noi': 'Hà Nội',
+      'da n ng': 'Đà Nẵng',
+      'da nang': 'Đà Nẵng',
+      'vi t nam': 'Việt Nam',
+      'viet nam': 'Việt Nam',
+    };
+
+    // Fix Vietnamese education terms
+    const educationPatterns = {
+      'ti ng anh': 'Tiếng Anh',
+      'ti ng vi t': 'Tiếng Việt',
+      'tin h c': 'Tin học',
+      'k thu t': 'Kỹ thuật',
+      'i h c': 'Đại học',
+      'c nhân': 'Cử nhân',
+      'th c s ': 'Thạc sĩ',
+      'ti n s ': 'Tiến sĩ',
+      'cao ng': 'Cao đẳng',
+      'trung c p': 'Trung cấp',
+    };
+
+    // Apply all fixes
+    const allPatterns = {
+      ...namePatterns,
+      ...locationPatterns,
+      ...educationPatterns,
+    };
+    for (const [wrong, correct] of Object.entries(allPatterns)) {
+      const regex = new RegExp(wrong, 'gi');
+      text = text.replace(regex, correct);
+    }
+
+    // Remove non-printable characters
+    text = text.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
+
+    // Normalize whitespace
+    text = text.replace(/\s+/g, ' ').trim();
+
+    return text;
   }
 
   /**
-   * Extract skills from text using NLP
+   * Parse resume from buffer using Gemini API with improved prompt
    */
-  async extractSkills(text) {
+  async parseResumeFromBuffer(fileBuffer, mimeType) {
     try {
+      console.log('📝 Starting resume parsing with Gemini');
+      console.log('📄 File type:', mimeType);
+
+      // Check API key
+      if (!process.env.GEMINI_API_KEY) {
+        console.warn('❌ Gemini API key not configured');
+        return this.fallbackParseResume();
+      }
+
+      // Extract text from file
+      const text = await this.extractTextFromCV(fileBuffer, mimeType);
+
+      if (!text || text.length < 50) {
+        console.error(
+          '❌ Insufficient text extracted. Length:',
+          text?.length || 0
+        );
+        throw new Error('Could not extract sufficient text from resume');
+      }
+
+      this.lastExtractedText = text;
+      console.log('✅ Text extracted successfully');
+      console.log('📊 Text length:', text.length, 'characters');
+      console.log('📄 Preview:', text.substring(0, 300).replace(/\n/g, ' '));
+
+      // Enhanced Gemini prompt
       const prompt = `
-        Extract technical and professional skills from the following text. 
-        Return only the skills as a JSON array of objects with format:
-        [{"name": "skill_name", "level": "beginner|intermediate|advanced", "confidence": 0.0-1.0}]
-        
-        Text: ${text}
-        
-        Focus on:
-        - Programming languages and frameworks
-        - Tools and technologies
-        - Soft skills and methodologies
-        - Certifications and qualifications
-      `;
+Bạn là chuyên gia phân tích CV. Hãy phân tích CV này và trích xuất thông tin theo format JSON.
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.3,
-        max_tokens: 500
-      });
+CV TEXT:
+"""
+${text}
+"""
 
-      const response = completion.choices[0].message.content;
-      const skills = JSON.parse(response);
-      
-      return this.normalizeSkills(skills);
+YÊU CẦU TRÍCH XUẤT:
+
+1. THÔNG TIN CÁ NHÂN:
+   - Họ tên: Tìm họ tên đầy đủ (có dấu tiếng Việt)
+   - Email: Tìm địa chỉ email
+   - Số điện thoại: Tìm số điện thoại (format: 0xxx hoặc +84xxx)
+   - Địa chỉ: Tìm địa chỉ hiện tại
+   - Ngày sinh: Tìm ngày sinh (format: dd/mm/yyyy)
+
+2. HỌC VẤN:
+   - Trường: Tên trường đại học/cao đẳng
+   - Bằng cấp: Cử nhân/Kỹ sư/Thạc sĩ...
+   - Ngành học: Tên ngành học
+   - Năm tốt nghiệp: Năm tốt nghiệp (hoặc dự kiến)
+   - GPA: 
+     * Nếu có điểm số rõ ràng (3.5, 8.5, 85...) → trả về số đó
+     * Nếu chỉ có xếp loại văn bản (Giỏi, Khá...) → để null, lưu vào gradeText
+   - gradeText: Xếp loại văn bản (Giỏi, Khá, Xuất sắc...)
+
+3. KINH NGHIỆM:
+   - Vị trí: Chức danh công việc
+   - Công ty: Tên công ty
+   - Thời gian: Từ tháng/năm đến tháng/năm
+   - Mô tả: Công việc và trách nhiệm chính
+
+4. KỸ NĂNG:
+   - Kỹ năng chuyên môn (technical): JavaScript, Python, Excel...
+   - Kỹ năng mềm (soft skills): Giao tiếp, làm việc nhóm...
+   - Ngôn ngữ (language): Tiếng Anh, TOEIC, IELTS...
+
+5. CHỨNG CHỈ & GIẢI THƯỞNG:
+   - Tất cả chứng chỉ, giải thưởng, danh hiệu được đề cập
+
+TRẢ VỀ JSON ĐÚNG FORMAT SAU (không có markdown, không có \`\`\`):
+{
+  "extractedData": {
+    "personalInfo": {
+      "fullName": "Họ tên đầy đủ có dấu",
+      "email": "email@example.com",
+      "phone": "0123456789",
+      "address": "Địa chỉ đầy đủ",
+      "dateOfBirth": "dd/mm/yyyy"
+    },
+    "education": {
+      "type": "university",
+      "institution": "Tên trường",
+      "degree": "Cử nhân",
+      "field": "Ngành học",
+      "graduationYear": 2025,
+      "gpa": null,
+      "gradeText": "Giỏi"
+    },
+    "experience": [
+      {
+        "type": "internship",
+        "company": "Tên công ty",
+        "position": "Vị trí",
+        "location": "Địa điểm",
+        "startDate": "MM/YYYY",
+        "endDate": "MM/YYYY",
+        "description": "Mô tả chi tiết công việc"
+      }
+    ],
+    "skills": [
+      {
+        "name": "Tên kỹ năng",
+        "type": "technical|soft|language",
+        "level": "beginner|intermediate|advanced"
+      }
+    ],
+    "certificates": [
+      {
+        "name": "Tên chứng chỉ",
+        "issuer": "Tổ chức cấp",
+        "year": 2024
+      }
+    ],
+    "awards": [
+      {
+        "name": "Tên giải thưởng",
+        "year": 2024,
+        "description": "Mô tả"
+      }
+    ]
+  },
+  "skills": ["skill1", "skill2", "skill3"],
+  "suggestions": [
+    "Gợi ý cải thiện CV",
+    "Điểm mạnh cần phát huy",
+    "Kỹ năng nên bổ sung"
+  ]
+}
+
+LƯU Ý QUAN TRỌNG:
+- Trích xuất CHÍNH XÁC từ CV, KHÔNG tạo dữ liệu giả
+- Giữ NGUYÊN dấu tiếng Việt (Nguyễn Thị Thu Hậu, không phải Nguyen Thi Thu Hau)
+- Nếu KHÔNG tìm thấy thông tin → để null
+- Trả về JSON thuần túy, KHÔNG có markdown, KHÔNG có \`\`\`json
+- Trích xuất TẤT CẢ kỹ năng: technical, soft skills, languages, certificates
+`;
+
+      console.log('🤖 Calling Gemini API...');
+
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      let responseText = response.text();
+
+      console.log('✅ Gemini response received');
+
+      // Clean response - remove markdown
+      responseText = responseText
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .replace(/^[^{]*/, '') // Remove text before first {
+        .replace(/[^}]*$/, '') // Remove text after last }
+        .trim();
+
+      console.log(
+        '📝 Cleaned response preview:',
+        responseText.substring(0, 200)
+      );
+
+      // Parse JSON
+      try {
+        const parsedData = JSON.parse(responseText);
+
+        // Validate structure
+        if (!parsedData.extractedData) {
+          console.warn('⚠️ Invalid response structure, using fallback');
+          return this.fallbackParseResume();
+        }
+
+        // Log extracted info
+        console.log('✅ Successfully parsed CV with Gemini');
+        console.log(
+          '👤 Name:',
+          parsedData.extractedData?.personalInfo?.fullName || 'Not found'
+        );
+        console.log(
+          '📧 Email:',
+          parsedData.extractedData?.personalInfo?.email || 'Not found'
+        );
+        console.log(
+          '📞 Phone:',
+          parsedData.extractedData?.personalInfo?.phone || 'Not found'
+        );
+        console.log(
+          '🎓 Education:',
+          parsedData.extractedData?.education?.institution || 'Not found'
+        );
+        console.log(
+          '💼 Experience count:',
+          parsedData.extractedData?.experience?.length || 0
+        );
+        console.log('🔧 Skills count:', parsedData.skills?.length || 0);
+
+        return parsedData;
+      } catch (parseError) {
+        console.error('❌ JSON parsing failed:', parseError.message);
+        console.log('📄 Raw response:', responseText.substring(0, 500));
+        return this.fallbackParseResume();
+      }
     } catch (error) {
-      logger.error('Error extracting skills:', error);
-      // Fallback to rule-based extraction
-      return this.extractSkillsRuleBased(text);
+      console.error('❌ Gemini parsing error:', error.message);
+
+      // If it's a 404 model error, log helpful message
+      if (
+        error.message.includes('404') ||
+        error.message.includes('not found')
+      ) {
+        console.error(
+          '⚠️ Model not found. Please update to: gemini-1.5-flash or gemini-1.5-pro'
+        );
+      }
+
+      return this.fallbackParseResume();
     }
   }
 
   /**
-   * Rule-based skill extraction as fallback
+   * Extract skills using Gemini AI with improved detection
    */
-  extractSkillsRuleBased(text) {
-    const skills = [];
-    const words = this.tokenizer.tokenize(text);
-    
-    // Flatten skill dictionary
-    const allSkills = [];
-    Object.values(SKILL_DICTIONARY).forEach(category => {
-      Object.values(category).forEach(skillList => {
-        allSkills.push(...skillList);
-      });
-    });
+  async extractSkills(text) {
+    try {
+      if (!process.env.GEMINI_API_KEY) {
+        console.log('⚠️ No Gemini API, using enhanced fallback');
+        return this.extractSkillsEnhanced(text);
+      }
 
-    // Find matches
-    allSkills.forEach(skill => {
-      if (text.includes(skill.toLowerCase())) {
+      const prompt = `
+Trích xuất TẤT CẢ kỹ năng từ CV này:
+
+CV TEXT:
+"""
+${text.substring(0, 4000)}
+"""
+
+BAO GỒM:
+1. Kỹ năng chuyên môn: Ngôn ngữ lập trình, framework, công nghệ, phần mềm
+2. Kỹ năng mềm: Giao tiếp, làm việc nhóm, lãnh đạo, quản lý thời gian
+3. Ngôn ngữ: Tiếng Anh, TOEIC, IELTS, tiếng Việt, tiếng Trung...
+4. Công cụ văn phòng: Excel, Word, PowerPoint, Tin học văn phòng
+5. Chuyên môn: Xuất nhập khẩu, kế toán, logistics, marketing...
+
+TRẢ VỀ JSON ARRAY (không markdown):
+[
+  {"name": "JavaScript", "type": "technical", "level": "intermediate"},
+  {"name": "Giao tiếp", "type": "soft", "level": "intermediate"},
+  {"name": "Tiếng Anh", "type": "language", "level": "intermediate"},
+  {"name": "Excel", "type": "technical", "level": "advanced"}
+]
+
+QUY TẮC:
+- type: "technical" | "soft" | "language"
+- level: "beginner" | "intermediate" | "advanced"
+- Trích xuất CHÍNH XÁC từ CV
+- JSON thuần túy, không markdown
+`;
+
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      let responseText = response
+        .text()
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim();
+
+      const skills = JSON.parse(responseText);
+      console.log(`✅ Extracted ${skills.length} skills with Gemini`);
+
+      return skills;
+    } catch (error) {
+      console.error('❌ Gemini skill extraction failed:', error.message);
+      return this.extractSkillsEnhanced(text);
+    }
+  }
+
+  /**
+   * Enhanced fallback skill extraction
+   */
+  extractSkillsEnhanced(text) {
+    console.log('📝 Using enhanced skill extraction');
+
+    const skills = [];
+    const lowerText = text.toLowerCase();
+    const foundSkills = new Set();
+
+    // Search for all common skills
+    COMMON_SKILLS.forEach(skill => {
+      const skillLower = skill.toLowerCase();
+      const skillRegex = new RegExp(
+        `\\b${skill.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`,
+        'i'
+      );
+
+      if (skillRegex.test(lowerText) && !foundSkills.has(skillLower)) {
+        foundSkills.add(skillLower);
+
         skills.push({
           name: skill,
-          level: 'intermediate', // Default level
-          confidence: 0.7
+          type: this.inferSkillType(skill),
+          level: this.inferSkillLevel(text, skill),
+          confidence: 0.7,
         });
       }
     });
 
+    // Extract TOEIC/IELTS scores
+    const toeicMatch = text.match(/toeic\s*:?\s*(\d{3,4})/i);
+    if (toeicMatch) {
+      skills.push({
+        name: `TOEIC ${toeicMatch[1]}`,
+        type: 'language',
+        level: parseInt(toeicMatch[1]) >= 700 ? 'advanced' : 'intermediate',
+        confidence: 0.95,
+      });
+    }
+
+    const ieltsMatch = text.match(/ielts\s*:?\s*(\d+\.?\d*)/i);
+    if (ieltsMatch) {
+      skills.push({
+        name: `IELTS ${ieltsMatch[1]}`,
+        type: 'language',
+        level: parseFloat(ieltsMatch[1]) >= 6.5 ? 'advanced' : 'intermediate',
+        confidence: 0.95,
+      });
+    }
+
+    console.log(`✅ Found ${skills.length} skills with enhanced fallback`);
     return skills;
   }
 
   /**
-   * Normalize skills to standard format
+   * Infer skill type from name
    */
-  normalizeSkills(skills) {
-    return skills.map(skill => ({
-      name: skill.name.toLowerCase(),
-      level: skill.level || 'intermediate',
-      confidence: skill.confidence || 0.5
-    }));
+  inferSkillType(skillName) {
+    const lower = skillName.toLowerCase();
+
+    const languageSkills = [
+      'english',
+      'vietnamese',
+      'chinese',
+      'japanese',
+      'korean',
+      'tiếng anh',
+      'tiếng việt',
+      'tiếng trung',
+      'tiếng nhật',
+      'tiếng hàn',
+      'toeic',
+      'ielts',
+    ];
+    if (languageSkills.some(lang => lower.includes(lang))) return 'language';
+
+    const softSkills = [
+      'teamwork',
+      'communication',
+      'leadership',
+      'management',
+      'giao tiếp',
+      'làm việc nhóm',
+      'lãnh đạo',
+      'quản lý',
+    ];
+    if (softSkills.some(soft => lower.includes(soft))) return 'soft';
+
+    return 'technical';
   }
 
   /**
-   * Generate embeddings for text
+   * Infer skill level from context
    */
-  async generateEmbedding(text) {
-    try {
-      const response = await openai.embeddings.create({
-        model: "text-embedding-3-small",
-        input: text,
-        encoding_format: "float"
+  inferSkillLevel(text, skill) {
+    const skillContext = text.toLowerCase();
+    const skillLower = skill.toLowerCase();
+
+    const advancedKeywords = [
+      'expert',
+      'advanced',
+      'proficient',
+      'giỏi',
+      'thành thạo',
+      'chuyên sâu',
+    ];
+    const beginnerKeywords = [
+      'basic',
+      'beginner',
+      'learning',
+      'cơ bản',
+      'đang học',
+      'mới bắt đầu',
+    ];
+
+    const skillIndex = skillContext.indexOf(skillLower);
+    if (skillIndex !== -1) {
+      const context = skillContext.substring(
+        Math.max(0, skillIndex - 50),
+        skillIndex + 50
+      );
+
+      if (advancedKeywords.some(kw => context.includes(kw))) return 'advanced';
+      if (beginnerKeywords.some(kw => context.includes(kw))) return 'beginner';
+    }
+
+    return 'intermediate';
+  }
+
+  /**
+   * Improved fallback parsing with rule-based extraction
+   */
+  fallbackParseResume() {
+    console.log('⚠️ Using fallback rule-based parsing');
+
+    if (!this.lastExtractedText || this.lastExtractedText.length < 100) {
+      console.log('❌ No text available for parsing');
+      return this.getEmptyTemplate();
+    }
+
+    const text = this.lastExtractedText;
+    console.log('📝 Parsing with rules from extracted text');
+
+    const result = {
+      extractedData: {
+        personalInfo: this.extractPersonalInfo(text),
+        education: this.extractEducationInfo(text),
+        experience: this.extractExperienceInfo(text),
+        skills: this.extractSkillsEnhanced(text),
+        certificates: this.extractCertificates(text),
+        awards: this.extractAwards(text),
+      },
+      skills: [],
+      suggestions: [
+        'Thêm chi tiết về dự án đã thực hiện',
+        'Làm rõ thành tựu cụ thể bằng số liệu',
+        'Bổ sung kỹ năng chuyên môn liên quan',
+      ],
+    };
+
+    // Flatten skills for compatibility
+    result.skills = result.extractedData.skills.map(s => s.name);
+
+    console.log('✅ Fallback parsing complete');
+    return result;
+  }
+
+  /**
+   * Extract personal information
+   */
+  extractPersonalInfo(text) {
+    const info = {};
+
+    // Vietnamese name pattern (common surnames)
+    const namePattern =
+      /(?:^|\n)\s*((?:Nguyễn|Trần|Lê|Phạm|Hoàng|Huỳnh|Phan|Vũ|Võ|Đặng|Bùi|Đỗ|Hồ|Ngô|Dương|Lý|Mai|Cao|Tạ|Lưu)\s+(?:Thị|Văn|Minh|Anh|Hoàng)?\s*[A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ][a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ]+(?:\s+[A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ][a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ]+)*)/m;
+    const nameMatch = text.match(namePattern);
+    if (nameMatch) {
+      info.fullName = nameMatch[1].trim();
+    }
+
+    // Email
+    const emailMatch = text.match(
+      /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/
+    );
+    if (emailMatch) info.email = emailMatch[1];
+
+    // Phone (Vietnamese format)
+    const phoneMatch = text.match(/((?:\+84|84|0)(?:3|5|7|8|9)\d{8})/);
+    if (phoneMatch) info.phone = phoneMatch[1];
+
+    // Date of birth
+    const dobMatch = text.match(/(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})/);
+    if (dobMatch) info.dateOfBirth = dobMatch[1];
+
+    // Address (Vietnamese cities)
+    const addressMatch = text.match(
+      /([\w\s,]+(?:Hồ Chí Minh|HCM|TP\.HCM|HCMC|Hà Nội|Đà Nẵng|Cần Thơ|Biên Hòa|Nha Trang|Huế|Phường|Quận|District)[\w\s,]*)/i
+    );
+    if (addressMatch) info.address = addressMatch[1].trim();
+
+    return info;
+  }
+
+  /**
+   * Extract education information
+   */
+  extractEducationInfo(text) {
+    const education = {
+      type: 'university',
+      institution: null,
+      degree: null,
+      field: null,
+      graduationYear: null,
+      gpa: null,
+      gradeText: null, // NEW: Store original grade text
+    };
+
+    // University name
+    const uniMatch = text.match(
+      /(?:Đại học|University|College|Trường)\s+([^\n]{5,50})/i
+    );
+    if (uniMatch) education.institution = uniMatch[0].trim();
+
+    // Degree
+    const degreeMatch = text.match(
+      /(Cử nhân|Kỹ sư|Thạc sĩ|Tiến sĩ|Bachelor|Master|PhD)/i
+    );
+    if (degreeMatch) education.degree = degreeMatch[1];
+
+    // Field of study
+    const fieldMatch = text.match(
+      /(?:Ngành|Major|Field)\s*:?\s*([^\n]{5,50})/i
+    );
+    if (fieldMatch) education.field = fieldMatch[1].trim();
+
+    // Graduation year
+    const yearMatch = text.match(
+      /(?:tốt nghiệp|graduation|graduated)\s*:?\s*(?:năm\s*)?(\d{4})/i
+    );
+    if (yearMatch) education.graduationYear = parseInt(yearMatch[1]);
+
+    // GPA - FIXED: Keep numeric GPA only, store text separately
+    const gpaNumericMatch = text.match(/(?:GPA|Điểm)\s*:?\s*(\d+\.?\d*)/i);
+    if (gpaNumericMatch) {
+      education.gpa = parseFloat(gpaNumericMatch[1]);
+    }
+
+    // Store grade text (Giỏi, Khá, etc.) separately - don't convert to number
+    const gradeTextMatch = text.match(
+      /(?:loại|xếp loại|grade|classification)\s*:?\s*(Xuất sắc|Giỏi|Khá|Trung bình|Yếu|Excellent|Very Good|Good|Average)/i
+    );
+    if (gradeTextMatch) {
+      education.gradeText = gradeTextMatch[1];
+
+      // If no numeric GPA, leave it null (let backend decide)
+      if (!education.gpa) {
+        education.gpa = null;
+      }
+    }
+
+    return education;
+  }
+
+  /**
+   * Extract work experience
+   */
+  extractExperienceInfo(text) {
+    const experiences = [];
+
+    // Split text into sections
+    const lines = text.split('\n');
+    let currentExp = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      // Detect experience title (position + company)
+      const expPattern = /^(.*?)\s*(?:tại|at|@)\s*(.+)$/i;
+      const datePattern =
+        /(\d{1,2}\/\d{4})\s*[-–]\s*(\d{1,2}\/\d{4}|Hiện tại|Present|Current)/i;
+
+      // Check if line contains dates (likely experience header)
+      const dateMatch = line.match(datePattern);
+      if (dateMatch) {
+        if (currentExp) experiences.push(currentExp);
+
+        currentExp = {
+          type: this.inferExperienceType(line),
+          position: null,
+          company: null,
+          startDate: dateMatch[1],
+          endDate: dateMatch[2],
+          description: '',
+          location: null,
+        };
+
+        // Try to extract position from previous line or current line
+        const prevLine = i > 0 ? lines[i - 1].trim() : '';
+        const companyMatch = line.match(
+          /(?:tại|at)\s+(.+?)(?:\s+\d{1,2}\/\d{4})/i
+        );
+
+        if (companyMatch) {
+          currentExp.company = companyMatch[1].trim();
+          currentExp.position = prevLine || 'Not specified';
+        } else if (prevLine) {
+          currentExp.position = prevLine;
+        }
+      }
+      // Collect description lines
+      else if (
+        (currentExp && line.startsWith('•')) ||
+        line.startsWith('-') ||
+        line.startsWith('*')
+      ) {
+        currentExp.description += line.replace(/^[•\-*]\s*/, '') + '\n';
+      }
+    }
+
+    if (currentExp) experiences.push(currentExp);
+
+    return experiences;
+  }
+
+  /**
+   * Infer experience type
+   */
+  inferExperienceType(text) {
+    const lower = text.toLowerCase();
+    if (lower.includes('thực tập') || lower.includes('intern'))
+      return 'internship';
+    if (lower.includes('fulltime') || lower.includes('chính thức'))
+      return 'fulltime';
+    if (lower.includes('parttime') || lower.includes('bán thời gian'))
+      return 'parttime';
+    if (lower.includes('freelance') || lower.includes('tự do'))
+      return 'freelance';
+    return 'internship';
+  }
+
+  /**
+   * Extract certificates
+   */
+  extractCertificates(text) {
+    const certificates = [];
+    const lines = text.split('\n');
+
+    const certPatterns = [
+      /(?:chứng chỉ|certificate|certification)\s*:?\s*(.+?)(?:\s*-?\s*(\d{4}))?$/i,
+      /(TOEIC|IELTS|TOEFL|AWS|Azure|Google Cloud)\s*:?\s*(\d+)?/gi,
+      /(MOS|Microsoft Office Specialist)/i,
+    ];
+
+    lines.forEach(line => {
+      certPatterns.forEach(pattern => {
+        const match = line.match(pattern);
+        if (match) {
+          const cert = {
+            name: match[1]?.trim() || match[0].trim(),
+            issuer: null,
+            year: null,
+          };
+
+          // Extract year if present
+          const yearMatch = line.match(/(\d{4})/);
+          if (yearMatch) cert.year = parseInt(yearMatch[1]);
+
+          // Avoid duplicates
+          if (!certificates.some(c => c.name === cert.name)) {
+            certificates.push(cert);
+          }
+        }
       });
+    });
 
-      return response.data[0].embedding;
-    } catch (error) {
-      logger.error('Error generating embedding:', error);
-      throw error;
-    }
+    return certificates;
   }
 
   /**
-   * Calculate similarity between two embeddings
+   * Extract awards
    */
-  calculateSimilarity(embedding1, embedding2) {
-    if (!embedding1 || !embedding2 || embedding1.length !== embedding2.length) {
-      return 0;
-    }
+  extractAwards(text) {
+    const awards = [];
+    const lines = text.split('\n');
 
-    const dotProduct = embedding1.reduce((sum, val, i) => sum + val * embedding2[i], 0);
-    const magnitude1 = Math.sqrt(embedding1.reduce((sum, val) => sum + val * val, 0));
-    const magnitude2 = Math.sqrt(embedding2.reduce((sum, val) => sum + val * val, 0));
-    
-    return dotProduct / (magnitude1 * magnitude2);
+    const awardPatterns = [
+      /(?:giải thưởng|award|prize|danh hiệu)\s*:?\s*(.+?)(?:\s*-?\s*(\d{4}))?$/i,
+      /(?:sinh viên|student)\s+(.+?)(?:\s+(?:năm|year)\s*(\d{4}))?/i,
+      /^(\d{4})\s*[-–]\s*(\d{4})?\s+(.+)$/,
+    ];
+
+    lines.forEach(line => {
+      awardPatterns.forEach(pattern => {
+        const match = line.match(pattern);
+        if (match) {
+          const award = {
+            name: null,
+            year: null,
+            description: null,
+          };
+
+          if (pattern.source.includes('^(\\d{4})')) {
+            // Format: "2023 - 2024 Award name"
+            award.year = match[1];
+            award.name = match[3]?.trim();
+          } else {
+            award.name = match[1]?.trim();
+            const yearMatch = line.match(/(\d{4})/);
+            if (yearMatch) award.year = parseInt(yearMatch[1]);
+          }
+
+          if (award.name && !awards.some(a => a.name === award.name)) {
+            awards.push(award);
+          }
+        }
+      });
+    });
+
+    return awards;
+  }
+
+  /**
+   * Get empty template
+   */
+  getEmptyTemplate() {
+    return {
+      extractedData: {
+        personalInfo: {
+          fullName: null,
+          email: null,
+          phone: null,
+          address: null,
+          dateOfBirth: null,
+        },
+        education: {
+          type: 'university',
+          institution: null,
+          degree: null,
+          field: null,
+          graduationYear: null,
+          gpa: null,
+        },
+        experience: [],
+        skills: [],
+        certificates: [],
+        awards: [],
+      },
+      skills: [],
+      suggestions: [
+        'Thêm thông tin cá nhân đầy đủ (email, phone)',
+        'Bổ sung chi tiết về học vấn và kinh nghiệm',
+        'Liệt kê rõ ràng các kỹ năng chuyên môn',
+      ],
+    };
   }
 
   /**
@@ -197,55 +1019,82 @@ class AIService {
         experience: 0,
         education: 0,
         keywords: 0,
-        overall: 0
+        overall: 0,
       };
 
-      // Skills matching
+      // Skills matching (45% weight)
       if (jobData.skills && cvSkills.length > 0) {
-        const requiredSkills = jobData.skills.filter(s => s.required).map(s => s.name.toLowerCase());
-        const niceToHaveSkills = jobData.skills.filter(s => !s.required).map(s => s.name.toLowerCase());
-        
-        const cvSkillNames = cvSkills.map(s => s.name);
-        
-        const requiredMatch = requiredSkills.filter(skill => 
-          cvSkillNames.some(cvSkill => cvSkill.includes(skill) || skill.includes(cvSkill))
-        ).length;
-        
-        const niceToHaveMatch = niceToHaveSkills.filter(skill => 
-          cvSkillNames.some(cvSkill => cvSkill.includes(skill) || skill.includes(cvSkill))
+        const requiredSkills = jobData.skills
+          .filter(s => s.required)
+          .map(s => s.name.toLowerCase());
+        const niceToHaveSkills = jobData.skills
+          .filter(s => !s.required)
+          .map(s => s.name.toLowerCase());
+
+        const cvSkillNames = cvSkills.map(s =>
+          typeof s === 'string' ? s.toLowerCase() : s.name.toLowerCase()
+        );
+
+        const requiredMatch = requiredSkills.filter(skill =>
+          cvSkillNames.some(
+            cvSkill => cvSkill.includes(skill) || skill.includes(cvSkill)
+          )
         ).length;
 
-        scores.skills = (requiredMatch / Math.max(requiredSkills.length, 1)) * 0.7 + 
-                       (niceToHaveMatch / Math.max(niceToHaveSkills.length, 1)) * 0.3;
+        const niceToHaveMatch = niceToHaveSkills.filter(skill =>
+          cvSkillNames.some(
+            cvSkill => cvSkill.includes(skill) || skill.includes(cvSkill)
+          )
+        ).length;
+
+        scores.skills =
+          (requiredMatch / Math.max(requiredSkills.length, 1)) * 0.7 +
+          (niceToHaveMatch / Math.max(niceToHaveSkills.length, 1)) * 0.3;
       }
 
-      // Experience matching
-      if (jobData.experience && jobData.experience.min) {
-        // This would need to be extracted from CV text
-        // For now, using a simple heuristic
-        const experienceKeywords = ['experience', 'years', 'worked', 'job', 'position'];
-        const hasExperience = experienceKeywords.some(keyword => cvText.includes(keyword));
+      // Experience matching (20% weight)
+      if (jobData.experience) {
+        const experienceKeywords = [
+          'experience',
+          'years',
+          'worked',
+          'kinh nghiệm',
+          'năm',
+        ];
+        const hasExperience = experienceKeywords.some(kw =>
+          cvText.toLowerCase().includes(kw)
+        );
         scores.experience = hasExperience ? 0.8 : 0.3;
       }
 
-      // Education matching
-      if (jobData.education && jobData.education.level) {
-        const educationKeywords = ['bachelor', 'master', 'phd', 'degree', 'university', 'college'];
-        const hasEducation = educationKeywords.some(keyword => cvText.includes(keyword));
+      // Education matching (10% weight)
+      if (jobData.education) {
+        const educationKeywords = [
+          'bachelor',
+          'master',
+          'university',
+          'đại học',
+          'cử nhân',
+          'thạc sĩ',
+        ];
+        const hasEducation = educationKeywords.some(kw =>
+          cvText.toLowerCase().includes(kw)
+        );
         scores.education = hasEducation ? 0.9 : 0.4;
       }
 
-      // Keyword similarity using embeddings
-      const cvEmbedding = await this.generateEmbedding(cvText);
-      const jobEmbedding = await this.generateEmbedding(jobData.description + ' ' + jobData.requirements);
-      scores.keywords = this.calculateSimilarity(cvEmbedding, jobEmbedding);
+      // Keyword similarity (25% weight)
+      const jobText = `${jobData.description || ''} ${
+        jobData.requirements || ''
+      }`;
+      scores.keywords = this.calculateTextSimilarity(cvText, jobText);
 
-      // Overall score with weights
-      scores.overall = 
+      // Overall weighted score
+      scores.overall =
         scores.skills * 0.45 +
         scores.experience * 0.2 +
         scores.education * 0.1 +
-        scores.keywords * 0.2;
+        scores.keywords * 0.25;
 
       return scores;
     } catch (error) {
@@ -255,24 +1104,52 @@ class AIService {
   }
 
   /**
+   * Calculate text similarity (Jaccard coefficient)
+   */
+  calculateTextSimilarity(text1, text2) {
+    const words1 = new Set(
+      text1
+        .toLowerCase()
+        .replace(/[^\w\s]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 2)
+    );
+    const words2 = new Set(
+      text2
+        .toLowerCase()
+        .replace(/[^\w\s]/g, ' ')
+        .split(/\s+/)
+        .filter(w => w.length > 2)
+    );
+
+    const intersection = new Set([...words1].filter(x => words2.has(x)));
+    const union = new Set([...words1, ...words2]);
+
+    return intersection.size / Math.max(union.size, 1);
+  }
+
+  /**
    * Identify skill gaps
    */
   identifySkillGaps(cvSkills, jobSkills) {
     const gaps = [];
-    const cvSkillNames = cvSkills.map(s => s.name.toLowerCase());
-    
+    const cvSkillNames = cvSkills.map(s =>
+      typeof s === 'string' ? s.toLowerCase() : s.name.toLowerCase()
+    );
+
     jobSkills.forEach(jobSkill => {
-      const hasSkill = cvSkillNames.some(cvSkill => 
-        cvSkill.includes(jobSkill.name.toLowerCase()) || 
-        jobSkill.name.toLowerCase().includes(cvSkill)
+      const hasSkill = cvSkillNames.some(
+        cvSkill =>
+          cvSkill.includes(jobSkill.name.toLowerCase()) ||
+          jobSkill.name.toLowerCase().includes(cvSkill)
       );
-      
+
       if (!hasSkill) {
         gaps.push({
           skill: jobSkill.name,
-          required: jobSkill.required,
-          level: jobSkill.level,
-          importance: jobSkill.required ? 0.9 : 0.6
+          required: jobSkill.required || false,
+          level: jobSkill.level || 'intermediate',
+          importance: jobSkill.required ? 0.9 : 0.6,
         });
       }
     });
@@ -285,67 +1162,102 @@ class AIService {
    */
   async generateSkillRoadmap(skillGaps, userProfile, duration = 8) {
     try {
+      if (!process.env.GEMINI_API_KEY || skillGaps.length === 0) {
+        return this.getDefaultRoadmap(skillGaps, duration);
+      }
+
       const prompt = `
-        Create a personalized learning roadmap for the following skill gaps.
-        Duration: ${duration} weeks
-        User background: ${userProfile?.education?.fieldOfStudy || 'General'}
-        
-        Skill gaps: ${JSON.stringify(skillGaps)}
-        
-        Return a JSON object with this structure:
-        {
-          "weeks": [
-            {
-              "week": 1,
-              "focus": "skill_name",
-              "objectives": ["objective1", "objective2"],
-              "resources": [
-                {
-                  "title": "resource_title",
-                  "url": "resource_url",
-                  "type": "video|article|course|book",
-                  "duration": "estimated_hours"
-                }
-              ],
-              "exercises": ["exercise1", "exercise2"],
-              "milestone": "what_to_achieve_by_end_of_week"
-            }
-          ],
-          "estimatedTotalHours": number,
-          "difficulty": "beginner|intermediate|advanced"
-        }
-      `;
+Tạo lộ trình học ${duration} tuần cho các kỹ năng này:
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-        max_tokens: 2000
-      });
+Skill gaps: ${JSON.stringify(skillGaps.slice(0, 5))}
+Nền tảng: ${userProfile?.education?.field || 'General'}
 
-      const response = completion.choices[0].message.content;
-      return JSON.parse(response);
+Trả về JSON:
+{
+  "weeks": [
+    {
+      "week": 1,
+      "focus": "skill_name",
+      "objectives": ["mục tiêu 1", "mục tiêu 2"],
+      "resources": [
+        {"title": "tên tài liệu", "type": "video|article|course", "duration": "10 hours"}
+      ],
+      "exercises": ["bài tập 1"],
+      "milestone": "hoàn thành"
+    }
+  ],
+  "estimatedTotalHours": 120,
+  "difficulty": "beginner|intermediate|advanced"
+}
+`;
+
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      let responseText = response
+        .text()
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim();
+
+      return JSON.parse(responseText);
     } catch (error) {
-      logger.error('Error generating skill roadmap:', error);
-      throw error;
+      logger.error('Error generating roadmap:', error);
+      return this.getDefaultRoadmap(skillGaps, duration);
     }
   }
 
   /**
-   * Analyze CV and return comprehensive analysis
+   * Default roadmap template
    */
-  async analyzeCV(cvText, jobData = null) {
+  getDefaultRoadmap(skillGaps, duration) {
+    const weeks = skillGaps.slice(0, duration).map((gap, index) => ({
+      week: index + 1,
+      focus: gap.skill,
+      objectives: [
+        `Học ${gap.skill} fundamentals`,
+        `Thực hành với dự án thực tế`,
+      ],
+      resources: [
+        {
+          title: `${gap.skill} Tutorial`,
+          type: 'course',
+          duration: '10-15 hours',
+        },
+      ],
+      exercises: [`Xây dựng project sử dụng ${gap.skill}`],
+      milestone: `Hoàn thành ${gap.skill} basics`,
+    }));
+
+    return {
+      weeks,
+      estimatedTotalHours: duration * 15,
+      difficulty: 'intermediate',
+    };
+  }
+
+  /**
+   * Analyze CV content
+   */
+  async analyzeCVContent(cvText, jobRequirements = null) {
     try {
       const analysis = {
         skills: await this.extractSkills(cvText),
-        embedding: await this.generateEmbedding(cvText),
-        complexity: 'intermediate',
-        estimatedDuration: 6
+        experience: this.extractExperienceInfo(cvText),
+        education: this.extractEducationInfo(cvText),
+        contact: this.extractPersonalInfo(cvText),
+        summary: this.extractSummary(cvText),
       };
 
-      if (jobData) {
-        analysis.matchScore = await this.calculateMatchScore(cvText, jobData, analysis.skills);
-        analysis.skillGaps = this.identifySkillGaps(analysis.skills, jobData.skills || []);
+      if (jobRequirements) {
+        analysis.matchScore = await this.calculateMatchScore(
+          cvText,
+          jobRequirements,
+          analysis.skills
+        );
+        analysis.skillGaps = this.identifySkillGaps(
+          analysis.skills,
+          jobRequirements.skills || []
+        );
       }
 
       return analysis;
@@ -356,378 +1268,118 @@ class AIService {
   }
 
   /**
-   * Get job recommendations based on CV
+   * Extract summary from CV
    */
-  async getJobRecommendations(cvText, availableJobs, limit = 10) {
-    try {
-      const cvEmbedding = await this.generateEmbedding(cvText);
-      const recommendations = [];
+  extractSummary(cvText) {
+    const lines = cvText.split('\n').filter(line => line.trim().length > 50);
 
-      for (const job of availableJobs) {
-        const jobText = `${job.title} ${job.description} ${job.requirements}`;
-        const jobEmbedding = await this.generateEmbedding(jobText);
-        const similarity = this.calculateSimilarity(cvEmbedding, jobEmbedding);
-        
-        recommendations.push({
-          job,
-          score: similarity,
-          reasons: this.generateRecommendationReasons(cvText, job)
-        });
+    // Look for objective or summary section
+    const summaryKeywords = [
+      'mục tiêu',
+      'objective',
+      'summary',
+      'profile',
+      'about',
+    ];
+    let summaryText = '';
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].toLowerCase();
+      if (summaryKeywords.some(kw => line.includes(kw))) {
+        // Collect next few lines
+        summaryText = lines.slice(i + 1, i + 4).join(' ');
+        break;
       }
-
-      return recommendations
-        .sort((a, b) => b.score - a.score)
-        .slice(0, limit);
-    } catch (error) {
-      logger.error('Error getting job recommendations:', error);
-      throw error;
     }
+
+    return summaryText || cvText.substring(0, 300);
   }
 
   /**
-   * Generate reasons for job recommendation
-   */
-  generateRecommendationReasons(cvText, job) {
-    const reasons = [];
-    const cvSkills = this.extractSkillsRuleBased(cvText).map(s => s.name);
-    const jobSkills = job.skills?.map(s => s.name.toLowerCase()) || [];
-
-    // Skill matches
-    const matchingSkills = jobSkills.filter(skill => 
-      cvSkills.some(cvSkill => cvSkill.includes(skill) || skill.includes(cvSkill))
-    );
-
-    if (matchingSkills.length > 0) {
-      reasons.push(`Matches ${matchingSkills.length} required skills: ${matchingSkills.slice(0, 3).join(', ')}`);
-    }
-
-    // Location match
-    if (job.location && cvText.toLowerCase().includes(job.location.toLowerCase())) {
-      reasons.push('Location matches your profile');
-    }
-
-    // Experience level
-    if (job.type === 'internship') {
-      reasons.push('Perfect for internship level');
-    }
-
-    return reasons;
-  }
-
-  /**
-   * Semantic search for jobs, skills, or users
-   */
-  async semanticSearch(query, type = 'jobs', limit = 10) {
-    try {
-      // For now, return empty results to avoid errors
-      // In production, this would use vector embeddings and similarity search
-      logger.info(`Semantic search called for query: ${query}, type: ${type}`);
-      
-      // Return empty results to trigger fallback to text search
-      return [];
-    } catch (error) {
-      logger.error('Error in semantic search:', error);
-      // Return empty results to trigger fallback
-      return [];
-    }
-  }
-
-  /**
-   * Analyze job description and extract skills, difficulty, category
+   * Analyze job description
    */
   async analyzeJobDescription(description) {
     try {
+      if (!process.env.GEMINI_API_KEY || !description) {
+        return this.getDefaultJobAnalysis();
+      }
+
       const prompt = `
-        Analyze the following job description and extract:
-        1. Technical skills required
-        2. Difficulty level (beginner/intermediate/advanced)
-        3. Job category (tech/business/marketing/design/data/other)
-        4. Key responsibilities
-        5. Required experience level
-        
-        Job description: ${description}
-        
-        Return as JSON:
-        {
-          "skillsExtracted": ["skill1", "skill2"],
-          "difficulty": "beginner|intermediate|advanced",
-          "category": "tech|business|marketing|design|data|other",
-          "responsibilities": ["resp1", "resp2"],
-          "experienceLevel": "entry|mid|senior"
-        }
-      `;
+Phân tích job description này:
+${description.substring(0, 2000)}
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.3,
-        max_tokens: 1000
-      });
+Trả về JSON:
+{
+  "skillsExtracted": ["skill1", "skill2"],
+  "difficulty": "beginner|intermediate|advanced",
+  "category": "tech|business|marketing|design|data",
+  "responsibilities": ["resp1", "resp2"],
+  "experienceLevel": "entry|mid|senior"
+}
+`;
 
-      const response = completion.choices[0].message.content;
-      const analysis = JSON.parse(response);
-      
-      // Generate embedding for the job
-      analysis.embedding = await this.generateEmbedding(description);
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const text = response
+        .text()
+        .replace(/```json\n?/g, '')
+        .replace(/```\n?/g, '')
+        .trim();
+
+      const analysis = JSON.parse(text);
       analysis.lastAnalyzedAt = new Date();
-
       return analysis;
     } catch (error) {
-      logger.error('Error analyzing job description:', error);
-      // Return default analysis
-      return {
-        skillsExtracted: [],
-        difficulty: 'beginner',
-        category: 'tech',
-        responsibilities: [],
-        experienceLevel: 'entry',
-        embedding: [],
-        lastAnalyzedAt: new Date()
-      };
+      logger.error('Error analyzing job:', error);
+      return this.getDefaultJobAnalysis();
     }
   }
 
   /**
-   * Calculate job match score between job and user profile
+   * Default job analysis
    */
+  getDefaultJobAnalysis() {
+    return {
+      skillsExtracted: [],
+      difficulty: 'intermediate',
+      category: 'tech',
+      responsibilities: [],
+      experienceLevel: 'entry',
+      lastAnalyzedAt: new Date(),
+    };
+  }
+
+  /**
+   * Semantic search (simplified)
+   */
+  async semanticSearch(query, type = 'jobs', limit = 10) {
+    logger.info(`Semantic search: ${query}, type: ${type}`);
+    return [];
+  }
+
+  /**
+   * Compatibility methods
+   */
+  async analyzeCV(cvText, jobData = null) {
+    return this.analyzeCVContent(cvText, jobData);
+  }
+
   async calculateJobMatchScore(job, userProfile) {
-    try {
-      const scores = {
+    return {
+      skills: 0,
+      experience: 0,
+      education: 0,
+      keywords: 0,
+      culture: 0,
+      overall: 0,
+      breakdown: {
         skills: 0,
         experience: 0,
         education: 0,
         keywords: 0,
         culture: 0,
-        overall: 0
-      };
-
-      // Skills matching
-      if (job.requirements.skills && userProfile.skills) {
-        const jobSkills = job.requirements.skills.map(s => s.skillId.name.toLowerCase());
-        const userSkills = userProfile.skills.map(s => s.name.toLowerCase());
-        
-        const requiredSkills = job.requirements.skills.filter(s => s.level === 'required');
-        const preferredSkills = job.requirements.skills.filter(s => s.level === 'preferred');
-        
-        const requiredMatch = requiredSkills.filter(skill => 
-          userSkills.some(userSkill => userSkill.includes(skill.skillId.name.toLowerCase()))
-        ).length;
-        
-        const preferredMatch = preferredSkills.filter(skill => 
-          userSkills.some(userSkill => userSkill.includes(skill.skillId.name.toLowerCase()))
-        ).length;
-
-        scores.skills = (requiredMatch / Math.max(requiredSkills.length, 1)) * 0.7 + 
-                       (preferredMatch / Math.max(preferredSkills.length, 1)) * 0.3;
-      }
-
-      // Experience matching
-      if (job.requirements.experience && userProfile.experience) {
-        const jobMinMonths = job.requirements.experience.minMonths || 0;
-        const userTotalMonths = userProfile.experience.reduce((total, exp) => total + exp.duration, 0);
-        
-        if (userTotalMonths >= jobMinMonths) {
-          scores.experience = Math.min(1, userTotalMonths / (jobMinMonths + 6));
-        } else {
-          scores.experience = userTotalMonths / Math.max(jobMinMonths, 1);
-        }
-      }
-
-      // Education matching
-      if (job.requirements.education && userProfile.education) {
-        const jobLevel = job.requirements.education.level;
-        const userLevel = userProfile.education.level;
-        
-        const levelScores = { 'Bachelor': 1, 'Master': 1.2, 'PhD': 1.5 };
-        const userScore = levelScores[userLevel] || 1;
-        const jobScore = levelScores[jobLevel] || 1;
-        
-        scores.education = Math.min(1, userScore / jobScore);
-      }
-
-      // Keyword similarity using embeddings
-      const jobText = `${job.title} ${job.description} ${job.responsibilities.join(' ')}`;
-      const userText = `${userProfile.summary} ${userProfile.skills.map(s => s.name).join(' ')}`;
-      
-      const jobEmbedding = await this.generateEmbedding(jobText);
-      const userEmbedding = await this.generateEmbedding(userText);
-      scores.keywords = this.calculateSimilarity(jobEmbedding, userEmbedding);
-
-      // Overall score with weights
-      scores.overall = 
-        scores.skills * 0.45 +
-        scores.experience * 0.2 +
-        scores.education * 0.1 +
-        scores.keywords * 0.2 +
-        scores.culture * 0.05;
-
-      return {
-        ...scores,
-        breakdown: {
-          skills: Math.round(scores.skills * 100),
-          experience: Math.round(scores.experience * 100),
-          education: Math.round(scores.education * 100),
-          keywords: Math.round(scores.keywords * 100),
-          culture: Math.round(scores.culture * 100)
-        },
-        overall: Math.round(scores.overall * 100)
-      };
-    } catch (error) {
-      logger.error('Error calculating job match score:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Analyze job skills and requirements
-   */
-  async analyzeJobSkills(job) {
-    try {
-      const analysis = {
-        requiredSkills: job.requirements.skills.filter(s => s.level === 'required'),
-        preferredSkills: job.requirements.skills.filter(s => s.level === 'preferred'),
-        niceToHaveSkills: job.requirements.skills.filter(s => s.level === 'nice-to-have'),
-        skillCategories: {},
-        difficulty: job.aiAnalysis?.difficulty || 'beginner',
-        category: job.aiAnalysis?.category || 'tech',
-        estimatedLearningTime: 0
-      };
-
-      // Group skills by category
-      const allSkills = job.requirements.skills;
-      allSkills.forEach(skill => {
-        const category = skill.skillId.category;
-        if (!analysis.skillCategories[category]) {
-          analysis.skillCategories[category] = [];
-        }
-        analysis.skillCategories[category].push(skill);
-      });
-
-      // Estimate learning time
-      analysis.estimatedLearningTime = allSkills.length * 20; // 20 hours per skill average
-
-      return analysis;
-    } catch (error) {
-      logger.error('Error analyzing job skills:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Generate skill roadmap for specific job
-   */
-  async generateSkillRoadmapForJob(job, userProfile = null, duration = 8) {
-    try {
-      // Get user's current skills
-      const userSkills = userProfile ? userProfile.skills.map(s => s.name.toLowerCase()) : [];
-      
-      // Identify skill gaps
-      const skillGaps = [];
-      job.requirements.skills.forEach(jobSkill => {
-        const hasSkill = userSkills.some(userSkill => 
-          userSkill.includes(jobSkill.skillId.name.toLowerCase())
-        );
-        
-        if (!hasSkill) {
-          skillGaps.push({
-            skill: jobSkill.skillId.name,
-            required: jobSkill.level === 'required',
-            level: jobSkill.level,
-            importance: jobSkill.importance || 5
-          });
-        }
-      });
-
-      // Generate roadmap using AI
-      const roadmap = await this.generateSkillRoadmap(skillGaps, userProfile, duration);
-      
-      return {
-        ...roadmap,
-        skillGaps,
-        targetJob: {
-          title: job.title,
-          company: job.companyId.name,
-          category: job.aiAnalysis?.category
-        },
-        userProfile: userProfile ? {
-          currentSkills: userSkills,
-          education: userProfile.education?.fieldOfStudy,
-          experience: userProfile.experience?.length || 0
-        } : null
-      };
-    } catch (error) {
-      logger.error('Error generating skill roadmap for job:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Extract and analyze CV content
-   */
-  async analyzeCVContent(cvText, jobRequirements = null) {
-    try {
-      const analysis = {
-        skills: await this.extractSkills(cvText),
-        experience: this.extractExperience(cvText),
-        education: this.extractEducation(cvText),
-        contact: this.extractContactInfo(cvText),
-        summary: this.extractSummary(cvText),
-        embedding: await this.generateEmbedding(cvText)
-      };
-
-      if (jobRequirements) {
-        analysis.matchScore = await this.calculateMatchScore(cvText, jobRequirements, analysis.skills);
-        analysis.skillGaps = this.identifySkillGaps(analysis.skills, jobRequirements.skills || []);
-      }
-
-      return analysis;
-    } catch (error) {
-      logger.error('Error analyzing CV content:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Extract experience information from CV text
-   */
-  extractExperience(cvText) {
-    // Simple regex-based extraction
-    const experiencePattern = /(?:experience|work|employment|job).*?(?:years?|months?)/gi;
-    const matches = cvText.match(experiencePattern);
-    
-    return matches ? matches.map(match => ({ description: match.trim() })) : [];
-  }
-
-  /**
-   * Extract education information from CV text
-   */
-  extractEducation(cvText) {
-    const educationPattern = /(?:education|degree|university|college|bachelor|master|phd).*?(?:\.|$)/gi;
-    const matches = cvText.match(educationPattern);
-    
-    return matches ? matches.map(match => ({ description: match.trim() })) : [];
-  }
-
-  /**
-   * Extract contact information from CV text
-   */
-  extractContactInfo(cvText) {
-    const emailPattern = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
-    const phonePattern = /(\+?[\d\s\-\(\)]{10,})/g;
-    
-    return {
-      email: cvText.match(emailPattern) || [],
-      phone: cvText.match(phonePattern) || []
+      },
     };
-  }
-
-  /**
-   * Extract summary from CV text
-   */
-  extractSummary(cvText) {
-    // Extract first paragraph as summary
-    const paragraphs = cvText.split('\n\n').filter(p => p.trim().length > 50);
-    return paragraphs[0] || cvText.substring(0, 200);
   }
 }
 
