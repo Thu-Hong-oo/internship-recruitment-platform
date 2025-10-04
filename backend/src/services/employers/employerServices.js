@@ -1,256 +1,465 @@
-// employerServices.js
-// Unified employer-related services
+// ============================================
+// employerService.js - IMPROVED VERSION
+// ============================================
 
 const EmployerProfile = require('../../models/EmployerProfile');
 const User = require('../../models/User');
-const UnifiedProfileService = require('../unifiedProfileService');
-const documentUploadService = require('../documentUploadService');
-const EmployerProfileHelpers = require('../../helpers/EmployerProfileHelpers');
 const { uploadImage, deleteImage } = require('../imageUploadService');
+const { AppError } = require('../../utils/errors');
+const { logger } = require('../../utils/logger');
 
-// --- Get or create employer profile ---
-async function getProfile(userId) {
-  let profile = await EmployerProfile.findOne({ owner: userId });
-  if (!profile) {
-    profile = await EmployerProfile.create({
-      owner: userId,
-      company: {
-        name: 'Chưa cập nhật',
-        industry: 'unknown',
-        size: 'small',
-        email: 'temp@example.com',
-        officeAddress: {
-          street: 'Chưa cập nhật',
-          ward: 'Chưa cập nhật',
-          district: 'Chưa cập nhật',
-          city: 'Chưa cập nhật',
-          country: 'Vietnam',
-        },
-      },
-      position: {
-        title: 'Chưa cập nhật',
-        level: 'junior',
-        department: 'Chưa cập nhật',
-      },
-      contact: {
-        name: 'Chưa cập nhật',
-        phone: 'Chưa cập nhật',
-        email: 'temp@example.com',
-      },
-      legalRepresentative: {
-        fullName: 'Chưa cập nhật',
-        position: 'Chưa cập nhật',
-        phone: 'Chưa cập nhật',
-        email: 'temp@example.com',
-      },
-      businessInfo: {
-        registrationNumber: 'temp',
-        taxId: `temp_${userId}_${Date.now()}`,
-        issueDate: new Date(),
-        issuePlace: 'Chưa cập nhật',
-        address: {
-          street: 'Chưa cập nhật',
-          ward: 'Chưa cập nhật',
-          district: 'Chưa cập nhật',
-          city: 'Chưa cập nhật',
-          country: 'Vietnam',
-        },
-      },
-    });
-    await User.findByIdAndUpdate(userId, { employerProfile: profile._id });
+class EmployerService {
+  /**
+   * Get employer profile (don't auto-create)
+   */
+  static async getProfile(userId, options = {}) {
+    const { populate = false, lean = false } = options;
+
+    let query = EmployerProfile.findOne({ owner: userId });
+
+    if (populate) {
+      query = query.populate('owner', 'email fullName avatar');
+      query = query.populate('members.user', 'email fullName avatar');
+    }
+
+    if (lean) {
+      query = query.lean();
+    }
+
+    const profile = await query;
+
+    if (!profile && options.required) {
+      throw new AppError('Employer profile not found', 404);
+    }
+
+    return profile;
   }
-  return profile;
-}
 
-// --- Update employer profile (position, contact) ---
-async function updateProfile(userId, body) {
-  return UnifiedProfileService.updateProfile(
-    userId,
-    body,
-    {
-      role: 'employer',
-      restrictFields: ['position', 'contact'],
-      updateUser: false,
-    }
-  );
-}
-
-// --- Update company info (company, businessInfo, legalRepresentative, documents) ---
-async function updateCompanyInfo(userId, body) {
-  return UnifiedProfileService.updateProfile(
-    userId,
-    body,
-    {
-      role: 'employer',
-      restrictFields: ['company', 'businessInfo', 'legalRepresentative', 'documents'],
-      updateUser: true,
-    }
-  );
-}
-
-// --- Document upload ---
-async function uploadDocument(file, userId, documentType, metadata, profile) {
-  const uploadResult = await documentUploadService.uploadDocument(file, userId, documentType);
-  await EmployerProfileHelpers.addDocument(
-    profile,
-    uploadResult.url,
-    uploadResult.publicId,
-    documentType,
-    {
-      ...metadata,
-      originalName: uploadResult.originalName,
-      size: uploadResult.size,
-      mimeType: uploadResult.mimeType,
-    }
-  );
-  return uploadResult;
-}
-
-// --- Remove document ---
-async function removeDocument(profile, documentId) {
-  await EmployerProfileHelpers.removeDocument(profile, documentId);
-}
-
-// --- Upload company logo ---
-async function uploadLogo(userId, file) {
-  // Get or create employer profile
-  const profile = await getProfile(userId);
-  
-  // Delete old logo if exists
-  if (profile.company?.logo?.filename) {
+  /**
+   * Create new employer profile
+   */
+  static async createProfile(userId, data) {
     try {
-      await deleteImage(profile.company.logo.filename);
+      // Check if profile already exists
+      const existing = await EmployerProfile.findOne({ owner: userId });
+      if (existing) {
+        throw new AppError('Employer profile already exists', 400);
+      }
+
+      // Validate required fields
+      const required = [
+        'company.name',
+        'company.email',
+        'company.industry',
+        'company.size',
+      ];
+      for (const field of required) {
+        const value = field.split('.').reduce((obj, key) => obj?.[key], data);
+        if (!value) {
+          throw new AppError(`Missing required field: ${field}`, 400);
+        }
+      }
+
+      // Create profile
+      const profile = await EmployerProfile.create({
+        owner: userId,
+        ...data,
+      });
+
+      // Update user reference
+      await User.findByIdAndUpdate(userId, {
+        employerProfile: profile._id,
+      });
+
+      logger.info('Employer profile created', {
+        userId,
+        profileId: profile._id,
+      });
+
+      return profile;
     } catch (error) {
-      console.warn('Failed to delete old logo:', error.message);
+      logger.error('Error creating employer profile', {
+        userId,
+        error: error.message,
+      });
+      throw error;
     }
   }
-  
-  // Upload new logo to Cloudinary
-  const uploadResult = await uploadImage('logo', file.buffer, {
-    public_id: `company-logo-${userId}-${Date.now()}`,
-  });
-  
-  console.log('Logo upload result:', uploadResult);
 
-  // Update profile with new logo info
-  profile.company.logo = {
-    url: uploadResult.url,
-    filename: uploadResult.publicId,
-    originalName: file.originalname,
-    size: file.size,
-    mimeType: file.mimetype,
-    uploadedAt: new Date(),
-  };
-  
-  console.log('Logo data before save:', profile.company.logo);
+  /**
+   * Update profile basic info
+   */
+  static async updateProfile(userId, updates) {
+    const profile = await this.getProfile(userId, { required: true });
 
-  await profile.save();
-  
-  console.log('Logo data after save:', profile.company.logo);
+    // Allowed fields to update
+    const allowedFields = ['position', 'contact', 'legalRepresentative'];
 
-  return {
-    logo: profile.company.logo,
-    publicId: uploadResult.publicId,
-    employerProfileId: profile._id,
-  };
-}
-
-// --- Remove company logo ---
-async function removeLogo(userId) {
-  const profile = await getProfile(userId);
-  
-  if (!profile.company?.logo?.filename) {
-    throw new Error('Không có logo để xóa');
-  }
-  
-  // Delete from Cloudinary
-  await deleteImage(profile.company.logo.filename);
-  
-  // Remove from profile
-  profile.company.logo = undefined;
-  await profile.save();
-  
-  return { message: 'Logo đã được xóa thành công' };
-}
-
-// Upload cover image
-async function uploadCoverImage(userId, file) {
-  try {
-    console.log('uploadCoverImage called with userId:', userId, 'file:', file.originalname);
-    
-    const profile = await getProfile(userId);
-    console.log('Profile found, current cover image:', profile.company?.coverImage?.filename);
-    
-    // Delete old cover image if exists
-    if (profile.company?.coverImage?.filename) {
-      try {
-        console.log('Deleting old cover image:', profile.company.coverImage.filename);
-        await deleteImage(profile.company.coverImage.filename);
-        console.log('Old cover image deleted successfully');
-      } catch (error) {
-        console.warn('Failed to delete old cover image:', error.message);
+    // Apply updates
+    for (const field of allowedFields) {
+      if (updates[field]) {
+        profile[field] = { ...profile[field], ...updates[field] };
       }
     }
-    
-    // Upload new cover image
-    console.log('Uploading new cover image...');
-    const uploadResult = await uploadImage('cover', file.buffer);
-    console.log('Upload result:', uploadResult.publicId, uploadResult.url);
-    
-    // Update profile
-    profile.company.coverImage = {
-      url: uploadResult.url,
-      filename: uploadResult.publicId,
-      originalName: file.originalname,
-      size: file.size,
-      mimeType: file.mimetype,
-      uploadedAt: new Date(),
-    };
-    
-    console.log('Saving profile...');
+
     await profile.save();
-    console.log('Profile saved successfully');
-    
+
+    logger.info('Employer profile updated', {
+      userId,
+      profileId: profile._id,
+    });
+
+    return profile;
+  }
+
+  /**
+   * Update company info
+   */
+  static async updateCompanyInfo(userId, updates) {
+    const profile = await this.getProfile(userId, { required: true });
+
+    // Allowed fields
+    const allowedFields = ['company', 'businessInfo'];
+
+    for (const field of allowedFields) {
+      if (updates[field]) {
+        profile[field] = { ...profile[field], ...updates[field] };
+      }
+    }
+
+    await profile.save();
+
+    logger.info('Company info updated', {
+      userId,
+      profileId: profile._id,
+    });
+
+    return profile;
+  }
+
+  /**
+   * Upload company logo
+   */
+  static async uploadLogo(userId, file) {
+    try {
+      const profile = await this.getProfile(userId, { required: true });
+
+      // Validate file
+      if (!file || !file.buffer) {
+        throw new AppError('No file provided', 400);
+      }
+
+      // Delete old logo if exists
+      if (profile.company?.logo?.cloudinaryId) {
+        try {
+          await deleteImage(profile.company.logo.cloudinaryId);
+        } catch (error) {
+          logger.warn('Failed to delete old logo', {
+            error: error.message,
+          });
+        }
+      }
+
+      // Upload new logo
+      const uploadResult = await uploadImage('logo', file.buffer, {
+        folder: 'company-logos',
+        public_id: `logo_${userId}_${Date.now()}`,
+        transformation: [
+          { width: 400, height: 400, crop: 'fill' },
+          { quality: 'auto', fetch_format: 'auto' },
+        ],
+      });
+
+      // Update profile
+      profile.company.logo = {
+        url: uploadResult.url,
+        cloudinaryId: uploadResult.publicId,
+        filename: uploadResult.publicId,
+        originalName: file.originalname,
+        size: file.size,
+        mimeType: file.mimetype,
+        uploadedAt: new Date(),
+      };
+
+      await profile.save();
+
+      logger.info('Logo uploaded', {
+        userId,
+        profileId: profile._id,
+        cloudinaryId: uploadResult.publicId,
+      });
+
+      return {
+        logo: profile.company.logo,
+        employerProfileId: profile._id,
+      };
+    } catch (error) {
+      logger.error('Error uploading logo', {
+        userId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Remove company logo
+   */
+  static async removeLogo(userId) {
+    const profile = await this.getProfile(userId, { required: true });
+
+    if (!profile.company?.logo?.cloudinaryId) {
+      throw new AppError('No logo to remove', 404);
+    }
+
+    // Delete from Cloudinary
+    await deleteImage(profile.company.logo.cloudinaryId);
+
+    // Remove from profile
+    profile.company.logo = undefined;
+    await profile.save();
+
+    logger.info('Logo removed', { userId, profileId: profile._id });
+
+    return { message: 'Logo removed successfully' };
+  }
+
+  /**
+   * Upload cover image
+   */
+  static async uploadCoverImage(userId, file) {
+    try {
+      const profile = await this.getProfile(userId, { required: true });
+
+      if (!file || !file.buffer) {
+        throw new AppError('No file provided', 400);
+      }
+
+      // Delete old cover if exists
+      if (profile.company?.coverImage?.cloudinaryId) {
+        try {
+          await deleteImage(profile.company.coverImage.cloudinaryId);
+        } catch (error) {
+          logger.warn('Failed to delete old cover', {
+            error: error.message,
+          });
+        }
+      }
+
+      // Upload new cover
+      const uploadResult = await uploadImage('cover', file.buffer, {
+        folder: 'company-covers',
+        public_id: `cover_${userId}_${Date.now()}`,
+        transformation: [
+          { width: 1200, height: 400, crop: 'fill' },
+          { quality: 'auto', fetch_format: 'auto' },
+        ],
+      });
+
+      // Update profile
+      profile.company.coverImage = {
+        url: uploadResult.url,
+        cloudinaryId: uploadResult.publicId,
+        filename: uploadResult.publicId,
+        originalName: file.originalname,
+        size: file.size,
+        mimeType: file.mimetype,
+        uploadedAt: new Date(),
+      };
+
+      await profile.save();
+
+      logger.info('Cover image uploaded', {
+        userId,
+        profileId: profile._id,
+        cloudinaryId: uploadResult.publicId,
+      });
+
+      return {
+        coverImage: profile.company.coverImage,
+        employerProfileId: profile._id,
+      };
+    } catch (error) {
+      logger.error('Error uploading cover', {
+        userId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Remove cover image
+   */
+  static async removeCoverImage(userId) {
+    const profile = await this.getProfile(userId, { required: true });
+
+    if (!profile.company?.coverImage?.cloudinaryId) {
+      throw new AppError('No cover image to remove', 404);
+    }
+
+    await deleteImage(profile.company.coverImage.cloudinaryId);
+
+    profile.company.coverImage = undefined;
+    await profile.save();
+
+    logger.info('Cover image removed', { userId, profileId: profile._id });
+
+    return { message: 'Cover image removed successfully' };
+  }
+
+  /**
+   * Add team member
+   */
+  static async addMember(userId, memberData) {
+    const profile = await this.getProfile(userId, { required: true });
+
+    // Check if owner has permission
+    if (!profile.userCan(userId, 'canManageTeam')) {
+      throw new AppError('No permission to manage team', 403);
+    }
+
+    // Check subscription limits
+    const activeMembers = profile.getActiveMembers();
+    if (activeMembers.length >= profile.subscription.features.maxTeamMembers) {
+      throw new AppError('Team member limit reached', 400);
+    }
+
+    await profile.addMember(memberData.userId, memberData.role);
+
+    logger.info('Team member added', {
+      userId,
+      profileId: profile._id,
+      newMemberId: memberData.userId,
+    });
+
+    return profile;
+  }
+
+  /**
+   * Remove team member
+   */
+  static async removeMember(userId, memberUserId) {
+    const profile = await this.getProfile(userId, { required: true });
+
+    if (!profile.userCan(userId, 'canManageTeam')) {
+      throw new AppError('No permission to manage team', 403);
+    }
+
+    await profile.removeMember(memberUserId);
+
+    logger.info('Team member removed', {
+      userId,
+      profileId: profile._id,
+      removedMemberId: memberUserId,
+    });
+
+    return profile;
+  }
+
+  /**
+   * Update member permissions
+   */
+  static async updateMemberPermissions(userId, memberUserId, permissions) {
+    const profile = await this.getProfile(userId, { required: true });
+
+    if (!profile.userCan(userId, 'canManageTeam')) {
+      throw new AppError('No permission to manage team', 403);
+    }
+
+    const member = profile.members.find(
+      m => m.user.toString() === memberUserId
+    );
+
+    if (!member) {
+      throw new AppError('Member not found', 404);
+    }
+
+    member.permissions = { ...member.permissions, ...permissions };
+    await profile.save();
+
+    logger.info('Member permissions updated', {
+      userId,
+      profileId: profile._id,
+      memberId: memberUserId,
+    });
+
+    return profile;
+  }
+
+  /**
+   * Get company statistics
+   */
+  static async getStatistics(userId) {
+    const profile = await this.getProfile(userId, { required: true });
+    await profile.updateStats();
+
     return {
-      coverImage: profile.company.coverImage,
-      publicId: uploadResult.publicId,
-      employerProfileId: profile._id,
+      stats: profile.stats,
+      engagement: profile.engagement,
+      reputation: profile.reputation,
+      subscription: profile.subscription,
     };
-  } catch (error) {
-    console.error('Error in uploadCoverImage:', error);
-    throw error;
+  }
+
+  /**
+   * Search employer profiles
+   */
+  static async search(query, options = {}) {
+    const {
+      page = 1,
+      limit = 20,
+      industry,
+      location,
+      verified = true,
+      sortBy = '-reputation.rating.overall',
+    } = options;
+
+    const filter = { status: 'verified' };
+
+    if (query) {
+      filter.$text = { $search: query };
+    }
+
+    if (industry) {
+      filter['company.industry'] = new RegExp(industry, 'i');
+    }
+
+    if (location) {
+      filter['company.officeAddress.city'] = new RegExp(location, 'i');
+    }
+
+    if (verified !== undefined) {
+      filter['verification.isVerified'] = verified;
+    }
+
+    const total = await EmployerProfile.countDocuments(filter);
+    const profiles = await EmployerProfile.find(filter)
+      .select('company reputation stats engagement')
+      .sort(sortBy)
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+
+    return {
+      profiles,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * Increment profile view
+   */
+  static async incrementView(profileId) {
+    await EmployerProfile.findByIdAndUpdate(profileId, {
+      $inc: { 'engagement.profileViews': 1 },
+    });
   }
 }
 
-// Remove cover image
-async function removeCoverImage(userId) {
-  const profile = await getProfile(userId);
-  
-  if (!profile.company?.coverImage?.filename) {
-    throw new Error('Không có ảnh bìa để xóa');
-  }
-  
-  // Delete from Cloudinary
-  await deleteImage(profile.company.coverImage.filename);
-  
-  // Remove from profile
-  profile.company.coverImage = undefined;
-  await profile.save();
-  
-  return { 
-    message: 'Ảnh bìa đã được xóa thành công',
-    employerProfileId: profile._id 
-  };
-}
-
-module.exports = {
-  getProfile,
-  updateProfile,
-  updateCompanyInfo,
-  uploadDocument,
-  removeDocument,
-  uploadLogo,
-  removeLogo,
-  uploadCoverImage,
-  removeCoverImage,
-};
+module.exports = EmployerService;

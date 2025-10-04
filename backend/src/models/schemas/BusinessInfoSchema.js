@@ -1,10 +1,24 @@
 const mongoose = require('mongoose');
 
-// Schema riêng cho thông tin pháp lý
+// Business Info Schema
 const BusinessInfoSchema = new mongoose.Schema(
   {
-    registrationNumber: { type: String, required: true },
-    taxId: { type: String, required: true },
+    registrationNumber: { 
+      type: String, 
+      required: true,
+      trim: true
+    },
+    taxId: { 
+      type: String, 
+      required: true,
+      trim: true,
+      validate: {
+        validator: function(v) {
+          return /^\d{10}(-\d{3})?$/.test(v);
+        },
+        message: 'Mã số thuế phải có định dạng: 0123456789 hoặc 0123456789-001'
+      }
+    },
     issueDate: { type: Date, required: true },
     issuePlace: { type: String, required: true },
     address: {

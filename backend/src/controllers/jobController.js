@@ -187,9 +187,25 @@ const getJob = async (req, res) => {
       };
     }
 
+    // Check if current user has applied for this job (if user is authenticated)
+    let hasApplied = false;
+    if (req.user && req.user.role === 'candidate') {
+      const candidateProfile = await CandidateProfile.findOne({ userId: req.user.id });
+      if (candidateProfile) {
+        const application = await Application.findOne({
+          jobId: job._id,
+          candidateId: candidateProfile._id,
+        });
+        hasApplied = !!application;
+      }
+    }
+
     res.status(200).json({
       success: true,
-      data: jobObj,
+      data: {
+        ...jobObj,
+        hasApplied,
+      },
     });
   } catch (error) {
     logger.error('Error getting job:', error);

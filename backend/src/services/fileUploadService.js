@@ -1,4 +1,4 @@
-const { cloudinary } = require('./cloudinaryService');
+const { cloudinary } = require('../utils/cloudinary');
 
 /**
  * Upload any file (image, video, document, audio, etc.) to Cloudinary
