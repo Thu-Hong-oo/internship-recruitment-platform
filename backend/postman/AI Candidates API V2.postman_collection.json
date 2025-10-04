@@ -1,0 +1,1377 @@
+{
+  "info": {
+    "name": "AI Candidates API V2",
+    "description": "Comprehensive test suite for AI-powered candidate features including recommendations, job matching, semantic search, resume AI, career development, and interview preparation. This collection covers all 8 optimized AI endpoints with detailed examples and test scenarios.",
+    "version": "2.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{auth_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "api_version",
+      "value": "v2",
+      "type": "string"
+    },
+    {
+      "key": "candidate_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "job_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "career_path_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🤖 Recommendations & Matching",
+      "description": "AI-powered job recommendations and matching analysis",
+      "item": [
+        {
+          "name": "🎯 Job Recommendations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/recommendations?type=jobs&limit=10",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "recommendations"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "jobs",
+                  "description": "Type of recommendations (jobs, skills, courses, career-paths, similar-jobs)"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Number of recommendations (1-50)"
+                }
+              ]
+            },
+            "description": "Get personalized job recommendations based on candidate profile"
+          },
+          "response": []
+        },
+        {
+          "name": "💡 Skill Recommendations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/recommendations?type=skills&limit=5",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "recommendations"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "skills"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Get recommended skills for career development"
+          },
+          "response": []
+        },
+        {
+          "name": "📚 Course Recommendations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/recommendations?type=courses&limit=8",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "recommendations"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "courses"
+                },
+                {
+                  "key": "limit",
+                  "value": "8"
+                }
+              ]
+            },
+            "description": "Get recommended courses and learning materials"
+          },
+          "response": []
+        },
+        {
+          "name": "🚀 Career Path Recommendations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/recommendations?type=career-paths&current_role=intern&target_role=senior-developer&limit=3",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "recommendations"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "career-paths"
+                },
+                {
+                  "key": "current_role",
+                  "value": "intern"
+                },
+                {
+                  "key": "target_role",
+                  "value": "senior-developer"
+                },
+                {
+                  "key": "limit",
+                  "value": "3"
+                }
+              ]
+            },
+            "description": "Get career path recommendations from current to target role"
+          },
+          "response": []
+        },
+        {
+          "name": "🔍 Similar Jobs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/recommendations?type=similar-jobs&job_id={{job_id}}&limit=5",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "recommendations"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "similar-jobs"
+                },
+                {
+                  "key": "job_id",
+                  "value": "{{job_id}}",
+                  "description": "Reference job ID for finding similar jobs"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Find jobs similar to a specific job posting"
+          },
+          "response": []
+        },
+        {
+          "name": "📊 Job Match Score",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/matching?job_id={{job_id}}&action=score",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "matching"
+              ],
+              "query": [
+                {
+                  "key": "job_id",
+                  "value": "{{job_id}}"
+                },
+                {
+                  "key": "action",
+                  "value": "score",
+                  "description": "Get overall match score"
+                }
+              ]
+            },
+            "description": "Calculate match score between candidate and job"
+          },
+          "response": []
+        },
+        {
+          "name": "🔬 Compatibility Analysis",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/matching?job_id={{job_id}}&action=analysis",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "matching"
+              ],
+              "query": [
+                {
+                  "key": "job_id",
+                  "value": "{{job_id}}"
+                },
+                {
+                  "key": "action",
+                  "value": "analysis",
+                  "description": "Get detailed compatibility analysis"
+                }
+              ]
+            },
+            "description": "Get detailed compatibility analysis for a job"
+          },
+          "response": []
+        },
+        {
+          "name": "🎯 Job Fit Analysis",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/matching?job_id={{job_id}}&action=fit",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "matching"
+              ],
+              "query": [
+                {
+                  "key": "job_id",
+                  "value": "{{job_id}}"
+                },
+                {
+                  "key": "action",
+                  "value": "fit"
+                }
+              ]
+            },
+            "description": "Analyze job fit with success probability and tips"
+          },
+          "response": []
+        },
+        {
+          "name": "⚖️ Compare Jobs (GET)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/matching?action=compare&job_ids=507f1f77bcf86cd799439011,507f1f77bcf86cd799439012,507f1f77bcf86cd799439013",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "matching"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "compare"
+                },
+                {
+                  "key": "job_ids",
+                  "value": "507f1f77bcf86cd799439011,507f1f77bcf86cd799439012,507f1f77bcf86cd799439013",
+                  "description": "Comma-separated job IDs (2-10 jobs)"
+                }
+              ]
+            },
+            "description": "Compare multiple jobs using GET method with query parameters"
+          },
+          "response": []
+        },
+        {
+          "name": "⚖️ Compare Jobs (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"job_ids\": [\n    \"507f1f77bcf86cd799439011\",\n    \"507f1f77bcf86cd799439012\",\n    \"507f1f77bcf86cd799439013\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/matching?action=compare",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "matching"
+              ],
+              "query": [
+                {
+                  "key": "action",
+                  "value": "compare"
+                }
+              ]
+            },
+            "description": "Compare multiple jobs using POST method with body data"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🔍 Search & Resume AI",
+      "description": "Semantic search and resume AI operations",
+      "item": [
+        {
+          "name": "🔍 Semantic Job Search",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"machine learning positions at tech startups with remote work options\",\n  \"type\": \"jobs\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/search",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "ai", "candidates", "search"]
+            },
+            "description": "Search for jobs using natural language semantic search"
+          },
+          "response": []
+        },
+        {
+          "name": "🏢 Semantic Company Search",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"innovative fintech companies with good work-life balance and growth opportunities\",\n  \"type\": \"companies\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/search",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "ai", "candidates", "search"]
+            },
+            "description": "Search for companies using natural language descriptions"
+          },
+          "response": []
+        },
+        {
+          "name": "📄 Resume Analysis",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"analyze\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/resume",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "ai", "candidates", "resume"]
+            },
+            "description": "Analyze current resume for strengths, weaknesses, and improvements"
+          },
+          "response": []
+        },
+        {
+          "name": "🔧 Resume Optimization",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"optimize\",\n  \"target_job_id\": \"{{job_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/resume",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "ai", "candidates", "resume"]
+            },
+            "description": "Optimize resume content for a specific job posting"
+          },
+          "response": []
+        },
+        {
+          "name": "📊 Resume Scoring",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"score\",\n  \"target_job_id\": \"{{job_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/resume",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "ai", "candidates", "resume"]
+            },
+            "description": "Score resume against a specific job or general standards"
+          },
+          "response": []
+        },
+        {
+          "name": "🤖 ATS Compatibility Check",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"ats-check\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/resume",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "ai", "candidates", "resume"]
+            },
+            "description": "Check resume compatibility with Applicant Tracking Systems"
+          },
+          "response": []
+        },
+        {
+          "name": "✍️ Generate Profile Summary",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"summary\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/resume/builder",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "resume",
+                "builder"
+              ]
+            },
+            "description": "Generate professional profile summary"
+          },
+          "response": []
+        },
+        {
+          "name": "• Generate Experience Bullets",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"bullets\",\n  \"data\": {\n    \"position\": \"Software Development Intern\",\n    \"company\": \"TechCorp Inc.\",\n    \"responsibilities\": [\"Developed web applications\", \"Collaborated with team\", \"Participated in code reviews\"],\n    \"achievements\": [\"Improved performance by 20%\", \"Implemented new feature\"]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/resume/builder",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "resume",
+                "builder"
+              ]
+            },
+            "description": "Generate professional bullet points for experience section"
+          },
+          "response": []
+        },
+        {
+          "name": "⚡ Generate Skills Section",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"skills\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/resume/builder",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "resume",
+                "builder"
+              ]
+            },
+            "description": "Generate organized and prioritized skills section"
+          },
+          "response": []
+        },
+        {
+          "name": "🎯 Tailor Resume for Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"tailor\",\n  \"job_id\": \"{{job_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/resume/builder",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "resume",
+                "builder"
+              ]
+            },
+            "description": "Tailor entire resume content for a specific job posting"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🚀 Career Development",
+      "description": "Career path planning and skill development",
+      "item": [
+        {
+          "name": "🛤️ Career Path Analysis",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/career?type=path&current_role=intern&target_role=senior-developer",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "ai", "candidates", "career"],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "path"
+                },
+                {
+                  "key": "current_role",
+                  "value": "intern"
+                },
+                {
+                  "key": "target_role",
+                  "value": "senior-developer"
+                }
+              ]
+            },
+            "description": "Analyze career progression paths from current to target role"
+          },
+          "response": []
+        },
+        {
+          "name": "📊 Skill Gap Analysis",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/career?type=skill-gap&target_role=data-scientist",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "ai", "candidates", "career"],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "skill-gap"
+                },
+                {
+                  "key": "target_role",
+                  "value": "data-scientist"
+                }
+              ]
+            },
+            "description": "Identify skill gaps for target career roles"
+          },
+          "response": []
+        },
+        {
+          "name": "📚 Learning Path Recommendations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/career?type=learning&skill=react&level=intermediate&target_role=frontend-developer",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "ai", "candidates", "career"],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "learning"
+                },
+                {
+                  "key": "skill",
+                  "value": "react"
+                },
+                {
+                  "key": "level",
+                  "value": "intermediate"
+                },
+                {
+                  "key": "target_role",
+                  "value": "frontend-developer"
+                }
+              ]
+            },
+            "description": "Get personalized learning path recommendations"
+          },
+          "response": []
+        },
+        {
+          "name": "✅ Select Career Path",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"select\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/career/{{career_path_id}}",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "career",
+                "{{career_path_id}}"
+              ]
+            },
+            "description": "Select a career path to add to active roadmaps"
+          },
+          "response": []
+        },
+        {
+          "name": "🎓 Enroll in Learning Path",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"enroll\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/career/{{career_path_id}}",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "career",
+                "{{career_path_id}}"
+              ]
+            },
+            "description": "Enroll in a specific learning path with materials and schedule"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🎤 Interview Preparation",
+      "description": "Interview preparation and mock interview evaluation",
+      "item": [
+        {
+          "name": "📝 Interview Preparation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"job_id\": \"{{job_id}}\",\n  \"action\": \"prep\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/interview",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "interview"
+              ]
+            },
+            "description": "Get comprehensive interview preparation materials for a specific job"
+          },
+          "response": []
+        },
+        {
+          "name": "🎭 Mock Interview Evaluation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"job_id\": \"{{job_id}}\",\n  \"action\": \"mock\",\n  \"questions\": [\n    \"Tell me about yourself and why you're interested in this position.\",\n    \"What are your greatest strengths and how do they apply to this role?\",\n    \"Describe a challenging project you worked on and how you overcame obstacles.\",\n    \"Where do you see yourself in 5 years?\",\n    \"Do you have any questions for us?\"\n  ],\n  \"answers\": [\n    \"I'm a passionate computer science student with strong experience in web development and data analysis. I'm excited about this position because it combines my technical skills with my interest in solving real-world problems. During my internships, I've developed skills in React, Python, and SQL that directly apply to this role.\",\n    \"My greatest strength is my ability to learn quickly and adapt to new technologies. For example, when I joined my last internship, I had to learn Vue.js in just two weeks to contribute to their main project. I was able to not only learn the framework but also implement two new features that improved user engagement by 15%.\",\n    \"During my capstone project, our team was tasked with building a full-stack application for local businesses. We faced a major challenge when our initial database design couldn't handle the complex relationships we needed. I took the initiative to research and propose a new schema design, collaborated with team members to implement the changes, and we successfully delivered the project on time with all required features.\",\n    \"In 5 years, I see myself as a senior developer leading technical projects and mentoring junior developers. I want to continue growing my technical expertise while also developing leadership skills. I'm particularly interested in specializing in cloud architecture and contributing to open-source projects that have meaningful impact.\",\n    \"Yes, I have a few questions. What does a typical day look like for someone in this position? What opportunities are there for professional development and learning new technologies? How does the team approach code reviews and knowledge sharing?\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/interview",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "interview"
+              ]
+            },
+            "description": "Conduct mock interview with AI evaluation and feedback"
+          },
+          "response": []
+        },
+        {
+          "name": "💼 Technical Interview Prep",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"job_id\": \"{{job_id}}\",\n  \"action\": \"prep\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/interview",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "interview"
+              ]
+            },
+            "description": "Get technical interview preparation for software engineering roles"
+          },
+          "response": []
+        },
+        {
+          "name": "🧠 Behavioral Interview Mock",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"job_id\": \"{{job_id}}\",\n  \"action\": \"mock\",\n  \"questions\": [\n    \"Describe a time when you had to work with a difficult team member.\",\n    \"Tell me about a time you failed and what you learned from it.\",\n    \"How do you handle competing priorities and tight deadlines?\"\n  ],\n  \"answers\": [\n    \"During a group project, one team member consistently missed deadlines and wasn't communicating effectively. Instead of escalating immediately, I scheduled a one-on-one conversation to understand their challenges. I discovered they were struggling with the technology stack. I offered to pair program with them and created a shared knowledge document. This approach not only improved their performance but strengthened our entire team's collaboration.\",\n    \"In my first internship, I was tasked with optimizing a database query that was causing performance issues. I made changes without fully understanding the system architecture and accidentally broke the user authentication flow. I immediately informed my supervisor, worked overtime to fix the issue, and implemented proper testing procedures. This taught me the importance of understanding systems holistically before making changes and the value of comprehensive testing.\",\n    \"I use a combination of prioritization frameworks and communication. First, I assess tasks based on urgency and impact using the Eisenhower Matrix. I then communicate with stakeholders about realistic timelines and potential trade-offs. For example, during finals week while working on multiple projects, I created a detailed schedule, communicated my availability clearly, and focused on delivering the most critical features first while ensuring quality wasn't compromised.\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/interview",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "interview"
+              ]
+            },
+            "description": "Practice behavioral interview questions with AI feedback"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🧪 Test Scenarios",
+      "description": "Edge cases and error handling tests",
+      "item": [
+        {
+          "name": "❌ Invalid Recommendation Type",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/recommendations?type=invalid&limit=5",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "recommendations"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "invalid"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Test error handling for invalid recommendation type"
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Missing Job ID for Similar Jobs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/recommendations?type=similar-jobs&limit=5",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "recommendations"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "similar-jobs"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Test error when job_id is missing for similar-jobs type"
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Invalid Job ID Format",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/matching?job_id=invalid-id&action=score",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "matching"
+              ],
+              "query": [
+                {
+                  "key": "job_id",
+                  "value": "invalid-id"
+                },
+                {
+                  "key": "action",
+                  "value": "score"
+                }
+              ]
+            },
+            "description": "Test error handling for invalid MongoDB ObjectId format"
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Empty Search Query",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"\",\n  \"type\": \"jobs\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/search",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "ai", "candidates", "search"]
+            },
+            "description": "Test error handling for empty search query"
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Invalid Resume Action",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"invalid-action\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/resume",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "ai", "candidates", "resume"]
+            },
+            "description": "Test error handling for invalid resume action"
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Missing Interview Questions for Mock",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"job_id\": \"{{job_id}}\",\n  \"action\": \"mock\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/interview",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "interview"
+              ]
+            },
+            "description": "Test error when questions are missing for mock interview"
+          },
+          "response": []
+        },
+        {
+          "name": "✅ Rate Limit Test",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/recommendations?type=jobs&limit=1",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "recommendations"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "jobs"
+                },
+                {
+                  "key": "limit",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Test rate limiting behavior (run multiple times quickly)"
+          },
+          "response": []
+        },
+        {
+          "name": "✅ No Resume Uploaded",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"analyze\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/resume",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "ai", "candidates", "resume"]
+            },
+            "description": "Test behavior when candidate has no resume uploaded"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📋 Integration Tests",
+      "description": "End-to-end workflow tests",
+      "item": [
+        {
+          "name": "🔄 Complete Workflow: Job Discovery to Application",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/recommendations?type=jobs&limit=3",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "recommendations"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "jobs"
+                },
+                {
+                  "key": "limit",
+                  "value": "3"
+                }
+              ]
+            },
+            "description": "Step 1: Get job recommendations"
+          },
+          "response": []
+        },
+        {
+          "name": "🔄 Workflow Step 2: Analyze Job Match",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/matching?job_id={{job_id}}&action=analysis",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "matching"
+              ],
+              "query": [
+                {
+                  "key": "job_id",
+                  "value": "{{job_id}}"
+                },
+                {
+                  "key": "action",
+                  "value": "analysis"
+                }
+              ]
+            },
+            "description": "Step 2: Analyze compatibility with selected job"
+          },
+          "response": []
+        },
+        {
+          "name": "🔄 Workflow Step 3: Optimize Resume",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"optimize\",\n  \"target_job_id\": \"{{job_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/resume",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "ai", "candidates", "resume"]
+            },
+            "description": "Step 3: Optimize resume for the job"
+          },
+          "response": []
+        },
+        {
+          "name": "🔄 Workflow Step 4: Prepare for Interview",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"job_id\": \"{{job_id}}\",\n  \"action\": \"prep\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/interview",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "interview"
+              ]
+            },
+            "description": "Step 4: Get interview preparation materials"
+          },
+          "response": []
+        },
+        {
+          "name": "🎯 Career Development Workflow",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/career?type=skill-gap&target_role=senior-developer",
+              "host": ["{{base_url}}"],
+              "path": ["api", "{{api_version}}", "ai", "candidates", "career"],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "skill-gap"
+                },
+                {
+                  "key": "target_role",
+                  "value": "senior-developer"
+                }
+              ]
+            },
+            "description": "Career Development: Identify skill gaps for target role"
+          },
+          "response": []
+        },
+        {
+          "name": "📚 Get Learning Recommendations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/{{api_version}}/ai/candidates/recommendations?type=courses&limit=5",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "{{api_version}}",
+                "ai",
+                "candidates",
+                "recommendations"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "courses"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Follow-up: Get course recommendations to fill skill gaps"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "exec": [
+          "// Set test data if variables are empty",
+          "if (!pm.environment.get('job_id')) {",
+          "    pm.environment.set('job_id', '507f1f77bcf86cd799439011');",
+          "}",
+          "",
+          "if (!pm.environment.get('career_path_id')) {",
+          "    pm.environment.set('career_path_id', '507f1f77bcf86cd799439022');",
+          "}",
+          "",
+          "// Add timestamp for unique test data",
+          "pm.environment.set('timestamp', Date.now());"
+        ],
+        "type": "text/javascript"
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "exec": [
+          "// Global test cases for all AI endpoints",
+          "pm.test('Response time is reasonable (< 30s for AI operations)', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(30000);",
+          "});",
+          "",
+          "pm.test('Content-Type is application/json', function () {",
+          "    pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');",
+          "});",
+          "",
+          "// Success response tests",
+          "if (pm.response.code === 200) {",
+          "    pm.test('Successful response has correct structure', function () {",
+          "        const jsonData = pm.response.json();",
+          "        pm.expect(jsonData).to.have.property('success', true);",
+          "        pm.expect(jsonData).to.have.property('data');",
+          "        pm.expect(jsonData).to.have.property('message');",
+          "    });",
+          "",
+          "    pm.test('Response data is not empty', function () {",
+          "        const jsonData = pm.response.json();",
+          "        pm.expect(jsonData.data).to.not.be.empty;",
+          "    });",
+          "}",
+          "",
+          "// Error response tests",
+          "if (pm.response.code >= 400) {",
+          "    pm.test('Error response has correct structure', function () {",
+          "        const jsonData = pm.response.json();",
+          "        pm.expect(jsonData).to.have.property('success', false);",
+          "        pm.expect(jsonData).to.have.property('message');",
+          "    });",
+          "}",
+          "",
+          "// Rate limit tests",
+          "if (pm.response.code === 429) {",
+          "    pm.test('Rate limit response is properly formatted', function () {",
+          "        const jsonData = pm.response.json();",
+          "        pm.expect(jsonData.message).to.include('Too many');",
+          "    });",
+          "}"
+        ],
+        "type": "text/javascript"
+      }
+    }
+  ]
+}

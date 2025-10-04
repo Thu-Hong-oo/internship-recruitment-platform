@@ -23,6 +23,7 @@
   "license": "ISC",
   "description": "AI-powered internship recruitment platform with NLP analysis and personalized skill roadmaps",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "axios": "^1.11.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.2",
@@ -46,6 +47,7 @@
     "multer-storage-cloudinary": "^4.0.0",
     "natural": "^6.10.4",
     "node-cron": "^4.2.1",
+    "node-fetch": "^3.3.2",
     "node-nlp": "^4.27.0",
     "nodemailer": "^6.9.7",
     "nodemon": "^3.1.10",

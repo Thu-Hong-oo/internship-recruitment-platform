@@ -101,6 +101,44 @@ const ApplicationSchema = new mongoose.Schema(
       createdAt: Date,
       updatedAt: Date,
     },
+
+    // THÊM: AI Analysis cho Application
+    aiAnalysis: {
+      resumeScore: {
+        overall: Number,
+        sections: {
+          format: Number,
+          content: Number,
+          keywords: Number,
+          experience: Number,
+        },
+      },
+
+      matchAnalysis: {
+        overallFit: Number,
+        technicalFit: Number,
+        experienceFit: Number,
+        educationFit: Number,
+        culturalFit: Number,
+
+        strengths: [String],
+        concerns: [String],
+        recommendations: [String],
+      },
+
+      predictedSuccess: {
+        probability: Number,
+        factors: [
+          {
+            factor: String,
+            impact: Number,
+            explanation: String,
+          },
+        ],
+      },
+
+      analyzedAt: Date,
+    },
   },
   {
     timestamps: true,
@@ -112,6 +150,12 @@ ApplicationSchema.index({ candidateId: 1, jobId: 1 }, { unique: true });
 ApplicationSchema.index({ status: 1 });
 ApplicationSchema.index({ 'matchingScore.overall': -1 });
 ApplicationSchema.index({ createdAt: -1 });
+
+// THÊM: Indexes cho AI analysis và performance
+ApplicationSchema.index({ jobId: 1, 'matchingScore.overall': -1 });
+ApplicationSchema.index({ candidateId: 1, status: 1, createdAt: -1 });
+ApplicationSchema.index({ 'aiAnalysis.matchAnalysis.overallFit': -1 });
+ApplicationSchema.index({ 'aiAnalysis.predictedSuccess.probability': -1 });
 
 // Pre-save middleware
 ApplicationSchema.pre('save', async function (next) {
