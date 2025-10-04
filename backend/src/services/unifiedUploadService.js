@@ -41,7 +41,7 @@ class UnifiedUploadService {
       },
       resume: {
         folder: 'internbridge/resumes',
-        resource_type: 'auto',
+        resource_type: 'raw', // Use 'raw' like old controller
         type: 'upload', // Public access for CV viewing
         access_mode: 'public', // Explicitly set public access
         allowed_formats: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'],
@@ -438,21 +438,34 @@ class UnifiedUploadService {
    */
   generateSignedUrl(publicId, options = {}) {
     try {
+      if (!publicId) {
+        throw new Error('Public ID is required for signed URL generation');
+      }
+
       const defaultOptions = {
         sign_url: true,
-        resource_type: 'auto',
+        resource_type: 'raw', // Use raw for documents/PDFs
         type: 'upload',
+        secure: true, // Force HTTPS
         expires_at: Math.floor(Date.now() / 1000) + 3600, // 1 hour expiry
       };
 
-      const signedUrl = cloudinary.url(publicId, {
+      const finalOptions = {
         ...defaultOptions,
         ...options,
+      };
+
+      console.log('🔐 Generating signed URL with options:', {
+        publicId,
+        ...finalOptions,
       });
+
+      const signedUrl = cloudinary.url(publicId, finalOptions);
 
       logger.info('Generated signed URL', {
         publicId,
-        expiresAt: defaultOptions.expires_at,
+        expiresAt: finalOptions.expires_at,
+        resourceType: finalOptions.resource_type,
       });
 
       return signedUrl;

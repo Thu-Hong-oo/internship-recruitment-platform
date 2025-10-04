@@ -31,7 +31,7 @@ const userRoutes = require('./src/routes/users');
 const adminRoutes = require('./src/routes/admin');
 const employerRoutes = require('./src/routes/employerProfiles');
 const jobRoutes = require('./src/routes/jobs');
-const candidateRoutes = require('./src/routes/candidateRoutesV2');
+const candidateRoutes = require('./src/routes/candidates');
 
 // Safe Additional Routes (confirmed models exist)
 const notificationRoutes = require('./src/routes/notifications');
