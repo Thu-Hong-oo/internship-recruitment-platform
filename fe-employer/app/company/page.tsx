@@ -25,38 +25,13 @@ import {
 import { getToken } from "@/lib/userStorage";
 import { useVietnamAddress } from "@/hooks/useVietnamAddress";
 import { AddressOption, findOptionByLabelLoose } from "@/lib/addressUtils";
-
-interface CompanyFormData {
-  company: {
-    name: string;
-    industry: string;
-    size: string;
-    email: string;
-    website: string;
-    description: string;
-    foundedYear: number | "";
-    employeesCount: number | "";
-  };
-  businessInfo: {
-    registrationNumber: string;
-    taxId: string;
-    issueDate: string; // yyyy-mm-dd
-    issuePlace: string;
-    address: {
-      street: string;
-      ward: string;
-      district: string;
-      city: string;
-      country: string;
-    };
-  };
-  legalRepresentative: {
-    fullName: string;
-    position: string;
-    phone: string;
-    email: string;
-  };
-}
+import {
+  getCompanyInfo,
+  updateCompanyInfo,
+  uploadCompanyLogo,
+  uploadCompanyCoverImage,
+  CompanyFormData,
+} from "@/lib/companyAPI";
 
 export default function CompanyPage() {
   const router = useRouter();
@@ -79,29 +54,18 @@ export default function CompanyPage() {
         setError("Vui lòng đăng nhập lại");
         return;
       }
-      const formData = new FormData();
-      formData.append("logo", file);
-      const res = await fetch(
-        "http://localhost:3000/api/employers/upload-logo",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
-        }
-      );
-      const data = await res.json();
-      if (!res.ok || !data?.success) {
-        throw new Error(data?.error || data?.message || "Tải logo thất bại");
+
+      const result = await uploadCompanyLogo(token, file);
+
+      if (result.success) {
+        setCompanyView((prev: any) => ({
+          ...(prev || {}),
+          logo: result.data?.logoUrl || prev?.logo,
+        }));
+        setSuccess(result.message || "Tải logo thành công");
+      } else {
+        setError(result.error || "Tải logo thất bại");
       }
-      const newUrl =
-        data?.data?.logo?.url || data?.data?.company?.logo?.url || data?.url;
-      setCompanyView((prev: any) => ({
-        ...(prev || {}),
-        logo: newUrl || prev?.logo,
-      }));
-      setSuccess("Tải logo thành công");
     } catch (e: any) {
       setError(e?.message || "Không thể tải logo");
     } finally {
@@ -117,31 +81,18 @@ export default function CompanyPage() {
         setError("Vui lòng đăng nhập lại");
         return;
       }
-      const formData = new FormData();
-      formData.append("coverImage", file);
-      const res = await fetch(
-        "http://localhost:3000/api/employers/upload-cover-image",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
-        }
-      );
-      const data = await res.json();
-      if (!res.ok || !data?.success) {
-        throw new Error(data?.error || data?.message || "Tải ảnh bìa thất bại");
+
+      const result = await uploadCompanyCoverImage(token, file);
+
+      if (result.success) {
+        setCompanyView((prev: any) => ({
+          ...(prev || {}),
+          coverImage: result.data?.coverImageUrl || prev?.coverImage,
+        }));
+        setSuccess(result.message || "Tải ảnh bìa thành công");
+      } else {
+        setError(result.error || "Tải ảnh bìa thất bại");
       }
-      const newUrl =
-        data?.data?.coverImage?.url ||
-        data?.data?.company?.coverImage?.url ||
-        data?.url;
-      setCompanyView((prev: any) => ({
-        ...(prev || {}),
-        coverImage: newUrl || prev?.coverImage,
-      }));
-      setSuccess("Tải ảnh bìa thành công");
     } catch (e: any) {
       setError(e?.message || "Không thể tải ảnh bìa");
     } finally {
@@ -273,12 +224,10 @@ export default function CompanyPage() {
       try {
         const token = getToken();
         if (!token) return;
-        const res = await fetch("http://localhost:3000/api/employers/company", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const json = await res.json();
-        const data = json?.data;
-        if (!data) return;
+
+        const result = await getCompanyInfo(token);
+        if (!result.success || !result.data) return;
+        const data = result.data;
         setCompanyView({
           ...data,
           logo: data?.logo || data?.company?.logo?.url || data?.company?.logo,
@@ -422,34 +371,12 @@ export default function CompanyPage() {
         return;
       }
 
-      const body = {
-        company: formData.company,
-        businessInfo: {
-          registrationNumber: formData.businessInfo.registrationNumber,
-          taxId: formData.businessInfo.taxId,
-          issueDate: formData.businessInfo.issueDate
-            ? new Date(formData.businessInfo.issueDate).toISOString()
-            : "",
-          issuePlace: formData.businessInfo.issuePlace,
-          address: formData.businessInfo.address,
-        },
-        legalRepresentative: formData.legalRepresentative,
-      };
+      const result = await updateCompanyInfo(token, formData);
 
-      const res = await fetch("http://localhost:3000/api/employers/company", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      });
-
-      const data = await res.json();
-      if (data?.success) {
-        setSuccess(data?.message || "Cập nhật thông tin công ty thành công");
+      if (result.success) {
+        setSuccess(result.message || "Cập nhật thông tin công ty thành công");
       } else {
-        setError(data?.error || data?.message || "Cập nhật thất bại");
+        setError(result.error || "Cập nhật thất bại");
       }
     } catch (err: any) {
       setError(err?.message || "Không thể kết nối máy chủ");
