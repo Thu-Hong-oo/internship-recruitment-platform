@@ -1,12 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const CandidateController = require('../controllers/candidate/CandidateController');
-const { protect, authorize } = require('../middleware/auth');
-const upload = require('../middleware/multerUpload');
-const { apiRateLimit } = require('../middleware/globalRateLimit');
+const CandidateController = require('../../controllers/candidate/CandidateController');
+const { protect, authorize } = require('../../middleware/auth');
+const upload = require('../../middleware/multerUpload');
+const { apiRateLimit } = require('../../middleware/globalRateLimit');
 
 // Import CV Builder routes
-const cvBuilderRoutes = require('./candidate/cvBuilderRoutes');
+const cvBuilderRoutes = require('../candidate/cvBuilderRoutes');
 
 // Initialize the new modular controller
 const candidateController = new CandidateController();
