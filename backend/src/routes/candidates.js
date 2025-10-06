@@ -5,12 +5,20 @@ const { protect, authorize } = require('../middleware/auth');
 const upload = require('../middleware/multerUpload');
 const { apiRateLimit } = require('../middleware/globalRateLimit');
 
+// Import CV Builder routes
+const cvBuilderRoutes = require('./candidate/cvBuilderRoutes');
+
 // Initialize the new modular controller
 const candidateController = new CandidateController();
 
 // Apply authentication to all routes
 router.use(protect);
 router.use(authorize('candidate'));
+
+// ============================================
+// CV BUILDER ROUTES
+// ============================================
+router.use('/me/cv-builder', cvBuilderRoutes);
 
 // ============================================
 // CORE PROFILE MANAGEMENT (2 endpoints)
@@ -69,13 +77,44 @@ router.post(
 router.get('/me/resume', candidateController.getResume);
 
 /**
- * @route   GET /api/candidates/me/resume/view
- * @desc    Stream current CV inline for viewing in browser
+ * @route   GET /api/candidates/me/resume/view/:id?
+ * @desc    Stream CV for viewing in browser (current or by ID)
  * @access  Private (Candidate only)
+ * @param   id - Optional. "current" for current CV, ObjectId for history CV, or omit for current
  * @example GET /api/candidates/me/resume/view
- * @returns PDF stream with inline headers for browser display
+ * @example GET /api/candidates/me/resume/view/current
+ * @example GET /api/candidates/me/resume/view/507f1f77bcf86cd799439011
+ * @returns File stream with inline headers for browser display
  */
-router.get('/me/resume/view', candidateController.viewCurrentCV);
+router.get('/me/resume/view/:id?', candidateController.viewCurrentCV);
+
+// ============================================
+// AI RESUME GENERATION (2 endpoints)
+// ============================================
+
+/**
+ * @route   POST /api/candidates/me/resume/generate
+ * @desc    Generate AI-enhanced resume from profile
+ * @access  Private (Candidate only)
+ * @body    { template: "modern"|"classic", targetJob: "Job Title", format: "html"|"pdf" }
+ * @example POST /api/candidates/me/resume/generate
+ *          Body: { "template": "modern", "targetJob": "Software Engineer", "format": "html" }
+ */
+router.post('/me/resume/generate', candidateController.generateSmartResume);
+
+/**
+ * @route   POST /api/candidates/me/resume/generate/:jobId
+ * @desc    Generate AI-enhanced resume targeted for specific job
+ * @access  Private (Candidate only)
+ * @param   jobId - Job ID to target
+ * @body    { template: "modern"|"classic", format: "html"|"pdf" }
+ * @example POST /api/candidates/me/resume/generate/507f1f77bcf86cd799439011
+ *          Body: { "template": "modern", "format": "html" }
+ */
+router.post(
+  '/me/resume/generate/:jobId',
+  candidateController.generateTargetedResume
+);
 
 /**
  * @route   DELETE /api/candidates/me/resume/:id

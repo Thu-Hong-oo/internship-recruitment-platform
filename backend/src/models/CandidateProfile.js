@@ -50,6 +50,25 @@ const CandidateProfileSchema = new mongoose.Schema(
         country: { type: String, default: 'Vietnam' },
       },
       bio: { type: String, maxlength: 500 },
+      avatar: String,
+      website: String,
+      linkedin: String,
+      github: String,
+    },
+
+    // Target job information for CV optimization
+    targetJob: {
+      title: String,
+      industry: String,
+      level: {
+        type: String,
+        enum: ['entry', 'mid', 'senior', 'executive'],
+        default: 'entry',
+      },
+      salary: String,
+      location: String,
+      description: String,
+      updatedAt: { type: Date, default: Date.now },
     },
 
     userId: {
