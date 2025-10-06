@@ -618,13 +618,19 @@ const verifyEmail = asyncHandler(async (req, res) => {
       await user.save();
     } else if (user.role === 'employer') {
       const EmployerProfile = require('../models/EmployerProfile');
+      
+      // Create valid default data
+      const timestamp = Date.now().toString().slice(-6);
+      const tempTaxId = `123456${timestamp}`;
+      const companyEmail = `company_${user._id}@company.com`;
+      
       const employerProfile = await EmployerProfile.create({
         owner: user._id,
         company: {
           name: 'Chưa cập nhật',
-          industry: 'unknown',
+          industry: 'technology',
           size: 'small',
-          email: user.email,
+          email: companyEmail,
         },
         position: {
           title: 'Chưa cập nhật',
@@ -633,20 +639,27 @@ const verifyEmail = asyncHandler(async (req, res) => {
         },
         contact: {
           name: user.fullName || 'Chưa cập nhật',
-          phone: 'Chưa cập nhật',
+          phone: '0123456789',
           email: user.email,
         },
         legalRepresentative: {
           fullName: user.fullName || 'Chưa cập nhật',
           position: 'Chưa cập nhật',
-          phone: 'Chưa cập nhật',
+          phone: '0123456789',
           email: user.email,
         },
         businessInfo: {
           registrationNumber: `temp_${user._id}`,
-          taxId: `temp_${user._id}_${Date.now()}`,
+          taxId: tempTaxId,
           issueDate: new Date(),
           issuePlace: 'Chưa cập nhật',
+          address: {
+            street: 'Chưa cập nhật',
+            ward: 'Chưa cập nhật',
+            district: 'Chưa cập nhật',
+            city: 'Chưa cập nhật',
+            country: 'Vietnam',
+          },
         },
         verification: {
           isVerified: false,
