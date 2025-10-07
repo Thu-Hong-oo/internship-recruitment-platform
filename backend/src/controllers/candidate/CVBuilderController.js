@@ -6,26 +6,43 @@ const resumeGeneratorService = require('../../services/resumeGeneratorService');
 const { ApiResponse } = require('../../utils/responseHandler');
 const { AppError } = require('../../utils/errors');
 
+/**
+ * CVBuilderController
+ *
+ * Chức năng chính:
+ * - Quản lý dữ liệu CV builder
+ * - Generate CV với templates
+ * - Export PDF
+ * - Quản lý templates
+ *
+ * Note: Các tính năng AI (analyze, match, suggestions)
+ * đã được chuyển sang AIController để tránh trùng lắp
+ */
 class CVBuilderController {
   constructor() {
-    // CV Builder Core
+    // Core CV Builder
     this.getBuilderData = this.getBuilderData.bind(this);
     this.updateBuilderData = this.updateBuilderData.bind(this);
-    this.generateSmartCV = this.generateSmartCV.bind(this);
-    this.generateDirectCV = this.generateDirectCV.bind(this);
-    this.getTemplates = this.getTemplates.bind(this);
-    this.analyzeJobDescription = this.analyzeJobDescription.bind(this);
 
-    // AI Features
-    this.getAISuggestions = this.getAISuggestions.bind(this);
-    this.analyzeJobMatch = this.analyzeJobMatch.bind(this);
-    this.getSkillGapAnalysis = this.getSkillGapAnalysis.bind(this);
-    this.generateSkillRoadmap = this.generateSkillRoadmap.bind(this);
+    // CV Generation
+    this.generateSmartCV = this.generateSmartCV.bind(this);
+
+    // Templates
+    this.getTemplates = this.getTemplates.bind(this);
 
     // PDF Export
     this.exportPDF = this.exportPDF.bind(this);
     this.exportPDFDirect = this.exportPDFDirect.bind(this);
+
+    // CV History Management
+    this.getCVHistory = this.getCVHistory.bind(this);
+    this.deleteCVFromHistory = this.deleteCVFromHistory.bind(this);
+    this.setCurrentCV = this.setCurrentCV.bind(this);
   }
+
+  // ========================================
+  // CV BUILDER DATA MANAGEMENT
+  // ========================================
 
   /**
    * GET /api/candidates/me/cv-builder
@@ -36,7 +53,6 @@ class CVBuilderController {
       const profile = await CandidateProfile.findOne({ userId: req.user.id });
 
       if (!profile) {
-        // Return empty template for new users
         return ApiResponse.success(
           res,
           this.getEmptyBuilderData(),
@@ -56,10 +72,10 @@ class CVBuilderController {
           linkedin: profile.personalInfo?.linkedin || '',
           github: profile.personalInfo?.github || '',
         },
-        targetJob: {
+        targetJob: profile.targetJob || {
           title: '',
           industry: '',
-          level: 'entry', // entry, mid, senior
+          level: 'entry',
           salary: '',
           location: '',
         },
@@ -70,7 +86,7 @@ class CVBuilderController {
         projects: this.formatProjects(profile.projects),
         certifications: this.formatCertifications(profile.certifications),
         awards: this.formatAwards(profile.awards),
-        languages: this.formatLanguages(profile.languages),
+        languages: this.formatLanguages(profile.skills?.languages),
         hobbies: profile.hobbies || [],
         references: profile.references || [],
       };
@@ -109,7 +125,6 @@ class CVBuilderController {
       let profile = await CandidateProfile.findOne({ userId: req.user.id });
 
       if (!profile) {
-        // Auto-create profile
         profile = new CandidateProfile({
           userId: req.user.id,
           personalInfo: {},
@@ -140,68 +155,18 @@ class CVBuilderController {
         };
       }
 
-      // Update target job (store in a new field)
-      profile.targetJob = targetJob;
+      // Update target job
+      if (targetJob) {
+        profile.targetJob = targetJob;
+      }
 
       // Update experience
       if (experience.length > 0) {
         profile.experience = {
-          internships: experience
-            .filter(exp => exp.type === 'internship')
-            .map(exp => ({
-              _id: exp._id || new mongoose.Types.ObjectId(),
-              company: exp.company,
-              position: exp.position,
-              location: exp.location,
-              startDate: exp.startDate,
-              endDate: exp.endDate,
-              description: exp.description,
-              achievements: exp.achievements || [],
-              skills: exp.skills || [],
-              current: exp.current || false,
-            })),
-          fulltime: experience
-            .filter(exp => exp.type === 'fulltime')
-            .map(exp => ({
-              _id: exp._id || new mongoose.Types.ObjectId(),
-              company: exp.company,
-              position: exp.position,
-              location: exp.location,
-              startDate: exp.startDate,
-              endDate: exp.endDate,
-              description: exp.description,
-              achievements: exp.achievements || [],
-              skills: exp.skills || [],
-              current: exp.current || false,
-            })),
-          parttime: experience
-            .filter(exp => exp.type === 'parttime')
-            .map(exp => ({
-              _id: exp._id || new mongoose.Types.ObjectId(),
-              company: exp.company,
-              position: exp.position,
-              location: exp.location,
-              startDate: exp.startDate,
-              endDate: exp.endDate,
-              description: exp.description,
-              achievements: exp.achievements || [],
-              skills: exp.skills || [],
-              current: exp.current || false,
-            })),
-          freelance: experience
-            .filter(exp => exp.type === 'freelance')
-            .map(exp => ({
-              _id: exp._id || new mongoose.Types.ObjectId(),
-              company: exp.company,
-              position: exp.position,
-              location: exp.location,
-              startDate: exp.startDate,
-              endDate: exp.endDate,
-              description: exp.description,
-              achievements: exp.achievements || [],
-              skills: exp.skills || [],
-              current: exp.current || false,
-            })),
+          internships: this.filterExperienceByType(experience, 'internship'),
+          fulltime: this.filterExperienceByType(experience, 'fulltime'),
+          parttime: this.filterExperienceByType(experience, 'parttime'),
+          freelance: this.filterExperienceByType(experience, 'freelance'),
         };
       }
 
@@ -334,6 +299,10 @@ class CVBuilderController {
     }
   }
 
+  // ========================================
+  // CV GENERATION
+  // ========================================
+
   /**
    * POST /api/candidates/me/cv-builder/generate
    * Tạo CV thông minh với AI enhancement
@@ -366,7 +335,6 @@ class CVBuilderController {
         throw new AppError(`Template '${template}' not found`, 400);
       }
 
-      // Get template configuration
       const templateConfig = CV_TEMPLATES[template];
 
       // Merge customization with template defaults
@@ -408,11 +376,9 @@ class CVBuilderController {
 
       // For minimal-clean or hideIcons requests, use basic generator (icon-free)
       if (template === 'minimal-clean' || hideIcons === true) {
-        // Ensure sections override if provided
         if (sections && sections.length > 0) {
           resumeContent.sections = sections;
         }
-        // Generate icon-free HTML
         generatedCV = await resumeGeneratorService.generateBasicResume(
           resumeContent,
           template
@@ -476,54 +442,9 @@ class CVBuilderController {
     }
   }
 
-  /**
-   * POST /api/candidates/me/cv-builder/generate-direct
-   * Tạo CV từ text thô bằng AI parsing
-   */
-  async generateDirectCV(req, res, next) {
-    try {
-      const { rawCVText } = req.body;
-      if (
-        !rawCVText ||
-        typeof rawCVText !== 'string' ||
-        rawCVText.trim().length === 0
-      ) {
-        return ApiResponse.error(res, 'Missing or invalid rawCVText', 400);
-      }
-
-      // Analyze raw CV text using AI service
-      const analysis = await aiService.analyzeCV(rawCVText);
-
-      // Optionally, create a new CandidateProfile or update existing with extracted data
-      let profile = await CandidateProfile.findOne({ userId: req.user.id });
-      if (!profile) {
-        profile = new CandidateProfile({ userId: req.user.id });
-      }
-
-      // Update profile fields with extracted data (do not overwrite existing unless empty)
-      profile.skills = analysis.skills || profile.skills;
-      profile.experience = analysis.experience || profile.experience;
-      profile.education = analysis.education || profile.education;
-      profile.personalInfo = {
-        ...profile.personalInfo,
-        ...analysis.contact,
-        bio: analysis.summary || profile.personalInfo?.bio || '',
-      };
-      await profile.save();
-
-      // Return extracted CV data for user editing
-      return ApiResponse.success(
-        res,
-        {
-          builderData: analysis,
-          message: 'CV generated from raw text successfully',
-        },
-        'CV generated from raw text successfully'
-      );
-    } catch (error) {
-      next(error);
-    }
-  }
+  // ========================================
+  // TEMPLATES MANAGEMENT
+  // ========================================
 
   /**
    * GET /api/candidates/me/cv-builder/templates
@@ -532,13 +453,17 @@ class CVBuilderController {
   async getTemplates(req, res, next) {
     try {
       const { CV_TEMPLATES } = require('../../config/cvTemplates');
-      const { industryCode, category, style } = req.query; // category kept for backward-compat only
+      const { industryCode, category, style } = req.query;
 
       let templates = Object.entries(CV_TEMPLATES).map(([key, template]) => ({
         id: key,
         name: template.name,
         description: template.description,
-        preview: template.preview,
+        preview: template.preview || {
+          image: `/templates/previews/${key}-preview.jpg`,
+          thumbnail: `/templates/previews/${key}-thumb.jpg`,
+          description: template.description,
+        },
         industryCode: template.industryCode || template.category || 'general',
         color: template.color,
         style: template.style,
@@ -589,44 +514,13 @@ class CVBuilderController {
     }
   }
 
-  /**
-   * POST /api/candidates/me/cv-builder/analyze-job
-   * Phân tích job description và đưa ra gợi ý tối ưu CV
-   */
-  async analyzeJobDescription(req, res, next) {
-    try {
-      const { jobDescription, targetJob, companyInfo } = req.body;
-
-      if (!jobDescription) {
-        throw new AppError('Job description is required', 400);
-      }
-
-      const profile = await CandidateProfile.findOne({ userId: req.user.id });
-      if (!profile) {
-        throw new AppError('Profile not found', 404);
-      }
-
-      // Analyze job description using AI
-      const analysis = await aiService.analyzeJobDescription(
-        jobDescription,
-        targetJob,
-        profile,
-        companyInfo
-      );
-
-      return ApiResponse.success(
-        res,
-        analysis,
-        'Job analysis completed successfully'
-      );
-    } catch (error) {
-      next(error);
-    }
-  }
+  // ========================================
+  // PDF EXPORT
+  // ========================================
 
   /**
    * POST /api/candidates/me/cv-builder/export-pdf
-   * Export CV thành PDF
+   * Export CV thành PDF từ URL hoặc CV ID
    */
   async exportPDF(req, res, next) {
     try {
@@ -709,7 +603,6 @@ class CVBuilderController {
       }
       profile.documents.push(pdfEntry);
 
-      // Save profile
       await profile.save();
 
       console.log('✅ PDF exported successfully');
@@ -798,7 +691,6 @@ class CVBuilderController {
       }
       profile.documents.push(pdfEntry);
 
-      // Save profile
       await profile.save();
 
       console.log('✅ PDF exported successfully from HTML');
@@ -814,6 +706,121 @@ class CVBuilderController {
       );
     } catch (error) {
       console.error('❌ PDF export from HTML failed:', error);
+      next(error);
+    }
+  }
+
+  // ========================================
+  // CV HISTORY MANAGEMENT
+  // ========================================
+
+  /**
+   * GET /api/candidates/me/cv-builder/history
+   * Lấy lịch sử các CV đã tạo
+   */
+  async getCVHistory(req, res, next) {
+    try {
+      const profile = await CandidateProfile.findOne({ userId: req.user.id });
+
+      if (!profile || !profile.resume.history) {
+        return ApiResponse.success(
+          res,
+          {
+            history: [],
+            current: null,
+          },
+          'No CV history found'
+        );
+      }
+
+      return ApiResponse.success(
+        res,
+        {
+          history: profile.resume.history.sort(
+            (a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt)
+          ),
+          current: profile.resume.current,
+        },
+        'CV history retrieved successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * DELETE /api/candidates/me/cv-builder/history/:cvId
+   * Xóa CV khỏi lịch sử
+   */
+  async deleteCVFromHistory(req, res, next) {
+    try {
+      const { cvId } = req.params;
+
+      const profile = await CandidateProfile.findOne({ userId: req.user.id });
+      if (!profile) {
+        throw new AppError('Profile not found', 404);
+      }
+
+      const cvIndex = profile.resume.history.findIndex(
+        cv => cv._id.toString() === cvId
+      );
+
+      if (cvIndex === -1) {
+        throw new AppError('CV not found in history', 404);
+      }
+
+      profile.resume.history.splice(cvIndex, 1);
+      await profile.save();
+
+      return ApiResponse.success(
+        res,
+        {
+          message: 'CV deleted from history successfully',
+        },
+        'CV deleted successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * PUT /api/candidates/me/cv-builder/current/:cvId
+   * Đặt CV làm current CV
+   */
+  async setCurrentCV(req, res, next) {
+    try {
+      const { cvId } = req.params;
+
+      const profile = await CandidateProfile.findOne({ userId: req.user.id });
+      if (!profile) {
+        throw new AppError('Profile not found', 404);
+      }
+
+      const cvEntry = profile.resume.history.find(
+        cv => cv._id.toString() === cvId
+      );
+
+      if (!cvEntry) {
+        throw new AppError('CV not found in history', 404);
+      }
+
+      profile.resume.current = {
+        ...cvEntry.toObject(),
+        updatedAt: new Date(),
+      };
+
+      await profile.save();
+
+      return ApiResponse.success(
+        res,
+        {
+          current: profile.resume.current,
+          message: 'Current CV updated successfully',
+        },
+        'Current CV set successfully'
+      );
+    } catch (error) {
       next(error);
     }
   }
@@ -879,6 +886,23 @@ class CVBuilderController {
     });
 
     return allExp.sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+  }
+
+  filterExperienceByType(experiences, type) {
+    return experiences
+      .filter(exp => exp.type === type)
+      .map(exp => ({
+        _id: exp._id || new mongoose.Types.ObjectId(),
+        company: exp.company,
+        position: exp.position,
+        location: exp.location,
+        startDate: exp.startDate,
+        endDate: exp.endDate,
+        description: exp.description,
+        achievements: exp.achievements || [],
+        skills: exp.skills || [],
+        current: exp.current || false,
+      }));
   }
 
   formatEducation(education) {
@@ -973,194 +997,6 @@ class CVBuilderController {
     if (profile.personalInfo?.bio) score += 5;
 
     return Math.round((score / total) * 100);
-  }
-
-  // ========================================
-  // 🤖 AI FEATURES - Tính năng AI cho CV
-  // ========================================
-
-  /**
-   * POST /api/candidates/me/cv-builder/ai-suggestions
-   * Lấy gợi ý AI cho các trường form
-   */
-  async getAISuggestions(req, res, next) {
-    try {
-      const { stepType, currentData, context } = req.body;
-
-      let suggestions = {};
-
-      switch (stepType) {
-        case 'targetJob':
-          suggestions = await aiService.getJobSuggestions(currentData.title);
-          break;
-
-        case 'careerObjective':
-          suggestions = await aiService.generateCareerObjective(
-            currentData,
-            context
-          );
-          break;
-
-        case 'skills':
-          suggestions = await aiService.suggestSkills(
-            context.targetJob,
-            context.experience
-          );
-          break;
-
-        case 'experience':
-          suggestions = await aiService.enhanceExperienceDescription(
-            currentData
-          );
-          break;
-
-        default:
-          return ApiResponse.error(res, 'Invalid step type', 400);
-      }
-
-      return ApiResponse.success(
-        res,
-        { suggestions },
-        'AI suggestions generated successfully'
-      );
-    } catch (error) {
-      console.error('AI suggestions error:', error);
-      return ApiResponse.error(res, 'Failed to generate AI suggestions', 500);
-    }
-  }
-
-  /**
-   * POST /api/candidates/me/cv-builder/analyze-job-match
-   * Phân tích điểm số khớp giữa CV và job target
-   */
-  async analyzeJobMatch(req, res, next) {
-    try {
-      const { targetJobDescription, targetJobTitle } = req.body;
-
-      const profile = await CandidateProfile.findOne({ userId: req.user.id });
-      if (!profile) {
-        return ApiResponse.error(res, 'Profile not found', 404);
-      }
-
-      // Get CV data
-      const cvData = this.extractCVData(profile);
-
-      // Analyze match using AI
-      const analysis = await aiService.analyzeJobMatch(cvData, {
-        title: targetJobTitle,
-        description: targetJobDescription,
-      });
-
-      return ApiResponse.success(res, analysis, 'Job match analysis completed');
-    } catch (error) {
-      console.error('Job match analysis error:', error);
-      next(new AppError('Failed to analyze job match', 500));
-    }
-  }
-
-  /**
-   * POST /api/candidates/me/cv-builder/skill-gap-analysis
-   * Phân tích khoảng cách kỹ năng giữa CV và job target
-   */
-  async getSkillGapAnalysis(req, res, next) {
-    try {
-      const { targetJobDescription, targetJobTitle, industry } = req.body;
-
-      const profile = await CandidateProfile.findOne({ userId: req.user.id });
-      if (!profile) {
-        return ApiResponse.error(res, 'Profile not found', 404);
-      }
-
-      const cvData = this.extractCVData(profile);
-
-      // Analyze skill gaps
-      const skillGapAnalysis = await aiService.analyzeSkillGaps(cvData, {
-        title: targetJobTitle,
-        description: targetJobDescription,
-        industry,
-      });
-
-      return ApiResponse.success(
-        res,
-        skillGapAnalysis,
-        'Skill gap analysis completed'
-      );
-    } catch (error) {
-      console.error('Skill gap analysis error:', error);
-      next(new AppError('Failed to analyze skill gaps', 500));
-    }
-  }
-
-  /**
-   * POST /api/candidates/me/cv-builder/generate-roadmap
-   * Tạo lộ trình học tập kỹ năng cá nhân hóa
-   */
-  async generateSkillRoadmap(req, res, next) {
-    try {
-      const {
-        targetJobTitle,
-        targetJobDescription,
-        skillGaps,
-        timeframe,
-        learningPreferences,
-      } = req.body;
-
-      const profile = await CandidateProfile.findOne({ userId: req.user.id });
-      if (!profile) {
-        return ApiResponse.error(res, 'Profile not found', 404);
-      }
-
-      const cvData = this.extractCVData(profile);
-
-      // Generate roadmap using AI
-      const roadmap = await aiService.generateLearningRoadmap({
-        currentSkills: cvData.skills,
-        targetJob: {
-          title: targetJobTitle,
-          description: targetJobDescription,
-        },
-        skillGaps,
-        timeframe: timeframe || '12 weeks',
-        preferences: learningPreferences || {},
-      });
-
-      // Save roadmap to profile
-      profile.skillRoadmap = {
-        ...roadmap,
-        createdAt: new Date(),
-        targetJob: {
-          title: targetJobTitle,
-          description: targetJobDescription,
-        },
-      };
-
-      await profile.save();
-
-      return ApiResponse.success(
-        res,
-        roadmap,
-        'Learning roadmap generated successfully'
-      );
-    } catch (error) {
-      console.error('Roadmap generation error:', error);
-      next(new AppError('Failed to generate learning roadmap', 500));
-    }
-  }
-
-  /**
-   * Extract CV data từ profile để AI analysis
-   */
-  extractCVData(profile) {
-    return {
-      personalInfo: profile.personalInfo || {},
-      skills: this.formatSkills(profile.skills || {}),
-      experience: this.getAllExperience(profile.experience || {}),
-      education: this.getAllEducation(profile.education || {}),
-      projects: profile.projects || [],
-      certifications: profile.certifications || [],
-      summary: profile.summary || '',
-      targetJob: profile.targetJob || {},
-    };
   }
 }
 
