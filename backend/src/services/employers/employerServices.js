@@ -1,7 +1,3 @@
-// ============================================
-// employerService.js - IMPROVED VERSION
-// ============================================
-
 const EmployerProfile = require('../../models/EmployerProfile');
 const User = require('../../models/User');
 const { uploadImage, deleteImage } = require('../imageUploadService');
@@ -30,6 +26,122 @@ class EmployerService {
 
     if (!profile && options.required) {
       throw new AppError('Employer profile not found', 404);
+    }
+
+    return profile;
+  }
+
+  /**
+   * Ensure employer profile exists (auto-create if not exists)
+   * Similar to ensureCandidateProfile for consistency
+   */
+  static async ensureProfile(userId) {
+    let profile = await EmployerProfile.findOne({ owner: userId });
+
+    // If profile exists but has invalid data, delete and recreate
+    if (profile) {
+      try {
+        // Test if profile is valid by calling validate
+        await profile.validate();
+        return profile; // Profile is valid, return it
+      } catch (validationError) {
+        logger.warn('Found invalid employer profile, deleting and recreating', {
+          userId,
+          profileId: profile._id,
+          error: validationError.message,
+        });
+
+        // Delete invalid profile
+        await EmployerProfile.findByIdAndDelete(profile._id);
+        profile = null; // Reset to trigger recreation
+      }
+    }
+
+    if (!profile) {
+      // Generate unique temporary values to avoid conflicts
+      const tempTaxId = `9999${Date.now().toString().slice(-6)}`;
+      const tempEmail = `temp-${userId}@placeholder.company`;
+
+      profile = await EmployerProfile.create({
+        owner: userId,
+        company: {
+          name: 'Tên công ty',
+          email: tempEmail,
+          industry: 'general',
+          size: 'startup',
+          description: '',
+          website: '',
+          officeAddress: {
+            street: '',
+            city: '',
+            country: 'Việt Nam',
+          },
+        },
+        businessInfo: {
+          registrationNumber: `REG${Date.now()}`,
+          taxId: tempTaxId,
+          issueDate: new Date(),
+          issuePlace: 'Chưa cập nhật',
+          address: {
+            street: 'Chưa cập nhật',
+            ward: 'Chưa cập nhật',
+            district: 'Chưa cập nhật',
+            city: 'Chưa cập nhật',
+            country: 'Vietnam',
+          },
+        },
+        legalRepresentative: {
+          fullName: 'Người đại diện',
+          position: 'Giám đốc',
+          phone: '0123456789',
+          email: tempEmail,
+        },
+        position: '',
+        contact: {
+          name: 'Người liên hệ',
+          phone: '0123456789',
+          email: tempEmail,
+        },
+        verification: {
+          isVerified: false,
+          steps: {
+            basicInfo: false,
+            businessInfo: false,
+            adminApproved: false,
+          },
+          documents: [],
+        },
+        status: 'pending',
+        stats: {
+          totalJobs: 0,
+          activeJobs: 0,
+          totalApplications: 0,
+          totalViews: 0,
+        },
+        engagement: {
+          profileViews: 0,
+          jobViews: 0,
+          applicationRate: 0,
+        },
+        reputation: {
+          rating: {
+            overall: 0,
+            communication: 0,
+            workEnvironment: 0,
+            compensation: 0,
+          },
+          reviews: [],
+          badges: [],
+        },
+      });
+
+      // Update user reference
+      await User.findByIdAndUpdate(userId, { employerProfile: profile._id });
+
+      logger.info('Employer profile auto-created', {
+        userId,
+        profileId: profile._id,
+      });
     }
 
     return profile;
@@ -90,7 +202,8 @@ class EmployerService {
    * Update profile basic info
    */
   static async updateProfile(userId, updates) {
-    const profile = await this.getProfile(userId, { required: true });
+    // Use ensureProfile to auto-create if needed
+    const profile = await this.ensureProfile(userId);
 
     // Allowed fields to update
     const allowedFields = ['position', 'contact', 'legalRepresentative'];
@@ -109,14 +222,15 @@ class EmployerService {
       profileId: profile._id,
     });
 
-    return profile;
+    return { profile, updatedFields: { profile: allowedFields } };
   }
 
   /**
    * Update company info
    */
   static async updateCompanyInfo(userId, updates) {
-    const profile = await this.getProfile(userId, { required: true });
+    // Use ensureProfile to auto-create if needed
+    const profile = await this.ensureProfile(userId);
 
     // Allowed fields
     const allowedFields = ['company', 'businessInfo'];
@@ -134,7 +248,7 @@ class EmployerService {
       profileId: profile._id,
     });
 
-    return profile;
+    return { profile, updatedFields: { profile: allowedFields } };
   }
 
   /**
@@ -142,7 +256,8 @@ class EmployerService {
    */
   static async uploadLogo(userId, file) {
     try {
-      const profile = await this.getProfile(userId, { required: true });
+      // Use ensureProfile to auto-create if needed
+      const profile = await this.ensureProfile(userId);
 
       // Validate file
       if (!file || !file.buffer) {
@@ -206,7 +321,7 @@ class EmployerService {
    * Remove company logo
    */
   static async removeLogo(userId) {
-    const profile = await this.getProfile(userId, { required: true });
+    const profile = await this.ensureProfile(userId);
 
     if (!profile.company?.logo?.cloudinaryId) {
       throw new AppError('No logo to remove', 404);
@@ -229,7 +344,7 @@ class EmployerService {
    */
   static async uploadCoverImage(userId, file) {
     try {
-      const profile = await this.getProfile(userId, { required: true });
+      const profile = await this.ensureProfile(userId);
 
       if (!file || !file.buffer) {
         throw new AppError('No file provided', 400);
@@ -292,7 +407,7 @@ class EmployerService {
    * Remove cover image
    */
   static async removeCoverImage(userId) {
-    const profile = await this.getProfile(userId, { required: true });
+    const profile = await this.ensureProfile(userId);
 
     if (!profile.company?.coverImage?.cloudinaryId) {
       throw new AppError('No cover image to remove', 404);
@@ -391,8 +506,11 @@ class EmployerService {
    * Get company statistics
    */
   static async getStatistics(userId) {
-    const profile = await this.getProfile(userId, { required: true });
-    await profile.updateStats();
+    const profile = await this.ensureProfile(userId);
+    // Note: updateStats() method might need to be implemented in EmployerProfile model
+    if (typeof profile.updateStats === 'function') {
+      await profile.updateStats();
+    }
 
     return {
       stats: profile.stats,
@@ -459,6 +577,42 @@ class EmployerService {
     await EmployerProfile.findByIdAndUpdate(profileId, {
       $inc: { 'engagement.profileViews': 1 },
     });
+  }
+
+  /**
+   * Upload document for verification
+   */
+  static async uploadDocument(file, userId, documentType, metadata, profile) {
+    const documentUploadService = require('../documentUploadService');
+
+    return await documentUploadService.uploadDocument(file, {
+      folder: `internbridge/employer-documents/${userId}`,
+      documentType,
+      metadata,
+      userId,
+    });
+  }
+
+  /**
+   * Delete document from Cloudinary
+   */
+  static async deleteDocument(cloudinaryId) {
+    const documentUploadService = require('../documentUploadService');
+
+    return await documentUploadService.deleteDocument(cloudinaryId);
+  }
+
+  /**
+   * Remove document from profile
+   */
+  static async removeDocument(profile, documentId) {
+    profile.verification.documents = profile.verification.documents.filter(
+      doc => doc._id.toString() !== documentId
+    );
+
+    await profile.save();
+
+    return profile;
   }
 }
 

@@ -28,15 +28,19 @@ const { createClient } = require('redis');
 // Core Routes
 const authRoutes = require('./src/routes/auth');
 const userRoutes = require('./src/routes/users');
-const adminRoutes = require('./src/routes/admin');
+const adminRoutes = require('./src/routes/admin/admin');
 const employerRoutes = require('./src/routes/employerProfiles');
 const jobRoutes = require('./src/routes/jobs');
-const candidateRoutes = require('./src/routes/candidates');
+const candidateRoutes = require('./src/routes/candidate/candidates');
+
+// AI & Analysis Routes
+const aiRoutes = require('./src/routes/ai');
 
 // Safe Additional Routes (confirmed models exist)
 const notificationRoutes = require('./src/routes/notifications');
 const skillRoutes = require('./src/routes/skills');
 const skillCategoryRoutes = require('./src/routes/skillCategories');
+const industryRoutes = require('./src/routes/industries');
 
 // Middleware & Utils
 const errorHandler = require('./src/middleware/errorHandler');
@@ -202,7 +206,7 @@ const swaggerOptions = {
       },
     ],
   },
-  apis: ['./src/routes/*.js'],
+  apis: ['./src/routes/*.js', './src/routes/**/*.js'],
 };
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
@@ -232,10 +236,14 @@ app.use('/api/employers', employerRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/candidates', candidateRoutes);
 
+// AI & Analysis Routes
+app.use('/api/ai', aiRoutes);
+
 // Safe Additional Routes (confirmed models exist)
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/skills', skillRoutes);
 app.use('/api/skill-categories', skillCategoryRoutes);
+app.use('/api/industries', industryRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
