@@ -61,6 +61,8 @@ class UnifiedUploadService {
           'jpg',
           'jpeg',
           'png',
+          'html',
+          'htm',
         ],
         max_size: 20 * 1024 * 1024, // 20MB
       },

@@ -13,22 +13,31 @@ async function uploadFile(type, filePathOrBuffer, options = {}) {
       folder: 'internbridge/images',
       resource_type: 'image',
       allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'svg'],
-      transformation: [
-        { quality: 85, fetch_format: 'auto' },
-      ],
+      transformation: [{ quality: 85, fetch_format: 'auto' }],
     },
     video: {
       folder: 'internbridge/videos',
       resource_type: 'video',
       allowed_formats: ['mp4', 'mov', 'avi', 'mkv', 'webm'],
-      transformation: [
-        { quality: 'auto' },
-      ],
+      transformation: [{ quality: 'auto' }],
     },
     document: {
       folder: 'internbridge/documents',
       resource_type: 'raw',
-      allowed_formats: ['pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png'],
+      allowed_formats: [
+        'pdf',
+        'doc',
+        'docx',
+        'ppt',
+        'pptx',
+        'xls',
+        'xlsx',
+        'jpg',
+        'jpeg',
+        'png',
+        'html',
+        'htm',
+      ],
     },
     audio: {
       folder: 'internbridge/audios',
@@ -43,15 +52,21 @@ async function uploadFile(type, filePathOrBuffer, options = {}) {
   };
 
   const config = { ...configByType[type], ...options };
+
+  // Debug logging
+  console.log(`📤 FileUploadService: Uploading ${type} file`);
+  console.log('Config:', JSON.stringify(config, null, 2));
+
   // Giới hạn kích thước file mặc định theo loại
   const defaultMaxSizeByType = {
-    image: 5 * 1024 * 1024,      // 5MB
+    image: 5 * 1024 * 1024, // 5MB
     document: 10 * 1024 * 1024, // 10MB
-    video: 50 * 1024 * 1024,    // 50MB
-    audio: 20 * 1024 * 1024,    // 20MB
-    other: 10 * 1024 * 1024,    // 10MB
+    video: 50 * 1024 * 1024, // 50MB
+    audio: 20 * 1024 * 1024, // 20MB
+    other: 10 * 1024 * 1024, // 10MB
   };
-  const maxSize = options.maxSize || defaultMaxSizeByType[type] || 10 * 1024 * 1024;
+  const maxSize =
+    options.maxSize || defaultMaxSizeByType[type] || 10 * 1024 * 1024;
   let fileSize;
   if (Buffer.isBuffer(filePathOrBuffer)) {
     fileSize = filePathOrBuffer.length;
@@ -64,22 +79,37 @@ async function uploadFile(type, filePathOrBuffer, options = {}) {
     }
   }
   if (fileSize !== undefined && fileSize > maxSize) {
-    throw new Error('File vượt quá giới hạn kích thước cho phép (' + (maxSize / (1024 * 1024)) + 'MB)');
+    throw new Error(
+      'File vượt quá giới hạn kích thước cho phép (' +
+        maxSize / (1024 * 1024) +
+        'MB)'
+    );
   }
 
   let result;
   if (Buffer.isBuffer(filePathOrBuffer)) {
+    console.log('📤 Uploading from buffer...');
     result = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         config,
         (err, res) => {
-          if (err) return reject(err);
+          if (err) {
+            console.error('❌ Upload stream error:', err);
+            return reject(err);
+          }
+          console.log('✅ Upload stream success:', {
+            public_id: res.public_id,
+            url: res.secure_url,
+            format: res.format,
+            bytes: res.bytes,
+          });
           resolve(res);
         }
       );
       uploadStream.end(filePathOrBuffer);
     });
   } else {
+    console.log('📤 Uploading from file path...');
     result = await cloudinary.uploader.upload(filePathOrBuffer, config);
   }
 
@@ -103,7 +133,9 @@ async function uploadFile(type, filePathOrBuffer, options = {}) {
 async function deleteFile(publicId, resourceType = 'auto') {
   try {
     if (publicId && !publicId.includes('http')) {
-      await cloudinary.uploader.destroy(publicId, { resource_type: resourceType });
+      await cloudinary.uploader.destroy(publicId, {
+        resource_type: resourceType,
+      });
       console.log(`Deleted file: ${publicId}`);
     }
   } catch (error) {

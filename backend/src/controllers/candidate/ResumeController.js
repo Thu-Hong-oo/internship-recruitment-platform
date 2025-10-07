@@ -21,6 +21,52 @@ class ResumeController {
     this.setCurrentResume = this.setCurrentResume.bind(this);
     this.renameResume = this.renameResume.bind(this);
     this.viewCurrentCV = this.viewCurrentCV.bind(this);
+    this.generateSmartResume = this.generateSmartResume.bind(this);
+    this.generateTargetedResume = this.generateTargetedResume.bind(this);
+    this.buildResumeContent = this.buildResumeContent.bind(this);
+    this.formatAddress = this.formatAddress.bind(this);
+    this.ensureCandidateProfile = this.ensureCandidateProfile.bind(this);
+  }
+
+  // ============================================
+  // HELPER METHODS
+  // ============================================
+
+  /**
+   * Ensure candidate profile exists, create if not found
+   * @param {string} userId - User ID
+   * @param {Object} user - User object from req.user
+   * @returns {Promise<Object>} Candidate profile
+   */
+  async ensureCandidateProfile(userId, user) {
+    let profile = await CandidateProfile.findOne({ userId });
+
+    if (!profile) {
+      console.log(`Creating new candidate profile for user: ${userId}`);
+
+      profile = new CandidateProfile({
+        userId: userId,
+        personalInfo: {
+          fullName: user.fullName || '',
+          email: user.email || '',
+          phone: '',
+          address: '',
+          dateOfBirth: null,
+          gender: '',
+          avatar: user.avatar || null,
+        },
+        progress: {
+          profileCompleteness: 10,
+          lastUpdated: new Date(),
+        },
+        status: 'active',
+      });
+
+      await profile.save();
+      console.log(`✅ Created candidate profile for user: ${userId}`);
+    }
+
+    return profile;
   }
 
   // ============================================
@@ -43,7 +89,14 @@ class ResumeController {
         case 'parse':
           return await this._parseResume(req, res, next);
         case 'generate':
-          return await this._generateResume(req, res, next);
+          // Deprecated: point clients to the new customizable generator
+          return res.status(410).json({
+            success: false,
+            error: 'DEPRECATED_ENDPOINT',
+            message:
+              'This endpoint is deprecated. Use /api/candidates/me/cv-builder/generate instead.',
+            replacement: '/api/candidates/me/cv-builder/generate',
+          });
         default:
           throw new AppError(
             'Invalid action. Must be: upload, parse, or generate',
@@ -387,31 +440,53 @@ class ResumeController {
   }
 
   /**
-   * GET /api/candidates/me/resume/view
-   * Redirect to CV for viewing in browser
-   */
-  /**
-   * GET /api/candidates/me/resume/view
-   * Stream current CV inline for viewing in browser
+   * GET /api/candidates/me/resume/view/:id?
+   * Stream CV for viewing in browser
+   * @param {string} id - Optional. "current" or ObjectId for history CV. Defaults to current if not provided
    */
   async viewCurrentCV(req, res, next) {
     try {
+      const { id } = req.params; // Optional parameter
+
       const profile = await CandidateProfile.findOne({ userId: req.user.id });
       if (!profile) {
         throw new AppError('Candidate profile not found', 404);
       }
 
-      console.log('🔍 Profile resume data:', {
-        current: profile?.resume?.current,
-        historyLength: profile?.resume?.history?.length || 0,
-      });
+      console.log('🔍 Looking for CV with ID:', id || 'current (default)');
 
-      const currentResume = profile?.resume?.current;
-      const url = currentResume?.url;
-      const publicId = currentResume?.publicId;
+      let resumeToView = null;
+
+      // Check if viewing specific CV by ID or default to current
+      if (!id || id === 'current') {
+        if (!profile.resume.current || !profile.resume.current.url) {
+          throw new AppError('Chưa có CV hiện tại để xem', 404);
+        }
+        resumeToView = profile.resume.current;
+        console.log('📄 Found current CV');
+      } else {
+        // Find CV in history by ID
+        if (!profile.resume.history || !Array.isArray(profile.resume.history)) {
+          throw new AppError('Không có lịch sử CV', 404);
+        }
+
+        const cvIndex = profile.resume.history.findIndex(
+          cv => cv._id.toString() === id
+        );
+
+        if (cvIndex === -1) {
+          throw new AppError('Không tìm thấy CV trong lịch sử', 404);
+        }
+
+        resumeToView = profile.resume.history[cvIndex];
+        console.log('📄 Found CV in history:', resumeToView.displayName);
+      }
+
+      const url = resumeToView.url;
+      const publicId = resumeToView.publicId;
 
       if (!url) {
-        throw new AppError('Chưa có CV hiện tại để xem', 404);
+        throw new AppError('URL CV không tồn tại', 404);
       }
 
       try {
@@ -424,7 +499,7 @@ class ResumeController {
           console.log('🔒 Fixed to HTTPS:', accessibleUrl);
         }
 
-        // Convert image/upload to raw/upload for PDF files (like old controller)
+        // Convert image/upload to raw/upload for PDF files
         if (url.includes('/image/upload/') && url.includes('.pdf')) {
           const rawUrl = url.replace('/image/upload/', '/raw/upload/');
           accessibleUrl = rawUrl;
@@ -433,7 +508,7 @@ class ResumeController {
         let fileBuffer;
 
         try {
-          // Use fetch directly like the old controller
+          // Use fetch to get file content
           const response = await fetch(accessibleUrl);
           console.log(
             '🌐 Fetch response status:',
@@ -441,7 +516,7 @@ class ResumeController {
             response.statusText
           );
 
-          // Accept 200 and 401 status codes like old controller
+          // Accept 200 and 401 status codes
           if (response.status !== 200 && response.status !== 401) {
             throw new AppError(
               `Không thể tải CV từ Cloudinary: ${response.status} ${response.statusText}`,
@@ -457,9 +532,9 @@ class ResumeController {
           throw new AppError('Lỗi khi tải CV', 500);
         }
 
-        // Get filename và format từ current resume
-        const filename = profile.resume.current.filename || 'resume.pdf';
-        const format = profile.resume.current.format || 'pdf';
+        // Get filename và format từ resume data
+        const filename = resumeToView.filename || 'resume.pdf';
+        const format = resumeToView.format || 'pdf';
 
         console.log('📋 File info:', {
           filename,
@@ -467,7 +542,7 @@ class ResumeController {
           size: fileBuffer.length,
         });
 
-        // Set content type dựa trên format - QUAN TRỌNG để browser hiển thị đúng
+        // Set content type dựa trên format
         let contentType = 'application/pdf';
         if (format.toLowerCase() === 'pdf') {
           contentType = 'application/pdf';
@@ -476,17 +551,31 @@ class ResumeController {
         } else if (format.toLowerCase() === 'docx') {
           contentType =
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        } else if (format.toLowerCase() === 'html') {
+          contentType = 'text/html; charset=utf-8';
         }
 
-        // Set headers để browser hiển thị INLINE thay vì download
+        // Set headers để browser hiển thị INLINE
         res.setHeader('Content-Type', contentType);
         res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
         res.setHeader('Cache-Control', 'public, max-age=3600');
         res.setHeader('X-Content-Type-Options', 'nosniff');
-        res.setHeader('X-Frame-Options', 'SAMEORIGIN'); // Cho phép iframe từ cùng origin
+        res.setHeader('X-Frame-Options', 'SAMEORIGIN');
 
-        console.log('✅ Successfully fetched CV, size:', fileBuffer.length);
-        res.send(fileBuffer);
+        // Special handling for HTML content
+        if (format.toLowerCase() === 'html') {
+          // Convert buffer to string to ensure proper encoding
+          const htmlContent = fileBuffer.toString('utf8');
+          console.log('✅ Successfully streaming HTML CV:', filename);
+          console.log(
+            '📄 HTML content preview:',
+            htmlContent.substring(0, 200) + '...'
+          );
+          res.send(htmlContent);
+        } else {
+          console.log('✅ Successfully streaming CV:', filename);
+          res.send(fileBuffer);
+        }
       } catch (streamError) {
         console.error('❌ Error streaming CV:', streamError);
         throw new AppError('Lỗi khi tải CV', 500);
@@ -839,6 +928,215 @@ class ResumeController {
     } catch (error) {
       console.warn('⚠️ Error auto-filling profile:', error.message);
     }
+  }
+
+  /**
+   * Generate AI-enhanced resume from profile
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next function
+   */
+  async generateSmartResume(req, res, next) {
+    try {
+      const userId = req.user.id;
+      const {
+        template = 'modern',
+        targetJob = null,
+        format = 'html',
+      } = req.body;
+
+      // Get candidate profile (auto-create if not found)
+      const profile = await this.ensureCandidateProfile(userId, req.user);
+
+      // Build basic resume content
+      const resumeContent = this.buildResumeContent(profile, { targetJob });
+
+      // Generate AI-enhanced resume
+      const aiService = require('../../services/aiService');
+      const generatedResume = await aiService.generateResume(resumeContent, {
+        template,
+        targetJob,
+        format,
+      });
+
+      // Save generated resume to history
+      const newResumeEntry = {
+        _id: new mongoose.Types.ObjectId(),
+        url: generatedResume.url,
+        filename: `AI_Generated_CV_${Date.now()}.${format}`,
+        displayName: `CV AI - ${targetJob || 'General'}`,
+        format: format,
+        size: generatedResume.size,
+        uploadedAt: new Date(),
+        aiGenerated: true,
+        targetJob: targetJob,
+        template: template,
+      };
+
+      profile.resume.history.push(newResumeEntry);
+
+      // Optionally set as current CV
+      if (req.body.setAsCurrent !== false) {
+        profile.resume.current = {
+          ...newResumeEntry,
+          updatedAt: new Date(),
+          aiAnalysis: generatedResume.enhancedContent?.optimization || {},
+        };
+      }
+
+      await profile.save();
+
+      return ApiResponse.success(
+        res,
+        {
+          resume: generatedResume,
+          profile: {
+            current: profile.resume.current,
+            history: profile.resume.history,
+          },
+          message: 'AI-enhanced resume generated successfully',
+        },
+        'Resume generated successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Generate AI-enhanced resume targeted for specific job
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next function
+   */
+  async generateTargetedResume(req, res, next) {
+    try {
+      const userId = req.user.id;
+      const { jobId } = req.params;
+      const { template = 'modern', format = 'html' } = req.body;
+
+      // Get job details
+      const Job = require('../../models/Job');
+      const job = await Job.findById(jobId);
+      if (!job) {
+        throw new AppError('Job not found', 404);
+      }
+
+      // Get candidate profile (auto-create if not found)
+      const profile = await this.ensureCandidateProfile(userId, req.user);
+
+      // Build resume content with job targeting
+      const resumeContent = this.buildResumeContent(profile, {
+        targetJob: job.title,
+        jobDescription: job.description,
+        jobRequirements: job.requirements,
+      });
+
+      // Generate AI-enhanced resume
+      const aiService = require('../../services/aiService');
+      const generatedResume = await aiService.generateResume(resumeContent, {
+        template,
+        targetJob: job.title,
+        format,
+      });
+
+      // Save generated resume to history
+      const newResumeEntry = {
+        _id: new mongoose.Types.ObjectId(),
+        url: generatedResume.url,
+        filename: `AI_CV_${job.title.replace(
+          /[^a-zA-Z0-9]/g,
+          '_'
+        )}_${Date.now()}.${format}`,
+        displayName: `CV AI - ${job.title}`,
+        format: format,
+        size: generatedResume.size,
+        uploadedAt: new Date(),
+        aiGenerated: true,
+        targetJob: job.title,
+        targetJobId: jobId,
+        template: template,
+      };
+
+      profile.resume.history.push(newResumeEntry);
+
+      // Optionally set as current CV
+      if (req.body.setAsCurrent !== false) {
+        profile.resume.current = {
+          ...newResumeEntry,
+          updatedAt: new Date(),
+          aiAnalysis: generatedResume.enhancedContent?.optimization || {},
+        };
+      }
+
+      await profile.save();
+
+      return ApiResponse.success(
+        res,
+        {
+          resume: generatedResume,
+          job: {
+            id: job._id,
+            title: job.title,
+            company: job.employer?.company?.name || 'N/A',
+          },
+          profile: {
+            current: profile.resume.current,
+            history: profile.resume.history,
+          },
+          message: `AI-enhanced resume generated for ${job.title}`,
+        },
+        'Targeted resume generated successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Build resume content from candidate profile
+   * @param {Object} profile - Candidate profile
+   * @param {Object} options - Build options
+   * @returns {Object} Structured resume content
+   */
+  buildResumeContent(profile, options = {}) {
+    const { targetJob, jobDescription, jobRequirements } = options;
+
+    return {
+      personalInfo: {
+        fullName: profile.personalInfo?.fullName || 'N/A',
+        email: profile.userId?.email || 'N/A',
+        phone: profile.personalInfo?.phone || 'N/A',
+        address: this.formatAddress(profile.personalInfo?.address),
+        bio: profile.personalInfo?.bio || '',
+        avatar: profile.personalInfo?.avatar,
+      },
+      education: profile.education || [],
+      experience: profile.experience || [],
+      skills: {
+        technical: profile.skills?.technical || [],
+        soft: profile.skills?.soft || [],
+        languages: profile.skills?.languages || [],
+      },
+      projects: profile.projects || [],
+      certifications: profile.certifications || [],
+      targetJob: targetJob,
+      jobDescription: jobDescription,
+      jobRequirements: jobRequirements,
+    };
+  }
+
+  /**
+   * Helper: Format address
+   * @param {Object|string} address - Address object or string
+   * @returns {string} Formatted address
+   */
+  formatAddress(address) {
+    if (!address) return 'N/A';
+    if (typeof address === 'string') return address;
+
+    const { street, ward, district, city, country } = address;
+    return [street, ward, district, city, country].filter(Boolean).join(', ');
   }
 }
 

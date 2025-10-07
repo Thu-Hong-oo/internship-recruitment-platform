@@ -277,14 +277,41 @@ class ProfileController {
         throw new AppError('Profile has been deactivated', 403);
       }
 
-      const profile = await CandidateProfile.findOne({
+      let profile = await CandidateProfile.findOne({
         userId: req.user.id,
         $or: [{ status: { $ne: 'inactive' } }, { status: { $exists: false } }],
         deletedAt: { $exists: false },
       }).populate(['userId']);
 
+      // Auto-create profile if not found (similar to employer logic)
       if (!profile) {
-        throw new AppError('Candidate profile not found', 404);
+        console.log(`Creating new candidate profile for user: ${req.user.id}`);
+
+        profile = new CandidateProfile({
+          userId: req.user.id,
+          personalInfo: {
+            fullName: req.user.fullName || '',
+            email: req.user.email || '',
+            phone: '',
+            address: '',
+            dateOfBirth: null,
+            gender: '',
+            avatar: req.user.avatar || null,
+          },
+          progress: {
+            profileCompleteness: 10, // Start with basic info
+            lastUpdated: new Date(),
+          },
+          status: 'active',
+        });
+
+        await profile.save();
+        console.log(`✅ Created candidate profile for user: ${req.user.id}`);
+
+        // Re-populate after creation
+        profile = await CandidateProfile.findById(profile._id).populate([
+          'userId',
+        ]);
       }
 
       // Handle include logic
