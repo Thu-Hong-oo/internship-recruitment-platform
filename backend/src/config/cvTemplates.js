@@ -15,7 +15,12 @@ const CV_TEMPLATES = {
     style: 'modern',
     color: '#2563eb',
     industryCode: 'general',
-    preview: '/templates/modern-preview.jpg',
+    preview: {
+      image: '/templates/previews/modern-preview.jpg',
+      thumbnail: '/templates/previews/modern-thumb.jpg',
+      description:
+        'Template hiện đại với layout 2 cột, màu xanh dương chuyên nghiệp',
+    },
     options: {
       languages: ['vi', 'en'],
       supportsIcons: false,
@@ -49,7 +54,12 @@ const CV_TEMPLATES = {
     style: 'modern',
     color: '#2563eb',
     industryCode: 'technology',
-    preview: '/templates/student-tech-preview.jpg',
+    preview: {
+      image: '/templates/previews/student-tech-preview.jpg',
+      thumbnail: '/templates/previews/student-tech-thumb.jpg',
+      description:
+        'Template công nghệ với gradient header, focus vào projects và skills',
+    },
     options: {
       languages: ['vi', 'en'],
       supportsIcons: false,
@@ -83,7 +93,11 @@ const CV_TEMPLATES = {
     style: 'executive',
     color: '#059669',
     industryCode: 'business',
-    preview: '/templates/business-preview.jpg',
+    preview: {
+      image: '/templates/previews/business-professional-preview.jpg',
+      thumbnail: '/templates/previews/business-professional-thumb.jpg',
+      description: 'Template chuyên nghiệp cho business, phong cách corporate',
+    },
     options: {
       languages: ['vi', 'en'],
       supportsIcons: false,
@@ -110,7 +124,11 @@ const CV_TEMPLATES = {
     style: 'minimal',
     color: '#7c3aed',
     industryCode: 'general',
-    preview: '/templates/minimal-preview.jpg',
+    preview: {
+      image: '/templates/previews/minimal-preview.jpg',
+      thumbnail: '/templates/previews/minimal-thumb.jpg',
+      description: 'Template tối giản, đơn giản với typography sạch sẽ',
+    },
     options: {
       languages: ['vi', 'en'],
       supportsIcons: false,
@@ -144,7 +162,11 @@ const CV_TEMPLATES = {
     style: 'creative',
     color: '#dc2626',
     industryCode: 'design',
-    preview: '/templates/creative-preview.jpg',
+    preview: {
+      image: '/templates/previews/creative-preview.jpg',
+      thumbnail: '/templates/previews/creative-thumb.jpg',
+      description: 'Template sáng tạo với gradient và design hiện đại',
+    },
     options: {
       languages: ['vi', 'en'],
       supportsIcons: false,
@@ -178,7 +200,11 @@ const CV_TEMPLATES = {
     style: 'executive',
     color: '#1a365d',
     industryCode: 'executive',
-    preview: '/templates/executive-preview.jpg',
+    preview: {
+      image: '/templates/previews/executive-preview.jpg',
+      thumbnail: '/templates/previews/executive-thumb.jpg',
+      description: 'Template executive sang trọng cho vị trí quản lý',
+    },
     options: {
       languages: ['vi', 'en'],
       supportsIcons: false,

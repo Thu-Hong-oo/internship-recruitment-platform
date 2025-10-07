@@ -1,4 +1,4 @@
-// cvBuilderRoutes.js - Fixed Authentication Issue
+// cvBuilderRoutes.js - CV Builder Core Features Only
 const express = require('express');
 const router = express.Router();
 const CVBuilderController = require('../../controllers/candidate/CVBuilderController');
@@ -6,32 +6,30 @@ const CVBuilderController = require('../../controllers/candidate/CVBuilderContro
 // Create controller instance
 const cvController = new CVBuilderController();
 
-// ❌ REMOVED: Double authentication (already handled in parent route)
-// router.use(protect);
-// router.use(authorize('candidate'));
-
 // Test route
 router.get('/test', (req, res) => {
   res.json({ message: 'CV Builder routes working' });
 });
 
+// ========================================
+// 📝 CV BUILDER CORE ROUTES
+// ========================================
+
 // ✅ GET - Lấy dữ liệu CV builder
 router.get('/', cvController.getBuilderData);
 
 // ✅ PUT - Cập nhật dữ liệu CV builder
-router.put('/', cvController.updateBuilderData); // FIX HERE!
+router.put('/', cvController.updateBuilderData);
 
 // ✅ POST - Tạo CV thông minh với AI
 router.post('/generate', cvController.generateSmartCV);
 
-// ✅ POST - Tạo CV từ raw text (AI parsing)
-router.post('/generate-direct', cvController.generateDirectCV);
-
 // ✅ GET - Lấy danh sách templates
 router.get('/templates', cvController.getTemplates);
 
-// ✅ POST - Analyze job description
-router.post('/analyze-job', cvController.analyzeJobDescription);
+// ========================================
+// 📄 PDF EXPORT ROUTES
+// ========================================
 
 // ✅ POST - Export CV as PDF from URL
 router.post('/export-pdf', cvController.exportPDF);
@@ -39,19 +37,21 @@ router.post('/export-pdf', cvController.exportPDF);
 // ✅ POST - Export CV as PDF directly from HTML content
 router.post('/export-pdf-direct', cvController.exportPDFDirect);
 
-// 🤖 AI ANALYSIS & ASSISTANCE ROUTES
-// ✅ POST - AI Suggestions cho form fields
-router.post('/ai-suggestions', cvController.getAISuggestions);
+// ========================================
+// 📚 CV HISTORY MANAGEMENT ROUTES
+// ========================================
+// ❌ REMOVED: These features are already available in /api/candidates/me/resume/*
+// - GET history: Use GET /api/candidates/me/resume?version=all
+// - DELETE from history: Use DELETE /api/candidates/me/resume/:id
+// - SET current CV: Use PUT /api/candidates/me/resume/set-current/:id
 
-// ✅ POST - Phân tích độ phù hợp với job
-router.post('/analyze-job-match', cvController.analyzeJobMatch);
-
-// ✅ POST - Phân tích skill gaps
-router.post('/skill-gap-analysis', cvController.getSkillGapAnalysis);
-
-// ✅ POST - Tạo learning roadmap
-router.post('/generate-roadmap', cvController.generateSkillRoadmap);
-
-// Removed preview routes; use /api/candidates/me/resume/view instead
+// ========================================
+// 🔗 NOTE: AI FEATURES MOVED TO /api/ai/*
+// ========================================
+// - AI Suggestions: POST /api/ai/suggestions
+// - Job Match Analysis: POST /api/ai/analyze-job-match
+// - Skill Gap Analysis: POST /api/ai/skill-gap-analysis
+// - Learning Roadmap: POST /api/ai/skill-roadmap
+// - CV Analysis: POST /api/ai/analyze-cv-text
 
 module.exports = router;
