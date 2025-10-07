@@ -13,7 +13,9 @@ const { logger } = require('../utils/logger');
 const { ApiResponse } = require('../utils/responseHandler');
 const { AppError } = require('../utils/errors');
 
-// Configure multer for file uploads
+// ============================================
+// MULTER CONFIGURATION FOR CV UPLOAD
+// ============================================
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const uploadPath = path.join(__dirname, '../../uploads/cv');
@@ -29,9 +31,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage: storage,
-  limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
-  },
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter: function (req, file, cb) {
     const allowedTypes = /pdf|doc|docx/;
     const extname = allowedTypes.test(
@@ -47,43 +47,51 @@ const upload = multer({
   },
 });
 
+// ============================================
+// AI CONTROLLER CLASS
+// ============================================
 class AIController {
   constructor() {
-    // Candidate AI methods
+    // CV Analysis
     this.analyzeCV = [upload.single('cv'), this.analyzeCVHandler.bind(this)];
     this.analyzeCVText = this.analyzeCVText.bind(this);
-    this.getJobRecommendations = this.getJobRecommendations.bind(this);
-    this.generateSkillRoadmap = this.generateSkillRoadmap.bind(this);
-    this.analyzeJobMatch = this.analyzeJobMatch.bind(this);
-    this.getSkillGapAnalysis = this.getSkillGapAnalysis.bind(this);
-    this.getAISuggestions = this.getAISuggestions.bind(this);
-    this.getCandidateInsights = this.getCandidateInsights.bind(this);
-    this.getMatchScore = this.getMatchScore.bind(this);
 
-    // Employer AI methods
+    // Job & Career AI
+    this.getJobRecommendations = this.getJobRecommendations.bind(this);
     this.analyzeJobPosting = this.analyzeJobPosting.bind(this);
+    this.analyzeJobDescription = this.analyzeJobDescription.bind(this);
+
+    // Matching & Scoring
+    this.analyzeJobMatch = this.analyzeJobMatch.bind(this);
+    this.getMatchScore = this.getMatchScore.bind(this);
     this.analyzeCandidate = this.analyzeCandidate.bind(this);
-    this.batchAnalyzeApplications = this.batchAnalyzeApplications.bind(this);
+
+    // Skills & Learning
+    this.getSkillGapAnalysis = this.getSkillGapAnalysis.bind(this);
+    this.generateSkillRoadmap = this.generateSkillRoadmap.bind(this);
+    this.getAISuggestions = this.getAISuggestions.bind(this);
+
+    // Insights & Analytics
+    this.getCandidateInsights = this.getCandidateInsights.bind(this);
     this.getEmployerInsights = this.getEmployerInsights.bind(this);
     this.getAIInsights = this.getAIInsights.bind(this);
+
+    // Batch Operations
+    this.batchAnalyzeApplications = this.batchAnalyzeApplications.bind(this);
   }
 
   // ========================================
-  // CANDIDATE AI ENDPOINTS
+  // CV ANALYSIS ENDPOINTS
   // ========================================
 
   /**
-   * POST /api/ai/candidates/analyze-cv
+   * POST /api/ai/analyze-cv
    * Phân tích CV từ file upload
    */
   async analyzeCVHandler(req, res) {
     try {
-      // Check if file was uploaded
       if (!req.file) {
-        return res.status(400).json({
-          success: false,
-          error: 'Please upload a CV file',
-        });
+        return ApiResponse.error(res, 'Please upload a CV file', 400);
       }
 
       const filePath = req.file.path;
@@ -98,13 +106,12 @@ class AIController {
       const extractedText = await aiService.extractTextFromCV(filePath);
 
       if (!extractedText || extractedText.trim().length === 0) {
-        // Clean up uploaded file
         await fs.unlink(filePath);
-        return res.status(400).json({
-          success: false,
-          error:
-            'Could not extract text from CV. Please ensure the file is readable.',
-        });
+        return ApiResponse.error(
+          res,
+          'Could not extract text from CV. Please ensure the file is readable.',
+          400
+        );
       }
 
       // Analyze CV content
@@ -119,7 +126,6 @@ class AIController {
         },
       };
 
-      // Update skills if extracted
       if (analysis.skills && analysis.skills.length > 0) {
         updateData.skills = analysis.skills.map(skill => ({
           name: skill.name,
@@ -128,17 +134,14 @@ class AIController {
         }));
       }
 
-      // Update experience if extracted
       if (analysis.experience && analysis.experience.length > 0) {
         updateData.experience = analysis.experience;
       }
 
-      // Update education if extracted
       if (analysis.education) {
         updateData.education = analysis.education;
       }
 
-      // Save updated user profile
       await User.findByIdAndUpdate(userId, updateData, { new: true });
 
       logger.info(`CV analysis completed for user ${userId}`, {
@@ -146,17 +149,17 @@ class AIController {
         experienceCount: analysis.experience?.length || 0,
       });
 
-      res.status(200).json({
-        success: true,
-        data: {
+      return ApiResponse.success(
+        res,
+        {
           analysis,
-          extractedText: extractedText.substring(0, 500) + '...', // First 500 chars for preview
+          extractedText: extractedText.substring(0, 500) + '...',
           filename: req.file.filename,
           uploadedAt: new Date(),
         },
-      });
+        'CV analyzed successfully'
+      );
     } catch (error) {
-      // Clean up uploaded file in case of error
       if (req.file && req.file.path) {
         try {
           await fs.unlink(req.file.path);
@@ -166,20 +169,22 @@ class AIController {
       }
 
       logger.error('CV analysis error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'CV analysis failed. Please try again.',
-      });
+      return ApiResponse.error(
+        res,
+        'CV analysis failed. Please try again.',
+        500
+      );
     }
   }
 
   /**
-   * POST /api/ai/candidates/analyze-cv-text
-   * Phân tích CV từ văn bản thô
+   * POST /api/ai/analyze-cv-text
+   * Phân tích CV từ văn bản thô (không cần upload file)
    */
   async analyzeCVText(req, res, next) {
     try {
       const { rawCVText } = req.body;
+
       if (
         !rawCVText ||
         typeof rawCVText !== 'string' ||
@@ -188,16 +193,14 @@ class AIController {
         return ApiResponse.error(res, 'Missing or invalid rawCVText', 400);
       }
 
-      // Analyze raw CV text using AI service
       const analysis = await aiService.analyzeCV(rawCVText);
 
-      // Optionally, create a new CandidateProfile or update existing with extracted data
       let profile = await CandidateProfile.findOne({ userId: req.user.id });
       if (!profile) {
         profile = new CandidateProfile({ userId: req.user.id });
       }
 
-      // Update profile fields with extracted data (do not overwrite existing unless empty)
+      // Update profile với dữ liệu AI extract (không ghi đè dữ liệu có sẵn)
       profile.skills = analysis.skills || profile.skills;
       profile.experience = analysis.experience || profile.experience;
       profile.education = analysis.education || profile.education;
@@ -206,9 +209,9 @@ class AIController {
         ...analysis.contact,
         bio: analysis.summary || profile.personalInfo?.bio || '',
       };
+
       await profile.save();
 
-      // Return extracted CV data for user editing
       return ApiResponse.success(
         res,
         {
@@ -222,8 +225,12 @@ class AIController {
     }
   }
 
+  // ========================================
+  // JOB & CAREER AI ENDPOINTS
+  // ========================================
+
   /**
-   * POST /api/ai/candidates/job-recommendations
+   * POST /api/ai/job-recommendations
    * Lấy gợi ý công việc dựa trên profile
    */
   async getJobRecommendations(req, res) {
@@ -231,32 +238,27 @@ class AIController {
     const { limit = 10, minScore = 60 } = req.body;
 
     try {
-      // Get user profile
       const user = await User.findById(userId);
       if (!user) {
-        return res.status(404).json({
-          success: false,
-          error: 'User not found',
-        });
+        return ApiResponse.error(res, 'User not found', 404);
       }
 
-      // Get active jobs
       const jobs = await Job.findActive().populate(
         'postedBy',
         'firstName lastName company'
       );
 
       if (jobs.length === 0) {
-        return res.status(200).json({
-          success: true,
-          data: {
+        return ApiResponse.success(
+          res,
+          {
             recommendations: [],
             message: 'No active jobs available at the moment',
           },
-        });
+          'No active jobs found'
+        );
       }
 
-      // Get recommendations from AI service
       const recommendations = await aiService.getJobRecommendations(
         user,
         jobs,
@@ -270,103 +272,159 @@ class AIController {
         `Generated ${recommendations.length} job recommendations for user ${userId}`
       );
 
-      res.status(200).json({
-        success: true,
-        data: {
+      return ApiResponse.success(
+        res,
+        {
           recommendations,
           totalJobs: jobs.length,
           filteredCount: recommendations.length,
         },
-      });
+        'Job recommendations generated successfully'
+      );
     } catch (error) {
       logger.error('Job recommendations error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to generate job recommendations',
-      });
+      return ApiResponse.error(
+        res,
+        'Failed to generate job recommendations',
+        500
+      );
     }
   }
 
   /**
-   * POST /api/ai/candidates/skill-roadmap
-   * Tạo lộ trình kỹ năng
+   * POST /api/ai/analyze-job-posting
+   * Phân tích job posting (từ jobId hoặc mô tả)
    */
-  async generateSkillRoadmap(req, res) {
-    const userId = req.user.id;
-    const {
-      targetRole,
-      targetSkills,
-      timeframe = 12,
-      currentLevel = 'beginner',
-    } = req.body;
+  async analyzeJobPosting(req, res) {
+    const { jobId, jobDescription } = req.body;
 
     try {
-      // Validate input
-      if (!targetRole && (!targetSkills || targetSkills.length === 0)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Please provide either a target role or target skills',
-        });
+      let job;
+
+      if (jobId) {
+        job = await Job.findById(jobId);
+        if (!job) {
+          return ApiResponse.error(res, 'Job not found', 404);
+        }
+
+        if (
+          job.postedBy.toString() !== req.user.id &&
+          req.user.role !== 'admin'
+        ) {
+          return ApiResponse.error(
+            res,
+            'Not authorized to analyze this job',
+            403
+          );
+        }
+      } else if (jobDescription) {
+        job = { description: jobDescription, title: 'Job Analysis' };
+      } else {
+        return ApiResponse.error(
+          res,
+          'Please provide either jobId or jobDescription',
+          400
+        );
       }
 
-      // Get user profile
-      const user = await User.findById(userId);
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          error: 'User not found',
-        });
+      const analysis = await aiService.analyzeJobPosting(job);
+
+      if (jobId && job._id) {
+        job.aiAnalysis = {
+          ...analysis,
+          lastAnalyzed: new Date(),
+        };
+        await job.save();
       }
 
-      // Generate roadmap
-      const roadmap = await aiService.generateSkillRoadmap({
-        user,
-        targetRole,
-        targetSkills,
-        timeframe: parseInt(timeframe),
-        currentLevel,
+      logger.info(`Job analysis completed`, {
+        jobId: jobId || 'description-only',
+        skillsFound: analysis.skillsExtracted?.length || 0,
       });
 
-      logger.info(`Generated skill roadmap for user ${userId}`, {
-        targetRole,
-        timeframe,
-        skillsCount: roadmap.skills?.length || 0,
-      });
-
-      res.status(200).json({
-        success: true,
-        data: roadmap,
-      });
+      return ApiResponse.success(
+        res,
+        analysis,
+        'Job posting analyzed successfully'
+      );
     } catch (error) {
-      logger.error('Skill roadmap generation error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to generate skill roadmap',
-      });
+      logger.error('Job analysis error:', error);
+      return ApiResponse.error(res, 'Failed to analyze job posting', 500);
     }
   }
 
   /**
-   * POST /api/ai/candidates/analyze-job-match
-   * Phân tích khớp công việc
+   * POST /api/ai/analyze-job-description
+   * Phân tích job description chi tiết (dành cho CV optimization)
    */
-  async analyzeJobMatch(req, res, next) {
+  async analyzeJobDescription(req, res, next) {
     try {
-      const { targetJobDescription, targetJobTitle } = req.body;
+      const { jobDescription, targetJob, companyInfo } = req.body;
+
+      if (!jobDescription) {
+        return ApiResponse.error(res, 'Job description is required', 400);
+      }
 
       const profile = await CandidateProfile.findOne({ userId: req.user.id });
       if (!profile) {
         return ApiResponse.error(res, 'Profile not found', 404);
       }
 
-      // Get CV data
+      const analysis = await aiService.analyzeJobDescription(
+        jobDescription,
+        targetJob,
+        profile,
+        companyInfo
+      );
+
+      return ApiResponse.success(
+        res,
+        analysis,
+        'Job description analyzed successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ========================================
+  // MATCHING & SCORING ENDPOINTS
+  // ========================================
+
+  /**
+   * POST /api/ai/analyze-job-match
+   * Phân tích độ khớp giữa candidate và job
+   */
+  async analyzeJobMatch(req, res, next) {
+    try {
+      const { targetJobDescription, targetJobTitle, jobId } = req.body;
+
+      const profile = await CandidateProfile.findOne({ userId: req.user.id });
+      if (!profile) {
+        return ApiResponse.error(res, 'Profile not found', 404);
+      }
+
       const cvData = this.extractCVData(profile);
 
-      // Analyze match using AI
-      const analysis = await aiService.analyzeJobMatch(cvData, {
+      let jobData = {
         title: targetJobTitle,
         description: targetJobDescription,
-      });
+      };
+
+      // Nếu có jobId, lấy thêm thông tin từ DB
+      if (jobId) {
+        const job = await Job.findById(jobId);
+        if (job) {
+          jobData = {
+            title: job.title,
+            description: job.description,
+            requirements: job.requirements,
+            skills: job.skills,
+          };
+        }
+      }
+
+      const analysis = await aiService.analyzeJobMatch(cvData, jobData);
 
       return ApiResponse.success(res, analysis, 'Job match analysis completed');
     } catch (error) {
@@ -376,12 +434,170 @@ class AIController {
   }
 
   /**
-   * POST /api/ai/candidates/skill-gap-analysis
+   * POST /api/ai/match-score
+   * Tính điểm khớp giữa candidate và job
+   */
+  async getMatchScore(req, res) {
+    try {
+      const { jobId, applicantId } = req.body;
+      const userId = req.user.id;
+
+      const job = await Job.findById(jobId);
+      if (!job) {
+        return ApiResponse.error(res, 'Job not found', 404);
+      }
+
+      const targetApplicantId = applicantId || userId;
+      const applicant = await CandidateProfile.findOne({
+        userId: targetApplicantId,
+      });
+
+      if (!applicant) {
+        return ApiResponse.error(res, 'Applicant profile not found', 404);
+      }
+
+      // Check authorization
+      if (
+        applicantId &&
+        applicantId !== userId &&
+        req.user.role !== 'admin' &&
+        job.postedBy.toString() !== userId
+      ) {
+        return ApiResponse.error(
+          res,
+          'Not authorized to view this match score',
+          403
+        );
+      }
+
+      const matchScore = await aiService.calculateMatchScore(applicant, job);
+
+      // Check và update application nếu tồn tại
+      let application = null;
+      if (targetApplicantId === userId) {
+        application = await Application.findOne({
+          job: jobId,
+          applicant: targetApplicantId,
+        });
+
+        if (application) {
+          application.aiAnalysis = {
+            ...application.aiAnalysis,
+            ...matchScore,
+            lastAnalyzed: new Date(),
+          };
+          await application.save();
+        }
+      }
+
+      logger.info(`Match score calculated`, {
+        jobId,
+        applicantId: targetApplicantId,
+        score: matchScore.overallScore,
+      });
+
+      return ApiResponse.success(
+        res,
+        {
+          matchScore,
+          hasApplication: !!application,
+          applicationId: application?._id,
+        },
+        'Match score calculated successfully'
+      );
+    } catch (error) {
+      logger.error('Match score calculation error:', error);
+      return ApiResponse.error(res, 'Failed to calculate match score', 500);
+    }
+  }
+
+  /**
+   * POST /api/ai/analyze-candidate
+   * Phân tích candidate cho một job cụ thể (Employer view)
+   */
+  async analyzeCandidate(req, res) {
+    const { jobId, applicantId } = req.body;
+    const userId = req.user.id;
+
+    try {
+      const job = await Job.findById(jobId);
+      if (!job) {
+        return ApiResponse.error(res, 'Job not found', 404);
+      }
+
+      const targetApplicantId = applicantId || userId;
+      const applicant = await User.findById(targetApplicantId);
+
+      if (!applicant) {
+        return ApiResponse.error(res, 'Applicant not found', 404);
+      }
+
+      // Check authorization
+      if (
+        applicantId &&
+        applicantId !== userId &&
+        req.user.role !== 'admin' &&
+        job.postedBy.toString() !== userId
+      ) {
+        return ApiResponse.error(
+          res,
+          'Not authorized to view this match score',
+          403
+        );
+      }
+
+      const matchScore = await aiService.calculateMatchScore(applicant, job);
+
+      let application = null;
+      if (targetApplicantId === userId) {
+        application = await Application.findOne({
+          job: jobId,
+          applicant: targetApplicantId,
+        });
+
+        if (application) {
+          application.aiAnalysis = {
+            ...application.aiAnalysis,
+            ...matchScore,
+            lastAnalyzed: new Date(),
+          };
+          await application.save();
+        }
+      }
+
+      logger.info(`Candidate analyzed`, {
+        jobId,
+        applicantId: targetApplicantId,
+        score: matchScore.overallScore,
+      });
+
+      return ApiResponse.success(
+        res,
+        {
+          matchScore,
+          hasApplication: !!application,
+          applicationId: application?._id,
+        },
+        'Candidate analyzed successfully'
+      );
+    } catch (error) {
+      logger.error('Candidate analysis error:', error);
+      return ApiResponse.error(res, 'Failed to analyze candidate', 500);
+    }
+  }
+
+  // ========================================
+  // SKILLS & LEARNING ENDPOINTS
+  // ========================================
+
+  /**
+   * POST /api/ai/skill-gap-analysis
    * Phân tích khoảng cách kỹ năng
    */
   async getSkillGapAnalysis(req, res, next) {
     try {
-      const { targetJobDescription, targetJobTitle, industry } = req.body;
+      const { targetJobDescription, targetJobTitle, industry, jobId } =
+        req.body;
 
       const profile = await CandidateProfile.findOne({ userId: req.user.id });
       if (!profile) {
@@ -390,12 +606,29 @@ class AIController {
 
       const cvData = this.extractCVData(profile);
 
-      // Analyze skill gaps
-      const skillGapAnalysis = await aiService.analyzeSkillGaps(cvData, {
+      let jobData = {
         title: targetJobTitle,
         description: targetJobDescription,
         industry,
-      });
+      };
+
+      // Nếu có jobId, lấy thông tin job từ DB
+      if (jobId) {
+        const job = await Job.findById(jobId);
+        if (job) {
+          jobData = {
+            title: job.title,
+            description: job.description,
+            industry: job.industry,
+            skills: job.skills,
+          };
+        }
+      }
+
+      const skillGapAnalysis = await aiService.analyzeSkillGaps(
+        cvData,
+        jobData
+      );
 
       return ApiResponse.success(
         res,
@@ -409,8 +642,103 @@ class AIController {
   }
 
   /**
-   * POST /api/ai/candidates/ai-suggestions
-   * Gợi ý AI cho các trường form
+   * POST /api/ai/skill-roadmap
+   * Tạo lộ trình học tập/phát triển kỹ năng
+   */
+  async generateSkillRoadmap(req, res) {
+    const userId = req.user.id;
+    const {
+      targetRole,
+      targetSkills,
+      timeframe = 12,
+      currentLevel = 'beginner',
+      targetJobTitle,
+      targetJobDescription,
+      skillGaps,
+      learningPreferences,
+    } = req.body;
+
+    try {
+      if (
+        !targetRole &&
+        (!targetSkills || targetSkills.length === 0) &&
+        !targetJobTitle
+      ) {
+        return ApiResponse.error(
+          res,
+          'Please provide either a target role, target skills, or target job',
+          400
+        );
+      }
+
+      const user = await User.findById(userId);
+      const profile = await CandidateProfile.findOne({ userId });
+
+      if (!user && !profile) {
+        return ApiResponse.error(res, 'User not found', 404);
+      }
+
+      let roadmap;
+
+      // Case 1: Generate from target role/skills (legacy)
+      if (targetRole || targetSkills) {
+        roadmap = await aiService.generateSkillRoadmap({
+          user,
+          targetRole,
+          targetSkills,
+          timeframe: parseInt(timeframe),
+          currentLevel,
+        });
+      }
+      // Case 2: Generate from job description và skill gaps (advanced)
+      else if (targetJobTitle || targetJobDescription) {
+        const cvData = this.extractCVData(profile);
+
+        roadmap = await aiService.generateLearningRoadmap({
+          currentSkills: cvData.skills,
+          targetJob: {
+            title: targetJobTitle,
+            description: targetJobDescription,
+          },
+          skillGaps,
+          timeframe: timeframe ? `${timeframe} weeks` : '12 weeks',
+          preferences: learningPreferences || {},
+        });
+
+        // Save roadmap to profile
+        if (profile) {
+          profile.skillRoadmap = {
+            ...roadmap,
+            createdAt: new Date(),
+            targetJob: {
+              title: targetJobTitle,
+              description: targetJobDescription,
+            },
+          };
+          await profile.save();
+        }
+      }
+
+      logger.info(`Skill roadmap generated for user ${userId}`, {
+        targetRole: targetRole || targetJobTitle,
+        timeframe,
+        skillsCount: roadmap.skills?.length || 0,
+      });
+
+      return ApiResponse.success(
+        res,
+        roadmap,
+        'Skill roadmap generated successfully'
+      );
+    } catch (error) {
+      logger.error('Skill roadmap generation error:', error);
+      return ApiResponse.error(res, 'Failed to generate skill roadmap', 500);
+    }
+  }
+
+  /**
+   * POST /api/ai/suggestions
+   * Lấy gợi ý AI cho các trường form (career objective, skills, experience, etc.)
    */
   async getAISuggestions(req, res, next) {
     try {
@@ -458,8 +786,53 @@ class AIController {
     }
   }
 
+  // ========================================
+  // INSIGHTS & ANALYTICS ENDPOINTS
+  // ========================================
+
   /**
-   * GET /api/ai/candidates/insights
+   * GET /api/ai/insights
+   * Lấy AI insights dựa trên role (candidate/employer/admin)
+   */
+  async getAIInsights(req, res) {
+    try {
+      const userId = req.user.id;
+      const userRole = req.user.role;
+
+      let insights = {};
+
+      if (userRole === 'candidate') {
+        return this.getCandidateInsights(req, res);
+      } else if (userRole === 'employer') {
+        return this.getEmployerInsights(req, res);
+      } else if (userRole === 'admin') {
+        insights = {
+          platformStats: await aiService.getPlatformStatistics(),
+          userBehavior: await aiService.getUserBehaviorInsights(),
+          systemPerformance: await aiService.getSystemPerformanceMetrics(),
+          trends: await aiService.getPlatformTrends(),
+        };
+      } else {
+        return ApiResponse.error(res, 'Invalid user role', 400);
+      }
+
+      logger.info(`AI insights generated for user ${userId}`, {
+        role: userRole,
+      });
+
+      return ApiResponse.success(
+        res,
+        insights,
+        'AI insights generated successfully'
+      );
+    } catch (error) {
+      logger.error('AI insights error:', error);
+      return ApiResponse.error(res, 'Failed to generate AI insights', 500);
+    }
+  }
+
+  /**
+   * GET /api/ai/candidate-insights
    * Lấy insights cho candidate
    */
   async getCandidateInsights(req, res) {
@@ -495,183 +868,69 @@ class AIController {
         },
       };
 
-      logger.info(`AI insights generated for user ${userId}`);
+      logger.info(`Candidate insights generated for user ${userId}`);
 
-      res.status(200).json({
-        success: true,
-        data: insights,
-      });
+      return ApiResponse.success(
+        res,
+        insights,
+        'Candidate insights generated successfully'
+      );
     } catch (error) {
-      logger.error('AI insights error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to generate AI insights',
-      });
-    }
-  }
-
-  // ========================================
-  // EMPLOYER AI ENDPOINTS
-  // ========================================
-
-  /**
-   * POST /api/ai/employers/analyze-job
-   * Phân tích công việc (từ jobId hoặc mô tả)
-   */
-  async analyzeJobPosting(req, res) {
-    const { jobId, jobDescription } = req.body;
-
-    try {
-      let job;
-
-      if (jobId) {
-        // Analyze existing job
-        job = await Job.findById(jobId);
-        if (!job) {
-          return res.status(404).json({
-            success: false,
-            error: 'Job not found',
-          });
-        }
-
-        // Check if user owns this job
-        if (
-          job.postedBy.toString() !== req.user.id &&
-          req.user.role !== 'admin'
-        ) {
-          return res.status(403).json({
-            success: false,
-            error: 'Not authorized to analyze this job',
-          });
-        }
-      } else if (jobDescription) {
-        // Analyze job description text
-        job = { description: jobDescription, title: 'Job Analysis' };
-      } else {
-        return res.status(400).json({
-          success: false,
-          error: 'Please provide either jobId or jobDescription',
-        });
-      }
-
-      // Perform AI analysis
-      const analysis = await aiService.analyzeJobPosting(job);
-
-      // Update job with AI analysis if it's an existing job
-      if (jobId && job._id) {
-        job.aiAnalysis = {
-          ...analysis,
-          lastAnalyzed: new Date(),
-        };
-        await job.save();
-      }
-
-      logger.info(`Job analysis completed`, {
-        jobId: jobId || 'description-only',
-        skillsFound: analysis.skillsExtracted?.length || 0,
-      });
-
-      res.status(200).json({
-        success: true,
-        data: analysis,
-      });
-    } catch (error) {
-      logger.error('Job analysis error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to analyze job posting',
-      });
+      logger.error('Candidate insights error:', error);
+      return ApiResponse.error(
+        res,
+        'Failed to generate candidate insights',
+        500
+      );
     }
   }
 
   /**
-   * POST /api/ai/employers/analyze-candidate
-   * Phân tích ứng viên cho một công việc
+   * GET /api/ai/employer-insights
+   * Lấy insights cho employer
    */
-  async analyzeCandidate(req, res) {
-    const { jobId, applicantId } = req.body;
+  async getEmployerInsights(req, res) {
     const userId = req.user.id;
 
     try {
-      // Get job
-      const job = await Job.findById(jobId);
-      if (!job) {
-        return res.status(404).json({
-          success: false,
-          error: 'Job not found',
-        });
-      }
+      const jobs = await Job.find({ postedBy: userId });
+      const applications = await Application.find({
+        job: { $in: jobs.map(j => j._id) },
+      }).populate('applicant', 'firstName lastName');
 
-      // Get applicant (if not provided, use current user)
-      const targetApplicantId = applicantId || userId;
-      const applicant = await User.findById(targetApplicantId);
-      if (!applicant) {
-        return res.status(404).json({
-          success: false,
-          error: 'Applicant not found',
-        });
-      }
-
-      // Check authorization
-      if (
-        applicantId &&
-        applicantId !== userId &&
-        req.user.role !== 'admin' &&
-        job.postedBy.toString() !== userId
-      ) {
-        return res.status(403).json({
-          success: false,
-          error: 'Not authorized to view this match score',
-        });
-      }
-
-      // Calculate match score
-      const matchScore = await aiService.calculateMatchScore(applicant, job);
-
-      // Check if there's an existing application
-      let application = null;
-      if (targetApplicantId === userId) {
-        application = await Application.findOne({
-          job: jobId,
-          applicant: targetApplicantId,
-        });
-
-        // Update application with match score if it exists
-        if (application) {
-          application.aiAnalysis = {
-            ...application.aiAnalysis,
-            ...matchScore,
-            lastAnalyzed: new Date(),
-          };
-          await application.save();
-        }
-      }
-
-      logger.info(`Match score calculated`, {
-        jobId,
-        applicantId: targetApplicantId,
-        score: matchScore.overallScore,
-      });
-
-      res.status(200).json({
-        success: true,
-        data: {
-          matchScore,
-          hasApplication: !!application,
-          applicationId: application?._id,
+      const insights = {
+        jobPerformance: await aiService.analyzeJobPerformance(jobs),
+        applicantInsights: await aiService.getApplicantInsights(applications),
+        marketTrends: await aiService.getMarketTrends(),
+        recommendations: {
+          jobOptimization: await aiService.getJobOptimizationTips(jobs),
+          talentPool: await aiService.getTalentPoolInsights(),
         },
-      });
+      };
+
+      logger.info(`Employer insights generated for user ${userId}`);
+
+      return ApiResponse.success(
+        res,
+        insights,
+        'Employer insights generated successfully'
+      );
     } catch (error) {
-      logger.error('Match score calculation error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to calculate match score',
-      });
+      logger.error('Employer insights error:', error);
+      return ApiResponse.error(
+        res,
+        'Failed to generate employer insights',
+        500
+      );
     }
   }
 
+  // ========================================
+  // BATCH OPERATIONS
+  // ========================================
+
   /**
-   * POST /api/ai/employers/batch-analyze
+   * POST /api/ai/batch-analyze-applications
    * Phân tích hàng loạt ứng viên cho một công việc
    */
   async batchAnalyzeApplications(req, res) {
@@ -679,39 +938,35 @@ class AIController {
     const userId = req.user.id;
 
     try {
-      // Get job and verify ownership
       const job = await Job.findById(jobId);
       if (!job) {
-        return res.status(404).json({
-          success: false,
-          error: 'Job not found',
-        });
+        return ApiResponse.error(res, 'Job not found', 404);
       }
 
       if (job.postedBy.toString() !== userId && req.user.role !== 'admin') {
-        return res.status(403).json({
-          success: false,
-          error: 'Not authorized to analyze applications for this job',
-        });
+        return ApiResponse.error(
+          res,
+          'Not authorized to analyze applications for this job',
+          403
+        );
       }
 
-      // Get all applications for this job
       const applications = await Application.find({ job: jobId }).populate(
         'applicant',
         'firstName lastName skills experience education'
       );
 
       if (applications.length === 0) {
-        return res.status(200).json({
-          success: true,
-          data: {
+        return ApiResponse.success(
+          res,
+          {
             message: 'No applications found for this job',
             analyzed: 0,
           },
-        });
+          'No applications found'
+        );
       }
 
-      // Batch analyze applications
       const analysisResults = [];
       for (const application of applications) {
         try {
@@ -752,60 +1007,20 @@ class AIController {
         successful: analysisResults.filter(r => r.status === 'analyzed').length,
       });
 
-      res.status(200).json({
-        success: true,
-        data: {
+      return ApiResponse.success(
+        res,
+        {
           jobTitle: job.title,
           totalApplications: applications.length,
           analyzed: analysisResults.filter(r => r.status === 'analyzed').length,
           errors: analysisResults.filter(r => r.status === 'error').length,
           results: analysisResults,
         },
-      });
+        'Batch analysis completed successfully'
+      );
     } catch (error) {
       logger.error('Batch analysis error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Batch analysis failed',
-      });
-    }
-  }
-
-  /**
-   * GET /api/ai/employers/insights
-   * Lấy insights cho employer
-   */
-  async getEmployerInsights(req, res) {
-    const userId = req.user.id;
-
-    try {
-      const jobs = await Job.find({ postedBy: userId });
-      const applications = await Application.find({
-        job: { $in: jobs.map(j => j._id) },
-      }).populate('applicant', 'firstName lastName');
-
-      const insights = {
-        jobPerformance: await aiService.analyzeJobPerformance(jobs),
-        applicantInsights: await aiService.getApplicantInsights(applications),
-        marketTrends: await aiService.getMarketTrends(),
-        recommendations: {
-          jobOptimization: await aiService.getJobOptimizationTips(jobs),
-          talentPool: await aiService.getTalentPoolInsights(),
-        },
-      };
-
-      logger.info(`AI insights generated for employer ${userId}`);
-
-      res.status(200).json({
-        success: true,
-        data: insights,
-      });
-    } catch (error) {
-      logger.error('Employer AI insights error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to generate employer insights',
-      });
+      return ApiResponse.error(res, 'Batch analysis failed', 500);
     }
   }
 
@@ -813,6 +1028,9 @@ class AIController {
   // HELPER METHODS
   // ========================================
 
+  /**
+   * Extract CV data từ CandidateProfile
+   */
   extractCVData(profile) {
     return {
       personalInfo: profile.personalInfo || {},
@@ -821,11 +1039,14 @@ class AIController {
       education: this.getAllEducation(profile.education || {}),
       projects: profile.projects || [],
       certifications: profile.certifications || [],
-      summary: profile.summary || '',
+      summary: profile.personalInfo?.bio || '',
       targetJob: profile.targetJob || {},
     };
   }
 
+  /**
+   * Format skills theo cấu trúc chuẩn
+   */
   formatSkills(skills) {
     return {
       technical: skills?.technical || [],
@@ -834,6 +1055,9 @@ class AIController {
     };
   }
 
+  /**
+   * Lấy tất cả experience từ các loại khác nhau
+   */
   getAllExperience(experience) {
     const allExp = [];
     if (experience) {
@@ -846,140 +1070,14 @@ class AIController {
     return allExp.sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
   }
 
+  /**
+   * Lấy tất cả education
+   */
   getAllEducation(education) {
     const allEdu = [];
     if (education?.university) allEdu.push(education.university);
     if (education?.highSchool) allEdu.push(education.highSchool);
     return allEdu;
-  }
-
-  // ========================================
-  // ADDITIONAL AI METHODS
-  // ========================================
-
-  /**
-   * GET /api/ai/match-score
-   * Calculate match score between candidate and job
-   */
-  async getMatchScore(req, res) {
-    try {
-      const { jobId, applicantId } = req.body;
-      const userId = req.user.id;
-
-      // Get job
-      const job = await Job.findById(jobId);
-      if (!job) {
-        return ApiResponse.error(res, 'Job not found', 404);
-      }
-
-      // Get applicant (if not provided, use current user)
-      const targetApplicantId = applicantId || userId;
-      const applicant = await CandidateProfile.findOne({
-        userId: targetApplicantId,
-      });
-      if (!applicant) {
-        return ApiResponse.error(res, 'Applicant profile not found', 404);
-      }
-
-      // Check authorization
-      if (
-        applicantId &&
-        applicantId !== userId &&
-        req.user.role !== 'admin' &&
-        job.postedBy.toString() !== userId
-      ) {
-        return ApiResponse.error(
-          res,
-          'Not authorized to view this match score',
-          403
-        );
-      }
-
-      // Calculate match score
-      const matchScore = await aiService.calculateMatchScore(applicant, job);
-
-      // Check if there's an existing application
-      let application = null;
-      if (targetApplicantId === userId) {
-        application = await Application.findOne({
-          job: jobId,
-          applicant: targetApplicantId,
-        });
-
-        // Update application with match score if it exists
-        if (application) {
-          application.aiAnalysis = {
-            ...application.aiAnalysis,
-            ...matchScore,
-            lastAnalyzed: new Date(),
-          };
-          await application.save();
-        }
-      }
-
-      logger.info(`Match score calculated`, {
-        jobId,
-        applicantId: targetApplicantId,
-        score: matchScore.overallScore,
-      });
-
-      return ApiResponse.success(
-        res,
-        {
-          matchScore,
-          hasApplication: !!application,
-          applicationId: application?._id,
-        },
-        'Match score calculated successfully'
-      );
-    } catch (error) {
-      logger.error('Match score calculation error:', error);
-      return ApiResponse.error(res, 'Failed to calculate match score', 500);
-    }
-  }
-
-  /**
-   * GET /api/ai/insights
-   * Get AI insights for dashboard
-   */
-  async getAIInsights(req, res) {
-    try {
-      const userId = req.user.id;
-      const userRole = req.user.role;
-
-      let insights = {};
-
-      if (userRole === 'candidate') {
-        // Candidate insights - delegate to getCandidateInsights
-        return this.getCandidateInsights(req, res);
-      } else if (userRole === 'employer') {
-        // Employer insights - delegate to getEmployerInsights
-        return this.getEmployerInsights(req, res);
-      } else if (userRole === 'admin') {
-        // Admin insights
-        insights = {
-          platformStats: await aiService.getPlatformStatistics(),
-          userBehavior: await aiService.getUserBehaviorInsights(),
-          systemPerformance: await aiService.getSystemPerformanceMetrics(),
-          trends: await aiService.getPlatformTrends(),
-        };
-      } else {
-        return ApiResponse.error(res, 'Invalid user role', 400);
-      }
-
-      logger.info(`AI insights generated for user ${userId}`, {
-        role: userRole,
-      });
-
-      return ApiResponse.success(
-        res,
-        insights,
-        'AI insights generated successfully'
-      );
-    } catch (error) {
-      logger.error('AI insights error:', error);
-      return ApiResponse.error(res, 'Failed to generate AI insights', 500);
-    }
   }
 }
 

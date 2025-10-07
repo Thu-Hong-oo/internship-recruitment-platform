@@ -3,6 +3,7 @@ const http = require('http');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const cron = require('node-cron');
+const path = require('path');
 
 require('dotenv').config();
 
@@ -29,6 +30,7 @@ const { createClient } = require('redis');
 const authRoutes = require('./src/routes/auth');
 const userRoutes = require('./src/routes/users');
 const adminRoutes = require('./src/routes/admin/admin');
+const templatesAdminRoutes = require('./src/routes/admin/templatesAdmin');
 const employerRoutes = require('./src/routes/employerProfiles');
 const jobRoutes = require('./src/routes/jobs');
 const candidateRoutes = require('./src/routes/candidate/candidates');
@@ -162,6 +164,9 @@ app.use(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Static file serving for CV template previews
+app.use('/templates', express.static(path.join(__dirname, 'public/templates')));
+
 // Swagger configuration
 const swaggerOptions = {
   definition: {
@@ -232,6 +237,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/templates', templatesAdminRoutes);
 app.use('/api/employers', employerRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/candidates', candidateRoutes);
