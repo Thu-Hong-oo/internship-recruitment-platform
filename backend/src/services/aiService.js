@@ -4918,6 +4918,476 @@ LƯU Ý:
       },
     };
   }
+
+  // ============================================
+  // NEW AI ANALYSIS METHODS FOR CV BUILDER
+  // ============================================
+
+  /**
+   * Get job suggestions based on job title input
+   */
+  async getJobSuggestions(jobTitle) {
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+      const prompt = `
+Dựa trên job title "${jobTitle}", hãy gợi ý:
+
+1. Related job titles (5 titles tương tự)
+2. Required skills (10 skills quan trọng nhất)
+3. Industry classification
+4. Experience level typically required
+5. Salary range in Vietnam (triệu VND)
+
+Return JSON format:
+{
+  "relatedTitles": ["title1", "title2", ...],
+  "requiredSkills": [
+    {"name": "skill", "importance": "high/medium/low", "category": "technical/soft"}
+  ],
+  "industry": "industry_name",
+  "experienceLevel": "intern/fresher/junior/mid/senior",
+  "salaryRange": "X-Y triệu VND",
+  "marketDemand": "high/medium/low"
+}
+`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      // Parse JSON response
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+
+      return {
+        relatedTitles: [],
+        requiredSkills: [],
+        industry: '',
+        experienceLevel: 'fresher',
+        salaryRange: '',
+        marketDemand: 'medium',
+      };
+    } catch (error) {
+      logger.error('Job suggestions error:', error);
+      return {
+        relatedTitles: [],
+        requiredSkills: [],
+        industry: '',
+        experienceLevel: 'fresher',
+        salaryRange: '',
+        marketDemand: 'medium',
+      };
+    }
+  }
+
+  /**
+   * Generate career objective based on target job and context
+   */
+  async generateCareerObjective(targetJobData, context) {
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+      const prompt = `
+Tạo career objective professional cho:
+- Target job: ${targetJobData.title || 'Not specified'}
+- Industry: ${targetJobData.industry || 'Not specified'}
+- Level: ${targetJobData.level || 'fresher'}
+- Current experience: ${JSON.stringify(context.experience || [])}
+- Education: ${JSON.stringify(context.education || [])}
+
+Yêu cầu:
+- 2-3 câu ngắn gọn
+- Highlight relevant skills và experience
+- Show passion và commitment
+- Professional tone
+- Tiếng Việt
+
+Return JSON:
+{
+  "suggestions": [
+    "objective1",
+    "objective2", 
+    "objective3"
+  ],
+  "tips": ["tip1", "tip2"]
+}
+`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+
+      return {
+        suggestions: [],
+        tips: [],
+      };
+    } catch (error) {
+      logger.error('Career objective generation error:', error);
+      return {
+        suggestions: [],
+        tips: [],
+      };
+    }
+  }
+
+  /**
+   * Analyze job match score between CV and job description
+   */
+  async analyzeJobMatch(cvData, jobData) {
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+      const prompt = `
+Phân tích độ phù hợp giữa CV và Job Description:
+
+CV DATA:
+${JSON.stringify(cvData, null, 2)}
+
+JOB DATA:
+- Title: ${jobData.title}
+- Description: ${jobData.description}
+
+Tính toán match score (0-100) cho từng category:
+1. Skills Match (technical + soft skills)
+2. Experience Match (relevance + years)
+3. Education Match (degree + field)
+4. Keywords Match (semantic similarity)
+5. Overall Match
+
+Return JSON:
+{
+  "matchScore": {
+    "skills": 85,
+    "experience": 70,
+    "education": 90,
+    "keywords": 75,
+    "overall": 80
+  },
+  "strengths": [
+    "Strong technical skills in React, Node.js",
+    "Relevant internship experience"
+  ],
+  "gaps": [
+    "Missing AWS experience",
+    "Need more project management skills"
+  ],
+  "recommendations": [
+    "Consider learning AWS basics",
+    "Highlight team leadership experience"
+  ],
+  "fitLevel": "good" // excellent/good/fair/poor
+}
+`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+
+      return {
+        matchScore: {
+          skills: 0,
+          experience: 0,
+          education: 0,
+          keywords: 0,
+          overall: 0,
+        },
+        strengths: [],
+        gaps: [],
+        recommendations: [],
+        fitLevel: 'poor',
+      };
+    } catch (error) {
+      logger.error('Job match analysis error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Analyze skill gaps between current skills and target job
+   */
+  async analyzeSkillGaps(cvData, jobData) {
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+      const prompt = `
+Phân tích skill gaps giữa CV hiện tại và job requirements:
+
+CURRENT SKILLS:
+${JSON.stringify(cvData.skills, null, 2)}
+
+TARGET JOB:
+- Title: ${jobData.title}
+- Description: ${jobData.description}
+- Industry: ${jobData.industry}
+
+Identify:
+1. Missing critical skills
+2. Skills needing improvement  
+3. Skills that are strong matches
+4. Priority order for learning
+
+Return JSON:
+{
+  "missingSkills": [
+    {
+      "name": "AWS",
+      "category": "technical",
+      "importance": "high",
+      "reason": "Required for cloud deployment"
+    }
+  ],
+  "skillsToImprove": [
+    {
+      "name": "React",
+      "currentLevel": "beginner", 
+      "targetLevel": "intermediate",
+      "importance": "high"
+    }
+  ],
+  "strongSkills": [
+    {
+      "name": "JavaScript",
+      "level": "advanced",
+      "relevance": "high"
+    }
+  ],
+  "learningPriority": [
+    {
+      "skill": "AWS",
+      "priority": 1,
+      "timeToLearn": "4-6 weeks",
+      "difficulty": "medium"
+    }
+  ],
+  "overallGapLevel": "medium" // low/medium/high
+}
+`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+
+      return {
+        missingSkills: [],
+        skillsToImprove: [],
+        strongSkills: [],
+        learningPriority: [],
+        overallGapLevel: 'high',
+      };
+    } catch (error) {
+      logger.error('Skill gap analysis error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate personalized learning roadmap
+   */
+  async generateLearningRoadmap(data) {
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+      const prompt = `
+Tạo learning roadmap cá nhân hóa:
+
+CURRENT SITUATION:
+- Current Skills: ${JSON.stringify(data.currentSkills)}
+- Target Job: ${data.targetJob.title}
+- Skill Gaps: ${JSON.stringify(data.skillGaps)}
+- Timeframe: ${data.timeframe}
+- Learning Preferences: ${JSON.stringify(data.preferences)}
+
+Create detailed roadmap with:
+1. Weekly breakdown
+2. Learning objectives
+3. Resources (courses, books, projects)
+4. Milestones and assessments
+5. Success criteria
+
+Return JSON:
+{
+  "roadmapTitle": "Full Stack Developer Learning Path",
+  "totalDuration": "12 weeks",
+  "overview": "Comprehensive plan to bridge skill gaps",
+  "phases": [
+    {
+      "phase": 1,
+      "title": "Foundation Phase",
+      "duration": "4 weeks",
+      "objectives": ["Master ES6", "Learn React basics"],
+      "weeks": [
+        {
+          "week": 1,
+          "focus": "JavaScript ES6",
+          "learningObjectives": ["arrow functions", "destructuring"],
+          "resources": [
+            {
+              "type": "course",
+              "title": "ES6 Masterclass",
+              "url": "https://...",
+              "duration": "10 hours"
+            }
+          ],
+          "projects": ["Build a calculator app"],
+          "assessments": ["Complete 5 coding challenges"],
+          "timeCommitment": "15 hours/week"
+        }
+      ]
+    }
+  ],
+  "milestones": [
+    {
+      "week": 4,
+      "title": "Complete React Fundamentals",
+      "criteria": ["Build 3 React apps", "Pass React quiz"]
+    }
+  ],
+  "successMetrics": [
+    "Complete 80% of assignments",
+    "Build 2 portfolio projects"
+  ]
+}
+`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+
+      return {
+        roadmapTitle: 'Learning Roadmap',
+        totalDuration: '12 weeks',
+        overview: 'Personalized learning plan',
+        phases: [],
+        milestones: [],
+        successMetrics: [],
+      };
+    } catch (error) {
+      logger.error('Roadmap generation error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Suggest skills based on target job and experience
+   */
+  async suggestSkills(targetJob, experience) {
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+      const prompt = `
+Gợi ý skills phù hợp cho:
+- Target job: ${JSON.stringify(targetJob)}
+- Current experience: ${JSON.stringify(experience)}
+
+Return JSON:
+{
+  "technical": [
+    {"name": "React", "importance": "high", "reason": "Required for frontend development"}
+  ],
+  "soft": [
+    {"name": "Communication", "importance": "medium", "reason": "Important for team collaboration"}
+  ],
+  "trending": [
+    {"name": "AI/ML", "growth": "high", "relevance": "medium"}
+  ]
+}
+`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+
+      return {
+        technical: [],
+        soft: [],
+        trending: [],
+      };
+    } catch (error) {
+      logger.error('Skill suggestions error:', error);
+      return {
+        technical: [],
+        soft: [],
+        trending: [],
+      };
+    }
+  }
+
+  /**
+   * Enhance experience descriptions
+   */
+  async enhanceExperienceDescription(experienceData) {
+    try {
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+      const prompt = `
+Enhance experience description:
+${JSON.stringify(experienceData)}
+
+Cải thiện:
+1. Use action verbs
+2. Quantify achievements
+3. Highlight impact
+4. Professional tone
+
+Return JSON:
+{
+  "enhanced": "Enhanced description",
+  "suggestions": ["tip1", "tip2"],
+  "keywords": ["keyword1", "keyword2"]
+}
+`;
+
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+
+      return {
+        enhanced: '',
+        suggestions: [],
+        keywords: [],
+      };
+    } catch (error) {
+      logger.error('Experience enhancement error:', error);
+      return {
+        enhanced: '',
+        suggestions: [],
+        keywords: [],
+      };
+    }
+  }
 }
 
 module.exports = new AIService();

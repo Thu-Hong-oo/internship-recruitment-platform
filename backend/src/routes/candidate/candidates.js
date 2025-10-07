@@ -324,5 +324,7 @@ router.use('*', (req, res) => {
   });
 });
 
-router.get('candidates/me/resume/view', candidateController.viewCurrentCV);
+// ❌ REMOVED: This route was in wrong place and format
+// router.get('candidates/me/resume/view', candidateController.viewCurrentCV);
+
 module.exports = router;

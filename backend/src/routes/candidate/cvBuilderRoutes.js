@@ -1,13 +1,15 @@
-// cvBuilderRoutes.js - Fixed
+// cvBuilderRoutes.js - Fixed Authentication Issue
 const express = require('express');
 const router = express.Router();
 const CVBuilderController = require('../../controllers/candidate/CVBuilderController');
-const { protect, authorize } = require('../../middleware/auth');
 
 // Create controller instance
 const cvController = new CVBuilderController();
-router.use(protect);
-router.use(authorize('candidate'));
+
+// ❌ REMOVED: Double authentication (already handled in parent route)
+// router.use(protect);
+// router.use(authorize('candidate'));
+
 // Test route
 router.get('/test', (req, res) => {
   res.json({ message: 'CV Builder routes working' });
@@ -22,6 +24,9 @@ router.put('/', cvController.updateBuilderData); // FIX HERE!
 // ✅ POST - Tạo CV thông minh với AI
 router.post('/generate', cvController.generateSmartCV);
 
+// ✅ POST - Tạo CV từ raw text (AI parsing)
+router.post('/generate-direct', cvController.generateDirectCV);
+
 // ✅ GET - Lấy danh sách templates
 router.get('/templates', cvController.getTemplates);
 
@@ -34,10 +39,19 @@ router.post('/export-pdf', cvController.exportPDF);
 // ✅ POST - Export CV as PDF directly from HTML content
 router.post('/export-pdf-direct', cvController.exportPDFDirect);
 
-// ✅ GET - Preview PDF CV
-router.get('/preview-pdf/:cvId', cvController.previewPDF);
+// 🤖 AI ANALYSIS & ASSISTANCE ROUTES
+// ✅ POST - AI Suggestions cho form fields
+router.post('/ai-suggestions', cvController.getAISuggestions);
 
-// ✅ GET - PDF Viewer with embedded viewer
-router.get('/pdf-viewer/:cvId', cvController.getPDFViewer);
+// ✅ POST - Phân tích độ phù hợp với job
+router.post('/analyze-job-match', cvController.analyzeJobMatch);
+
+// ✅ POST - Phân tích skill gaps
+router.post('/skill-gap-analysis', cvController.getSkillGapAnalysis);
+
+// ✅ POST - Tạo learning roadmap
+router.post('/generate-roadmap', cvController.generateSkillRoadmap);
+
+// Removed preview routes; use /api/candidates/me/resume/view instead
 
 module.exports = router;
