@@ -8,18 +8,28 @@ const { AppError } = require('../../utils/errors');
 
 class CVBuilderController {
   constructor() {
+    // CV Builder Core
     this.getBuilderData = this.getBuilderData.bind(this);
     this.updateBuilderData = this.updateBuilderData.bind(this);
     this.generateSmartCV = this.generateSmartCV.bind(this);
+    this.generateDirectCV = this.generateDirectCV.bind(this);
     this.getTemplates = this.getTemplates.bind(this);
-    this.previewCV = this.previewCV.bind(this);
+    this.analyzeJobDescription = this.analyzeJobDescription.bind(this);
+
+    // AI Features
+    this.getAISuggestions = this.getAISuggestions.bind(this);
+    this.analyzeJobMatch = this.analyzeJobMatch.bind(this);
+    this.getSkillGapAnalysis = this.getSkillGapAnalysis.bind(this);
+    this.generateSkillRoadmap = this.generateSkillRoadmap.bind(this);
+
+    // PDF Export
     this.exportPDF = this.exportPDF.bind(this);
-    this.previewPDF = this.previewPDF.bind(this);
+    this.exportPDFDirect = this.exportPDFDirect.bind(this);
   }
 
   /**
    * GET /api/candidates/me/cv-builder
-   * Get current CV builder data
+   * Lấy dữ liệu CV builder hiện tại
    */
   async getBuilderData(req, res, next) {
     try {
@@ -77,7 +87,7 @@ class CVBuilderController {
 
   /**
    * PUT /api/candidates/me/cv-builder
-   * Update CV builder data
+   * Cập nhật dữ liệu CV builder
    */
   async updateBuilderData(req, res, next) {
     try {
@@ -326,7 +336,7 @@ class CVBuilderController {
 
   /**
    * POST /api/candidates/me/cv-builder/generate
-   * Generate smart CV with AI enhancement
+   * Tạo CV thông minh với AI enhancement
    */
   async generateSmartCV(req, res, next) {
     try {
@@ -467,20 +477,69 @@ class CVBuilderController {
   }
 
   /**
+   * POST /api/candidates/me/cv-builder/generate-direct
+   * Tạo CV từ text thô bằng AI parsing
+   */
+  async generateDirectCV(req, res, next) {
+    try {
+      const { rawCVText } = req.body;
+      if (
+        !rawCVText ||
+        typeof rawCVText !== 'string' ||
+        rawCVText.trim().length === 0
+      ) {
+        return ApiResponse.error(res, 'Missing or invalid rawCVText', 400);
+      }
+
+      // Analyze raw CV text using AI service
+      const analysis = await aiService.analyzeCV(rawCVText);
+
+      // Optionally, create a new CandidateProfile or update existing with extracted data
+      let profile = await CandidateProfile.findOne({ userId: req.user.id });
+      if (!profile) {
+        profile = new CandidateProfile({ userId: req.user.id });
+      }
+
+      // Update profile fields with extracted data (do not overwrite existing unless empty)
+      profile.skills = analysis.skills || profile.skills;
+      profile.experience = analysis.experience || profile.experience;
+      profile.education = analysis.education || profile.education;
+      profile.personalInfo = {
+        ...profile.personalInfo,
+        ...analysis.contact,
+        bio: analysis.summary || profile.personalInfo?.bio || '',
+      };
+      await profile.save();
+
+      // Return extracted CV data for user editing
+      return ApiResponse.success(
+        res,
+        {
+          builderData: analysis,
+          message: 'CV generated from raw text successfully',
+        },
+        'CV generated from raw text successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * GET /api/candidates/me/cv-builder/templates
-   * Get available CV templates
+   * Lấy danh sách CV templates có sẵn
    */
   async getTemplates(req, res, next) {
     try {
       const { CV_TEMPLATES } = require('../../config/cvTemplates');
-      const { category, style } = req.query;
+      const { industryCode, category, style } = req.query; // category kept for backward-compat only
 
       let templates = Object.entries(CV_TEMPLATES).map(([key, template]) => ({
         id: key,
         name: template.name,
         description: template.description,
         preview: template.preview,
-        category: template.category,
+        industryCode: template.industryCode || template.category || 'general',
         color: template.color,
         style: template.style,
         sections: template.sections,
@@ -494,9 +553,10 @@ class CVBuilderController {
         },
       }));
 
-      // Filter by category if provided
-      if (category) {
-        templates = templates.filter(t => t.category === category);
+      // Filter by industryCode (preferred) or legacy category
+      const effectiveIndustry = industryCode || category;
+      if (effectiveIndustry) {
+        templates = templates.filter(t => t.industryCode === effectiveIndustry);
       }
 
       // Filter by style if provided
@@ -506,10 +566,11 @@ class CVBuilderController {
 
       // Group by category
       const groupedTemplates = templates.reduce((acc, template) => {
-        if (!acc[template.category]) {
-          acc[template.category] = [];
+        const key = template.industryCode;
+        if (!acc[key]) {
+          acc[key] = [];
         }
-        acc[template.category].push(template);
+        acc[key].push(template);
         return acc;
       }, {});
 
@@ -518,7 +579,7 @@ class CVBuilderController {
         {
           templates,
           groupedTemplates,
-          categories: Object.keys(groupedTemplates),
+          industries: Object.keys(groupedTemplates),
           total: templates.length,
         },
         'CV templates retrieved successfully'
@@ -530,7 +591,7 @@ class CVBuilderController {
 
   /**
    * POST /api/candidates/me/cv-builder/analyze-job
-   * Analyze job description and provide CV optimization suggestions
+   * Phân tích job description và đưa ra gợi ý tối ưu CV
    */
   async analyzeJobDescription(req, res, next) {
     try {
@@ -562,75 +623,205 @@ class CVBuilderController {
       next(error);
     }
   }
-  async previewCV(req, res, next) {
+
+  /**
+   * POST /api/candidates/me/cv-builder/export-pdf
+   * Export CV thành PDF
+   */
+  async exportPDF(req, res, next) {
     try {
       const {
+        cvId,
+        cvUrl,
         template = 'modern',
-        customization = {},
-        sections = [],
+        pdfOptions = {},
+        filename = null,
       } = req.body;
+
+      if (!cvId && !cvUrl) {
+        throw new AppError('Either cvId or cvUrl is required', 400);
+      }
 
       const profile = await CandidateProfile.findOne({ userId: req.user.id });
       if (!profile) {
         throw new AppError('Profile not found', 404);
       }
 
-      // Build preview data
-      const previewData = {
-        personalInfo: {
-          fullName: profile.personalInfo?.fullName || 'Your Name',
-          email: profile.personalInfo?.email || 'your.email@example.com',
-          phone: profile.personalInfo?.phone || '+84 123 456 789',
-          address:
-            this.formatAddress(profile.personalInfo?.address) || 'Your Address',
-          website: profile.personalInfo?.website,
-          linkedin: profile.personalInfo?.linkedin,
-          github: profile.personalInfo?.github,
-        },
-        targetJob: profile.targetJob,
-        careerObjective:
-          profile.personalInfo?.bio ||
-          'Your career objective will appear here...',
-        experience: this.getAllExperience(profile.experience),
-        education: this.getAllEducation(profile.education),
-        skills: profile.skills || {},
-        projects: profile.projects || [],
-        certifications: profile.certifications || [],
-        sections:
-          sections.length > 0
-            ? sections
-            : [
-                'personalInfo',
-                'careerObjective',
-                'experience',
-                'education',
-                'skills',
-              ],
-        customization,
+      let htmlContent = null;
+      let cvUrlToUse = cvUrl;
+
+      // If cvId is provided, get the CV from database
+      if (cvId) {
+        const cvEntry = profile.documents?.find(
+          doc => doc._id.toString() === cvId
+        );
+        if (!cvEntry) {
+          throw new AppError('CV not found', 404);
+        }
+        cvUrlToUse = cvEntry.url;
+      }
+
+      // Generate filename if not provided
+      const candidateName = profile.personalInfo?.fullName || 'Candidate';
+      const targetJob = profile.targetJob?.title || 'General';
+      const finalFilename =
+        filename ||
+        pdfGenerationService.generatePDFFilename(
+          candidateName,
+          targetJob,
+          template
+        );
+
+      // Get PDF options for template
+      const templatePDFOptions =
+        pdfGenerationService.getPDFOptionsForTemplate(template);
+      const finalPDFOptions = { ...templatePDFOptions, ...pdfOptions };
+
+      console.log('🔄 Exporting CV to PDF...');
+      console.log(`📄 CV URL: ${cvUrlToUse}`);
+      console.log(`📁 Filename: ${finalFilename}`);
+      console.log(`🎨 Template: ${template}`);
+
+      // Generate PDF from CV URL
+      const pdfResult = await pdfGenerationService.generatePDFFromCVURL(
+        cvUrlToUse,
+        finalFilename,
+        finalPDFOptions
+      );
+
+      // Save PDF entry to profile
+      const pdfEntry = {
+        url: pdfResult.url,
+        filename: pdfResult.filename,
+        displayName: `PDF - ${candidateName} - ${targetJob}`,
+        format: 'pdf',
+        size: pdfResult.size,
+        uploadedAt: pdfResult.uploadedAt,
+        aiGenerated: false,
+        template: template,
+        targetJob: targetJob,
+        pdfOptions: finalPDFOptions,
       };
 
-      // Generate preview HTML (without AI enhancement for speed)
-      const previewHTML = await aiService.generatePreviewHTML(
-        previewData,
-        template
-      );
+      // Add to profile documents
+      if (!profile.documents) {
+        profile.documents = [];
+      }
+      profile.documents.push(pdfEntry);
+
+      // Save profile
+      await profile.save();
+
+      console.log('✅ PDF exported successfully');
 
       return ApiResponse.success(
         res,
         {
-          html: previewHTML,
-          template,
-          customization: finalCustomization,
-          sections,
+          pdf: pdfResult,
+          entry: pdfEntry,
+          message: 'CV exported to PDF successfully',
         },
-        'Preview generated successfully'
+        'CV exported to PDF successfully'
       );
     } catch (error) {
+      console.error('❌ PDF export failed:', error);
       next(error);
     }
   }
 
-  // Helper methods
+  /**
+   * POST /api/candidates/me/cv-builder/export-pdf-direct
+   * Export CV thành PDF trực tiếp từ HTML content
+   */
+  async exportPDFDirect(req, res, next) {
+    try {
+      const {
+        htmlContent,
+        template = 'modern',
+        pdfOptions = {},
+        filename = null,
+      } = req.body;
+
+      if (!htmlContent) {
+        throw new AppError('HTML content is required', 400);
+      }
+
+      const profile = await CandidateProfile.findOne({ userId: req.user.id });
+      if (!profile) {
+        throw new AppError('Profile not found', 404);
+      }
+
+      // Generate filename if not provided
+      const candidateName = profile.personalInfo?.fullName || 'Candidate';
+      const targetJob = profile.targetJob?.title || 'General';
+      const finalFilename =
+        filename ||
+        pdfGenerationService.generatePDFFilename(
+          candidateName,
+          targetJob,
+          template
+        );
+
+      // Get PDF options for template
+      const templatePDFOptions =
+        pdfGenerationService.getPDFOptionsForTemplate(template);
+      const finalPDFOptions = { ...templatePDFOptions, ...pdfOptions };
+
+      console.log('🔄 Exporting CV to PDF directly from HTML...');
+      console.log(`📁 Filename: ${finalFilename}`);
+      console.log(`🎨 Template: ${template}`);
+
+      // Generate PDF from HTML content
+      const pdfResult = await pdfGenerationService.generateAndUploadPDF(
+        htmlContent,
+        finalFilename,
+        finalPDFOptions
+      );
+
+      // Save PDF entry to profile
+      const pdfEntry = {
+        url: pdfResult.url,
+        filename: pdfResult.filename,
+        displayName: `PDF - ${candidateName} - ${targetJob}`,
+        format: 'pdf',
+        size: pdfResult.size,
+        uploadedAt: pdfResult.uploadedAt,
+        aiGenerated: false,
+        template: template,
+        targetJob: targetJob,
+        pdfOptions: finalPDFOptions,
+      };
+
+      // Add to profile documents
+      if (!profile.documents) {
+        profile.documents = [];
+      }
+      profile.documents.push(pdfEntry);
+
+      // Save profile
+      await profile.save();
+
+      console.log('✅ PDF exported successfully from HTML');
+
+      return ApiResponse.success(
+        res,
+        {
+          pdf: pdfResult,
+          entry: pdfEntry,
+          message: 'CV exported to PDF successfully from HTML',
+        },
+        'CV exported to PDF successfully'
+      );
+    } catch (error) {
+      console.error('❌ PDF export from HTML failed:', error);
+      next(error);
+    }
+  }
+
+  // ========================================
+  // HELPER METHODS
+  // ========================================
+
   getEmptyBuilderData() {
     return {
       personalInfo: {
@@ -784,583 +975,192 @@ class CVBuilderController {
     return Math.round((score / total) * 100);
   }
 
+  // ========================================
+  // 🤖 AI FEATURES - Tính năng AI cho CV
+  // ========================================
+
   /**
-   * POST /api/candidates/me/cv-builder/export-pdf
-   * Export CV as PDF
+   * POST /api/candidates/me/cv-builder/ai-suggestions
+   * Lấy gợi ý AI cho các trường form
    */
-  async exportPDF(req, res, next) {
+  async getAISuggestions(req, res, next) {
+    try {
+      const { stepType, currentData, context } = req.body;
+
+      let suggestions = {};
+
+      switch (stepType) {
+        case 'targetJob':
+          suggestions = await aiService.getJobSuggestions(currentData.title);
+          break;
+
+        case 'careerObjective':
+          suggestions = await aiService.generateCareerObjective(
+            currentData,
+            context
+          );
+          break;
+
+        case 'skills':
+          suggestions = await aiService.suggestSkills(
+            context.targetJob,
+            context.experience
+          );
+          break;
+
+        case 'experience':
+          suggestions = await aiService.enhanceExperienceDescription(
+            currentData
+          );
+          break;
+
+        default:
+          return ApiResponse.error(res, 'Invalid step type', 400);
+      }
+
+      return ApiResponse.success(
+        res,
+        { suggestions },
+        'AI suggestions generated successfully'
+      );
+    } catch (error) {
+      console.error('AI suggestions error:', error);
+      return ApiResponse.error(res, 'Failed to generate AI suggestions', 500);
+    }
+  }
+
+  /**
+   * POST /api/candidates/me/cv-builder/analyze-job-match
+   * Phân tích điểm số khớp giữa CV và job target
+   */
+  async analyzeJobMatch(req, res, next) {
+    try {
+      const { targetJobDescription, targetJobTitle } = req.body;
+
+      const profile = await CandidateProfile.findOne({ userId: req.user.id });
+      if (!profile) {
+        return ApiResponse.error(res, 'Profile not found', 404);
+      }
+
+      // Get CV data
+      const cvData = this.extractCVData(profile);
+
+      // Analyze match using AI
+      const analysis = await aiService.analyzeJobMatch(cvData, {
+        title: targetJobTitle,
+        description: targetJobDescription,
+      });
+
+      return ApiResponse.success(res, analysis, 'Job match analysis completed');
+    } catch (error) {
+      console.error('Job match analysis error:', error);
+      next(new AppError('Failed to analyze job match', 500));
+    }
+  }
+
+  /**
+   * POST /api/candidates/me/cv-builder/skill-gap-analysis
+   * Phân tích khoảng cách kỹ năng giữa CV và job target
+   */
+  async getSkillGapAnalysis(req, res, next) {
+    try {
+      const { targetJobDescription, targetJobTitle, industry } = req.body;
+
+      const profile = await CandidateProfile.findOne({ userId: req.user.id });
+      if (!profile) {
+        return ApiResponse.error(res, 'Profile not found', 404);
+      }
+
+      const cvData = this.extractCVData(profile);
+
+      // Analyze skill gaps
+      const skillGapAnalysis = await aiService.analyzeSkillGaps(cvData, {
+        title: targetJobTitle,
+        description: targetJobDescription,
+        industry,
+      });
+
+      return ApiResponse.success(
+        res,
+        skillGapAnalysis,
+        'Skill gap analysis completed'
+      );
+    } catch (error) {
+      console.error('Skill gap analysis error:', error);
+      next(new AppError('Failed to analyze skill gaps', 500));
+    }
+  }
+
+  /**
+   * POST /api/candidates/me/cv-builder/generate-roadmap
+   * Tạo lộ trình học tập kỹ năng cá nhân hóa
+   */
+  async generateSkillRoadmap(req, res, next) {
     try {
       const {
-        cvId,
-        cvUrl,
-        template = 'modern',
-        pdfOptions = {},
-        filename = null,
+        targetJobTitle,
+        targetJobDescription,
+        skillGaps,
+        timeframe,
+        learningPreferences,
       } = req.body;
 
-      if (!cvId && !cvUrl) {
-        throw new AppError('Either cvId or cvUrl is required', 400);
-      }
-
       const profile = await CandidateProfile.findOne({ userId: req.user.id });
       if (!profile) {
-        throw new AppError('Profile not found', 404);
+        return ApiResponse.error(res, 'Profile not found', 404);
       }
 
-      let htmlContent = null;
-      let cvUrlToUse = cvUrl;
+      const cvData = this.extractCVData(profile);
 
-      // If cvId is provided, get the CV from database
-      if (cvId) {
-        const cvEntry = profile.documents?.find(
-          doc => doc._id.toString() === cvId
-        );
-        if (!cvEntry) {
-          throw new AppError('CV not found', 404);
-        }
-        cvUrlToUse = cvEntry.url;
-      }
+      // Generate roadmap using AI
+      const roadmap = await aiService.generateLearningRoadmap({
+        currentSkills: cvData.skills,
+        targetJob: {
+          title: targetJobTitle,
+          description: targetJobDescription,
+        },
+        skillGaps,
+        timeframe: timeframe || '12 weeks',
+        preferences: learningPreferences || {},
+      });
 
-      // Generate filename if not provided
-      const candidateName = profile.personalInfo?.fullName || 'Candidate';
-      const targetJob = profile.targetJob?.title || 'General';
-      const finalFilename =
-        filename ||
-        pdfGenerationService.generatePDFFilename(
-          candidateName,
-          targetJob,
-          template
-        );
-
-      // Get PDF options for template
-      const templatePDFOptions =
-        pdfGenerationService.getPDFOptionsForTemplate(template);
-      const finalPDFOptions = { ...templatePDFOptions, ...pdfOptions };
-
-      console.log('🔄 Exporting CV to PDF...');
-      console.log(`📄 CV URL: ${cvUrlToUse}`);
-      console.log(`📁 Filename: ${finalFilename}`);
-      console.log(`🎨 Template: ${template}`);
-
-      // Generate PDF from CV URL
-      const pdfResult = await pdfGenerationService.generatePDFFromCVURL(
-        cvUrlToUse,
-        finalFilename,
-        finalPDFOptions
-      );
-
-      // Save PDF entry to profile
-      const pdfEntry = {
-        url: pdfResult.url,
-        filename: pdfResult.filename,
-        displayName: `PDF - ${candidateName} - ${targetJob}`,
-        format: 'pdf',
-        size: pdfResult.size,
-        uploadedAt: pdfResult.uploadedAt,
-        aiGenerated: false,
-        template: template,
-        targetJob: targetJob,
-        pdfOptions: finalPDFOptions,
+      // Save roadmap to profile
+      profile.skillRoadmap = {
+        ...roadmap,
+        createdAt: new Date(),
+        targetJob: {
+          title: targetJobTitle,
+          description: targetJobDescription,
+        },
       };
 
-      // Add to profile documents
-      if (!profile.documents) {
-        profile.documents = [];
-      }
-      profile.documents.push(pdfEntry);
-
-      // Save profile
       await profile.save();
 
-      console.log('✅ PDF exported successfully');
-
       return ApiResponse.success(
         res,
-        {
-          pdf: pdfResult,
-          entry: pdfEntry,
-          message: 'CV exported to PDF successfully',
-        },
-        'CV exported to PDF successfully'
+        roadmap,
+        'Learning roadmap generated successfully'
       );
     } catch (error) {
-      console.error('❌ PDF export failed:', error);
-      next(error);
+      console.error('Roadmap generation error:', error);
+      next(new AppError('Failed to generate learning roadmap', 500));
     }
   }
 
   /**
-   * POST /api/candidates/me/cv-builder/export-pdf-direct
-   * Export CV as PDF directly from HTML content
+   * Extract CV data từ profile để AI analysis
    */
-  async exportPDFDirect(req, res, next) {
-    try {
-      const {
-        htmlContent,
-        template = 'modern',
-        pdfOptions = {},
-        filename = null,
-      } = req.body;
-
-      if (!htmlContent) {
-        throw new AppError('HTML content is required', 400);
-      }
-
-      const profile = await CandidateProfile.findOne({ userId: req.user.id });
-      if (!profile) {
-        throw new AppError('Profile not found', 404);
-      }
-
-      // Generate filename if not provided
-      const candidateName = profile.personalInfo?.fullName || 'Candidate';
-      const targetJob = profile.targetJob?.title || 'General';
-      const finalFilename =
-        filename ||
-        pdfGenerationService.generatePDFFilename(
-          candidateName,
-          targetJob,
-          template
-        );
-
-      // Get PDF options for template
-      const templatePDFOptions =
-        pdfGenerationService.getPDFOptionsForTemplate(template);
-      const finalPDFOptions = { ...templatePDFOptions, ...pdfOptions };
-
-      console.log('🔄 Exporting CV to PDF directly from HTML...');
-      console.log(`📁 Filename: ${finalFilename}`);
-      console.log(`🎨 Template: ${template}`);
-
-      // Generate PDF from HTML content
-      const pdfResult = await pdfGenerationService.generateAndUploadPDF(
-        htmlContent,
-        finalFilename,
-        finalPDFOptions
-      );
-
-      // Save PDF entry to profile
-      const pdfEntry = {
-        url: pdfResult.url,
-        filename: pdfResult.filename,
-        displayName: `PDF - ${candidateName} - ${targetJob}`,
-        format: 'pdf',
-        size: pdfResult.size,
-        uploadedAt: pdfResult.uploadedAt,
-        aiGenerated: false,
-        template: template,
-        targetJob: targetJob,
-        pdfOptions: finalPDFOptions,
-      };
-
-      // Add to profile documents
-      if (!profile.documents) {
-        profile.documents = [];
-      }
-      profile.documents.push(pdfEntry);
-
-      // Save profile
-      await profile.save();
-
-      console.log('✅ PDF exported successfully from HTML');
-
-      return ApiResponse.success(
-        res,
-        {
-          pdf: pdfResult,
-          entry: pdfEntry,
-          message: 'CV exported to PDF successfully from HTML',
-        },
-        'CV exported to PDF successfully'
-      );
-    } catch (error) {
-      console.error('❌ PDF export from HTML failed:', error);
-      next(error);
-    }
-  }
-
-  /**
-   * GET /api/candidates/me/cv-builder/preview-pdf/:cvId
-   * Preview PDF CV
-   */
-  async previewPDF(req, res, next) {
-    try {
-      const { cvId } = req.params;
-
-      if (!cvId) {
-        throw new AppError('CV ID is required', 400);
-      }
-
-      const profile = await CandidateProfile.findOne({ userId: req.user.id });
-      if (!profile) {
-        throw new AppError('Profile not found', 404);
-      }
-
-      // Find CV document
-      const cvEntry = profile.documents?.find(
-        doc => doc._id.toString() === cvId
-      );
-      if (!cvEntry) {
-        throw new AppError('CV not found', 404);
-      }
-
-      // Check if it's a PDF
-      if (cvEntry.format !== 'pdf') {
-        throw new AppError('This CV is not a PDF file', 400);
-      }
-
-      console.log('📄 Previewing PDF CV:', cvEntry.filename);
-      console.log('🔗 PDF URL:', cvEntry.url);
-
-      // Return PDF info for preview
-      return ApiResponse.success(
-        res,
-        {
-          cv: {
-            id: cvEntry._id,
-            url: cvEntry.url,
-            filename: cvEntry.filename,
-            displayName: cvEntry.displayName,
-            format: cvEntry.format,
-            size: cvEntry.size,
-            uploadedAt: cvEntry.uploadedAt,
-            template: cvEntry.template,
-            targetJob: cvEntry.targetJob,
-            aiGenerated: cvEntry.aiGenerated,
-            pdfOptions: cvEntry.pdfOptions,
-          },
-          previewType: 'pdf',
-          message: 'PDF CV preview data retrieved successfully',
-        },
-        'PDF CV preview retrieved successfully'
-      );
-    } catch (error) {
-      console.error('❌ PDF preview failed:', error);
-      next(error);
-    }
-  }
-
-  /**
-   * GET /api/candidates/me/cv-builder/pdf-viewer/:cvId
-   * Get PDF viewer data with embedded viewer
-   */
-  async getPDFViewer(req, res, next) {
-    try {
-      const { cvId } = req.params;
-
-      if (!cvId) {
-        throw new AppError('CV ID is required', 400);
-      }
-
-      const profile = await CandidateProfile.findOne({ userId: req.user.id });
-      if (!profile) {
-        throw new AppError('Profile not found', 404);
-      }
-
-      // Find CV document
-      const cvEntry = profile.documents?.find(
-        doc => doc._id.toString() === cvId
-      );
-      if (!cvEntry) {
-        throw new AppError('CV not found', 404);
-      }
-
-      // Check if it's a PDF
-      if (cvEntry.format !== 'pdf') {
-        throw new AppError('This CV is not a PDF file', 400);
-      }
-
-      // Generate PDF viewer HTML
-      const pdfViewerHTML = this.generatePDFViewerHTML(cvEntry);
-
-      console.log('📄 Generating PDF viewer for:', cvEntry.filename);
-
-      return ApiResponse.success(
-        res,
-        {
-          viewerHTML: pdfViewerHTML,
-          pdfInfo: {
-            id: cvEntry._id,
-            url: cvEntry.url,
-            filename: cvEntry.filename,
-            displayName: cvEntry.displayName,
-            format: cvEntry.format,
-            size: cvEntry.size,
-            uploadedAt: cvEntry.uploadedAt,
-            template: cvEntry.template,
-            targetJob: cvEntry.targetJob,
-          },
-          message: 'PDF viewer generated successfully',
-        },
-        'PDF viewer generated successfully'
-      );
-    } catch (error) {
-      console.error('❌ PDF viewer generation failed:', error);
-      next(error);
-    }
-  }
-
-  /**
-   * Generate PDF viewer HTML
-   * @param {Object} cvEntry - CV entry object
-   * @returns {string} HTML for PDF viewer
-   */
-  generatePDFViewerHTML(cvEntry) {
-    return `
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF Viewer - ${cvEntry.displayName}</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f5f5;
-            height: 100vh;
-            overflow: hidden;
-        }
-        
-        .pdf-viewer-container {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-        }
-        
-        .pdf-header {
-            background: #2563eb;
-            color: white;
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        
-        .pdf-title {
-            font-size: 1.2em;
-            font-weight: 600;
-        }
-        
-        .pdf-actions {
-            display: flex;
-            gap: 10px;
-        }
-        
-        .btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.9em;
-            transition: all 0.3s ease;
-        }
-        
-        .btn-primary {
-            background: #10b981;
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            background: #059669;
-        }
-        
-        .btn-secondary {
-            background: rgba(255,255,255,0.2);
-            color: white;
-            border: 1px solid rgba(255,255,255,0.3);
-        }
-        
-        .btn-secondary:hover {
-            background: rgba(255,255,255,0.3);
-        }
-        
-        .pdf-content {
-            flex: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
-        
-        .pdf-embed {
-            width: 100%;
-            height: 100%;
-            border: none;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            background: white;
-        }
-        
-        .pdf-info {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(0,0,0,0.7);
-            color: white;
-            padding: 10px;
-            border-radius: 6px;
-            font-size: 0.8em;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .pdf-content:hover .pdf-info {
-            opacity: 1;
-        }
-        
-        .loading {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 20px;
-        }
-        
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #e5e7eb;
-            border-top: 4px solid #2563eb;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .error-message {
-            text-align: center;
-            color: #ef4444;
-            padding: 20px;
-        }
-        
-        @media (max-width: 768px) {
-            .pdf-header {
-                padding: 10px 15px;
-            }
-            
-            .pdf-title {
-                font-size: 1em;
-            }
-            
-            .pdf-actions {
-                gap: 5px;
-            }
-            
-            .btn {
-                padding: 6px 12px;
-                font-size: 0.8em;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="pdf-viewer-container">
-        <div class="pdf-header">
-            <div class="pdf-title">📄 ${cvEntry.displayName}</div>
-            <div class="pdf-actions">
-                <button class="btn btn-secondary" onclick="downloadPDF()">📥 Tải xuống</button>
-                <button class="btn btn-primary" onclick="openInNewTab()">🔗 Mở tab mới</button>
-            </div>
-        </div>
-        
-        <div class="pdf-content">
-            <div class="pdf-info">
-                <div><strong>File:</strong> ${cvEntry.filename}</div>
-                <div><strong>Kích thước:</strong> ${this.formatFileSize(
-                  cvEntry.size
-                )}</div>
-                <div><strong>Ngày tạo:</strong> ${new Date(
-                  cvEntry.uploadedAt
-                ).toLocaleDateString('vi-VN')}</div>
-                ${
-                  cvEntry.template
-                    ? `<div><strong>Template:</strong> ${cvEntry.template}</div>`
-                    : ''
-                }
-                ${
-                  cvEntry.targetJob
-                    ? `<div><strong>Vị trí:</strong> ${cvEntry.targetJob}</div>`
-                    : ''
-                }
-            </div>
-            
-            <iframe 
-                class="pdf-embed" 
-                src="${cvEntry.url}#toolbar=1&navpanes=1&scrollbar=1&view=FitH"
-                onload="hideLoading()"
-                onerror="showError()"
-            ></iframe>
-            
-            <div id="loading" class="loading">
-                <div class="spinner"></div>
-                <div>Đang tải PDF...</div>
-            </div>
-            
-            <div id="error" class="error-message" style="display: none;">
-                <h3>❌ Không thể tải PDF</h3>
-                <p>Có thể file PDF không tồn tại hoặc có lỗi kết nối.</p>
-                <button class="btn btn-primary" onclick="retryLoad()">🔄 Thử lại</button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        function hideLoading() {
-            document.getElementById('loading').style.display = 'none';
-        }
-        
-        function showError() {
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('error').style.display = 'block';
-        }
-        
-        function retryLoad() {
-            document.getElementById('error').style.display = 'none';
-            document.getElementById('loading').style.display = 'flex';
-            location.reload();
-        }
-        
-        function downloadPDF() {
-            const link = document.createElement('a');
-            link.href = '${cvEntry.url}';
-            link.download = '${cvEntry.filename}';
-            link.click();
-        }
-        
-        function openInNewTab() {
-            window.open('${cvEntry.url}', '_blank');
-        }
-        
-        // Auto-hide loading after 5 seconds
-        setTimeout(() => {
-            hideLoading();
-        }, 5000);
-    </script>
-</body>
-</html>`;
-  }
-
-  /**
-   * Format file size
-   * @param {number} bytes - File size in bytes
-   * @returns {string} Formatted file size
-   */
-  formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
-
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  extractCVData(profile) {
+    return {
+      personalInfo: profile.personalInfo || {},
+      skills: this.formatSkills(profile.skills || {}),
+      experience: this.getAllExperience(profile.experience || {}),
+      education: this.getAllEducation(profile.education || {}),
+      projects: profile.projects || [],
+      certifications: profile.certifications || [],
+      summary: profile.summary || '',
+      targetJob: profile.targetJob || {},
+    };
   }
 }
 

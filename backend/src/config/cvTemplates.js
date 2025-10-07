@@ -14,7 +14,7 @@ const CV_TEMPLATES = {
     ],
     style: 'modern',
     color: '#2563eb',
-    category: 'general',
+    industryCode: 'general',
     preview: '/templates/modern-preview.jpg',
     options: {
       languages: ['vi', 'en'],
@@ -48,7 +48,7 @@ const CV_TEMPLATES = {
     ],
     style: 'modern',
     color: '#2563eb',
-    category: 'technology',
+    industryCode: 'technology',
     preview: '/templates/student-tech-preview.jpg',
     options: {
       languages: ['vi', 'en'],
@@ -82,7 +82,7 @@ const CV_TEMPLATES = {
     ],
     style: 'executive',
     color: '#059669',
-    category: 'business',
+    industryCode: 'business',
     preview: '/templates/business-preview.jpg',
     options: {
       languages: ['vi', 'en'],
@@ -109,7 +109,7 @@ const CV_TEMPLATES = {
     sections: ['personalInfo', 'objective', 'education', 'skills', 'projects'],
     style: 'minimal',
     color: '#7c3aed',
-    category: 'general',
+    industryCode: 'general',
     preview: '/templates/minimal-preview.jpg',
     options: {
       languages: ['vi', 'en'],
@@ -143,7 +143,7 @@ const CV_TEMPLATES = {
     ],
     style: 'creative',
     color: '#dc2626',
-    category: 'design',
+    industryCode: 'design',
     preview: '/templates/creative-preview.jpg',
     options: {
       languages: ['vi', 'en'],
@@ -177,7 +177,7 @@ const CV_TEMPLATES = {
     ],
     style: 'executive',
     color: '#1a365d',
-    category: 'executive',
+    industryCode: 'executive',
     preview: '/templates/executive-preview.jpg',
     options: {
       languages: ['vi', 'en'],
@@ -210,7 +210,7 @@ const CV_TEMPLATES = {
     ],
     style: 'classic',
     color: '#2c3e50',
-    category: 'traditional',
+    industryCode: 'traditional',
     preview: '/templates/classic-preview.jpg',
     options: {
       languages: ['vi', 'en'],
@@ -244,7 +244,7 @@ const CV_TEMPLATES = {
     ],
     style: 'professional',
     color: '#059669',
-    category: 'healthcare',
+    industryCode: 'healthcare',
     preview: '/templates/healthcare-preview.jpg',
     options: {
       languages: ['vi', 'en'],
@@ -278,7 +278,7 @@ const CV_TEMPLATES = {
     ],
     style: 'professional',
     color: '#7c3aed',
-    category: 'education',
+    industryCode: 'education',
     preview: '/templates/education-preview.jpg',
     options: {
       languages: ['vi', 'en'],
@@ -312,7 +312,7 @@ const CV_TEMPLATES = {
     ],
     style: 'creative',
     color: '#dc2626',
-    category: 'marketing',
+    industryCode: 'marketing',
     preview: '/templates/marketing-preview.jpg',
     options: {
       languages: ['vi', 'en'],
@@ -347,7 +347,7 @@ const CV_TEMPLATES = {
     ],
     style: 'professional',
     color: '#0f766e',
-    category: 'finance',
+    industryCode: 'finance',
     preview: '/templates/finance-preview.jpg',
     options: { languages: ['vi', 'en'], supportsIcons: false },
     customization: {
@@ -370,7 +370,7 @@ const CV_TEMPLATES = {
     ],
     style: 'classic',
     color: '#334155',
-    category: 'finance',
+    industryCode: 'finance',
     preview: '/templates/accounting-preview.jpg',
     options: { languages: ['vi', 'en'], supportsIcons: false },
     customization: {
@@ -394,7 +394,7 @@ const CV_TEMPLATES = {
     ],
     style: 'professional',
     color: '#2563eb',
-    category: 'logistics',
+    industryCode: 'logistics',
     preview: '/templates/logistics-preview.jpg',
     options: { languages: ['vi', 'en'], supportsIcons: false },
     customization: {
@@ -418,7 +418,7 @@ const CV_TEMPLATES = {
     ],
     style: 'modern',
     color: '#3b82f6',
-    category: 'data',
+    industryCode: 'data',
     preview: '/templates/data-analyst-preview.jpg',
     options: { languages: ['vi', 'en'], supportsIcons: false },
     customization: {
@@ -443,7 +443,7 @@ const CV_TEMPLATES = {
     ],
     style: 'professional',
     color: '#9333ea',
-    category: 'human-resources',
+    industryCode: 'human-resources',
     preview: '/templates/hr-preview.jpg',
     options: { languages: ['vi', 'en'], supportsIcons: false },
     customization: {
@@ -467,7 +467,7 @@ const CV_TEMPLATES = {
     ],
     style: 'creative',
     color: '#dc2626',
-    category: 'hospitality',
+    industryCode: 'hospitality',
     preview: '/templates/hospitality-preview.jpg',
     options: { languages: ['vi', 'en'], supportsIcons: false },
     customization: {
@@ -490,7 +490,7 @@ const CV_TEMPLATES = {
     ],
     style: 'classic',
     color: '#1f2937',
-    category: 'law',
+    industryCode: 'law',
     preview: '/templates/legal-preview.jpg',
     options: { languages: ['vi', 'en'], supportsIcons: false },
     customization: {
@@ -513,7 +513,7 @@ const CV_TEMPLATES = {
     ],
     style: 'minimal',
     color: '#111827',
-    category: 'general',
+    industryCode: 'general',
     preview: '/templates/minimal-clean-preview.jpg',
     options: {
       languages: ['vi', 'en'],

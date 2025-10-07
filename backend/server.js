@@ -33,6 +33,9 @@ const employerRoutes = require('./src/routes/employerProfiles');
 const jobRoutes = require('./src/routes/jobs');
 const candidateRoutes = require('./src/routes/candidate/candidates');
 
+// AI & Analysis Routes
+const aiRoutes = require('./src/routes/ai');
+
 // Safe Additional Routes (confirmed models exist)
 const notificationRoutes = require('./src/routes/notifications');
 const skillRoutes = require('./src/routes/skills');
@@ -203,7 +206,7 @@ const swaggerOptions = {
       },
     ],
   },
-  apis: ['./src/routes/*.js'],
+  apis: ['./src/routes/*.js', './src/routes/**/*.js'],
 };
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
@@ -232,6 +235,9 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/employers', employerRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/candidates', candidateRoutes);
+
+// AI & Analysis Routes
+app.use('/api/ai', aiRoutes);
 
 // Safe Additional Routes (confirmed models exist)
 app.use('/api/notifications', notificationRoutes);

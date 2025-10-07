@@ -89,7 +89,14 @@ class ResumeController {
         case 'parse':
           return await this._parseResume(req, res, next);
         case 'generate':
-          return await this._generateResume(req, res, next);
+          // Deprecated: point clients to the new customizable generator
+          return res.status(410).json({
+            success: false,
+            error: 'DEPRECATED_ENDPOINT',
+            message:
+              'This endpoint is deprecated. Use /api/candidates/me/cv-builder/generate instead.',
+            replacement: '/api/candidates/me/cv-builder/generate',
+          });
         default:
           throw new AppError(
             'Invalid action. Must be: upload, parse, or generate',
