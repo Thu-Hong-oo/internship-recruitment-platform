@@ -19,8 +19,14 @@ const JobSchema = new mongoose.Schema({
   benefits: { type: String },
   skills: [{ type: String, trim: true }],
   tags: [{ type: String, trim: true }],
+  // DEPRECATED: use industryCode/subIndustryCode instead
   category: { type: String },
   industry: { type: String },
+
+  // New normalized industry fields
+  industryCode: { type: String, index: true }, // maps to Industry.code (root or leaf)
+  subIndustryCode: { type: String, index: true }, // optional child industry
+  industryPath: [{ type: String }], // e.g., ["technology", "software-dev"] for easy filtering
   level: {
     type: String,
     enum: ['Intern', 'Fresher', 'Junior', 'Senior', 'Manager', 'Director'],
@@ -131,6 +137,8 @@ JobSchema.index({
 // THÊM: Indexes cần thiết cho performance
 JobSchema.index({ 'ai.embedding': 1 }); // Cho vector search
 JobSchema.index({ skills: 1, location: 1, status: 1 });
+JobSchema.index({ industryCode: 1, subIndustryCode: 1, status: 1 });
+JobSchema.index({ industryPath: 1 });
 JobSchema.index({ 'ai.suggestedCandidates.score': -1 });
 JobSchema.index({ status: 1, createdAt: -1 });
 JobSchema.index({ employer: 1, status: 1 });

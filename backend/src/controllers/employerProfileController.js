@@ -26,7 +26,8 @@ const getApplications = asyncHandler(async (req, res) => {
   try {
     const Application = require('../models/Application');
     const Job = require('../models/Job');
-    const profile = await EmployerServices.getProfile(req.user.id);
+    // Sử dụng ensureProfile thay vì getProfile
+    const profile = await EmployerServices.ensureProfile(req.user.id);
     const jobs = await Job.find({ employer: profile._id }).select('_id');
     const jobIds = jobs.map(j => j._id);
     const page = parseInt(req.query.page) || 1;
@@ -74,7 +75,8 @@ const getApplications = asyncHandler(async (req, res) => {
  */
 const getProfile = asyncHandler(async (req, res) => {
   try {
-    const profile = await EmployerServices.getProfile(req.user.id);
+    // Sử dụng ensureProfile thay vì getProfile để auto-create
+    const profile = await EmployerServices.ensureProfile(req.user.id);
     return success(res, 'Lấy profile thành công', {
       _id: profile._id,
       company: profile.company,
@@ -165,7 +167,8 @@ const updateProfile = [
 // GET /api/employers/verification-status
 //trả về tiến độ hoàn thành xác thực
 const getVerificationStatus = asyncHandler(async (req, res) => {
-  const profile = await EmployerServices.getProfile(req.user.id);
+  // Sử dụng ensureProfile thay vì getProfile
+  const profile = await EmployerServices.ensureProfile(req.user.id);
 
   // Check if business info is actually complete
   const hasBusinessInfo =
@@ -354,7 +357,8 @@ const getStatusMessage = (status, nextStepsCount, pendingReview = false) => {
 const getDocumentTypes = asyncHandler(async (req, res) => {
   try {
     const { industry } = req.query;
-    const profile = await EmployerServices.getProfile(req.user.id);
+    // Sử dụng ensureProfile thay vì getProfile
+    const profile = await EmployerServices.ensureProfile(req.user.id);
     const documentTypes = getDocumentTypesForIndustry(
       industry || profile.company.industry || 'general'
     );
@@ -410,7 +414,8 @@ const uploadBusinessLicense = asyncHandler(async (req, res) => {
   try {
     if (!req.file) return error(res, 'Không có file được upload', null, 400);
     const { documentNumber, issueDate, issuePlace, validUntil } = req.body;
-    const profile = await EmployerServices.getProfile(req.user.id);
+    // Sử dụng ensureProfile thay vì getProfile
+    const profile = await EmployerServices.ensureProfile(req.user.id);
     const documentType = 'business-license';
     const metadata = { documentNumber, issueDate, issuePlace, validUntil };
     const metadataValidation = validateDocumentMetadata(documentType, metadata);
@@ -484,7 +489,8 @@ const uploadTaxCertificate = asyncHandler(async (req, res) => {
     }
 
     const { documentNumber, issueDate, validUntil } = req.body;
-    const profile = await EmployerServices.getProfile(req.user.id);
+    // Sử dụng ensureProfile thay vì getProfile
+    const profile = await EmployerServices.ensureProfile(req.user.id);
     const documentType = 'tax-certificate';
 
     // Validate metadata cho tax certificate
@@ -568,7 +574,8 @@ const uploadTaxCertificate = asyncHandler(async (req, res) => {
 // GET /api/employers/jobs
 const getPostedJobs = asyncHandler(async (req, res) => {
   const Job = require('../models/Job');
-  const profile = await EmployerServices.getProfile(req.user.id);
+  // Sử dụng ensureProfile thay vì getProfile
+  const profile = await EmployerServices.ensureProfile(req.user.id);
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
   const startIndex = (page - 1) * limit;
@@ -602,7 +609,8 @@ const getPostedJobs = asyncHandler(async (req, res) => {
 const removeDocument = asyncHandler(async (req, res) => {
   try {
     const { documentId } = req.params;
-    const profile = await EmployerServices.getProfile(req.user.id);
+    // Sử dụng ensureProfile thay vì getProfile
+    const profile = await EmployerServices.ensureProfile(req.user.id);
     const document = profile.verification.documents.find(
       doc => doc._id.toString() === documentId
     );
@@ -648,7 +656,8 @@ const removeDocument = asyncHandler(async (req, res) => {
 const getAnalytics = asyncHandler(async (req, res) => {
   const Job = require('../models/Job');
   const Application = require('../models/Application');
-  const profile = await EmployerServices.getProfile(req.user.id);
+  // Sử dụng ensureProfile thay vì getProfile
+  const profile = await EmployerServices.ensureProfile(req.user.id);
 
   const totalJobs = await Job.countDocuments({ employer: profile._id });
   const activeJobs = await Job.countDocuments({
@@ -934,7 +943,8 @@ const removeLogo = asyncHandler(async (req, res) => {
 // Trả về đầy đủ thông tin công ty cho employer (nội bộ)
 const getCompanyInfo = asyncHandler(async (req, res) => {
   try {
-    const profile = await EmployerServices.getProfile(req.user.id);
+    // Sử dụng ensureProfile thay vì getProfile
+    const profile = await EmployerServices.ensureProfile(req.user.id);
     const c = profile.company || {};
     res.status(200).json({
       success: true,

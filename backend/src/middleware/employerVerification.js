@@ -171,9 +171,41 @@ function getNextVerificationSteps(employerProfile) {
   return steps;
 }
 
+/**
+ * Ensure employer profile exists, create if not
+ * Similar to ensureCandidateProfile
+ */
+const ensureEmployerProfile = async (req, res, next) => {
+  try {
+    if (req.user.role !== 'employer') {
+      return res.status(403).json({
+        success: false,
+        message: 'Chỉ dành cho employer',
+      });
+    }
+
+    // Use EmployerServices.ensureProfile instead of manual creation
+    const EmployerServices = require('../services/employers/employerServices');
+    const employerProfile = await EmployerServices.ensureProfile(req.user.id);
+
+    req.employerProfile = employerProfile;
+    next();
+  } catch (error) {
+    logger.error('Error in ensureEmployerProfile middleware:', {
+      error: error.message,
+      userId: req.user?.id,
+    });
+    return res.status(500).json({
+      success: false,
+      message: 'Lỗi tạo hồ sơ employer',
+    });
+  }
+};
+
 module.exports = {
   requireVerifiedEmployer,
   requireEmployerProfile,
+  ensureEmployerProfile,
   getMissingDocuments,
   getNextVerificationSteps,
 };

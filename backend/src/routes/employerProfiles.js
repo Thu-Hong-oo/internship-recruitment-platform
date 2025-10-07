@@ -4,6 +4,7 @@ const { protect, authorize } = require('../middleware/auth');
 const {
   requireEmployerProfile,
   requireVerifiedEmployer,
+  ensureEmployerProfile,
 } = require('../middleware/employerVerification');
 const { validateFileUpload } = require('../middleware/fileValidation');
 const {
@@ -76,7 +77,7 @@ router.get(
   '/profile',
   protect,
   authorize('employer'),
-  requireEmployerProfile,
+  ensureEmployerProfile,
   getProfile
 );
 router.get(
