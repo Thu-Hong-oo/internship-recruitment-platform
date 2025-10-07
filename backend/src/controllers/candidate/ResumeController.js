@@ -706,6 +706,21 @@ class ResumeController {
       }
     }
 
+    // Add previous current resume to history before overwriting (to keep history count consistent)
+    if (profile.resume.current && profile.resume.current.url) {
+      if (!profile.resume.history) profile.resume.history = [];
+      profile.resume.history.push({
+        url: profile.resume.current.url,
+        publicId: profile.resume.current.publicId,
+        filename: profile.resume.current.filename,
+        displayName: profile.resume.current.displayName,
+        format: profile.resume.current.format,
+        size: profile.resume.current.size,
+        mimeType: profile.resume.current.mimeType,
+        uploadedAt: profile.resume.current.updatedAt,
+      });
+    }
+
     // Update profile with new resume data
     profile.resume.current = {
       url: result.url,
