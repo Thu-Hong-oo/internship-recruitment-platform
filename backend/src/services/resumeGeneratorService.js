@@ -119,10 +119,14 @@ async function generateBasicResume(content, template) {
 
   // Upload the HTML file
   const uploadResult = await uploadFile('document', Buffer.from(html, 'utf8'), {
+    // For raw uploads via stream, Cloudinary infers format from public_id extension
     public_id: `generated_resume_${Date.now()}_${Math.random()
       .toString(36)
-      .substr(2, 9)}`,
-    format: 'html',
+      .substr(2, 9)}.html`,
+    resource_type: 'raw',
+    use_filename: true,
+    unique_filename: false,
+    filename_override: fileName,
   });
 
   return {

@@ -36,6 +36,8 @@ class CandidateController {
     this.setCurrentResume = this.resumeController.setCurrentResume;
     this.renameResume = this.resumeController.renameResume;
     this.viewCurrentCV = this.resumeController.viewCurrentCV;
+    this.generateSmartResume = this.resumeController.generateSmartResume;
+    this.generateTargetedResume = this.resumeController.generateTargetedResume;
 
     // Application management methods
     this.getApplications = this.applicationController.getApplications;

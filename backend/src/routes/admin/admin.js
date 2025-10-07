@@ -1,5 +1,5 @@
 const express = require('express');
-const { protect, authorize } = require('../middleware/auth');
+const { protect, authorize } = require('../../middleware/auth');
 
 // Import từ admin controllers mới - modular structure
 const {
@@ -10,13 +10,13 @@ const {
   updateUser,
   updateUserStatus,
   updateUserRole,
-} = require('../controllers/admin/userController');
+} = require('../../controllers/admin/userController');
 
 const {
   // Analytics & Dashboard
   getDashboardStats,
   getUserAnalytics,
-} = require('../controllers/admin/analyticsController');
+} = require('../../controllers/admin/analyticsController');
 
 const {
   // Employer Management
@@ -26,7 +26,7 @@ const {
   getEmployerCompanies,
   getEmployerJobs,
   searchEmployers,
-} = require('../controllers/admin/employerController');
+} = require('../../controllers/admin/employerController');
 
 const {
   // Company Management
@@ -37,7 +37,7 @@ const {
   getCompanyJobs,
   getCompanyApplications,
   updateCompanyStatus,
-} = require('../controllers/admin/companyController');
+} = require('../../controllers/admin/companyController');
 
 const {
   // Employer Verification
@@ -45,7 +45,7 @@ const {
   getEmployerVerificationDetails,
   verifyEmployer,
   verifyEmployerDocument,
-} = require('../controllers/admin/verificationController');
+} = require('../../controllers/admin/verificationController');
 
 const {
   // Job Moderation
@@ -54,7 +54,7 @@ const {
   updateJobStatus,
   deleteJobAdmin,
   getJobApplicationsAdmin,
-} = require('../controllers/admin/jobController');
+} = require('../../controllers/admin/jobController');
 
 const {
   // System Management
@@ -62,7 +62,7 @@ const {
   getSystemLogs,
   getSystemOverview,
   updateSystemSettings,
-} = require('../controllers/admin/systemController');
+} = require('../../controllers/admin/systemController');
 
 const router = express.Router();
 
@@ -146,6 +146,6 @@ router.put('/system/settings', updateSystemSettings);
 // INDUSTRY MANAGEMENT
 // ========================================
 
-router.use('/industries', require('./admin/industriesAdmin'));
+router.use('/industries', require('./industriesAdmin'));
 
 module.exports = router;
