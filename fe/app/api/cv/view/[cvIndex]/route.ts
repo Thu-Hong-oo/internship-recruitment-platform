@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { cvIndex: string } }
+  { params }: { params: Promise<{ cvIndex: string }> }
 ) {
   try {
-    console.log('History CV Proxy: Request received for index', params.cvIndex)
+    const { cvIndex } = await params;
+    console.log('History CV Proxy: Request received for index', cvIndex)
     
     // Get token from query parameter or authorization header
     const { searchParams } = new URL(request.url)
@@ -28,7 +29,7 @@ export async function GET(
 
     // Forward request to backend
     const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
-    const fullUrl = `${backendUrl}/api/candidates/me/cv/view/${params.cvIndex}`
+    const fullUrl = `${backendUrl}/api/candidates/me/cv/view/${cvIndex}`
     
     console.log('History CV Proxy: Fetching from', fullUrl)
 

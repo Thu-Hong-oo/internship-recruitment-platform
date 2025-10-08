@@ -590,6 +590,7 @@ class JobsApi {
       stats?: { applications?: number; interviews?: number; offers?: number };
       createdAt?: string;
       updatedAt?: string;
+      hasApplied?: boolean; // New field to track application status
       employer?: BackendJob["employer"]; // keep original nested employer for detail page
       postedBy?: {
         id?: string;
@@ -618,6 +619,7 @@ class JobsApi {
         views: (j as any).views,
         positions: (j as any).positions,
         stats: (j as any).stats,
+        hasApplied: (j as any).hasApplied || false,
         createdAt: j.createdAt,
         updatedAt: (j as any).updatedAt,
         employer: j.employer,
@@ -632,6 +634,11 @@ class JobsApi {
           : undefined,
       },
     };
+  }
+
+  async apply(jobId: string, coverLetter?: string): Promise<{ success: boolean; message?: string } | any> {
+    const endpoint = `/jobs/${encodeURIComponent(jobId)}/apply`;
+    return apiClient.post(endpoint, coverLetter ? { coverLetter } : {});
   }
 }
 

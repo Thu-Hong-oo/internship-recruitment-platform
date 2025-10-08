@@ -14,13 +14,14 @@ import {
 import { PageLayout } from "@/components/layout";
 import { jobsAPI } from "@/lib/api";
 import { notFound } from "next/navigation";
+import { ApplyForm } from "./apply-form";
 
 interface JobDetailPageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export default async function JobDetailPage({ params }: JobDetailPageProps) {
-  const { id } = params;
+  const { id } = await params;
 
   try {
     const res = await jobsAPI.getJobById(id);
@@ -92,9 +93,14 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                   </span>
                 )}
                 {job.deadline && (
-                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-muted text-foreground text-xs">
+                  <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs ${
+                    new Date(job.deadline) < new Date() 
+                      ? 'bg-red-50 text-red-700 border border-red-200' 
+                      : 'bg-muted text-foreground'
+                  }`}>
                     <CalendarDays className="w-3 h-3" /> Hạn:{" "}
                     {new Date(job.deadline).toLocaleDateString()}
+                    {new Date(job.deadline) < new Date() && " (Hết hạn)"}
                   </span>
                 )}
                 {job.status && (
@@ -105,7 +111,7 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button className="font-medium">Ứng tuyển ngay</Button>
+              <ApplyForm jobId={id} deadline={job.deadline} hasApplied={job.hasApplied} />
               <Button variant="outline">Lưu việc làm</Button>
             </div>
           </div>
@@ -154,8 +160,13 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                       <div className="flex items-center gap-2">
                         <CalendarDays className="w-4 h-4 text-muted-foreground" />
                         <span className="text-muted-foreground">Hạn nộp:</span>
-                        <span className="font-medium text-foreground">
+                        <span className={`font-medium ${
+                          new Date(job.deadline) < new Date() 
+                            ? 'text-red-600' 
+                            : 'text-foreground'
+                        }`}>
                           {new Date(job.deadline).toLocaleDateString()}
+                          {new Date(job.deadline) < new Date() && " (Hết hạn)"}
                         </span>
                       </div>
                     )}
@@ -188,9 +199,9 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                     <ul className="list-disc list-inside text-sm leading-6 space-y-1">
                       {job.requirements
                         .split("\n")
-                        .map((line) => line.trim())
-                        .filter((line) => line.length > 0)
-                        .map((line, idx) => (
+                        .map((line: string) => line.trim())
+                        .filter((line: string) => line.length > 0)
+                        .map((line: string, idx: number) => (
                           <li key={idx}>{line.replace(/^[-•]\s?/, "")}</li>
                         ))}
                     </ul>
@@ -207,7 +218,7 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                   <h2 className="font-semibold mb-3">Kỹ năng</h2>
                   {job.skills && job.skills.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
-                      {job.skills.map((s) => (
+                      {job.skills.map((s: string) => (
                         <Badge key={s} variant="secondary">
                           {s}
                         </Badge>
@@ -229,10 +240,15 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                     <div className="text-sm text-muted-foreground">
                       Hạn nộp hồ sơ:{" "}
                       {new Date(job.deadline).toLocaleDateString()}
+                      {new Date(job.deadline) < new Date() && (
+                        <span className="ml-2 text-red-600 font-medium">
+                          (Đã hết hạn)
+                        </span>
+                      )}
                     </div>
                   )}
                   <div className="flex gap-3">
-                    <Button className="font-medium">Ứng tuyển ngay</Button>
+                    <ApplyForm jobId={id} deadline={job.deadline} hasApplied={job.hasApplied} />
                     <Button variant="outline">Lưu việc làm</Button>
                   </div>
                 </CardContent>

@@ -401,82 +401,6 @@ const deleteJob = async (req, res) => {
   }
 };
 
-// @desc    Apply for job
-// @route   POST /api/jobs/:id/apply
-// @access  Private (Candidate)
-const applyForJob = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { coverLetter, resumeUrl, portfolioUrl } = req.body;
-
-    const job = await Job.findById(id);
-    if (!job) {
-      return res
-        .status(404)
-        .json({ success: false, message: 'Không tìm thấy công việc' });
-    }
-    // Chỉ cho ứng tuyển khi job open
-    if (job.status !== JOB_STATUS.OPEN && job.status !== JOB_STATUS.ACTIVE) {
-      return res
-        .status(400)
-        .json({ success: false, message: 'Công việc chưa được mở ứng tuyển' });
-    }
-    // Resolve candidate profile and check existing application
-    const candidateProfile = await CandidateProfile.findOne({
-      userId: req.user.id,
-    });
-    if (!candidateProfile) {
-      return res.status(400).json({
-        success: false,
-        message: 'Bạn cần hoàn thiện hồ sơ ứng viên trước khi ứng tuyển',
-      });
-    }
-    const existingApplication = await Application.findOne({
-      jobId: id,
-      candidateId: candidateProfile._id,
-    });
-    if (existingApplication) {
-      return res.status(400).json({
-        success: false,
-        message: 'Bạn đã ứng tuyển cho công việc này',
-      });
-    }
-    // Check application deadline
-    if (job.deadline && new Date() > job.deadline) {
-      return res
-        .status(400)
-        .json({ success: false, message: 'Đã hết hạn ứng tuyển' });
-    }
-    // Determine resume url: prefer provided, otherwise current resume in profile
-    let finalResumeUrl = resumeUrl;
-    if (!finalResumeUrl) {
-      finalResumeUrl = candidateProfile?.resume?.current?.url || null;
-    }
-
-    const application = await Application.create({
-      jobId: id,
-      candidateId: candidateProfile._id,
-      coverLetter,
-      attachments: portfolioUrl
-        ? [{ name: 'portfolio', url: portfolioUrl, type: 'link' }]
-        : [],
-      resume: finalResumeUrl
-        ? { url: finalResumeUrl, uploadedAt: new Date() }
-        : undefined,
-      status: APPLICATION_STATUS.PENDING,
-    });
-    // Update job stats
-    await Job.findByIdAndUpdate(id, { $inc: { 'stats.applications': 1 } });
-    res.status(201).json({ success: true, data: application });
-  } catch (error) {
-    logger.error('Error applying for job:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Lỗi khi ứng tuyển',
-    });
-  }
-};
-
 // @desc    Get job applications
 // @route   GET /api/jobs/:id/applications
 // @access  Private (Employer)
@@ -888,7 +812,6 @@ module.exports = {
   createJob,
   updateJob,
   deleteJob,
-  applyForJob,
   getJobApplications,
   getJobBySlug,
   incrementJobViews,

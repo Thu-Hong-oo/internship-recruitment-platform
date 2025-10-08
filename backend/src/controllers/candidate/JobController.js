@@ -1,5 +1,6 @@
 const CandidateProfile = require('../../models/CandidateProfile');
 const Job = require('../../models/Job');
+const Application = require('../../models/Application');
 const SavedJob = require('../../models/SavedJob');
 const { ApiResponse } = require('../../utils/responseHandler');
 const { AppError } = require('../../utils/errors');
@@ -61,10 +62,7 @@ class JobController {
         case 'unsave':
           return this._unsaveJob(jobId, req, res, next);
         case 'apply':
-          throw new AppError(
-            'Apply action should be handled by ApplicationController',
-            400
-          );
+          return this._applyForJob(jobId, req, res, next);
         default:
           throw new AppError(
             'Invalid action. Must be: save, unsave, or apply',
@@ -250,6 +248,71 @@ class JobController {
     await savedJob.save();
 
     return ApiResponse.success(res, savedJob, 'Job saved successfully');
+  }
+
+  /**
+   * Apply for a job
+   */
+  async _applyForJob(jobId, req, res, next) {
+    const { coverLetter, resumeId } = req.body;
+
+    // Check if job exists and is active
+    const job = await Job.findById(jobId);
+    if (!job || job.status !== 'active' || job.deletedAt) {
+      throw new AppError('Job not found or not available', 404);
+    }
+
+    // Check if already applied
+    const existingApplication = await Application.findOne({
+      candidateId: req.user.candidateProfile,
+      jobId: jobId,
+    });
+
+    if (existingApplication) {
+      throw new AppError('You have already applied for this job', 400);
+    }
+
+    // Get candidate profile
+    const candidateProfile = await CandidateProfile.findOne({
+      userId: req.user.id,
+    });
+
+    if (!candidateProfile) {
+      throw new AppError('Candidate profile not found', 404);
+    }
+
+    // Create application
+    const application = new Application({
+      candidateId: req.user.candidateProfile,
+      jobId: jobId,
+      coverLetter: coverLetter,
+      resume: {
+        url: candidateProfile.resume.current.url,
+        version: resumeId || 1,
+        uploadedAt: new Date(),
+      },
+      status: 'pending',
+      timeline: [
+        {
+          status: 'pending',
+          note: 'Application submitted',
+          createdAt: new Date(),
+          createdBy: req.user.id,
+        },
+      ],
+    });
+
+    await application.save();
+
+    // Update job stats
+    job.stats.applications = (job.stats.applications || 0) + 1;
+    await job.save();
+
+    return ApiResponse.success(
+      res,
+      application,
+      'Application submitted successfully'
+    );
   }
 
   /**
