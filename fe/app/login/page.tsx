@@ -15,7 +15,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
-import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
@@ -198,7 +197,10 @@ export default function LoginPage() {
                         <Button
                           variant="outline"
                           className="h-10 bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
-                          onClick={() => signIn("google", { callbackUrl: "/" })}
+                          onClick={() => {
+                            // TODO: Implement Google OAuth with custom auth
+                            alert("Google OAuth chưa được implement");
+                          }}
                         >
                           <span className="font-bold text-lg">G</span>
                           <span className="ml-2">Đăng nhập bằng Google</span>
@@ -323,7 +325,10 @@ export default function LoginPage() {
               <Button
                 variant="outline"
                 className="h-12 bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
-                onClick={() => signIn("google", { callbackUrl: "/" })}
+                onClick={() => {
+                  // TODO: Implement Google OAuth with custom auth
+                  alert("Google OAuth chưa được implement");
+                }}
               >
                 <span className="font-bold text-lg">G</span>
                 <span className="ml-2">Google</span>

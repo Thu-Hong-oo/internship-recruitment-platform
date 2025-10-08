@@ -1,0 +1,184 @@
+@startuml Job Recruitment System Architecture
+
+skinparam backgroundColor #FFFFFF
+skinparam packageStyle rectangle
+skinparam linetype ortho
+
+skinparam package {
+    BackgroundColor<<presentation>> #E3F2FD
+    BackgroundColor<<application>> #FFF3E0
+    BackgroundColor<<business>> #FFECB3
+    BackgroundColor<<persistence>> #F3E5F5
+    BackgroundColor<<database>> #F8BBD0
+    BorderColor #424242
+}
+
+skinparam component {
+    BackgroundColor #FAFAFA
+    BorderColor #616161
+}
+
+' left to right direction
+
+title Layered Architecture (Client-Server Architecture)
+
+
+
+' ============================================
+' PRESENTATION LAYER
+' ============================================
+package "PRESENTATION LAYER" <<presentation>> {
+    
+    package "fe-candidate" {
+        component [View Layer\n(Pages & Components)] as FE_View
+        component [Presentation Logic\n(Hooks)] as FE_Logic
+        component [API Client\n(Services)] as FE_API
+    }
+    
+    package "fe-employer" {
+        component [Employer View] as EMP_View
+        component [Employer Logic] as EMP_Logic
+        component [Employer API] as EMP_API
+    }
+    
+    package "admin" {
+        component [Admin View] as ADMIN_View
+        component [Admin Logic] as ADMIN_Logic
+        component [Admin API] as ADMIN_API
+    }
+}
+
+' ============================================
+' NETWORK
+' ============================================
+package "Network Layer" {
+    interface HTTP
+    interface WebSocket
+}
+
+' ============================================
+' APPLICATION LAYER
+' ============================================
+package "APPLICATION LAYER" <<application>> {
+    
+    component [Routing Layer\n(Express Routes)] as Routes
+    component [Middleware Layer\n(Auth, CORS, etc)] as Middleware
+    component [Controller Layer\n(Request Handlers)] as Controllers
+}
+
+' ============================================
+' BUSINESS LAYER
+' ============================================
+package "BUSINESS LOGIC LAYER" <<business>> {
+    
+    component [Service Layer\n(Business Logic)] as Services
+    component [Domain Models\n(Mongoose Schemas)] as Models
+    component [Business Rules\n(Validators)] as Rules
+}
+
+' ============================================
+' PERSISTENCE LAYER
+' ============================================
+package "PERSISTENCE LAYER" <<persistence>> {
+    
+    component [ODM Layer\n(Mongoose)] as ODM
+    component [DB Connection] as DBConn
+    component [Data Mappers] as Mappers
+}
+
+' ============================================
+' DATABASE LAYER
+' ============================================
+package "DATABASE LAYER" <<database>> {
+    
+    database MongoDB {
+        ' collections Users
+        ' collections Jobs
+        ' collections Applications
+        ' collections Profiles
+    }
+    
+    database Redis {
+        ' folder Sessions
+        ' folder Cache
+        ' folder Queue
+    }
+}
+
+' ============================================
+' EXTERNAL SERVICES
+' ============================================
+package "External Services" {
+    component [Email Service\nSMTP của Google] as Email
+    component [File Storage\nCloudinary] as Storage
+    component [WebSocket Server\nSocket.io] as WSServer
+}
+
+
+
+' ============================================
+' FRONTEND INTERNAL
+' ============================================
+FE_View --> FE_Logic
+FE_Logic --> FE_API
+
+EMP_View --> EMP_Logic
+EMP_Logic --> EMP_API
+
+ADMIN_View --> ADMIN_Logic
+ADMIN_Logic --> ADMIN_API
+
+' ============================================
+' FRONTEND TO NETWORK
+' ============================================
+FE_API --> HTTP
+EMP_API --> HTTP
+ADMIN_API --> HTTP
+
+FE_View ..> WebSocket
+EMP_View ..> WebSocket
+
+' ============================================
+' NETWORK TO BACKEND
+' ============================================
+HTTP --> Routes
+WebSocket --> WSServer
+
+' ============================================
+' APPLICATION LAYER FLOW
+' ============================================
+Routes --> Middleware
+Middleware --> Controllers
+
+' ============================================
+' BUSINESS LAYER
+' ============================================
+Controllers --> Services
+Services --> Rules
+Rules --> Models
+
+
+' ============================================
+' PERSISTENCE LAYER
+' ============================================
+Models --> Mappers
+Mappers --> ODM
+ODM --> DBConn
+
+' ============================================
+' DATABASE
+' ============================================
+DBConn --> MongoDB
+ODM --> MongoDB
+Services --> Redis
+
+' ============================================
+' EXTERNAL SERVICES
+' ============================================
+Services --> Email
+Services --> Storage
+WSServer --> Redis
+
+
+
+@enduml
