@@ -22,7 +22,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useLazyProfile } from "@/hooks/useLazyProfile";
-import { Skill, LanguageSkill, SkillFormData } from "@/lib/types/profile";
+import { Skill, LanguageSkill, SkillFormData } from "@/lib/api";
 
 interface LazySkillsSectionProps {
   className?: string;
@@ -495,4 +495,3 @@ export default function LazySkillsSection({
     </Card>
   );
 }
-

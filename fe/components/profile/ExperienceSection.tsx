@@ -35,7 +35,7 @@ import {
   ProjectEntry,
   ExperienceFormData,
   ProjectFormData,
-} from "@/lib/types/profile";
+} from "@/lib/api";
 
 interface ExperienceSectionProps {
   className?: string;

@@ -22,7 +22,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useSkills } from "@/hooks/useProfile";
-import { Skill, LanguageSkill, SkillFormData } from "@/lib/types/profile";
+import { Skill, LanguageSkill, SkillFormData } from "@/lib/api";
 
 interface SkillsSectionProps {
   className?: string;

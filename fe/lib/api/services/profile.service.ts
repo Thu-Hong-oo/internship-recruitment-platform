@@ -1,3 +1,4 @@
+import { apiClient } from "../client";
 import {
   ApiResponse,
   ProfileData,
@@ -8,12 +9,9 @@ import {
   ExperienceFormData,
   ProjectFormData,
   SkillFormData,
-} from "@/lib/types/profile";
+} from "../types/profile.types";
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-
-class ProfileAPI {
+class ProfileService {
   private requestQueue: Promise<any>[] = [];
   private isProcessing = false;
 
@@ -44,10 +42,12 @@ class ProfileAPI {
         throw new Error("No authentication token found. Please login again.");
       }
 
-      console.log(`Making API request to: ${API_BASE_URL}${endpoint}`);
+      console.log(
+        `Making API request to: ${apiClient.getBaseURL()}${endpoint}`
+      );
       console.log(`Token exists: ${!!token}`);
 
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      const response = await fetch(`${apiClient.getBaseURL()}${endpoint}`, {
         ...options,
         headers: {
           "Content-Type": "application/json",
@@ -103,14 +103,14 @@ class ProfileAPI {
   // Profile Management
   async getProfile(include?: string[]): Promise<ApiResponse<ProfileData>> {
     const query = include?.length ? `?include=${include.join(",")}` : "";
-    return this.request<ProfileData>(`/api/candidates/me${query}`);
+    return this.request<ProfileData>(`/candidates/me${query}`);
   }
 
   async updateProfile(
     section: string,
     data: any
   ): Promise<ApiResponse<ProfileData>> {
-    return this.request<ProfileData>("/api/candidates/me", {
+    return this.request<ProfileData>("/candidates/me", {
       method: "PATCH",
       body: JSON.stringify({ section, data }),
     });
@@ -118,13 +118,13 @@ class ProfileAPI {
 
   // Education Management
   async getEducation(): Promise<ApiResponse<EducationResponse>> {
-    return this.request<EducationResponse>("/api/candidates/me/education");
+    return this.request<EducationResponse>("/candidates/me/education");
   }
 
   async addEducation(
     data: EducationFormData
   ): Promise<ApiResponse<EducationResponse>> {
-    return this.request<EducationResponse>("/api/candidates/me/education", {
+    return this.request<EducationResponse>("/candidates/me/education", {
       method: "POST",
       body: JSON.stringify(data),
     });
@@ -134,33 +134,27 @@ class ProfileAPI {
     id: string,
     data: Partial<EducationFormData>
   ): Promise<ApiResponse<EducationResponse>> {
-    return this.request<EducationResponse>(
-      `/api/candidates/me/education/${id}`,
-      {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      }
-    );
+    return this.request<EducationResponse>(`/candidates/me/education/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
   }
 
   async deleteEducation(id: string): Promise<ApiResponse<{ message: string }>> {
-    return this.request<{ message: string }>(
-      `/api/candidates/me/education/${id}`,
-      {
-        method: "DELETE",
-      }
-    );
+    return this.request<{ message: string }>(`/candidates/me/education/${id}`, {
+      method: "DELETE",
+    });
   }
 
   // Experience Management
   async getExperience(): Promise<ApiResponse<ExperienceResponse>> {
-    return this.request<ExperienceResponse>("/api/candidates/me/experience");
+    return this.request<ExperienceResponse>("/candidates/me/experience");
   }
 
   async addExperience(
     data: ExperienceFormData
   ): Promise<ApiResponse<ExperienceResponse>> {
-    return this.request<ExperienceResponse>("/api/candidates/me/experience", {
+    return this.request<ExperienceResponse>("/candidates/me/experience", {
       method: "POST",
       body: JSON.stringify(data),
     });
@@ -170,20 +164,17 @@ class ProfileAPI {
     id: string,
     data: Partial<ExperienceFormData>
   ): Promise<ApiResponse<ExperienceResponse>> {
-    return this.request<ExperienceResponse>(
-      `/api/candidates/me/experience/${id}`,
-      {
-        method: "PATCH",
-        body: JSON.stringify(data),
-      }
-    );
+    return this.request<ExperienceResponse>(`/candidates/me/experience/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
   }
 
   async deleteExperience(
     id: string
   ): Promise<ApiResponse<{ message: string }>> {
     return this.request<{ message: string }>(
-      `/api/candidates/me/experience/${id}`,
+      `/candidates/me/experience/${id}`,
       {
         method: "DELETE",
       }
@@ -192,11 +183,11 @@ class ProfileAPI {
 
   // Skills Management
   async getSkills(): Promise<ApiResponse<SkillsResponse>> {
-    return this.request<SkillsResponse>("/api/candidates/me/skills");
+    return this.request<SkillsResponse>("/candidates/me/skills");
   }
 
   async addSkill(data: SkillFormData): Promise<ApiResponse<SkillsResponse>> {
-    return this.request<SkillsResponse>("/api/candidates/me/skills", {
+    return this.request<SkillsResponse>("/candidates/me/skills", {
       method: "POST",
       body: JSON.stringify(data),
     });
@@ -206,19 +197,16 @@ class ProfileAPI {
     id: string,
     data: Partial<SkillFormData>
   ): Promise<ApiResponse<SkillsResponse>> {
-    return this.request<SkillsResponse>(`/api/candidates/me/skills/${id}`, {
+    return this.request<SkillsResponse>(`/candidates/me/skills/${id}`, {
       method: "PATCH",
       body: JSON.stringify(data),
     });
   }
 
   async deleteSkill(id: string): Promise<ApiResponse<{ message: string }>> {
-    return this.request<{ message: string }>(
-      `/api/candidates/me/skills/${id}`,
-      {
-        method: "DELETE",
-      }
-    );
+    return this.request<{ message: string }>(`/candidates/me/skills/${id}`, {
+      method: "DELETE",
+    });
   }
 
   // Visibility Settings
@@ -241,4 +229,4 @@ class ProfileAPI {
   }
 }
 
-export const profileAPI = new ProfileAPI();
+export const profileService = new ProfileService();

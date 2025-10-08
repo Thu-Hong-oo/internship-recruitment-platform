@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
-import { profileAPI } from "@/lib/api/profile";
+import { profileAPI } from "@/lib/api";
 import { useApiRateLimit } from "./useApiRateLimit";
 import {
   ProfileData,
   EducationResponse,
   ExperienceResponse,
   SkillsResponse,
-} from "@/lib/types/profile";
+} from "@/lib/api";
 
 export const useProfile = (include?: string[]) => {
   const [profile, setProfile] = useState<ProfileData | null>(null);

@@ -23,7 +23,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useEducation } from "@/hooks/useProfile";
-import { EducationEntry, EducationFormData } from "@/lib/types/profile";
+import { EducationEntry, EducationFormData } from "@/lib/api";
 
 interface EducationSectionProps {
   className?: string;

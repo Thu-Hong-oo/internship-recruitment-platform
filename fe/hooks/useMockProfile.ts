@@ -4,7 +4,7 @@ import {
   EducationResponse,
   ExperienceResponse,
   SkillsResponse,
-} from "@/lib/types/profile";
+} from "@/lib/api";
 
 // Mock data for development/testing - matches real API response structure
 const mockProfile: ProfileData = {

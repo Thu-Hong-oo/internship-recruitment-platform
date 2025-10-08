@@ -35,7 +35,7 @@ import {
   ProjectEntry,
   ExperienceFormData,
   ProjectFormData,
-} from "@/lib/types/profile";
+} from "@/lib/api";
 
 interface LazyExperienceSectionProps {
   className?: string;
@@ -749,4 +749,3 @@ export default function LazyExperienceSection({
     </Card>
   );
 }
-
