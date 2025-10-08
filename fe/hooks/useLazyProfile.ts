@@ -1,12 +1,12 @@
 import { useState, useCallback } from "react";
-import { profileAPI } from "@/lib/api/profile";
+import { profileAPI } from "@/lib/api";
 import { useApiRateLimit } from "./useApiRateLimit";
 import {
   ProfileData,
   EducationResponse,
   ExperienceResponse,
   SkillsResponse,
-} from "@/lib/types/profile";
+} from "@/lib/api";
 
 // Cache để lưu trữ dữ liệu đã tải
 const dataCache = {
@@ -412,4 +412,3 @@ export const useLazyProfile = () => {
     clearCache,
   };
 };
-

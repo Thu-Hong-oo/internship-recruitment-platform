@@ -23,7 +23,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useLazyProfile } from "@/hooks/useLazyProfile";
-import { EducationEntry, EducationFormData } from "@/lib/types/profile";
+import { EducationEntry, EducationFormData } from "@/lib/api";
 
 interface LazyEducationSectionProps {
   className?: string;
@@ -483,4 +483,3 @@ export default function LazyEducationSection({
     </Card>
   );
 }
-
