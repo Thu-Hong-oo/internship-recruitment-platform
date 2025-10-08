@@ -88,7 +88,8 @@ class ProfileController {
           // Skip if address is empty string to prevent MongoDB error
         }
         if (dateOfBirth && !profile.personalInfo.dateOfBirth)
-          profile.personalInfo.dateOfBirth = dateOfBirth;
+          // FIX: Use the _parseDate helper to correctly handle date formats like "DD/MM/YYYY"
+          profile.personalInfo.dateOfBirth = this._parseDate(dateOfBirth);
       }
 
       // Education
@@ -115,10 +116,17 @@ class ProfileController {
       // Skills (support type: technical, soft, languages)
       if (Array.isArray(aiAnalysis.skills) && aiAnalysis.skills.length > 0) {
         for (const skill of aiAnalysis.skills) {
-          let skillName = typeof skill === 'string' ? skill : skill.name;
-          let skillType = skill.type || 'technical';
+          const skillName = typeof skill === 'string' ? skill : skill.name;
+          const skillType = skill.type || 'technical';
           if (!skillName) continue;
-          if (!profile.skills[skillType]) profile.skills[skillType] = [];
+
+          // Ensure the skill type array exists
+          if (!profile.skills) {
+            profile.skills = { technical: [], soft: [], languages: [] };
+          }
+          if (!profile.skills[skillType]) {
+            profile.skills[skillType] = [];
+          }
           const exists = profile.skills[skillType].some(
             s => s.name?.toLowerCase() === skillName.toLowerCase()
           );
@@ -132,6 +140,30 @@ class ProfileController {
           }
         }
       }
+      // FIX: Also check the root-level skills array from aiAnalysis
+      const rootSkills = profile?.resume?.current?.aiAnalysis?.skills;
+      if (Array.isArray(rootSkills) && rootSkills.length > 0) {
+        if (!profile.skills) {
+          profile.skills = { technical: [], soft: [], languages: [] };
+        }
+        if (!profile.skills.technical) {
+          profile.skills.technical = [];
+        }
+        const existingSkills = profile.skills.technical.map(s =>
+          s.name?.toLowerCase()
+        );
+        for (const skillName of rootSkills) {
+          if (skillName && !existingSkills.includes(skillName.toLowerCase())) {
+            profile.skills.technical.push({
+              _id: new mongoose.Types.ObjectId(),
+              name: skillName,
+              level: 'intermediate',
+              verified: false,
+            });
+            existingSkills.push(skillName.toLowerCase()); // Add to check list to avoid duplicates in the same run
+          }
+        }
+      }
 
       // Experience (array)
       if (
@@ -139,12 +171,16 @@ class ProfileController {
         aiAnalysis.experience.length > 0
       ) {
         for (const exp of aiAnalysis.experience) {
-          let expType = exp.type || 'internship';
-          if (expType === 'internship') {
+          const expType = exp.type || 'internship';
+          // FIX: Treat 'job' and other types as 'internship' for now to ensure they are saved.
+          // The CandidateProfile model currently only supports 'internships' and 'projects'.
+          if (expType === 'internship' || expType === 'job') {
             if (!profile.experience.internships)
               profile.experience.internships = [];
             const exists = profile.experience.internships.some(
-              e => e.company === exp.company && e.position === exp.position
+              e =>
+                e.company?.trim() === exp.company?.trim() &&
+                e.position?.trim() === exp.position?.trim()
             );
             if (!exists) {
               profile.experience.internships.push({
@@ -160,7 +196,7 @@ class ProfileController {
             }
           } else if (expType === 'project') {
             if (!profile.experience.projects) profile.experience.projects = [];
-            const exists = profile.experience.projects.some(
+            const exists = profile.experience.projects?.some(
               p => p.title === exp.position && p.name === exp.company
             );
             if (!exists) {
