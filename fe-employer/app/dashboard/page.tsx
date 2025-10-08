@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -36,9 +36,12 @@ import {
 import { User, getUserData, getToken, clearUserData } from "@/lib/userStorage";
 import { logoutEmployer } from "@/lib/api";
 import { useRouter } from "next/navigation";
+import VerificationProgress from "@/components/VerificationProgress";
+import { useVerificationContext } from "@/contexts/VerificationContext";
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { refreshVerification } = useVerificationContext();
   const [user, setUser] = useState<User | null>(null);
   const [timeLeft, setTimeLeft] = useState({
     days: 7,
@@ -258,7 +261,90 @@ export default function DashboardPage() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 p-6"></main>
+        <main className="flex-1 p-6">
+          <div className="max-w-6xl mx-auto">
+            {/* Debug: Manual refresh button */}
+            <div className="mb-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={refreshVerification}
+                className="text-xs"
+              >
+                🔄 Refresh Verification Status
+              </Button>
+            </div>
+
+            {/* Verification Progress */}
+            <VerificationProgress />
+
+            {/* Dashboard Content */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Welcome Card */}
+              <Card className="md:col-span-2 lg:col-span-1">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-primary/10 rounded-full">
+                      <BarChart3 className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold">
+                        Chào mừng trở lại!
+                      </h3>
+                      <p className="text-sm text-gray-600">
+                        {user?.fullName || "Employer"}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Quick Stats */}
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600">Tin đã đăng</p>
+                      <p className="text-2xl font-bold">0</p>
+                    </div>
+                    <Briefcase className="w-8 h-8 text-primary" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600">Ứng viên</p>
+                      <p className="text-2xl font-bold">0</p>
+                    </div>
+                    <Users className="w-8 h-8 text-green-500" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Recent Activity */}
+              <Card className="md:col-span-2 lg:col-span-3">
+                <CardHeader>
+                  <CardTitle>Hoạt động gần đây</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-8 text-gray-500">
+                    <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>Chưa có hoạt động nào</p>
+                    <Button
+                      className="mt-4"
+                      onClick={() => router.push("/jobs/create-job")}
+                    >
+                      Tạo tin tuyển dụng đầu tiên
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </main>
       </div>
     </div>
   );
