@@ -17,8 +17,6 @@ import { PageLayout } from "@/components/layout";
 import LazyEducationSection from "@/components/profile/LazyEducationSection";
 import LazyExperienceSection from "@/components/profile/LazyExperienceSection";
 import LazySkillsSection from "@/components/profile/LazySkillsSection";
-import RateLimitToast from "../../components/ui/rate-limit-toast";
-import ApiTestComponent from "@/components/debug/ApiTestComponent";
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -45,7 +43,6 @@ export default function ProfilePage() {
     profileVisible: true,
   });
 
-  const [showRateLimitToast, setShowRateLimitToast] = useState(false);
   const [apiStatus, setApiStatus] = useState<"real" | "mock" | "error">("real");
 
   // Load basic profile data on mount
@@ -90,23 +87,7 @@ export default function ProfilePage() {
       console.log("Profile updated successfully");
     } catch (error: any) {
       console.error("Error updating profile:", error);
-      if (
-        error.message?.includes("429") ||
-        error.message?.includes("Rate limit")
-      ) {
-        setShowRateLimitToast(true);
-      }
     }
-  };
-
-  const handleRetry = () => {
-    setShowRateLimitToast(false);
-    // Retry the last action
-    handleSubmit(new Event("submit") as any);
-  };
-
-  const handleDismissToast = () => {
-    setShowRateLimitToast(false);
   };
 
   if (loading.profile) {
@@ -258,7 +239,7 @@ export default function ProfilePage() {
             {/* Right Column - Profile Content */}
             <div className="lg:col-span-3">
               <Tabs defaultValue="personal" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-5">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger
                     value="personal"
                     className="flex items-center gap-2"
@@ -286,13 +267,6 @@ export default function ProfilePage() {
                   >
                     <User className="w-4 h-4" />
                     Kỹ năng
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="debug"
-                    className="flex items-center gap-2"
-                  >
-                    <Settings className="w-4 h-4" />
-                    Debug
                   </TabsTrigger>
                 </TabsList>
 
@@ -403,22 +377,11 @@ export default function ProfilePage() {
                 <TabsContent value="skills">
                   <LazySkillsSection />
                 </TabsContent>
-
-                <TabsContent value="debug">
-                  <ApiTestComponent />
-                </TabsContent>
               </Tabs>
             </div>
           </div>
         </div>
       </div>
-
-      <RateLimitToast
-        isVisible={showRateLimitToast}
-        onRetry={handleRetry}
-        onDismiss={handleDismissToast}
-        retryAfter={60}
-      />
     </PageLayout>
   );
 }

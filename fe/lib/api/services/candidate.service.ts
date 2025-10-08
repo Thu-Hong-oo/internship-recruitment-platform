@@ -45,25 +45,26 @@ class CandidateService {
     return apiClient.post<CVResponse>(endpoint, formData);
   }
 
-  // Xóa CV khỏi lịch sử
+  // Xóa CV theo ID ("current" hoặc ObjectId)
   async deleteCV(
-    cvIndex: number,
+    cvId: string,
     userId?: string
   ): Promise<{ success: boolean; message: string }> {
     const endpoint = userId
-      ? `/candidates/${userId}/cv/${cvIndex}`
-      : `/candidates/me/cv/${cvIndex}`;
+      ? `/candidates/${userId}/resume/${cvId}`
+      : `/candidates/me/resume/${cvId}`;
     return apiClient.delete(endpoint);
   }
 
   // Đặt CV trong lịch sử làm current
   async setCurrent(
-    cvIndex: number,
-    userId?: string
+    cvId: string
+    // userId?: string
   ): Promise<{ success: boolean; message?: string; current?: any }> {
-    const endpoint = userId
-      ? `/candidates/${userId}/cv/current/${cvIndex}`
-      : `/candidates/me/cv/current/${cvIndex}`;
+    const endpoint = `/candidates/me/resume/set-current/${cvId}`;
+    // const endpoint = userId
+    //   ? `/candidates/${userId}/cv/current/${cvIndex}`
+    //   : `/candidates/me/cv/current/${cvIndex}`;
     return apiClient.put(endpoint);
   }
 
