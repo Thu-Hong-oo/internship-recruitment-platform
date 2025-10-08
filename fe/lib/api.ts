@@ -24,8 +24,7 @@ export interface User {
 export interface RegisterRequest {
   email: string;
   password: string;
-  firstName: string;
-  lastName: string;
+  fullName: string;
   role: "student" | "employer";
 }
 
@@ -641,13 +640,70 @@ export const jobsAPI = new JobsApi();
 export interface CVResponse {
   success: boolean;
   data: {
-    previewUrl: string;
-    downloadUrl: string;
-    filename: string;
-    format: string;
-    updatedAt: string;
-    aiAnalysis: any;
+    // For upload only
+    url?: string;
+    publicId?: string;
+    filename?: string;
+    displayName?: string;
+    format?: string;
+    size?: number;
+    mimeType?: string;
+    uploadedAt?: string;
+
+    // For parse response
+    upload?: {
+      url: string;
+      publicId: string;
+      filename: string;
+      displayName: string;
+      format: string;
+      size: number;
+      mimeType: string;
+      uploadedAt: string;
+    };
+    parsing?: {
+      extractedData?: {
+        personalInfo?: {
+          fullName?: string;
+          email?: string;
+          phone?: string;
+          address?: string;
+          dateOfBirth?: string;
+        };
+        education?: {
+          institution?: string;
+          degree?: string;
+          field?: string;
+          graduationYear?: number;
+          gpa?: number;
+          gradeText?: string;
+        };
+        experience?: Array<{
+          company?: string;
+          position?: string;
+          location?: string;
+          startDate?: string;
+          endDate?: string;
+          description?: string;
+        }>;
+        skills?: {
+          technical?: string[];
+          soft?: string[];
+          languages?: string[];
+        };
+        certifications?: Array<{
+          name?: string;
+          issuer?: string;
+          date?: string;
+        }>;
+      };
+      skills?: string[];
+      suggestions?: string[];
+      analyzedAt?: string;
+      error?: string;
+    };
   };
+  message: string;
 }
 
 export interface CandidateProfile {
@@ -744,6 +800,33 @@ export interface CandidateProfileResponse {
   data: CandidateProfile;
 }
 
+// CV Builder Types
+export interface CVTemplate {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  style: string;
+  colors?: {
+    primary: string;
+    secondary: string;
+    accent: string;
+  };
+  sections: string[];
+}
+
+export interface CVTemplatesResponse {
+  success: boolean;
+  data: {
+    templates: CVTemplate[];
+    groupedTemplates?: {
+      [key: string]: CVTemplate[];
+    };
+    categories: string[];
+    total: number;
+  };
+}
+
 class CandidateCVApi {
   private apiClient: ApiClient;
 
@@ -753,26 +836,58 @@ class CandidateCVApi {
 
   // Lấy profile candidate
   async getProfile(userId?: string): Promise<CandidateProfileResponse> {
-    const endpoint = userId ? `/candidates/${userId}` : '/candidates/me';
+    const endpoint = userId ? `/candidates/${userId}` : "/candidates/me";
     return this.apiClient.get<CandidateProfileResponse>(endpoint);
   }
 
-  // Upload CV
+  // Lấy resume (current + history) với version=all
+  async getResumesAll(): Promise<{
+    success: boolean;
+    data: { current?: any; history?: any[] } | any; // backend returns current when not all
+    message: string;
+  }> {
+    return this.apiClient.get(`/candidates/me/resume?version=all`);
+  }
+
+  // Upload CV (without parsing)
   async uploadCV(formData: FormData, userId?: string): Promise<CVResponse> {
-    const endpoint = userId ? `/candidates/${userId}/cv` : '/candidates/me/cv';
+    const endpoint = userId
+      ? `/candidates/${userId}/resume`
+      : "/candidates/me/resume";
+    // Add action to formData
+    formData.append("action", "upload");
+    return this.apiClient.post<CVResponse>(endpoint, formData);
+  }
+
+  // Upload and Parse CV (with AI parsing)
+  async uploadAndParseCV(
+    formData: FormData,
+    userId?: string
+  ): Promise<CVResponse> {
+    const endpoint = userId
+      ? `/candidates/${userId}/resume`
+      : "/candidates/me/resume";
+    // Add action to formData
+    formData.append("action", "parse");
     return this.apiClient.post<CVResponse>(endpoint, formData);
   }
 
   // Xóa CV khỏi lịch sử
-  async deleteCV(cvIndex: number, userId?: string): Promise<{ success: boolean; message: string }> {
-    const endpoint = userId 
-      ? `/candidates/${userId}/cv/${cvIndex}` 
+  async deleteCV(
+    cvIndex: number,
+    userId?: string
+  ): Promise<{ success: boolean; message: string }> {
+    const endpoint = userId
+      ? `/candidates/${userId}/cv/${cvIndex}`
       : `/candidates/me/cv/${cvIndex}`;
     return this.apiClient.delete(endpoint);
   }
 
   // Đặt CV trong lịch sử làm current
-  async setCurrent(cvIndex: number, userId?: string): Promise<{ success: boolean; message?: string; current?: any }> {
+  async setCurrent(
+    cvIndex: number,
+    userId?: string
+  ): Promise<{ success: boolean; message?: string; current?: any }> {
     const endpoint = userId
       ? `/candidates/${userId}/cv/current/${cvIndex}`
       : `/candidates/me/cv/current/${cvIndex}`;
@@ -780,8 +895,17 @@ class CandidateCVApi {
   }
 
   // Đổi tên CV (current hoặc history)
-  async renameCV(params: { scope: 'current' | 'history'; index?: number; displayName: string }, userId?: string): Promise<{ success: boolean; message?: string }> {
-    const endpoint = userId ? `/candidates/${userId}/cv/rename` : '/candidates/me/cv/rename';
+  async renameCV(
+    params: {
+      scope: "current" | "history";
+      index?: number;
+      displayName: string;
+    },
+    userId?: string
+  ): Promise<{ success: boolean; message?: string }> {
+    const endpoint = userId
+      ? `/candidates/${userId}/cv/rename`
+      : "/candidates/me/cv/rename";
     return this.apiClient.put(endpoint, params);
   }
 
@@ -792,67 +916,158 @@ class CandidateCVApi {
       const endpoint = `/candidates/${userId}/cv/view`;
       const url = `${this.apiClient.getBaseURL()}${endpoint}`;
       const headers: Record<string, string> = {};
-      
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
       if (token) {
         headers.Authorization = `Bearer ${token}`;
       }
-      
-      console.log('Fetching CV for user:', userId, 'from URL:', url)
-      
+
+      console.log("Fetching CV for user:", userId, "from URL:", url);
+
       const response = await fetch(url, {
-        method: 'GET',
+        method: "GET",
         headers,
       });
-      
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const blob = await response.blob();
       return URL.createObjectURL(blob);
     } else {
       // For current user, use frontend proxy route
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
       if (!token) {
-        throw new Error('No authentication token found');
+        throw new Error("No authentication token found");
       }
-      
-      console.log('Fetching CV via proxy route for current user')
-      
-      const response = await fetch(`/api/cv/view?token=${encodeURIComponent(token)}`, {
-        method: 'GET',
-      });
-      
-      console.log('Proxy response status:', response.status)
-      
+
+      console.log("Fetching CV via proxy route for current user");
+
+      const response = await fetch(
+        `/api/cv/view?token=${encodeURIComponent(token)}`,
+        {
+          method: "GET",
+        }
+      );
+
+      console.log("Proxy response status:", response.status);
+
       if (!response.ok) {
-        const errorText = await response.text()
-        console.log('Proxy error response:', errorText)
-        throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+        const errorText = await response.text();
+        console.log("Proxy error response:", errorText);
+        throw new Error(
+          `HTTP error! status: ${response.status} - ${errorText}`
+        );
       }
-      
+
       const blob = await response.blob();
-      console.log('Blob created, size:', blob.size, 'type:', blob.type)
-      
+      console.log("Blob created, size:", blob.size, "type:", blob.type);
+
       const objectUrl = URL.createObjectURL(blob);
-      console.log('Object URL created:', objectUrl.substring(0, 50))
-      
+      console.log("Object URL created:", objectUrl.substring(0, 50));
+
       return objectUrl;
     }
   }
 
   // Lấy phân tích AI của CV
-  async getCVAnalysis(userId?: string): Promise<{ success: boolean; data: any }> {
-    const endpoint = userId 
-      ? `/candidates/${userId}/cv/analysis` 
-      : '/candidates/me/cv/analysis';
+  async getCVAnalysis(
+    userId?: string
+  ): Promise<{ success: boolean; data: any }> {
+    const endpoint = userId
+      ? `/candidates/${userId}/cv/analysis`
+      : "/candidates/me/cv/analysis";
     return this.apiClient.get(endpoint);
   }
 
+  // CV Builder Methods
+  async getTemplates(
+    category?: string,
+    style?: string
+  ): Promise<CVTemplatesResponse> {
+    const params = new URLSearchParams();
+    if (category) params.append("category", category);
+    if (style) params.append("style", style);
+
+    const queryString = params.toString();
+    const endpoint = `/candidates/me/cv-builder/templates${
+      queryString ? `?${queryString}` : ""
+    }`;
+    return this.apiClient.get<CVTemplatesResponse>(endpoint);
+  }
+
+  async generateCV(data: {
+    template: string;
+    customization?: {
+      colors?: {
+        primary?: string;
+        secondary?: string;
+        accent?: string;
+      };
+      fonts?: {
+        heading?: string;
+        body?: string;
+      };
+      layout?: string;
+    };
+    sections?: string[];
+    targetJob?: string;
+    jobDescription?: string;
+    companyInfo?: {
+      name?: string;
+      industry?: string;
+    };
+    format?: string;
+    setAsCurrent?: boolean;
+  }): Promise<{ success: boolean; data: { url: string; filename: string } }> {
+    return this.apiClient.post("/candidates/me/cv-builder/generate", data);
+  }
+
+  async analyzeJob(data: {
+    jobDescription: string;
+    targetJob: string;
+    companyInfo?: {
+      name?: string;
+      industry?: string;
+      size?: string;
+    };
+  }): Promise<{
+    success: boolean;
+    data: { recommendations: any; matchAnalysis: any };
+  }> {
+    return this.apiClient.post("/candidates/me/cv-builder/analyze-job", data);
+  }
+
+  async exportPDF(data: {
+    cvUrl: string;
+    template: string;
+    pdfOptions?: {
+      format?: string;
+      printBackground?: boolean;
+      margin?: {
+        top?: string;
+        right?: string;
+        bottom?: string;
+        left?: string;
+      };
+    };
+    filename?: string;
+  }): Promise<{
+    success: boolean;
+    data: { pdf: { url: string }; entry: any };
+  }> {
+    return this.apiClient.post("/candidates/me/cv-builder/export-pdf", data);
+  }
+
   // Cập nhật profile
-  async updateProfile(data: Partial<CandidateProfile>, userId?: string): Promise<CandidateProfileResponse> {
-    const endpoint = userId ? `/candidates/${userId}` : '/candidates/me';
+  async updateProfile(
+    data: Partial<CandidateProfile>,
+    userId?: string
+  ): Promise<CandidateProfileResponse> {
+    const endpoint = userId ? `/candidates/${userId}` : "/candidates/me";
     return this.apiClient.put<CandidateProfileResponse>(endpoint, data);
   }
 }
@@ -864,5 +1079,5 @@ export const api = {
   candidateCV: candidateCVAPI,
   jobs: jobsAPI,
   auth: authAPI,
-  client: apiClient
+  client: apiClient,
 };

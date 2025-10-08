@@ -32,9 +32,11 @@ import {
   uploadCompanyCoverImage,
   CompanyFormData,
 } from "@/lib/companyAPI";
+import { useVerificationContext } from "@/contexts/VerificationContext";
 
 export default function CompanyPage() {
   const router = useRouter();
+  const { refreshVerification } = useVerificationContext();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -375,6 +377,8 @@ export default function CompanyPage() {
 
       if (result.success) {
         setSuccess(result.message || "Cập nhật thông tin công ty thành công");
+        // Refresh verification status after successful update
+        refreshVerification();
       } else {
         setError(result.error || "Cập nhật thất bại");
       }

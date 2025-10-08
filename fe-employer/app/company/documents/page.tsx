@@ -27,6 +27,7 @@ import {
   type UploadedDocument,
   type DocumentTypesResponse,
 } from "@/lib/documentAPI";
+import { useVerificationContext } from "@/contexts/VerificationContext";
 
 interface DocState {
   document: File | null;
@@ -40,6 +41,7 @@ interface DocState {
 
 export default function DocumentsPage() {
   const router = useRouter();
+  const { refreshVerification } = useVerificationContext();
 
   const [documentTypes, setDocumentTypes] =
     useState<DocumentTypesResponse | null>(null);
@@ -129,6 +131,8 @@ export default function DocumentsPage() {
         // Reload document types to get updated data
         const updatedData = await getDocumentTypes();
         setDocumentTypes(updatedData);
+        // Refresh verification status
+        refreshVerification();
         // Reset form
         setUploadForm((prev) => ({
           ...prev,
@@ -190,6 +194,8 @@ export default function DocumentsPage() {
         // Reload document types to get updated data
         const updatedData = await getDocumentTypes();
         setDocumentTypes(updatedData);
+        // Refresh verification status
+        refreshVerification();
         // Reset form and exit update mode
         setUploadForm((prev) => ({
           ...prev,
@@ -233,6 +239,8 @@ export default function DocumentsPage() {
         // Reload document types to get updated data
         const updatedData = await getDocumentTypes();
         setDocumentTypes(updatedData);
+        // Refresh verification status
+        refreshVerification();
       } else {
         setError(result.error || "Xóa thất bại");
       }
