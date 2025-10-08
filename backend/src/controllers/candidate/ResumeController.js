@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const CandidateProfile = require('../../models/CandidateProfile');
 const uploadService = require('../../services/unifiedUploadService');
+const ProfileController = require('./ProfileController'); // Import ProfileController
 const aiService = require('../../services/aiService');
 const { ApiResponse } = require('../../utils/responseHandler');
 const { AppError } = require('../../utils/errors');
@@ -759,6 +760,15 @@ class ResumeController {
     });
 
     await this._updateResumeInProfile(profile, newResumeEntry, true, true);
+
+    // *** FIX: Auto-fill profile after parsing ***
+    if (parseResult && parseResult.extractedData) {
+      console.log('🚀 Triggering profile auto-fill from parsed data...');
+      const profileController = new ProfileController();
+      // Pass the profile object directly to be updated
+      await profileController.mapParsedCVToProfile(profile);
+      console.log('✅ Profile auto-fill process completed.');
+    }
 
     return ApiResponse.success(
       res,
