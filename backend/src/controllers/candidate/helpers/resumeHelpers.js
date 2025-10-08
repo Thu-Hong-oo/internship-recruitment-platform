@@ -21,7 +21,13 @@ class ResumeHelpers {
           profile.personalInfo.phone = phone;
         }
         if (address && !profile.personalInfo.address) {
-          profile.personalInfo.address = address;
+          // Validate address is not empty string before setting
+          if (typeof address === 'string' && address.trim() !== '') {
+            profile.personalInfo.address = address;
+          } else if (typeof address === 'object' && address !== null) {
+            profile.personalInfo.address = address;
+          }
+          // Skip if address is empty string to prevent MongoDB error
         }
       }
 

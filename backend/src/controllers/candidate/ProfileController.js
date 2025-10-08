@@ -78,8 +78,15 @@ class ProfileController {
           profile.personalInfo.email = email;
         if (phone && !profile.personalInfo.phone)
           profile.personalInfo.phone = phone;
-        if (address && !profile.personalInfo.address)
-          profile.personalInfo.address = address;
+        if (address && !profile.personalInfo.address) {
+          // Validate address is not empty string before setting
+          if (typeof address === 'string' && address.trim() !== '') {
+            profile.personalInfo.address = address;
+          } else if (typeof address === 'object' && address !== null) {
+            profile.personalInfo.address = address;
+          }
+          // Skip if address is empty string to prevent MongoDB error
+        }
         if (dateOfBirth && !profile.personalInfo.dateOfBirth)
           profile.personalInfo.dateOfBirth = dateOfBirth;
       }
@@ -293,7 +300,7 @@ class ProfileController {
             fullName: req.user.fullName || '',
             email: req.user.email || '',
             phone: '',
-            address: '',
+            address: null,
             dateOfBirth: null,
             gender: '',
             avatar: req.user.avatar || null,

@@ -52,6 +52,37 @@ class ResumeController {
       });
       await profile.save();
       console.log(`✅ Created candidate profile for user: ${userId}`);
+    } else {
+      // Fix address field if it's corrupted (string instead of object)
+      if (profile.personalInfo && profile.personalInfo.address !== undefined) {
+        if (typeof profile.personalInfo.address === 'string') {
+          console.log('🔧 Fixing corrupted address field in existing profile');
+          const addressString = profile.personalInfo.address;
+
+          if (addressString === '') {
+            // Empty string - set to null
+            profile.personalInfo.address = null;
+          } else {
+            // Non-empty string - convert to object
+            profile.personalInfo.address = {
+              street: '',
+              ward: '',
+              district: '',
+              city: addressString,
+              country: 'Vietnam',
+            };
+          }
+
+          try {
+            await profile.save();
+            console.log('✅ Address field fixed successfully');
+          } catch (error) {
+            console.error('❌ Failed to fix address field:', error.message);
+            // If save fails, set address to null to prevent further errors
+            profile.personalInfo.address = null;
+          }
+        }
+      }
     }
     return profile;
   }
@@ -95,58 +126,106 @@ class ResumeController {
     shouldUpdateHistory = true,
     shouldDeleteOldFile = true
   ) {
-    // 1. Add old current resume to history
-    if (
-      shouldUpdateHistory &&
-      profile.resume.current &&
-      profile.resume.current.url
-    ) {
-      if (!profile.resume.history) profile.resume.history = [];
-      profile.resume.history.push({
-        ...profile.resume.current,
-        _id: new mongoose.Types.ObjectId(), // Ensure new history item has a unique ID
-        uploadedAt: profile.resume.current.updatedAt || new Date(),
-      });
-    }
-
-    // 2. Delete old file from Cloudinary
-    if (shouldDeleteOldFile && profile.resume.current.publicId) {
-      try {
-        console.log('🗑️ Deleting old resume from Cloudinary...');
-        await uploadService.deleteFile(profile.resume.current.publicId);
-        console.log('✅ Old resume deleted');
-      } catch (deleteError) {
-        console.warn('⚠️ Failed to delete old resume:', deleteError.message);
+    try {
+      // 1. Add old current resume to history
+      if (
+        shouldUpdateHistory &&
+        profile.resume.current &&
+        profile.resume.current.url
+      ) {
+        if (!profile.resume.history) profile.resume.history = [];
+        profile.resume.history.push({
+          ...profile.resume.current,
+          _id: new mongoose.Types.ObjectId(), // Ensure new history item has a unique ID
+          uploadedAt: profile.resume.current.updatedAt || new Date(),
+        });
       }
+
+      // 2. Delete old file from Cloudinary
+      if (shouldDeleteOldFile && profile.resume.current.publicId) {
+        try {
+          console.log('🗑️ Deleting old resume from Cloudinary...');
+          await uploadService.deleteFile(profile.resume.current.publicId);
+          console.log('✅ Old resume deleted');
+        } catch (deleteError) {
+          console.warn('⚠️ Failed to delete old resume:', deleteError.message);
+        }
+      }
+
+      // 3. Fix address field if it's a string but code expects object
+      if (profile.personalInfo && profile.personalInfo.address !== undefined) {
+        if (typeof profile.personalInfo.address === 'string') {
+          console.log(
+            '🔧 Converting address string to object to prevent MongoDB error'
+          );
+          const addressString = profile.personalInfo.address;
+
+          if (addressString === '') {
+            // Empty string - set to null to avoid MongoDB error
+            profile.personalInfo.address = null;
+          } else {
+            // Non-empty string - convert to object
+            profile.personalInfo.address = {
+              street: '',
+              ward: '',
+              district: '',
+              city: addressString,
+              country: 'Vietnam',
+            };
+          }
+        }
+      }
+
+      // 4. Set the new resume as current
+      profile.resume.current = {
+        ...newResumeData,
+        updatedAt: new Date(),
+      };
+
+      // 5. Update analytics
+      if (!profile.analytics) profile.analytics = {};
+      if (!profile.analytics.resumeStats)
+        profile.analytics.resumeStats = { uploads: 0, lastUpload: null };
+      profile.analytics.resumeStats.uploads += 1;
+      profile.analytics.resumeStats.lastUpload = new Date();
+
+      return profile.save();
+    } catch (error) {
+      console.error('❌ Error in _updateResumeInProfile:', error);
+      throw error;
     }
-
-    // 3. Set the new resume as current
-    profile.resume.current = {
-      ...newResumeData,
-      updatedAt: new Date(),
-    };
-
-    // 4. Update analytics
-    if (!profile.analytics) profile.analytics = {};
-    if (!profile.analytics.resumeStats)
-      profile.analytics.resumeStats = { uploads: 0, lastUpload: null };
-    profile.analytics.resumeStats.uploads += 1;
-    profile.analytics.resumeStats.lastUpload = new Date();
-
-    return profile.save();
   }
 
   /**
    * Helper: Format address
-   * @param {Object|string} address - Address object or string
+   * @param {Object|string|null} address - Address object or string
    * @returns {string} Formatted address
    */
   formatAddress(address) {
-    if (!address) return 'N/A';
+    if (!address || address === '' || address === null) return 'N/A';
+
+    // If address is string, return as is
     if (typeof address === 'string') return address;
 
-    const { street, ward, district, city, country } = address;
-    return [street, ward, district, city, country].filter(Boolean).join(', ');
+    // If address is object but empty, return N/A
+    if (typeof address === 'object' && Object.keys(address).length === 0)
+      return 'N/A';
+
+    try {
+      const { street, ward, district, city, country } = address;
+      const addressParts = [street, ward, district, city, country].filter(
+        Boolean
+      );
+      return addressParts.length > 0 ? addressParts.join(', ') : 'N/A';
+    } catch (error) {
+      console.warn(
+        '⚠️ Error formatting address:',
+        error.message,
+        'Address:',
+        address
+      );
+      return 'N/A';
+    }
   }
 
   // ============================================
