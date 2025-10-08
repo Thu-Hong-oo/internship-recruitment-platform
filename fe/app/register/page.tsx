@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
-import { splitFullName, validateEmail, validatePassword } from "@/lib/utils";
+import { validateEmail, validatePassword } from "@/lib/utils";
 import { authAPI } from "@/lib/api";
 
 export default function RegisterPage() {
@@ -120,14 +120,11 @@ export default function RegisterPage() {
     setSuccess("");
 
     try {
-      const { firstName, lastName } = splitFullName(formData.fullName);
-
       const response = await register({
         email: formData.email,
         password: formData.password,
-        firstName,
-        lastName,
-        role: "student", // Default role for registration
+        fullName: formData.fullName,
+        role: "candidate", // Default role for registration
       });
 
       if (response.success) {

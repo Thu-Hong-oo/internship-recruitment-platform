@@ -37,7 +37,6 @@ import { truncate } from "fs/promises";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { getUserAvatar } from "@/lib/api";
-import { useSession, signOut } from "next-auth/react";
 
 // Custom hook để quản lý dropdown
 const useDropdown = (delay = 150) => {
@@ -74,7 +73,6 @@ export default function Header() {
   const { resolvedTheme, setTheme } = useTheme();
   const router = useRouter();
   const { user, loading, logout } = useAuth();
-  const { data: session, status } = useSession();
 
   // Sử dụng custom hook cho 2 dropdowns
   const jobsDropdown = useDropdown(150);
@@ -409,7 +407,7 @@ export default function Header() {
                 <div className="w-5 h-5 bg-muted animate-pulse rounded"></div>
                 <div className="w-8 h-8 bg-muted animate-pulse rounded-full"></div>
               </div>
-            ) : session?.user || user ? (
+            ) : user ? (
               // UI khi đã đăng nhập
               <>
                 <Bell className="w-5 h-5 text-muted-foreground hover:text-primary cursor-pointer transition-colors duration-200" />
@@ -420,7 +418,6 @@ export default function Header() {
                         <Avatar>
                           <AvatarImage
                             src={
-                              (session?.user?.image as string | undefined) ||
                               (user ? getUserAvatar(user) : undefined) ||
                               "/placeholder-user.jpg"
                             }
@@ -428,8 +425,7 @@ export default function Header() {
                             referrerPolicy="no-referrer"
                           />
                           <AvatarFallback>
-                            {(session?.user?.name?.[0] as string | undefined) ||
-                              user?.firstName?.[0]}
+                            {user?.firstName?.[0]}
                             {user?.lastName?.[0]}
                           </AvatarFallback>
                         </Avatar>
@@ -440,7 +436,6 @@ export default function Header() {
                         <Avatar>
                           <AvatarImage
                             src={
-                              (session?.user?.image as string | undefined) ||
                               (user ? getUserAvatar(user) : undefined) ||
                               "/placeholder-user.jpg"
                             }
@@ -448,28 +443,24 @@ export default function Header() {
                             referrerPolicy="no-referrer"
                           />
                           <AvatarFallback>
-                            {(session?.user?.name?.[0] as string | undefined) ||
-                              user?.firstName?.[0]}
+                            {user?.firstName?.[0]}
                             {user?.lastName?.[0]}
                           </AvatarFallback>
                         </Avatar>
                         <div>
                           <div className="font-semibold text-foreground">
-                            {session?.user?.name ||
-                              user?.fullName ||
+                            {user?.fullName ||
                               `${user?.firstName ?? ""} ${
                                 user?.lastName ?? ""
                               }`}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {session?.user
-                              ? "Đăng nhập bằng Google (đã xác thực)"
-                              : user?.isEmailVerified
+                            {user?.isEmailVerified
                               ? "Tài khoản đã xác thực"
                               : "Chưa xác thực email"}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {session?.user?.email || user?.email}
+                            {user?.email}
                           </div>
                         </div>
                       </div>
@@ -521,9 +512,7 @@ export default function Header() {
                             <AccordionContent className="pt-1 pb-2">
                               <div className="space-y-1 text-sm text-muted-foreground">
                                 <Link
-
                                   href="/my-cv"
-
                                   className="flex items-center rounded-md px-2 py-2 hover:bg-muted hover:text-foreground"
                                 >
                                   <span>CV của tôi</span>
@@ -587,12 +576,8 @@ export default function Header() {
                             className="group w-full flex items-center justify-center gap-2 rounded-full bg-muted text-foreground hover:bg-muted/80 active:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none shadow-sm hover:shadow transition-all py-3 active:scale-[0.98]"
                             aria-label="Đăng xuất"
                             onClick={() => {
-                              if (session?.user) {
-                                signOut({ callbackUrl: "/login" });
-                              } else {
-                                logout();
-                                router.push("/login");
-                              }
+                              logout();
+                              router.push("/login");
                             }}
                           >
                             <LogOut className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
