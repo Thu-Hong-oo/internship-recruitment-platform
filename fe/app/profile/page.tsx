@@ -12,7 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLazyProfile } from "@/hooks/useLazyProfile";
 import { useMockProfile } from "@/hooks/useMockProfile";
 import AvatarUpload from "@/components/AvatarUpload";
-import { getUserAvatar } from "@/lib/api";
+import { getUserAvatar, api } from "@/lib/api";
 import { PageLayout } from "@/components/layout";
 import LazyEducationSection from "@/components/profile/LazyEducationSection";
 import LazyExperienceSection from "@/components/profile/LazyExperienceSection";
@@ -51,6 +51,18 @@ export default function ProfilePage() {
       try {
         await fetchProfile(["progress", "settings"]); // Only load essential data
         setApiStatus("real");
+
+        // Prefill personal info with lib service mapping
+        const basic = await api.candidateCV.getMeBasic();
+        if (basic?.success && basic.data) {
+          setFormData((prev) => ({
+            ...prev,
+            fullName: basic.data.fullName || prev.fullName,
+            phone: basic.data.phone || prev.phone,
+            email: basic.data.email || prev.email,
+            bio: prev.bio,
+          }));
+        }
       } catch (error) {
         console.error("Real API failed, using mock data:", error);
         setApiStatus("mock");
