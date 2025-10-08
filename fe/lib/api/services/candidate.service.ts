@@ -82,68 +82,35 @@ class CandidateService {
     return apiClient.put(endpoint, params);
   }
 
-  // Xem CV trực tiếp - sử dụng proxy route để tránh CORS và security issues
-  async getCVViewUrl(userId?: string): Promise<string> {
-    if (userId) {
-      // For other users, use direct backend endpoint
-      const endpoint = `/candidates/${userId}/cv/view`;
-      const url = `${apiClient.getBaseURL()}${endpoint}`;
-      const headers: Record<string, string> = {};
+  // Xem CV trực tiếp - gọi thẳng backend với Bearer token và trả về Object URL
+  async getCVObjectUrl(cvId?: string): Promise<string> {
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (!token) throw new Error("No authentication token found");
 
-      const token =
-        typeof window !== "undefined" ? localStorage.getItem("token") : null;
-      if (token) {
-        headers.Authorization = `Bearer ${token}`;
-      }
+    const base = apiClient.getBaseURL();
+    const endpoint = cvId
+      ? `${base}/candidates/me/resume/view/${cvId}`
+      : `${base}/candidates/me/resume/view`;
 
-      console.log("Fetching CV for user:", userId, "from URL:", url);
-
-      const response = await fetch(url, {
-        method: "GET",
-        headers,
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const blob = await response.blob();
-      return URL.createObjectURL(blob);
-    } else {
-      // For current user, use frontend proxy route
-      const token =
-        typeof window !== "undefined" ? localStorage.getItem("token") : null;
-      if (!token) {
-        throw new Error("No authentication token found");
-      }
-
-      console.log("Fetching CV via proxy route for current user");
-
-      const response = await fetch(
-        `/api/cv/view?token=${encodeURIComponent(token)}`,
-        {
-          method: "GET",
-        }
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      throw new Error(
+        `HTTP ${response.status} ${response.statusText} ${errorText}`.trim()
       );
-
-      console.log("Proxy response status:", response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.log("Proxy error response:", errorText);
-        throw new Error(
-          `HTTP error! status: ${response.status} - ${errorText}`
-        );
-      }
-
-      const blob = await response.blob();
-      console.log("Blob created, size:", blob.size, "type:", blob.type);
-
-      const objectUrl = URL.createObjectURL(blob);
-      console.log("Object URL created:", objectUrl.substring(0, 50));
-
-      return objectUrl;
     }
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  }
+
+  // Helper: mở CV tab mới (current hoặc theo id)
+  async openCVInNewTab(cvId?: string): Promise<void> {
+    const objectUrl = await this.getCVObjectUrl(cvId);
+    window.open(objectUrl, "_blank");
   }
 
   // Lấy phân tích AI của CV

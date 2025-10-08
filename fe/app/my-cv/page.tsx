@@ -40,6 +40,7 @@ import {
   X,
 } from "lucide-react";
 import { api, type CandidateProfile } from "@/lib/api";
+import { apiClient } from "@/lib/api/client";
 import PageLayout from "@/components/layout/page-layout";
 import UploadCVModal from "@/components/cv/UploadCVModal";
 
@@ -230,63 +231,101 @@ export default function CVManagementPage() {
     }
   };
 
-  const handleViewCurrentCV = () => {
-    const token =
-      typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    const viewUrl = token
-      ? `/api/cv/view?token=${encodeURIComponent(token)}`
-      : "/api/cv/view";
-    setPreviewUrl(viewUrl);
-    setShowPreview(true);
-  };
-
-  const handleViewHistoryCV = (cvIndex: number) => {
-    const token =
-      typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    if (!token) {
-      setError("Không tìm thấy token xác thực");
-      return;
-    }
-
-    // Get the CV ID from history array
-    const cvId = profile?.resume?.history?.[cvIndex]?._id;
-    if (!cvId) {
-      setError("Không tìm thấy CV trong lịch sử");
-      return;
-    }
-
-    const backendEndpoint = `/api/cv/view/${cvId}?token=${encodeURIComponent(
-      token
-    )}`;
-    setPreviewUrl(backendEndpoint);
-    setShowPreview(true);
-  };
-
-  const openHistoryInNewTab = (cvIndex: number, url?: string) => {
-    const token =
-      typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    if (token) {
-      // Get the CV ID from history array
-      const cvId = profile?.resume?.history?.[cvIndex]?._id;
-      if (cvId) {
-        const backendEndpoint = `/api/cv/view/${cvId}?token=${encodeURIComponent(
-          token
-        )}`;
-        window.open(backendEndpoint, "_blank");
+  const handleViewCurrentCV = async () => {
+    try {
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      if (!token) {
+        setError("Không tìm thấy token xác thực");
         return;
       }
-    }
 
-    if (url) {
-      const normalized = url.replace(/\\/g, "/");
-      const absolute = normalized.startsWith("http")
-        ? normalized
-        : `${window.location.origin}/${normalized.replace(/^\//, "")}`;
-      window.open(absolute, "_blank");
-      return;
+      const url = `${apiClient.getBaseURL()}/candidates/me/resume/view`;
+      const res = await fetch(url, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`${res.status} ${txt}`);
+      }
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      setPreviewUrl(objectUrl);
+      setShowPreview(true);
+    } catch (e: any) {
+      setError(e?.message || "Không thể xem CV hiện tại");
     }
+  };
 
-    setError("Không thể mở CV, vui lòng thử lại");
+  const handleViewHistoryCV = async (cvIndex: number) => {
+    try {
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      if (!token) {
+        setError("Không tìm thấy token xác thực");
+        return;
+      }
+
+      const cvId = (profile as any)?.resume?.history?.[cvIndex]?._id;
+      if (!cvId) {
+        setError("Không tìm thấy CV trong lịch sử");
+        return;
+      }
+
+      const url = `${apiClient.getBaseURL()}/candidates/me/resume/view/${cvId}`;
+      const res = await fetch(url, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`${res.status} ${txt}`);
+      }
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      setPreviewUrl(objectUrl);
+      setShowPreview(true);
+    } catch (e: any) {
+      setError(e?.message || "Không thể xem CV lịch sử");
+    }
+  };
+
+  const openHistoryInNewTab = async (cvIndex: number, url?: string) => {
+    try {
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const cvId = (profile as any)?.resume?.history?.[cvIndex]?._id;
+
+      if (token && cvId) {
+        const endpoint = `${apiClient.getBaseURL()}/candidates/me/resume/view/${cvId}`;
+        const res = await fetch(endpoint, {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(`${res.status} ${txt}`);
+        }
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        window.open(objectUrl, "_blank");
+        return;
+      }
+
+      if (url) {
+        const normalized = url.replace(/\\/g, "/");
+        const absolute = normalized.startsWith("http")
+          ? normalized
+          : `${window.location.origin}/${normalized.replace(/^\//, "")}`;
+        window.open(absolute, "_blank");
+        return;
+      }
+
+      setError("Không thể mở CV, vui lòng thử lại");
+    } catch (e: any) {
+      setError(e?.message || "Không thể mở CV");
+    }
   };
 
   const closePreview = () => {
@@ -545,14 +584,28 @@ export default function CVManagementPage() {
                           Đổi tên
                         </Button>
                         <Button
-                          onClick={() => {
-                            const token = localStorage.getItem("token");
-                            if (token) {
-                              window.open(
-                                `/api/cv/view?token=${encodeURIComponent(
-                                  token
-                                )}`,
-                                "_blank"
+                          onClick={async () => {
+                            try {
+                              const token = localStorage.getItem("token");
+                              if (!token) {
+                                setError("Không tìm thấy token xác thực");
+                                return;
+                              }
+                              const endpoint = `${apiClient.getBaseURL()}/candidates/me/resume/view`;
+                              const res = await fetch(endpoint, {
+                                method: "GET",
+                                headers: { Authorization: `Bearer ${token}` },
+                              });
+                              if (!res.ok) {
+                                const txt = await res.text();
+                                throw new Error(`${res.status} ${txt}`);
+                              }
+                              const blob = await res.blob();
+                              const objectUrl = URL.createObjectURL(blob);
+                              window.open(objectUrl, "_blank");
+                            } catch (e: any) {
+                              setError(
+                                e?.message || "Không thể mở CV hiện tại"
                               );
                             }
                           }}
@@ -631,20 +684,32 @@ export default function CVManagementPage() {
                         </Button>
                         <div className="flex gap-2">
                           <Button
-                            onClick={() => {
-                              const token = localStorage.getItem("token");
-                              if (token) {
-                                const cvId = (cv as any)._id;
-                                if (cvId) {
-                                  const downloadUrl = `/api/cv/view/${cvId}?token=${encodeURIComponent(
-                                    token
-                                  )}`;
-                                  window.open(downloadUrl, "_blank");
-                                } else {
-                                  setError("Không tìm thấy ID của CV");
+                            onClick={async () => {
+                              try {
+                                const token = localStorage.getItem("token");
+                                if (!token) {
+                                  setError("Không tìm thấy token xác thực");
+                                  return;
                                 }
-                              } else {
-                                setError("Không tìm thấy token xác thực");
+                                const cvId = (cv as any)._id;
+                                if (!cvId) {
+                                  setError("Không tìm thấy ID của CV");
+                                  return;
+                                }
+                                const endpoint = `${apiClient.getBaseURL()}/candidates/me/resume/view/${cvId}`;
+                                const res = await fetch(endpoint, {
+                                  method: "GET",
+                                  headers: { Authorization: `Bearer ${token}` },
+                                });
+                                if (!res.ok) {
+                                  const txt = await res.text();
+                                  throw new Error(`${res.status} ${txt}`);
+                                }
+                                const blob = await res.blob();
+                                const objectUrl = URL.createObjectURL(blob);
+                                window.open(objectUrl, "_blank");
+                              } catch (e: any) {
+                                setError(e?.message || "Không thể tải CV");
                               }
                             }}
                             variant="outline"
