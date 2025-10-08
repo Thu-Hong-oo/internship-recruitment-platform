@@ -447,6 +447,15 @@ LƯU Ý QUAN TRỌNG:
           return this.fallbackParseResume();
         }
 
+        // Fix address field if it's empty string (prevent MongoDB error)
+        if (
+          parsedData.extractedData.personalInfo &&
+          parsedData.extractedData.personalInfo.address === ''
+        ) {
+          console.log('🔧 Fixing empty address string from AI response');
+          parsedData.extractedData.personalInfo.address = null;
+        }
+
         // Log extracted info
         console.log('✅ Successfully parsed CV with Gemini');
         console.log(
@@ -752,7 +761,12 @@ QUY TẮC:
     const addressMatch = text.match(
       /([\w\s,]+(?:Hồ Chí Minh|HCM|TP\.HCM|HCMC|Hà Nội|Đà Nẵng|Cần Thơ|Biên Hòa|Nha Trang|Huế|Phường|Quận|District)[\w\s,]*)/i
     );
-    if (addressMatch) info.address = addressMatch[1].trim();
+    if (addressMatch && addressMatch[1].trim() !== '') {
+      info.address = addressMatch[1].trim();
+    } else {
+      // Prevent empty address string that causes MongoDB error
+      info.address = null;
+    }
 
     return info;
   }
