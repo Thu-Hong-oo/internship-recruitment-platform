@@ -119,6 +119,7 @@ const CandidateProfileSchema = new mongoose.Schema(
       technical: [
         {
           _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
+          skillId: { type: mongoose.Schema.Types.ObjectId, ref: 'Skill' },
           name: String,
           level: { type: String, enum: Object.values(SKILL_LEVELS) },
           verified: {
@@ -138,6 +139,7 @@ const CandidateProfileSchema = new mongoose.Schema(
       soft: [
         {
           _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
+          skillId: { type: mongoose.Schema.Types.ObjectId, ref: 'Skill' },
           name: String,
           level: { type: String, enum: Object.values(SKILL_LEVELS) },
           selfAssessment: { type: Number, min: 1, max: 5 },
@@ -223,6 +225,7 @@ const CandidateProfileSchema = new mongoose.Schema(
         size: Number,
         mimeType: String,
         updatedAt: Date,
+        uploadedAt: Date,
         aiAnalysis: {
           // Extracted raw data from resume
           extractedData: mongoose.Schema.Types.Mixed,
@@ -324,6 +327,8 @@ const CandidateProfileSchema = new mongoose.Schema(
 CandidateProfileSchema.index({ userId: 1 });
 CandidateProfileSchema.index({ 'education.university.name': 1 });
 CandidateProfileSchema.index({ 'skills.technical.name': 1 });
+CandidateProfileSchema.index({ 'skills.technical.skillId': 1 });
+CandidateProfileSchema.index({ 'skills.soft.skillId': 1 });
 CandidateProfileSchema.index({ 'preferences.locations': 1 });
 CandidateProfileSchema.index({ 'analytics.viewCount': -1 });
 
