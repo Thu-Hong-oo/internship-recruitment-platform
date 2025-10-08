@@ -193,21 +193,54 @@ class UnifiedUploadService {
    * @returns {Promise<Object>} Cloudinary result
    */
   async performUpload(file, config) {
+    // Add timeout to config
+    const configWithTimeout = {
+      ...config,
+      timeout: 240000, // 4 minutes timeout
+    };
+
     if (file.buffer) {
-      // Upload from buffer (memory storage)
+      // Upload from buffer (memory storage) with timeout
       return new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+          reject(new Error('Cloudinary upload timeout after 4 minutes'));
+        }, 240000);
+
         const uploadStream = cloudinary.uploader.upload_stream(
-          config,
+          configWithTimeout,
           (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
+            clearTimeout(timeoutId);
+            if (error) {
+              logger.error('Cloudinary upload error', {
+                error: error.message,
+                file: file.originalname,
+                size: file.size,
+              });
+              reject(error);
+            } else {
+              logger.info('Cloudinary upload success', {
+                publicId: result.public_id,
+                file: file.originalname,
+                size: result.bytes,
+              });
+              resolve(result);
+            }
           }
         );
         uploadStream.end(file.buffer);
       });
     } else if (file.path) {
-      // Upload from file path (disk storage)
-      return cloudinary.uploader.upload(file.path, config);
+      // Upload from file path (disk storage) with timeout
+      return Promise.race([
+        cloudinary.uploader.upload(file.path, configWithTimeout),
+        new Promise((_, reject) =>
+          setTimeout(
+            () =>
+              reject(new Error('Cloudinary upload timeout after 4 minutes')),
+            240000
+          )
+        ),
+      ]);
     } else {
       throw new Error('File must have either buffer or path property');
     }
