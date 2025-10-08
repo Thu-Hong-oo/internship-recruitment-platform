@@ -421,4 +421,34 @@ CandidateProfileSchema.virtual('experienceYears').get(function () {
   return Math.round((totalDays / 365) * 10) / 10; // Round to 1 decimal
 });
 
+// Pre-save hook to fix address field type issues
+CandidateProfileSchema.pre('save', function (next) {
+  // Fix address field if it's a string (prevent MongoDB error)
+  if (this.personalInfo && this.personalInfo.address !== undefined) {
+    if (typeof this.personalInfo.address === 'string') {
+      console.log(
+        '🔧 Pre-save: Converting address string to prevent MongoDB error'
+      );
+      const addressString = this.personalInfo.address;
+
+      if (addressString === '') {
+        // Empty string - set to null to avoid MongoDB error
+        this.personalInfo.address = null;
+        console.log('   → Empty string converted to null');
+      } else {
+        // Non-empty string - convert to object
+        this.personalInfo.address = {
+          street: '',
+          ward: '',
+          district: '',
+          city: addressString,
+          country: 'Vietnam',
+        };
+        console.log(`   → String "${addressString}" converted to object`);
+      }
+    }
+  }
+  next();
+});
+
 module.exports = mongoose.model('CandidateProfile', CandidateProfileSchema);
