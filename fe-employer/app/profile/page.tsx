@@ -17,6 +17,7 @@ import { ArrowLeft, Save, User, Building, Edit3 } from "lucide-react";
 import { User as UserType, getUserData, getToken } from "@/lib/userStorage";
 import { EMPLOYER_LEVEL_LABEL } from "@/lib/labels";
 import { getEmployerProfile } from "@/lib/api";
+import { useVerificationContext } from "@/contexts/VerificationContext";
 
 interface ProfileData {
   contact: {
@@ -33,6 +34,7 @@ interface ProfileData {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { refreshVerification } = useVerificationContext();
   const [user, setUser] = useState<UserType | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -158,6 +160,8 @@ export default function ProfilePage() {
 
       if (data.success) {
         setSuccess("Cập nhật thông tin thành công!");
+        // Refresh verification status
+        refreshVerification();
         // Update user data in localStorage if needed
         if (data.user) {
           // You might want to update the user data here

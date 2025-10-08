@@ -9,9 +9,8 @@ interface AuthContextType {
   register: (data: {
     email: string;
     password: string;
-    firstName: string;
-    lastName: string;
-    role: "student" | "employer";
+    fullName: string;
+    role: "candidate";
   }) => Promise<AuthResponse>; // trả về AuthResponse từ api
   login: (email: string, password: string) => Promise<AuthResponse>;
   logout: () => void;
@@ -55,8 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (data: {
     email: string;
     password: string;
-    firstName: string;
-    lastName: string;
+    fullName: string;
     role: "student" | "employer";
   }) => {
     const response = await authAPI.register(data);

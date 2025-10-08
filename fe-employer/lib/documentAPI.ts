@@ -1,5 +1,8 @@
 import { getToken } from "@/lib/userStorage";
 
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL;
+
 export interface DocumentValidation {
   metadataRequired: string[];
   fileTypes: string[];
@@ -74,18 +77,13 @@ export const getDocumentTypes = async (): Promise<DocumentTypesResponse> => {
     throw new Error("Vui lòng đăng nhập lại");
   }
 
-  const response = await fetch(
-    `${
-      process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
-    }/employers/document-types`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    }
-  );
+  const response = await fetch(`${API_BASE_URL}/employers/document-types`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
 
   if (!response.ok) {
     throw new Error("Không thể tải thông tin tài liệu");
@@ -116,9 +114,7 @@ export const uploadDocument = async (
   });
 
   const response = await fetch(
-    `${
-      process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
-    }/employers/documents/${documentType}`,
+    `${API_BASE_URL}/employers/documents/${documentType}`,
     {
       method: "POST",
       headers: {
@@ -166,9 +162,7 @@ export const updateDocument = async (
   });
 
   const response = await fetch(
-    `${
-      process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
-    }/employers/documents/${documentId}`,
+    `${API_BASE_URL}/employers/documents/${documentId}`,
     {
       method: "PUT",
       headers: {
@@ -204,9 +198,7 @@ export const deleteDocument = async (
   }
 
   const response = await fetch(
-    `${
-      process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api"
-    }/employers/documents/${documentId}`,
+    `${API_BASE_URL}/employers/documents/${documentId}`,
     {
       method: "DELETE",
       headers: {
