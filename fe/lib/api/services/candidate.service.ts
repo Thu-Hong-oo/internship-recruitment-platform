@@ -13,6 +13,50 @@ class CandidateService {
     return apiClient.get<CandidateProfileResponse>(endpoint);
   }
 
+  // Lấy đầy đủ dữ liệu /candidates/me (bao gồm userId, personalInfo, progress...)
+  async getMeRaw(): Promise<{
+    success: boolean;
+    message?: string;
+    data: any;
+    timestamp?: string;
+    requestId?: string | null;
+  }> {
+    return apiClient.get(`/candidates/me`);
+  }
+
+  // Lấy thông tin cơ bản để hiển thị tab Cá nhân (map từ /candidates/me)
+  async getMeBasic(): Promise<{
+    success: boolean;
+    data: {
+      fullName: string;
+      phone: string;
+      email: string;
+      avatar?: string;
+      dateOfBirth?: string;
+      addressCountry?: string;
+      isEmailVerified?: boolean;
+    };
+  }> {
+    const res = await this.getMeRaw();
+    const apiData = res?.data || {};
+    const user = apiData.userId || {};
+    const personalInfo = apiData.personalInfo || {};
+    const address = personalInfo.address || {};
+
+    return {
+      success: Boolean(res?.success),
+      data: {
+        fullName: personalInfo.fullName || user.fullName || "",
+        phone: personalInfo.phone || "",
+        email: user.email || "",
+        avatar: user.avatar,
+        dateOfBirth: personalInfo.dateOfBirth,
+        addressCountry: address.country,
+        isEmailVerified: user.isEmailVerified,
+      },
+    };
+  }
+
   // Lấy resume (current + history) với version=all
   async getResumesAll(): Promise<{
     success: boolean;

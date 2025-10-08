@@ -344,7 +344,8 @@ export default function LazyEducationSection({
                   <div className="flex items-center gap-2 mb-2">
                     <GraduationCap className="w-5 h-5 text-blue-600" />
                     <h3 className="font-semibold text-lg">
-                      {education.university.institution}
+                      {education.university.name ||
+                        education.university.institution}
                     </h3>
                     <Badge variant="secondary">
                       {education.university.type}
@@ -355,9 +356,10 @@ export default function LazyEducationSection({
                       {education.university.degree}
                     </p>
                   )}
-                  {education.university.field && (
+                  {(education.university.major ||
+                    education.university.field) && (
                     <p className="text-gray-600 mb-1">
-                      {education.university.field}
+                      {education.university.major || education.university.field}
                     </p>
                   )}
                   <div className="flex gap-4 text-sm text-gray-500 mb-2">
@@ -371,6 +373,13 @@ export default function LazyEducationSection({
                         - {new Date(education.university.endDate).getFullYear()}
                       </span>
                     )}
+                    {!education.university.startDate &&
+                      !education.university.endDate &&
+                      education.university.graduationYear && (
+                        <span>
+                          Tốt nghiệp {education.university.graduationYear}
+                        </span>
+                      )}
                     {education.university.gpa && (
                       <span>GPA: {education.university.gpa}</span>
                     )}
@@ -427,14 +436,17 @@ export default function LazyEducationSection({
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
                         <Award className="w-5 h-5 text-green-600" />
-                        <h4 className="font-semibold">{cert.institution}</h4>
-                        <Badge variant="outline">{cert.type}</Badge>
+                        <h4 className="font-semibold">
+                          {(cert as any).name || (cert as any).institution}
+                        </h4>
+                        {cert.type && (
+                          <Badge variant="outline">{cert.type}</Badge>
+                        )}
                       </div>
-                      {cert.degree && (
-                        <p className="text-gray-600 mb-1">{cert.degree}</p>
-                      )}
-                      {cert.field && (
-                        <p className="text-gray-600 mb-1">{cert.field}</p>
+                      {(cert as any).issuer && (
+                        <p className="text-gray-600 mb-1">
+                          {(cert as any).issuer}
+                        </p>
                       )}
                       <div className="flex gap-4 text-sm text-gray-500">
                         {cert.startDate && (
