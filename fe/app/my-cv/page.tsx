@@ -148,14 +148,14 @@ export default function CVManagementPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
-  const [deleteIndex, setDeleteIndex] = useState<number | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [renameOpen, setRenameOpen] = useState(false);
   const [renameScope, setRenameScope] = useState<"current" | "history">(
     "current"
   );
   const [renameIndex, setRenameIndex] = useState<number | undefined>(undefined);
   const [renameValue, setRenameValue] = useState("");
-  const [confirmSetIndex, setConfirmSetIndex] = useState<number | null>(null);
+  const [confirmSetId, setConfirmSetId] = useState<string | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
 
   const primaryColor = "oklch(0.65 0.18 195)";
@@ -219,10 +219,10 @@ export default function CVManagementPage() {
     }
   };
 
-  const handleDeleteCV = async (cvIndex: number) => {
+  const handleDeleteCV = async (cvId: string) => {
     try {
       setError(null);
-      await api.candidateCV.deleteCV(cvIndex);
+      await api.candidateCV.deleteCV(cvId);
       setSuccess("Xóa CV thành công!");
       toast({ description: "Đã xóa CV", duration: 2000 });
       await loadProfile();
@@ -291,43 +291,6 @@ export default function CVManagementPage() {
     }
   };
 
-  const openHistoryInNewTab = async (cvIndex: number, url?: string) => {
-    try {
-      const token =
-        typeof window !== "undefined" ? localStorage.getItem("token") : null;
-      const cvId = (profile as any)?.resume?.history?.[cvIndex]?._id;
-
-      if (token && cvId) {
-        const endpoint = `${apiClient.getBaseURL()}/candidates/me/resume/view/${cvId}`;
-        const res = await fetch(endpoint, {
-          method: "GET",
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) {
-          const txt = await res.text();
-          throw new Error(`${res.status} ${txt}`);
-        }
-        const blob = await res.blob();
-        const objectUrl = URL.createObjectURL(blob);
-        window.open(objectUrl, "_blank");
-        return;
-      }
-
-      if (url) {
-        const normalized = url.replace(/\\/g, "/");
-        const absolute = normalized.startsWith("http")
-          ? normalized
-          : `${window.location.origin}/${normalized.replace(/^\//, "")}`;
-        window.open(absolute, "_blank");
-        return;
-      }
-
-      setError("Không thể mở CV, vui lòng thử lại");
-    } catch (e: any) {
-      setError(e?.message || "Không thể mở CV");
-    }
-  };
-
   const closePreview = () => {
     if (previewUrl && previewUrl.startsWith("blob:")) {
       URL.revokeObjectURL(previewUrl);
@@ -347,10 +310,10 @@ export default function CVManagementPage() {
     );
   };
 
-  const handleSetCurrent = async (cvIndex: number) => {
+  const handleSetCurrent = async (cvId: string) => {
     try {
       setError(null);
-      await api.candidateCV.setCurrent(cvIndex);
+      await api.candidateCV.setCurrent(cvId);
       toast({ description: "Đã đặt làm CV hiện tại", duration: 2000 });
       await loadProfile();
     } catch (err: any) {
@@ -616,9 +579,7 @@ export default function CVManagementPage() {
                           Mở tab mới
                         </Button>
                         <Button
-                          onClick={() =>
-                            setDeleteIndex(getCurrentHistoryIndex())
-                          }
+                          onClick={() => setDeleteId("current")}
                           variant="outline"
                           className="flex-1 rounded-xl border-red-200 bg-red-50/60 text-sm font-medium text-red-600 transition-colors duration-300 hover:border-red-400 hover:bg-red-100"
                         >
@@ -642,7 +603,7 @@ export default function CVManagementPage() {
                   >
                     <button
                       type="button"
-                      onClick={() => setConfirmSetIndex(index)}
+                      onClick={() => setConfirmSetId((cv as any)?._id)}
                       title="Đặt làm CV hiện tại"
                       aria-label="Đặt làm CV hiện tại"
                       className="absolute right-5 top-5 z-10 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white text-amber-400 shadow ring-1 ring-slate-200 transition hover:scale-105 active:scale-95"
@@ -719,7 +680,7 @@ export default function CVManagementPage() {
                             Tải về
                           </Button>
                           <Button
-                            onClick={() => setDeleteIndex(index)}
+                            onClick={() => setDeleteId((cv as any)?._id)}
                             variant="outline"
                             className="flex-1 rounded-xl border-red-200 bg-red-50/60 text-sm font-medium text-red-600 transition-colors duration-300 hover:border-red-400 hover:bg-red-100"
                           >
@@ -835,8 +796,8 @@ export default function CVManagementPage() {
         )}
 
         <AlertDialog
-          open={deleteIndex !== null}
-          onOpenChange={(open) => !open && setDeleteIndex(null)}
+          open={deleteId !== null}
+          onOpenChange={(open) => !open && setDeleteId(null)}
         >
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -849,9 +810,9 @@ export default function CVManagementPage() {
               <AlertDialogCancel>Hủy</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => {
-                  if (deleteIndex !== null) {
-                    handleDeleteCV(deleteIndex);
-                    setDeleteIndex(null);
+                  if (deleteId !== null) {
+                    handleDeleteCV(deleteId);
+                    setDeleteId(null);
                   }
                 }}
               >
@@ -862,8 +823,8 @@ export default function CVManagementPage() {
         </AlertDialog>
 
         <AlertDialog
-          open={confirmSetIndex !== null}
-          onOpenChange={(open) => !open && setConfirmSetIndex(null)}
+          open={confirmSetId !== null}
+          onOpenChange={(open) => !open && setConfirmSetId(null)}
         >
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -876,9 +837,9 @@ export default function CVManagementPage() {
               <AlertDialogCancel>Hủy</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => {
-                  if (confirmSetIndex !== null) {
-                    handleSetCurrent(confirmSetIndex);
-                    setConfirmSetIndex(null);
+                  if (confirmSetId !== null) {
+                    handleSetCurrent(confirmSetId);
+                    setConfirmSetId(null);
                   }
                 }}
               >
