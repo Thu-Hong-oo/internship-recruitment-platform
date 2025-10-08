@@ -13,7 +13,6 @@ import { useLazyProfile } from "@/hooks/useLazyProfile";
 import { useMockProfile } from "@/hooks/useMockProfile";
 import AvatarUpload from "@/components/AvatarUpload";
 import { getUserAvatar } from "@/lib/api";
-import { useSession } from "next-auth/react";
 import { PageLayout } from "@/components/layout";
 import LazyEducationSection from "@/components/profile/LazyEducationSection";
 import LazyExperienceSection from "@/components/profile/LazyExperienceSection";
@@ -23,7 +22,6 @@ import ApiTestComponent from "@/components/debug/ApiTestComponent";
 
 export default function ProfilePage() {
   const { user } = useAuth();
-  const { data: session, status } = useSession();
 
   // Try real API first, fallback to mock data
   const realApi = useLazyProfile();
@@ -36,9 +34,6 @@ export default function ProfilePage() {
     fullName:
       user?.fullName ||
       `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim() ||
-      (session?.user?.name as string | undefined) ||
-      ((session?.user?.name?.[0] as string | undefined) ||
-        user?.firstName?.[0]) + (user?.lastName?.[0] ?? "") ||
       "",
     phone: "",
     email: user?.email || "",
@@ -155,7 +150,6 @@ export default function ProfilePage() {
                 <div className="text-center">
                   <AvatarUpload
                     currentAvatar={
-                      (session?.user?.image as string | undefined) ||
                       (user ? getUserAvatar(user) : undefined) ||
                       "/placeholder-user.jpg"
                     }
