@@ -18,6 +18,7 @@ const JobSchema = new mongoose.Schema({
   requirements: { type: String },
   benefits: { type: String },
   skills: [{ type: String, trim: true }],
+  skillIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Skill' }],
   tags: [{ type: String, trim: true }],
   // DEPRECATED: use industryCode/subIndustryCode instead
   category: { type: String },
@@ -137,6 +138,7 @@ JobSchema.index({
 // THÊM: Indexes cần thiết cho performance
 JobSchema.index({ 'ai.embedding': 1 }); // Cho vector search
 JobSchema.index({ skills: 1, location: 1, status: 1 });
+JobSchema.index({ skillIds: 1, status: 1 });
 JobSchema.index({ industryCode: 1, subIndustryCode: 1, status: 1 });
 JobSchema.index({ industryPath: 1 });
 JobSchema.index({ 'ai.suggestedCandidates.score': -1 });
