@@ -10,7 +10,8 @@ import {
   SkillFormData,
 } from "@/lib/types/profile";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
 
 class ProfileAPI {
   private requestQueue: Promise<any>[] = [];
@@ -38,6 +39,14 @@ class ProfileAPI {
     try {
       const token = localStorage.getItem("token");
 
+      // Check if token exists
+      if (!token) {
+        throw new Error("No authentication token found. Please login again.");
+      }
+
+      console.log(`Making API request to: ${API_BASE_URL}${endpoint}`);
+      console.log(`Token exists: ${!!token}`);
+
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         ...options,
         headers: {
@@ -47,7 +56,15 @@ class ProfileAPI {
         },
       });
 
+      console.log(`Response status: ${response.status}`);
+
       if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Authentication failed. Please login again.");
+        }
+        if (response.status === 404) {
+          throw new Error(`API endpoint not found: ${endpoint}`);
+        }
         if (response.status === 429) {
           // Rate limit exceeded, wait and retry
           await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -59,6 +76,7 @@ class ProfileAPI {
       const data = await response.json();
       resolve(data);
     } catch (error) {
+      console.error(`API request failed for ${endpoint}:`, error);
       reject(error);
     }
   }

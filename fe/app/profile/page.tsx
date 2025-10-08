@@ -9,20 +9,28 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
-import { useProfile } from "@/hooks/useProfile";
+import { useLazyProfile } from "@/hooks/useLazyProfile";
+import { useMockProfile } from "@/hooks/useMockProfile";
 import AvatarUpload from "@/components/AvatarUpload";
 import { getUserAvatar } from "@/lib/api";
 import { useSession } from "next-auth/react";
 import { PageLayout } from "@/components/layout";
-import EducationSection from "@/components/profile/EducationSection";
-import ExperienceSection from "@/components/profile/ExperienceSection";
-import SkillsSection from "@/components/profile/SkillsSection";
-import { RateLimitToast } from "@/components/ui/rate-limit-toast";
+import LazyEducationSection from "@/components/profile/LazyEducationSection";
+import LazyExperienceSection from "@/components/profile/LazyExperienceSection";
+import LazySkillsSection from "@/components/profile/LazySkillsSection";
+import RateLimitToast from "../../components/ui/rate-limit-toast";
+import ApiTestComponent from "@/components/debug/ApiTestComponent";
 
 export default function ProfilePage() {
   const { user } = useAuth();
   const { data: session, status } = useSession();
-  const { profile, loading, error, updateProfile } = useProfile(["all"]);
+
+  // Try real API first, fallback to mock data
+  const realApi = useLazyProfile();
+  const mockApi = useMockProfile();
+
+  // Always use real API first, fallback to mock only on error
+  const { profile, loading, errors, fetchProfile, updateProfile } = realApi;
 
   const [formData, setFormData] = useState({
     fullName:
@@ -43,6 +51,22 @@ export default function ProfilePage() {
   });
 
   const [showRateLimitToast, setShowRateLimitToast] = useState(false);
+  const [apiStatus, setApiStatus] = useState<"real" | "mock" | "error">("real");
+
+  // Load basic profile data on mount
+  React.useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        await fetchProfile(["progress", "settings"]); // Only load essential data
+        setApiStatus("real");
+      } catch (error) {
+        console.error("Real API failed, using mock data:", error);
+        setApiStatus("mock");
+      }
+    };
+
+    loadProfile();
+  }, [fetchProfile]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({
@@ -90,7 +114,7 @@ export default function ProfilePage() {
     setShowRateLimitToast(false);
   };
 
-  if (loading) {
+  if (loading.profile) {
     return (
       <PageLayout>
         <div className="bg-gray-50 py-8">
@@ -106,6 +130,23 @@ export default function ProfilePage() {
     <PageLayout>
       <div className="bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4">
+          {/* API Status Banner */}
+          {apiStatus === "mock" && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className="bg-yellow-100 text-yellow-800"
+                >
+                  DEMO MODE
+                </Badge>
+                <span className="text-sm text-yellow-700">
+                  API không khả dụng, đang sử dụng dữ liệu mẫu
+                </span>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             {/* Left Column - Profile Overview */}
             <div className="lg:col-span-1">
@@ -223,7 +264,7 @@ export default function ProfilePage() {
             {/* Right Column - Profile Content */}
             <div className="lg:col-span-3">
               <Tabs defaultValue="personal" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-4">
+                <TabsList className="grid w-full grid-cols-5">
                   <TabsTrigger
                     value="personal"
                     className="flex items-center gap-2"
@@ -251,6 +292,13 @@ export default function ProfilePage() {
                   >
                     <User className="w-4 h-4" />
                     Kỹ năng
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="debug"
+                    className="flex items-center gap-2"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Debug
                   </TabsTrigger>
                 </TabsList>
 
@@ -351,15 +399,19 @@ export default function ProfilePage() {
                 </TabsContent>
 
                 <TabsContent value="education">
-                  <EducationSection />
+                  <LazyEducationSection />
                 </TabsContent>
 
                 <TabsContent value="experience">
-                  <ExperienceSection />
+                  <LazyExperienceSection />
                 </TabsContent>
 
                 <TabsContent value="skills">
-                  <SkillsSection />
+                  <LazySkillsSection />
+                </TabsContent>
+
+                <TabsContent value="debug">
+                  <ApiTestComponent />
                 </TabsContent>
               </Tabs>
             </div>
