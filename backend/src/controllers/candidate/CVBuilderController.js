@@ -141,7 +141,11 @@ class CVBuilderController {
             personalInfo.fullName || profile.personalInfo?.fullName || '',
           email: personalInfo.email || profile.personalInfo?.email || '',
           phone: personalInfo.phone || profile.personalInfo?.phone || '',
-          address: personalInfo.address || profile.personalInfo?.address || '',
+          // Only set address if provided and not an empty string; otherwise keep existing or null
+          address:
+            typeof personalInfo.address === 'string'
+              ? personalInfo.address.trim() || null
+              : personalInfo.address ?? profile.personalInfo?.address ?? null,
           dateOfBirth:
             personalInfo.dateOfBirth ||
             profile.personalInfo?.dateOfBirth ||
@@ -835,7 +839,7 @@ class CVBuilderController {
         fullName: '',
         email: '',
         phone: '',
-        address: '',
+        address: null,
         dateOfBirth: null,
         avatar: null,
         website: '',
