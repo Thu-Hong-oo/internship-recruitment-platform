@@ -2,7 +2,7 @@ const { createClient } = require('redis');
 const OTPService = require('../services/otpService');
 const OTPCooldownService = require('../services/otpCooldownService');
 const { logger } = require('../utils/logger');
-
+require('dotenv').config();
 let otpService = null;
 let otpCooldownService = null;
 
@@ -10,8 +10,10 @@ const initializeRedisServices = async () => {
   try {
     const redisClient = createClient({
       url: process.env.REDIS_URL,
+  
+      
     });
-
+  console.log("Testnnesedii",process.env.REDIS_URL);
     redisClient.on('error', err => {
       logger.error('Redis Client Error', { error: err.message });
     });

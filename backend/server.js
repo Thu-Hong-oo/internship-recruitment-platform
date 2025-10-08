@@ -167,6 +167,28 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Static file serving for CV template previews
 app.use('/templates', express.static(path.join(__dirname, 'public/templates')));
 
+// 🔧 FIX: Add timeout handling for file upload routes
+app.use('/api/candidates/me/resume', (req, res, next) => {
+  // Increase timeout for file upload endpoints
+  req.setTimeout(300000); // 5 minutes
+  res.setTimeout(300000); // 5 minutes
+
+  // Add timeout headers
+  res.setHeader('Keep-Alive', 'timeout=300, max=1000');
+  res.setHeader('Connection', 'keep-alive');
+
+  console.log(`📤 Resume upload request: ${req.method} ${req.path}`);
+  console.log(`📦 Content-Length: ${req.headers['content-length']} bytes`);
+
+  const startTime = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - startTime;
+    console.log(`⏱️ Request completed in ${duration}ms`);
+  });
+
+  next();
+});
+
 // Swagger configuration
 const swaggerOptions = {
   definition: {
