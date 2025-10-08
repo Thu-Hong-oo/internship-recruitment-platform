@@ -18,7 +18,7 @@ interface RateLimitToastProps {
   retryAfter?: number; // seconds
 }
 
-export function RateLimitToast({
+export default function RateLimitToast({
   isVisible,
   onRetry,
   onDismiss,

@@ -50,7 +50,7 @@ left to right direction
 actor Admin
 
 rectangle "Hệ thống" {
-  (Đăng nhập) as UCLogin
+  (Đăng nhập) <<main>> as UCLogin
   (Đăng xuất) as UCLogout
 
   (Quản lý tài khoản) <<main>> as UCManageAccount
@@ -128,10 +128,23 @@ Admin --> UCManageIndustry
 Admin --> UCManagePackages
 Admin --> UCViewStatistics
 
+UCLogin ..> UCManageAccount : <<include>>
+UCLogin ..> UCManageUsers : <<include>>
+UCLogin ..> UCManageCandidate : <<include>>
+UCLogin ..> UCManageEmployer : <<include>>
+UCLogin ..> UCManageCompany : <<include>>
+UCLogin ..> UCManageAccount : <<include>>
+UCLogin ..> UCViewStatistics : <<include>>
+UCLogin ..> UCManagePackages : <<include>>
+UCLogin ..> UCManageIndustry : <<include>>
+UCLogin ..> UCManageJobPosts : <<include>>
+
+
 ' ===== 3.1 QUẢN LÝ TÀI KHOẢN =====
 UCManageAccount ..> UCUpdatePersonalInfo : <<include>>
 UCManageAccount ..> UCUpdateAvatar : <<include>>
 UCManageAccount ..> UCChangePassword : <<include>>
+
 
 ' ===== 3.2 QUẢN LÝ NGƯỜI DÙNG =====
 UCManageUsers ..> UCViewUserList : <<include>>
