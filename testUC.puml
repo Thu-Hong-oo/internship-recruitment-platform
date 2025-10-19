@@ -4,10 +4,11 @@ skinparam linetype ortho
 hide stereotype
 left to right direction
 
+
 skinparam actor {
   BackgroundColor #E3F2FD
   BorderColor #1976D2
-  FontSize 30
+  FontSize 50
   FontColor #000000
 }
 
@@ -15,7 +16,7 @@ skinparam usecase {
   BackgroundColor #E3F2FD
   BorderColor #1976D2
   BorderThickness 2
-  FontSize 35
+  FontSize 40
   FontColor #000000
 }
 
@@ -23,33 +24,27 @@ skinparam rectangle {
   BackgroundColor #B3E5FC
   BorderColor #0277BD
   BorderThickness 3
-  FontSize 13
+  FontSize 50
   FontColor #000000
   FontStyle bold
 }
 
 skinparam arrow {
+  FontSize 30
   Color #1976D2
-  Thickness 1.5
+  Thickness 3
 }
+skinparam ArrowMessageAlignment center
 
 ' Use case chính được highlight
 skinparam usecase<<main>> {
   BackgroundColor #FFE0B2
   BorderColor #FB8C00
   FontColor #E65100
-  FontSize 38
+  FontSize 45
   BorderThickness 3
 }
 
-' Authentication quan trọng
-skinparam usecase<<auth>> {
-  BackgroundColor #C8E6C9
-  BorderColor #388E3C
-  FontColor #1B5E20
-  FontSize 38
-  BorderThickness 2
-}
 
 skinparam usecase<<login>> {
   BackgroundColor #C8E6C9
@@ -94,40 +89,42 @@ rectangle "HỆ THỐNG" {
         (Quản lý việc của tôi) <<main>> as UCManageMyJob
         (Quản lý thông báo) <<main>> as UCManageNotification
      }
-  
-  ' ========== XÁC THỰC (CHUNG) - Đặt sau ==========
-  together {
-    (Đăng ký) <<auth>> as UCRegister
-    (Xác thực email) as UCVerifyEmail
-    (Đăng xuất) <<auth>> as UCLogout
-    (Đăng nhập) <<login>> as UCLogin
- }
-
     together {
-  ' ========== CHỨC NĂNG NHÀ TUYỂN DỤNG ==========
         together {
-            (Quản lý thông tin NTD) <<main>> as UCManageEmployerProfile
-            (Cập nhật hồ sơ cá nhân/ doanh nghiệp) as UCUpdateEmployerProfile
+    ' ========== CHỨC NĂNG NHÀ TUYỂN DỤNG ==========
+            together {
+                (Quản lý thông tin NTD) <<main>> as UCManageEmployerProfile
+                (Cập nhật hồ sơ cá nhân/ doanh nghiệp) as UCUpdateEmployerProfile
+            }
+            together {
+                (Quản lý gói dịch vụ NTD) <<main>> as UCManagePackages
+                (Gia hạn/ hủy gói \n dịch vụ đã mua) as UCRenewPackages
+                (Mua gói dịch vụ) as UCBuyPackages
+            }
+            (Quản lý bài đăng tuyển dụng) <<main>> as UCManageJobPosting
+            (Quản lý ứng viên ứng tuyển) as UCManageCandidatesApplying
         }
+        ' ========== CHỨC NĂNG QUẢN TRỊ ==========
         together {
-            (Quản lý gói dịch vụ NTD) <<main>> as UCManagePackages
-            (Gia hạn/ hủy gói \n dịch vụ đã mua) as UCRenewPackages
-            (Mua gói dịch vụ) as UCBuyPackages
+            (Quản lý người dùng) <<main>> as UCManageUsers
+            (Quản lý doanh nghiệp) <<main>> as UCManageCompany
+            (Quản lý ngành nghề) <<main>> as UCManageIndustry
+            (Quản lý bài đăng) <<main>> as UCManageJobPosts
+            (Quản lý gói dịch vụ hệ thống) <<main>> as UCManageEmployerPackages
+            (Xem thống kê) <<main>> as UCViewStatistics
         }
-        (Quản lý bài đăng tuyển dụng) <<main>> as UCManageJobPosting
-        (Quản lý ứng viên ứng tuyển) as UCManageCandidatesApplying
     }
 
   
-  ' ========== CHỨC NĂNG QUẢN TRỊ ==========
+  
+
+     ' ========== XÁC THỰC (CHUNG) - Đặt sau ==========
     together {
-        (Quản lý người dùng) <<main>> as UCManageUsers
-        (Quản lý doanh nghiệp) <<main>> as UCManageCompany
-        (Quản lý ngành nghề) <<main>> as UCManageIndustry
-        (Quản lý bài đăng) <<main>> as UCManageJobPosts
-        (Quản lý gói dịch vụ hệ thống) <<main>> as UCManageEmployerPackages
-        (Xem thống kê) <<main>> as UCViewStatistics
+        (Đăng nhập) <<login>> as UCLogin
+        (Đăng kí) as UCRegister
     }
+
+  
 
 }
 
@@ -140,16 +137,12 @@ Candidate --> UCManageCV
 Candidate --> UCSearchJob
 Candidate --> UCManageMyJob
 Candidate --> UCManageNotification
-Candidate --> UCRegister
-Candidate --> UCLogin
-Candidate --> UCLogout
 
 ' ==========================================
 ' KẾT NỐI - NHÀ TUYỂN DỤNG (Chỉ nối UC CHÍNH)
 ' ==========================================
-Employer --> UCRegister
-Employer --> UCLogin
-Employer --> UCLogout
+' Employer --> UCRegister
+
 Employer --> UCManageEmployerProfile
 Employer --> UCManageJobPosting
 Employer --> UCManagePackages
@@ -157,9 +150,8 @@ Employer --> UCManagePackages
 ' ==========================================
 ' KẾT NỐI - QUẢN TRỊ VIÊN (Chỉ nối UC CHÍNH)
 ' ==========================================
-Admin --> UCRegister
-Admin --> UCLogin
-Admin --> UCLogout
+' Admin --> UCRegister
+
 Admin --> UCManageUsers
 Admin --> UCManageCompany
 Admin --> UCManageJobPosts
@@ -170,18 +162,18 @@ Admin --> UCViewStatistics
 ' ==========================================
 ' QUAN HỆ - XÁC THỰC
 ' ==========================================
-UCRegister --> UCVerifyEmail : <<include>>
 
 ' ==========================================
 ' QUAN HỆ - ỨNG VIÊN (Từ UC CHÍNH ra UC PHỤ)
 ' ==========================================
 ' Tài khoản - Từ UC chính ra các UC phụ
-UCManageAccount ..> UCLogin : <<include>>
+UCLogin ..> UCRegister : "  <<include>>  "
+UCManageAccount ..> UCLogin : "  <<include>>  "
 UCManageAccount <.. UCUpdateProfile : <<extend>>
 UCManageAccount <.. UCChangePassword : <<extend>>
 
 ' CV - Từ UC chính ra các UC phụ
-UCManageCV ..> UCLogin : <<include>>
+UCManageCV ..> UCLogin : "  <<include>>  "
 UCManageCV <.. UCUploadCV : <<extend>>
 UCManageCV <.. UCParseCV : <<extend>>
 UCManageCV <.. UCSetDefaultCV : <<extend>>
@@ -194,37 +186,37 @@ UCCreateFromTemplate <.. UCDownloadCV : <<extend>>
 UCSearchJob <.. UCViewJobDetail : <<extend>>
 UCViewJobDetail <.. UCSaveJob : <<extend>>
 UCViewJobDetail <.. UCApplyJob : <<extend>>
-UCSaveJob ..> UCLogin : <<include>>
-UCApplyJob ..> UCLogin : <<include>>
+UCSaveJob ..right.. UCLogin : "  <<include>>  "
+UCApplyJob ..> UCLogin : "  <<include>>  "
 
 ' Quản lý việc đã apply
-UCManageMyJob ..> UCLogin : <<include>>
+UCManageMyJob ..> UCLogin : "  <<include>>  "
 
 ' Thông báo
-UCManageNotification ..> UCLogin : <<include>>
+UCManageNotification ..> UCLogin : "  <<include>>  "
 
 ' ==========================================
 ' QUAN HỆ - NHÀ TUYỂN DỤNG
 ' ==========================================
-UCManageEmployerProfile ..> UCLogin : <<include>>
+UCManageEmployerProfile ..> UCLogin : "  <<include>>  "
 UCUpdateEmployerProfile <.. UCManageEmployerProfile : <<extend>>
 
-UCManageJobPosting ..> UCLogin : <<include>>
+UCManageJobPosting ..> UCLogin : "  <<include>>  "
 UCManageCandidatesApplying <.. UCManageJobPosting : <<extend>>
 
 
-UCManagePackages ..> UCLogin : <<include>>
+UCManagePackages ..> UCLogin : "  <<include>>  "
 UCRenewPackages <.. UCManagePackages : <<extend>>
 UCBuyPackages <.. UCManagePackages : <<extend>>
 
 ' ==========================================
 ' QUAN HỆ - QUẢN TRỊ VIÊN
 ' ==========================================
-UCManageUsers ..> UCLogin : <<include>>
-UCManageCompany ..> UCLogin : <<include>>
-UCManageJobPosts ..> UCLogin : <<include>>
-UCManageIndustry ..> UCLogin : <<include>>
-UCManageEmployerPackages ..> UCLogin : <<include>>
-UCViewStatistics ..> UCLogin : <<include>>
+UCManageUsers ..> UCLogin : "  <<include>>  "
+UCManageCompany ..> UCLogin : "  <<include>>  "
+UCManageJobPosts ..> UCLogin : "  <<include>>  "
+UCManageIndustry ..> UCLogin : "  <<include>>  "
+UCManageEmployerPackages ..> UCLogin : "  <<include>>  "
+UCViewStatistics ..> UCLogin : "  <<include>>  "
 
 @enduml

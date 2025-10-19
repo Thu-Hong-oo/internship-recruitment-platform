@@ -33,6 +33,14 @@ export class ApiClient {
 
     const url = `${this.baseURL}${endpoint}`;
 
+    // Debug logging
+    console.log("🚀 API Request:", {
+      url,
+      method: options.method || "GET",
+      headers: options.headers,
+      body: options.body,
+    });
+
     const config: RequestInit = {
       headers: {
         ...options.headers,
@@ -59,9 +67,17 @@ export class ApiClient {
     try {
       const response = await fetch(url, config);
 
+      console.log("📡 API Response:", {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries()),
+      });
+
       if (!response.ok) {
         //200-299 >< 400, 401, 403, 404, 500, ...
         const errorData = await response.json().catch(() => ({}));
+        console.error("❌ API Error Response:", errorData);
         throw new Error(
           errorData.error ||
             errorData.message ||
@@ -69,9 +85,16 @@ export class ApiClient {
         );
       }
 
-      return await response.json();
+      const result = await response.json();
+      console.log("✅ API Success Response:", result);
+      return result;
     } catch (error) {
-      console.error("API request failed:", error);
+      console.error("💥 API request failed:", error);
+      console.error("💥 Error details:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      });
       throw error;
     }
   }
@@ -92,6 +115,14 @@ export class ApiClient {
   public async put<T>(endpoint: string, body?: unknown): Promise<T> {
     return this.request<T>(endpoint, {
       method: "PUT",
+      body:
+        body instanceof FormData ? (body as any) : JSON.stringify(body ?? {}),
+    });
+  }
+
+  public async patch<T>(endpoint: string, body?: unknown): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: "PATCH",
       body:
         body instanceof FormData ? (body as any) : JSON.stringify(body ?? {}),
     });

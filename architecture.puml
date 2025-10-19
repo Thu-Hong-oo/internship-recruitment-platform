@@ -3,6 +3,7 @@
 skinparam backgroundColor #FFFFFF
 skinparam packageStyle rectangle
 skinparam linetype ortho
+' left to right direction
 
 skinparam package {
     BackgroundColor<<presentation>> #E3F2FD

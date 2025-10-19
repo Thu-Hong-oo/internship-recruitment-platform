@@ -248,12 +248,24 @@ class CandidateService {
   }
 
   // Cập nhật profile
-  async updateProfile(
-    data: Partial<CandidateProfile>,
-    userId?: string
-  ): Promise<CandidateProfileResponse> {
-    const endpoint = userId ? `/candidates/${userId}` : "/candidates/me";
-    return apiClient.put<CandidateProfileResponse>(endpoint, data);
+  async updateProfile(data: {
+    section: "profile";
+    data: {
+      personalInfo?: {
+        fullName?: string;
+        phone?: string;
+        bio?: string;
+        address?: {
+          street?: string;
+          ward?: string;
+          district?: string;
+          city?: string;
+          country?: string;
+        };
+      };
+    };
+  }): Promise<CandidateProfileResponse> {
+    return apiClient.patch<CandidateProfileResponse>("/candidates/me", data);
   }
 }
 

@@ -65,8 +65,6 @@ export default function ExperienceSection({
     type: "internship",
     company: "",
     position: "",
-    startDate: "",
-    endDate: "",
     description: "",
     skills: [],
     projects: [],
@@ -93,8 +91,6 @@ export default function ExperienceSection({
       type: "internship",
       company: "",
       position: "",
-      startDate: "",
-      endDate: "",
       description: "",
       skills: [],
       projects: [],
@@ -110,8 +106,6 @@ export default function ExperienceSection({
         type: item.type,
         company: item.company,
         position: item.position,
-        startDate: item.startDate || "",
-        endDate: item.endDate || "",
         description: item.description || "",
         skills: item.skills || [],
         projects: item.projects || [],
@@ -292,37 +286,6 @@ export default function ExperienceSection({
                     }
                     required
                   />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="startDate">Ngày bắt đầu</Label>
-                    <Input
-                      id="startDate"
-                      type="date"
-                      value={formData.startDate}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          startDate: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="endDate">Ngày kết thúc</Label>
-                    <Input
-                      id="endDate"
-                      type="date"
-                      value={formData.endDate}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          endDate: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
                 </div>
 
                 <div>

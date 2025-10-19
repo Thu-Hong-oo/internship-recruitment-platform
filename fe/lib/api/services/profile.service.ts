@@ -110,9 +110,9 @@ class ProfileService {
     section: string,
     data: any
   ): Promise<ApiResponse<ProfileData>> {
-    return this.request<ProfileData>("/candidates/me", {
-      method: "PATCH",
-      body: JSON.stringify({ section, data }),
+    return apiClient.patch<ApiResponse<ProfileData>>("/candidates/me", {
+      section,
+      data,
     });
   }
 

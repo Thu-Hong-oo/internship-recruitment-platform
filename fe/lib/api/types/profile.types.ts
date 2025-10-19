@@ -200,8 +200,6 @@ export interface EducationFormData {
   institution: string;
   degree?: string;
   field?: string;
-  startDate?: string;
-  endDate?: string;
   gpa?: number;
   achievements?: string[];
 }
