@@ -45,8 +45,6 @@ export default function EducationSection({ className }: EducationSectionProps) {
     institution: "",
     degree: "",
     field: "",
-    startDate: "",
-    endDate: "",
     gpa: undefined,
     achievements: [],
   });
@@ -66,8 +64,6 @@ export default function EducationSection({ className }: EducationSectionProps) {
         institution: "",
         degree: "",
         field: "",
-        startDate: "",
-        endDate: "",
         gpa: undefined,
         achievements: [],
       });
@@ -83,8 +79,6 @@ export default function EducationSection({ className }: EducationSectionProps) {
       institution: item.institution,
       degree: item.degree || "",
       field: item.field || "",
-      startDate: item.startDate || "",
-      endDate: item.endDate || "",
       gpa: item.gpa,
       achievements: item.achievements || [],
     });
@@ -221,37 +215,6 @@ export default function EducationSection({ className }: EducationSectionProps) {
                       setFormData((prev) => ({
                         ...prev,
                         field: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="startDate">Ngày bắt đầu</Label>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        startDate: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="endDate">Ngày kết thúc</Label>
-                  <Input
-                    id="endDate"
-                    type="date"
-                    value={formData.endDate}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        endDate: e.target.value,
                       }))
                     }
                   />
