@@ -1,0 +1,318 @@
+{
+  "info": {
+    "name": "Skills API (Updated)",
+    "_postman_id": "skills-api-updated-collection",
+    "description": "Skills management and discovery API with PATCH updates",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api/skills",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Public Endpoints",
+      "item": [
+        {
+          "name": "Get All Skills",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/?page=1&limit=50&isActive=true",
+              "host": ["{{baseUrl}}"],
+              "path": [""],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "isActive",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Get all skills with pagination"
+          }
+        },
+        {
+          "name": "Search Skills",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search?q=javascript&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "javascript",
+                  "description": "Search query"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Search skills by name or description"
+          }
+        },
+        {
+          "name": "Get Skill By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:id",
+              "host": ["{{baseUrl}}"],
+              "path": [":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "SKILL_ID"
+                }
+              ]
+            },
+            "description": "Get detailed skill information"
+          }
+        },
+        {
+          "name": "Get Skill Categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories"]
+            },
+            "description": "Get all skill categories"
+          }
+        },
+        {
+          "name": "Get Skills By Category",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/category/:categoryId",
+              "host": ["{{baseUrl}}"],
+              "path": ["category", ":categoryId"],
+              "variable": [
+                {
+                  "key": "categoryId",
+                  "value": "CATEGORY_ID"
+                }
+              ]
+            },
+            "description": "Get all skills in a specific category"
+          }
+        },
+        {
+          "name": "Get Popular Skills",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/popular?limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["popular"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Get most popular skills based on usage"
+          }
+        },
+        {
+          "name": "Get Trending Skills",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/trending?limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["trending"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Get trending skills"
+          }
+        },
+        {
+          "name": "Get Skill Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["stats"]
+            },
+            "description": "Get overall skill statistics"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Candidate Endpoints",
+      "item": [
+        {
+          "name": "Get Skill Recommendations",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recommendations?limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["recommendations"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Get skill recommendations based on user profile (Candidate only)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin Endpoints",
+      "item": [
+        {
+          "name": "Create Skill",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"GraphQL\",\n  \"slug\": \"graphql\",\n  \"description\": \"Query language for APIs\",\n  \"parentId\": null,\n  \"level\": 0,\n  \"demandLevel\": \"high\",\n  \"trend\": \"growing\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            },
+            "description": "Create a new skill (Admin only)"
+          }
+        },
+        {
+          "name": "Update Skill",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated description\",\n  \"demandLevel\": \"critical\",\n  \"trend\": \"emerging\",\n  \"popularity\": 9500\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/:id",
+              "host": ["{{baseUrl}}"],
+              "path": [":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "SKILL_ID"
+                }
+              ]
+            },
+            "description": "Update skill information (Admin only, partial update)"
+          }
+        },
+        {
+          "name": "Delete Skill",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:id",
+              "host": ["{{baseUrl}}"],
+              "path": [":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "SKILL_ID"
+                }
+              ]
+            },
+            "description": "Delete a skill (Admin only)"
+          }
+        }
+      ]
+    }
+  ]
+}

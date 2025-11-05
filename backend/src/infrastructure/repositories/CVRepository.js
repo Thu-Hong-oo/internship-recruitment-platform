@@ -1,55 +1,96 @@
-const CV = require('../models/CV');
+const CVModel = require('../models/CV');
+const CVMapper = require('../mappers/CVMapper');
 
 /**
  * CVRepository
  * Infrastructure layer for CV data operations
+ * Uses CVMapper to convert between domain entities and Mongoose documents
  */
 class CVRepository {
   async findById(id) {
-    return await CV.findById(id);
+    const cvDoc = await CVModel.findById(id);
+    return cvDoc ? CVMapper.toDomain(cvDoc) : null;
   }
 
   async findByCandidate(candidateId) {
-    return await CV.find({ candidateId, isActive: true });
+    const cvDocs = await CVModel.find({ candidateId, isActive: true }).sort({
+      createdAt: -1,
+    });
+    return CVMapper.toDomainArray(cvDocs);
   }
 
-  async create(cvData) {
-    const cv = new CV(cvData);
-    return await cv.save();
+  async create(cvEntity) {
+    const cvData = CVMapper.toMongoose(cvEntity);
+    const cv = new CVModel(cvData);
+    const savedDoc = await cv.save();
+    return CVMapper.toDomain(savedDoc);
   }
 
-  async update(id, cvData) {
-    return await CV.findByIdAndUpdate(id, cvData, { new: true });
+  async update(id, cvEntity) {
+    const cvData = CVMapper.toMongoose(cvEntity);
+    const updatedDoc = await CVModel.findByIdAndUpdate(id, cvData, {
+      new: true,
+    });
+    return updatedDoc ? CVMapper.toDomain(updatedDoc) : null;
   }
 
-  async deleteCV(id) {
-    return await CV.findByIdAndUpdate(id, { isActive: false }, { new: true });
+  async delete(id) {
+    const deletedDoc = await CVModel.findByIdAndUpdate(
+      id,
+      { isActive: false },
+      { new: true }
+    );
+    return deletedDoc ? CVMapper.toDomain(deletedDoc) : null;
   }
 
-  async setAsDefault(cvId) {
-    const cv = await CV.findById(cvId);
-    if (cv) {
-      return await cv.setAsDefault();
-    }
-    return null;
+  async setAsDefault(cvId, candidateId) {
+    // Remove default flag from all other CVs
+    await CVModel.updateMany(
+      { candidateId, _id: { $ne: cvId } },
+      { isDefault: false }
+    );
+
+    // Set this CV as default
+    const updatedDoc = await CVModel.findByIdAndUpdate(
+      cvId,
+      { isDefault: true },
+      { new: true }
+    );
+
+    return updatedDoc ? CVMapper.toDomain(updatedDoc) : null;
   }
 
   async getDefaultCV(candidateId) {
-    return await CV.findOne({ candidateId, isDefault: true, isActive: true });
+    const cvDoc = await CVModel.findOne({
+      candidateId,
+      isDefault: true,
+      isActive: true,
+    });
+    return cvDoc ? CVMapper.toDomain(cvDoc) : null;
   }
 
   async getAnalysisByCV(cvId) {
-    // This would typically join with CVAnalysis model
-    // For now, return the CV with analysis status
-    return await CV.findById(cvId).select('analysisStatus');
+    const cvDoc = await CVModel.findById(cvId).select('analysisStatus');
+    return cvDoc ? CVMapper.toDomain(cvDoc) : null;
   }
 
   async updateAnalysisStatus(cvId, status) {
-    return await CV.findByIdAndUpdate(
+    const updatedDoc = await CVModel.findByIdAndUpdate(
       cvId,
       { analysisStatus: status },
       { new: true }
     );
+    return updatedDoc ? CVMapper.toDomain(updatedDoc) : null;
+  }
+
+  async findAll() {
+    const cvDocs = await CVModel.find();
+    return CVMapper.toDomainArray(cvDocs);
+  }
+
+  async findActiveByCandidate(candidateId) {
+    const cvDocs = await CVModel.find({ candidateId, isActive: true });
+    return CVMapper.toDomainArray(cvDocs);
   }
 }
 

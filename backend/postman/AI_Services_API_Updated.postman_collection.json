@@ -1,0 +1,245 @@
+{
+  "info": {
+    "name": "AI Services API (Updated)",
+    "_postman_id": "ai-services-api-updated-collection",
+    "description": "AI-powered matching, NLP parsing, and intelligent suggestions API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api/ai",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "AI Matching",
+      "item": [
+        {
+          "name": "Match Candidate to Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"candidateId\": \"CANDIDATE_ID\",\n  \"jobId\": \"JOB_POST_ID\",\n  \"includeExplanation\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/match",
+              "host": ["{{baseUrl}}"],
+              "path": ["match"]
+            },
+            "description": "Calculate AI-powered matching score between candidate and job"
+          }
+        },
+        {
+          "name": "Get Matching History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/matching-history?page=1&limit=20&minScore=70",
+              "host": ["{{baseUrl}}"],
+              "path": ["matching-history"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "minScore",
+                  "value": "70",
+                  "description": "Filter by minimum matching score"
+                }
+              ]
+            },
+            "description": "Get AI matching history for current user"
+          }
+        }
+      ]
+    },
+    {
+      "name": "NLP Parsing",
+      "item": [
+        {
+          "name": "Parse CV",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "cv",
+                  "type": "file",
+                  "src": "/path/to/resume.pdf",
+                  "description": "CV file (PDF, DOC, DOCX)"
+                },
+                {
+                  "key": "extractSkills",
+                  "value": "true",
+                  "type": "text",
+                  "description": "Extract skills from CV"
+                },
+                {
+                  "key": "extractExperience",
+                  "value": "true",
+                  "type": "text",
+                  "description": "Extract work experience"
+                },
+                {
+                  "key": "extractEducation",
+                  "value": "true",
+                  "type": "text",
+                  "description": "Extract education"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/parse-cv",
+              "host": ["{{baseUrl}}"],
+              "path": ["parse-cv"]
+            },
+            "description": "Parse CV using AI/NLP to extract structured information"
+          }
+        },
+        {
+          "name": "Parse Job Description",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"We are looking for a Senior Backend Developer with 5+ years of experience in Node.js, MongoDB, and microservices architecture. Must have strong knowledge of Docker and AWS...\",\n  \"extractSkills\": true,\n  \"extractRequirements\": true,\n  \"suggestSalaryRange\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/parse-job-description",
+              "host": ["{{baseUrl}}"],
+              "path": ["parse-job-description"]
+            },
+            "description": "Parse job description to extract skills, requirements, and metadata"
+          }
+        }
+      ]
+    },
+    {
+      "name": "AI Suggestions",
+      "item": [
+        {
+          "name": "Get Skill Suggestions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentSkills\": [\"JavaScript\", \"Node.js\", \"MongoDB\"],\n  \"targetRole\": \"Full-stack Developer\",\n  \"experienceLevel\": \"intermediate\",\n  \"limit\": 10\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/suggestions/skills",
+              "host": ["{{baseUrl}}"],
+              "path": ["suggestions", "skills"]
+            },
+            "description": "Get AI-powered skill suggestions based on current profile and career goals"
+          }
+        },
+        {
+          "name": "Get Career Suggestions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentRole\": \"Junior Developer\",\n  \"skills\": [\"JavaScript\", \"React\", \"Node.js\"],\n  \"yearsOfExperience\": 2,\n  \"interests\": [\"backend\", \"cloud\", \"architecture\"],\n  \"limit\": 5\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/suggestions/career",
+              "host": ["{{baseUrl}}"],
+              "path": ["suggestions", "career"]
+            },
+            "description": "Get AI-powered career path suggestions and recommendations"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Market Insights",
+      "item": [
+        {
+          "name": "Get Market Insights",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/insights/market?skills=nodejs,react&location=Ho Chi Minh&role=backend-developer",
+              "host": ["{{baseUrl}}"],
+              "path": ["insights", "market"],
+              "query": [
+                {
+                  "key": "skills",
+                  "value": "nodejs,react",
+                  "description": "Skills to analyze"
+                },
+                {
+                  "key": "location",
+                  "value": "Ho Chi Minh",
+                  "description": "Location filter"
+                },
+                {
+                  "key": "role",
+                  "value": "backend-developer",
+                  "description": "Role filter"
+                }
+              ]
+            },
+            "description": "Get market insights and trends (demand, salary, popular skills, etc.)"
+          }
+        }
+      ]
+    }
+  ]
+}

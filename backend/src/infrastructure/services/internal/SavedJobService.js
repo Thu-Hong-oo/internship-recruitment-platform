@@ -1,14 +1,18 @@
-const SavedJobRepository = require('../../repositories/SavedJobRepository');
-const JobRepository = require('../../repositories/JobRepository');
-const UserRepository = require('../../repositories/UserRepository');
-const ValidationService = require('./ValidationService');
-
+/**
+ * SavedJobService - Handles saved job operations
+ * Dependencies injected via constructor for proper DI
+ */
 class SavedJobService {
-  constructor() {
-    this.savedJobRepository = new SavedJobRepository();
-    this.jobRepository = new JobRepository();
-    this.userRepository = new UserRepository();
-    this.validationService = new ValidationService();
+  constructor(
+    savedJobRepository,
+    jobRepository,
+    userRepository,
+    validationService
+  ) {
+    this.savedJobRepository = savedJobRepository;
+    this.jobRepository = jobRepository;
+    this.userRepository = userRepository;
+    this.validationService = validationService;
   }
 
   async saveJob(savedJobData) {
@@ -384,4 +388,4 @@ class SavedJobService {
   }
 }
 
-module.exports = new SavedJobService();
+module.exports = SavedJobService;

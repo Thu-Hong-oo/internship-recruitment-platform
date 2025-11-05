@@ -1,6 +1,6 @@
 const { createClient } = require('redis');
-const OTPService = require('../services/external/OTPService');
-const OTPCooldownService = require('../services/external/OTPCooldownService');
+const OTPService = require('../services/external/core/OTPService');
+const OTPCooldownService = require('../services/external/core/OTPCooldownService');
 const { logger } = require('../../shared/utils/logger');
 require('dotenv').config();
 let otpService = null;

@@ -1,0 +1,300 @@
+{
+  "info": {
+    "name": "Application API (Updated)",
+    "_postman_id": "application-api-updated-collection",
+    "description": "Job application management API with PATCH updates",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api/applications",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Candidate Actions",
+      "item": [
+        {
+          "name": "Apply for Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": \"JOB_POST_ID\",\n  \"cvId\": \"CV_ID\",\n  \"coverLetter\": \"I am very interested in this position...\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            },
+            "description": "Apply for a job (Candidate only)"
+          }
+        },
+        {
+          "name": "Get Candidate Applications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/candidate?status=pending&page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["candidate"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending",
+                  "description": "Filter by status: pending, reviewing, accepted, rejected"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Get all applications for logged-in candidate"
+          }
+        },
+        {
+          "name": "Withdraw Application",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Found another opportunity\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/:id/withdraw",
+              "host": ["{{baseUrl}}"],
+              "path": [":id", "withdraw"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "APPLICATION_ID"
+                }
+              ]
+            },
+            "description": "Withdraw application (Candidate only)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Employer Actions",
+      "item": [
+        {
+          "name": "Get Job Applications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/job/:jobId?status=pending&page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["job", ":jobId"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "jobId",
+                  "value": "JOB_POST_ID"
+                }
+              ]
+            },
+            "description": "Get all applications for a specific job (Employer only)"
+          }
+        },
+        {
+          "name": "Update Application Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"reviewing\",\n  \"note\": \"Moving to next round\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/:id/status",
+              "host": ["{{baseUrl}}"],
+              "path": [":id", "status"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "APPLICATION_ID"
+                }
+              ]
+            },
+            "description": "Update application status (Employer only). Status: pending, reviewing, accepted, rejected, withdrawn"
+          }
+        },
+        {
+          "name": "Mark Application as Viewed",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:id/view",
+              "host": ["{{baseUrl}}"],
+              "path": [":id", "view"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "APPLICATION_ID"
+                }
+              ]
+            },
+            "description": "Mark application as viewed by employer"
+          }
+        },
+        {
+          "name": "Add Employer Notes",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Strong technical skills, good communication in interview\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/:id/notes",
+              "host": ["{{baseUrl}}"],
+              "path": [":id", "notes"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "APPLICATION_ID"
+                }
+              ]
+            },
+            "description": "Add private notes to application (Employer only)"
+          }
+        },
+        {
+          "name": "Get Employer Application Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/employer/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["employer", "stats"]
+            },
+            "description": "Get application statistics for employer"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Common Actions",
+      "item": [
+        {
+          "name": "Get Application By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:id",
+              "host": ["{{baseUrl}}"],
+              "path": [":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "APPLICATION_ID"
+                }
+              ]
+            },
+            "description": "Get detailed application information"
+          }
+        },
+        {
+          "name": "Send Application Notification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"applicationId\": \"APPLICATION_ID\",\n  \"type\": \"status_update\",\n  \"message\": \"Your application status has been updated\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/notification",
+              "host": ["{{baseUrl}}"],
+              "path": ["notification"]
+            },
+            "description": "Send notification about application"
+          }
+        },
+        {
+          "name": "Get Application Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["stats"]
+            },
+            "description": "Get general application statistics"
+          }
+        }
+      ]
+    }
+  ]
+}

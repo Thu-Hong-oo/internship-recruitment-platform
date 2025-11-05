@@ -1,5 +1,5 @@
 // documentService.js
-const documentUploadService = require('../services/documentUploadService');
+const UnifiedUploadService = require('../external/UnifiedUploadService');
 const EmployerProfileHelpers = require('../helpers/EmployerProfileHelpers');
 
 /**
@@ -12,11 +12,17 @@ const EmployerProfileHelpers = require('../helpers/EmployerProfileHelpers');
  * @returns {Promise<Object>} upload result
  */
 async function uploadDocument(file, userId, documentType, metadata, profile) {
-  const uploadResult = await documentUploadService.uploadDocument(file, userId, documentType);
+  // UnifiedUploadService is singleton, and expects object parameter
+  const uploadResult = await UnifiedUploadService.uploadFile({
+    file: file,
+    type: 'document',
+    userId: userId,
+    metadata: { documentType, ...metadata },
+  });
   await EmployerProfileHelpers.addDocument(
     profile,
     uploadResult.url,
-    uploadResult.publicId,
+    uploadResult.public_id,
     documentType,
     {
       ...metadata,

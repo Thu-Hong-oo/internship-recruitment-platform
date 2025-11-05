@@ -1,14 +1,20 @@
-const NotificationRepository = require('../../repositories/NotificationRepository');
-const UserRepository = require('../../repositories/UserRepository');
-const ValidationService = require('./ValidationService');
-const SocketService = require('../external/SocketService');
-const EmailService = require('../external/EmailService');
-
+/**
+ * NotificationService - Handles notification operations
+ * Dependencies injected via constructor for proper DI
+ */
 class NotificationService {
-  constructor() {
-    this.notificationRepository = new NotificationRepository();
-    this.userRepository = new UserRepository();
-    this.validationService = new ValidationService();
+  constructor(
+    notificationRepository,
+    userRepository,
+    validationService,
+    socketService,
+    emailService
+  ) {
+    this.notificationRepository = notificationRepository;
+    this.userRepository = userRepository;
+    this.validationService = validationService;
+    this.socketService = socketService;
+    this.emailService = emailService;
   }
 
   async getUserNotifications(userId, filters = {}) {
@@ -371,5 +377,4 @@ class NotificationService {
   }
 }
 
-module.exports = new NotificationService();
-
+module.exports = NotificationService;

@@ -1,20 +1,30 @@
-const Application = require('../models/Application');
+const ApplicationModel = require('../models/Application');
 const IApplicationRepository = require('../../application/recruitment/repositories/IApplicationRepository');
+const ApplicationMapper = require('../mappers/ApplicationMapper');
 
 /**
  * ApplicationRepository
  * Infrastructure layer implementation of IApplicationRepository
+ * Converts between Application Domain Entities and Mongoose Models
  */
 class ApplicationRepository extends IApplicationRepository {
   async create(applicationData) {
-    const application = new Application(applicationData);
-    return await application.save();
+    // applicationData can be either Domain Entity or plain object
+    const mongooseData =
+      applicationData.constructor.name === 'Application'
+        ? ApplicationMapper.toMongoose(applicationData)
+        : applicationData;
+
+    const doc = new ApplicationModel(mongooseData);
+    await doc.save();
+    return ApplicationMapper.toDomain(doc);
   }
 
   async findById(applicationId) {
-    return await Application.findById(applicationId)
+    const doc = await ApplicationModel.findById(applicationId)
       .populate('candidateId', 'fullName email avatar')
       .populate('jobId', 'title company location');
+    return ApplicationMapper.toDomain(doc);
   }
 
   async findByCandidateId(candidateId, options = {}) {
@@ -26,7 +36,7 @@ class ApplicationRepository extends IApplicationRepository {
       query.status = status;
     }
 
-    const applications = await Application.find(query)
+    const docs = await ApplicationModel.find(query)
       .populate(
         'jobId',
         'title company location salaryMin salaryMax status deadline'
@@ -35,7 +45,10 @@ class ApplicationRepository extends IApplicationRepository {
       .skip(skip)
       .limit(parseInt(limit));
 
-    const total = await Application.countDocuments(query);
+    const total = await ApplicationModel.countDocuments(query);
+
+    // Convert to domain entities
+    const applications = docs.map(doc => ApplicationMapper.toDomain(doc));
 
     return {
       applications,
@@ -57,13 +70,16 @@ class ApplicationRepository extends IApplicationRepository {
       query.status = status;
     }
 
-    const applications = await Application.find(query)
+    const docs = await ApplicationModel.find(query)
       .populate('candidateId', 'fullName email avatar phone profile.resume')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
 
-    const total = await Application.countDocuments(query);
+    const total = await ApplicationModel.countDocuments(query);
+
+    // Convert to domain entities
+    const applications = docs.map(doc => ApplicationMapper.toDomain(doc));
 
     return {
       applications,
@@ -77,36 +93,41 @@ class ApplicationRepository extends IApplicationRepository {
   }
 
   async updateById(applicationId, updateData) {
-    return await Application.findByIdAndUpdate(applicationId, updateData, {
-      new: true,
-    });
+    const doc = await ApplicationModel.findByIdAndUpdate(
+      applicationId,
+      updateData,
+      {
+        new: true,
+      }
+    );
+    return ApplicationMapper.toDomain(doc);
   }
 
   async deleteById(applicationId) {
-    const result = await Application.findByIdAndDelete(applicationId);
+    const result = await ApplicationModel.findByIdAndDelete(applicationId);
     return !!result;
   }
 
   async hasCandidateAppliedForJob(candidateId, jobId) {
-    const application = await Application.findOne({ candidateId, jobId });
-    return !!application;
+    const doc = await ApplicationModel.findOne({ candidateId, jobId });
+    return !!doc;
   }
 
   async getApplicationStats(jobId) {
-    const total = await Application.countDocuments({ jobId });
-    const pending = await Application.countDocuments({
+    const total = await ApplicationModel.countDocuments({ jobId });
+    const pending = await ApplicationModel.countDocuments({
       jobId,
       status: 'pending',
     });
-    const reviewed = await Application.countDocuments({
+    const reviewed = await ApplicationModel.countDocuments({
       jobId,
       status: 'reviewed',
     });
-    const accepted = await Application.countDocuments({
+    const accepted = await ApplicationModel.countDocuments({
       jobId,
       status: 'accepted',
     });
-    const rejected = await Application.countDocuments({
+    const rejected = await ApplicationModel.countDocuments({
       jobId,
       status: 'rejected',
     });

@@ -30,7 +30,7 @@ router.route('/users').get(getAllUsers);
 
 router.route('/users/:id').get(getUserById).delete(deleteUser);
 
-router.route('/users/:id/status').put(updateUserStatus);
+router.route('/users/:id/status').patch(updateUserStatus); // Changed from PUT to PATCH - partial update of user status
 
 // System routes
 router.route('/stats').get(getSystemStats);
@@ -43,7 +43,7 @@ router.route('/queues').get(getQueueStatus);
 
 router.route('/queues/:queueName').delete(clearQueue);
 
-router.route('/settings').get(getSystemSettings).put(updateSystemSettings);
+router.route('/settings').get(getSystemSettings).patch(updateSystemSettings); // Changed from PUT to PATCH - partial update of settings
 
 router.route('/notifications').post(sendSystemNotification);
 

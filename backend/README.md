@@ -2,6 +2,24 @@
 
 > Website ứng dụng AI hỗ trợ tìm việc intern, hỗ trợ kết nối doanh nghiệp và nguồn nhân lực mới lâu dài bằng phân tích nhu cầu tuyển dụng, CV tìm việc làm.
 
+## ⭐ Clean Architecture - 56% Complete!
+
+**Status**: ✅ Core domains migrated to Clean Architecture  
+**Progress**: 11/20 repositories refactored (56%)  
+**Documentation**: See `CLEAN_ARCHITECTURE_*.md` files
+
+### Architecture Highlights
+
+- ✅ **11 Domain Entities** with rich business logic
+- ✅ **11 Pure Mappers** for data transformation
+- ✅ **11 Repositories** following repository pattern
+- ✅ **Zero Infrastructure Dependencies** in domain layer
+- ✅ **100% Testable** domain logic without database
+
+[📚 Read Migration Guide](./CLEAN_ARCHITECTURE_MIGRATION_PLAN.md) | [📊 View Progress Report](./CLEAN_ARCHITECTURE_COMPLETION_REPORT.md)
+
+---
+
 ## 📋 TỔNG QUAN
 
 InternBridge là nền tảng kết nối thực tập sinh thông minh với các tính năng:

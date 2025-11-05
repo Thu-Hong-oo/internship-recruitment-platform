@@ -1,0 +1,246 @@
+{
+  "info": {
+    "name": "Roadmap API (Updated)",
+    "_postman_id": "roadmap-api-updated-collection",
+    "description": "Learning roadmap and skill development API with PATCH updates",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api/roadmaps",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Roadmap Management",
+      "item": [
+        {
+          "name": "Generate Roadmap",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetRole\": \"Full-stack Developer\",\n  \"currentSkills\": [\"JavaScript\", \"HTML\", \"CSS\"],\n  \"experienceLevel\": \"intermediate\",\n  \"timeframe\": \"6 months\",\n  \"focus\": \"backend\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/generate",
+              "host": ["{{baseUrl}}"],
+              "path": ["generate"]
+            },
+            "description": "Generate personalized learning roadmap based on user profile"
+          }
+        },
+        {
+          "name": "Get User Roadmaps",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/?page=1&limit=10&status=in_progress",
+              "host": ["{{baseUrl}}"],
+              "path": [""],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "status",
+                  "value": "in_progress",
+                  "description": "Filter by status: not_started, in_progress, completed"
+                }
+              ]
+            },
+            "description": "Get all roadmaps for logged-in candidate"
+          }
+        },
+        {
+          "name": "Get Roadmap By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:id",
+              "host": ["{{baseUrl}}"],
+              "path": [":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "ROADMAP_ID"
+                }
+              ]
+            },
+            "description": "Get detailed roadmap information"
+          }
+        },
+        {
+          "name": "Delete Roadmap",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:id",
+              "host": ["{{baseUrl}}"],
+              "path": [":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "ROADMAP_ID"
+                }
+              ]
+            },
+            "description": "Delete a roadmap"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Progress Tracking",
+      "item": [
+        {
+          "name": "Get Roadmap Progress",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:id/progress",
+              "host": ["{{baseUrl}}"],
+              "path": [":id", "progress"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "ROADMAP_ID"
+                }
+              ]
+            },
+            "description": "Get current progress for a roadmap"
+          }
+        },
+        {
+          "name": "Update Roadmap Progress",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"overallProgress\": 45,\n  \"currentPhase\": \"phase-2\",\n  \"completedItems\": [\"item-1\", \"item-2\", \"item-3\"],\n  \"notes\": \"Making good progress on backend fundamentals\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/:id/progress",
+              "host": ["{{baseUrl}}"],
+              "path": [":id", "progress"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "ROADMAP_ID"
+                }
+              ]
+            },
+            "description": "Update roadmap progress (partial update)"
+          }
+        },
+        {
+          "name": "Complete Roadmap Phase",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completedAt\": \"2024-11-05T10:30:00Z\",\n  \"notes\": \"Completed all phase objectives\",\n  \"achievements\": [\"mastered-nodejs\", \"built-rest-api\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/:id/phases/:phaseId/complete",
+              "host": ["{{baseUrl}}"],
+              "path": [":id", "phases", ":phaseId", "complete"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "ROADMAP_ID"
+                },
+                {
+                  "key": "phaseId",
+                  "value": "PHASE_ID"
+                }
+              ]
+            },
+            "description": "Mark a specific phase as completed"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Recommendations & Stats",
+      "item": [
+        {
+          "name": "Get Roadmap Recommendations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recommendations?limit=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["recommendations"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Get recommended roadmaps based on user profile and career goals"
+          }
+        },
+        {
+          "name": "Get Roadmap Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["stats"]
+            },
+            "description": "Get user's roadmap statistics (total, completed, in-progress, time spent, etc.)"
+          }
+        }
+      ]
+    }
+  ]
+}

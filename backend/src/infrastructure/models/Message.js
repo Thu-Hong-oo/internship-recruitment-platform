@@ -14,29 +14,54 @@ const MessageSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    content: { type: String, default: '' },
-    type: { type: String, default: 'text' },
+    content: {
+      type: String,
+      default: '',
+    },
+    type: {
+      type: String,
+      enum: ['TEXT', 'IMAGE', 'FILE', 'SYSTEM', 'AUDIO', 'VIDEO', 'LOCATION'],
+      default: 'TEXT',
+      index: true,
+    },
     attachments: [
       {
-        url: String,
-        type: String,
-        size: Number,
-        name: String,
+        url: { type: String, required: true },
+        type: { type: String },
+        size: { type: Number },
+        name: { type: String },
+        uploadedAt: { type: Date, default: Date.now },
       },
     ],
-    readBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    readBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
     deliveredAt: { type: Date, default: null },
     readAt: { type: Date, default: null },
-    isDeleted: { type: Boolean, default: false },
+    isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: { type: Date, default: null },
+    editedAt: { type: Date, default: null },
+    metadata: {
+      type: Map,
+      of: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
   },
   {
     timestamps: true,
   }
 );
 
-MessageSchema.index({ conversationId: 1 });
+// FIXED: Remove duplicate index (conversationId already has index: true above)
+// Compound indexes for efficient queries
+MessageSchema.index({ conversationId: 1, createdAt: -1 });
+MessageSchema.index({ conversationId: 1, isDeleted: 1 });
+MessageSchema.index({ senderId: 1, createdAt: -1 });
 
+// Legacy methods for backward compatibility (moved to domain entity)
 MessageSchema.methods.markAsRead = async function (userId) {
   if (!this.readBy.some(id => String(id) === String(userId))) {
     this.readBy.push(userId);
@@ -51,10 +76,11 @@ MessageSchema.methods.isReadBy = function (userId) {
 };
 
 MessageSchema.methods.canEdit = function () {
-  // Can edit within 5 minutes of sending
+  if (this.isDeleted) return false;
+  if (this.type !== 'TEXT') return false;
+
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-  // No system field createdAt, adjust logic if needed
-  return !this.isDeleted;
+  return this.createdAt > fiveMinutesAgo;
 };
 
 MessageSchema.methods.canDelete = function () {

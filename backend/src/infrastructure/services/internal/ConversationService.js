@@ -1,14 +1,18 @@
-const ConversationRepository = require('../../repositories/ConversationRepository');
-const MessageRepository = require('../../repositories/MessageRepository');
-const UserRepository = require('../../repositories/UserRepository');
-const ValidationService = require('./ValidationService');
-
+/**
+ * ConversationService - Handles conversation operations
+ * Dependencies injected via constructor for proper DI
+ */
 class ConversationService {
-  constructor() {
-    this.conversationRepository = new ConversationRepository();
-    this.messageRepository = new MessageRepository();
-    this.userRepository = new UserRepository();
-    this.validationService = new ValidationService();
+  constructor(
+    conversationRepository,
+    messageRepository,
+    userRepository,
+    validationService
+  ) {
+    this.conversationRepository = conversationRepository;
+    this.messageRepository = messageRepository;
+    this.userRepository = userRepository;
+    this.validationService = validationService;
   }
 
   async createConversation(conversationData) {
@@ -436,4 +440,4 @@ class ConversationService {
   }
 }
 
-module.exports = new ConversationService();
+module.exports = ConversationService;

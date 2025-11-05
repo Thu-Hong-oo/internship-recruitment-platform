@@ -11,8 +11,10 @@ const chatRoutes = require('./chat');
 const notificationRoutes = require('./notification');
 const roadmapRoutes = require('./roadmap');
 const skillRoutes = require('./skill');
+const industryRoutes = require('./industry');
 const adminRoutes = require('./admin');
-// const aiRoutes = require('./ai');
+const aiRoutes = require('./ai');
+const savedJobsRoutes = require('./savedJobs');
 
 // Health check route
 router.get('/health', (req, res) => {
@@ -34,8 +36,10 @@ router.use('/chat', chatRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/roadmaps', roadmapRoutes);
 router.use('/skills', skillRoutes);
+router.use('/industries', industryRoutes);
 router.use('/admin', adminRoutes);
-// router.use('/ai', aiRoutes);
+router.use('/ai', aiRoutes);
+router.use('/saved-jobs', savedJobsRoutes);
 
 // 404 handler for undefined routes
 router.use('*', (req, res) => {

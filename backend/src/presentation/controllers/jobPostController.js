@@ -1,12 +1,5 @@
 const asyncHandler = require('express-async-handler');
 const { logger } = require('../../shared/utils/logger');
-const {
-  createJobUseCase,
-  getAllJobsUseCase,
-  getJobUseCase,
-  updateJobUseCase,
-  deleteJobUseCase,
-} = require('../../infrastructure/config/diContainer');
 const JobResponseDTO = require('../dtos/JobResponseDTO');
 
 // @desc    Create job post
@@ -14,6 +7,9 @@ const JobResponseDTO = require('../dtos/JobResponseDTO');
 // @access  Private (Employer)
 const createJobPost = asyncHandler(async (req, res) => {
   try {
+    // Get use case from Awilix container (dependency injection)
+    const createJobUseCase = req.container.resolve('createJobUseCase');
+
     const result = await createJobUseCase.execute({
       employerId: req.user.employerId,
       jobData: req.body,
@@ -38,6 +34,9 @@ const createJobPost = asyncHandler(async (req, res) => {
 // @access  Public
 const getAllJobPosts = asyncHandler(async (req, res) => {
   try {
+    // Get use case from Awilix container (dependency injection)
+    const getAllJobsUseCase = req.container.resolve('getAllJobsUseCase');
+
     const result = await getAllJobsUseCase.execute({
       filters: req.query,
       options: {
@@ -69,6 +68,9 @@ const getAllJobPosts = asyncHandler(async (req, res) => {
 // @access  Public
 const getJobPost = asyncHandler(async (req, res) => {
   try {
+    // Get use case from Awilix container (dependency injection)
+    const getJobUseCase = req.container.resolve('getJobUseCase');
+
     const result = await getJobUseCase.execute(req.params.id);
 
     res.status(200).json({
@@ -89,6 +91,9 @@ const getJobPost = asyncHandler(async (req, res) => {
 // @access  Private (Employer)
 const updateJobPost = asyncHandler(async (req, res) => {
   try {
+    // Get use case from Awilix container (dependency injection)
+    const updateJobUseCase = req.container.resolve('updateJobUseCase');
+
     const result = await updateJobUseCase.execute({
       jobId: req.params.id,
       employerId: req.user.employerId,
@@ -114,6 +119,9 @@ const updateJobPost = asyncHandler(async (req, res) => {
 // @access  Private (Employer)
 const deleteJobPost = asyncHandler(async (req, res) => {
   try {
+    // Get use case from Awilix container (dependency injection)
+    const deleteJobUseCase = req.container.resolve('deleteJobUseCase');
+
     const result = await deleteJobUseCase.execute({
       jobId: req.params.id,
       employerId: req.user.employerId,

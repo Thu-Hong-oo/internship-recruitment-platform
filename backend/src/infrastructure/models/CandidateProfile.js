@@ -13,6 +13,7 @@ const CandidateProfileSchema = new mongoose.Schema(
       dateOfBirth: { type: Date },
       gender: { type: String },
       phone: { type: String },
+      avatarUrl: { type: String }, // Avatar URL
       address: {
         street: { type: String },
         city: { type: String },
@@ -64,10 +65,8 @@ const CandidateProfileSchema = new mongoose.Schema(
         currency: { type: String, default: 'VND' },
       },
     },
-    resume: {
-      url: { type: String },
-      uploadedAt: { type: Date },
-    },
+    // NOTE: CVs are managed in separate CV collection
+    // Use GET /api/candidates/cv to fetch candidate's CVs
     profileCompleteness: { type: Number, default: 0 },
     visibility: {
       type: String,

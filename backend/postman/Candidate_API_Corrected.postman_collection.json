@@ -1,0 +1,701 @@
+{
+  "info": {
+    "name": "Candidate API - Corrected",
+    "description": "Candidate-related endpoints based on actual source code (/api/candidates, /api/applications, /api/saved-jobs)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api"
+    },
+    {
+      "key": "candidateToken",
+      "value": ""
+    },
+    {
+      "key": "jobId",
+      "value": ""
+    },
+    {
+      "key": "applicationId",
+      "value": ""
+    },
+    {
+      "key": "cvId",
+      "value": ""
+    },
+    {
+      "key": "savedJobId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication Setup",
+      "item": [
+        {
+          "name": "Register Candidate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('candidateToken', response.data.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Jane Candidate\",\n  \"email\": \"jane.candidate@test.com\",\n  \"password\": \"password123\",\n  \"role\": \"candidate\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login Candidate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('candidateToken', response.data.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"jane.candidate@test.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profile Management",
+      "item": [
+        {
+          "name": "Create Profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"personalInfo\": {\n    \"firstName\": \"Jane\",\n    \"lastName\": \"Candidate\",\n    \"phone\": \"+84123456789\",\n    \"dateOfBirth\": \"1995-05-15\",\n    \"address\": {\n      \"city\": \"Ho Chi Minh\",\n      \"country\": \"Vietnam\"\n    }\n  },\n  \"summary\": \"Experienced software developer with 3+ years in web development\",\n  \"skills\": [\"JavaScript\", \"React\", \"Node.js\"],\n  \"preferences\": {\n    \"jobType\": \"full-time\",\n    \"salaryExpectation\": {\n      \"min\": 1500,\n      \"max\": 2500,\n      \"currency\": \"USD\"\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/candidates/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["candidates", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/candidates/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["candidates", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"summary\": \"Experienced full-stack developer with 4+ years in web development\",\n  \"skills\": [\"JavaScript\", \"React\", \"Node.js\", \"Python\", \"MongoDB\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/candidates/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["candidates", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Get Profile Completeness",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/candidates/completeness",
+              "host": ["{{baseUrl}}"],
+              "path": ["candidates", "completeness"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Avatar Management",
+      "item": [
+        {
+          "name": "Upload Avatar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "avatar",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/candidates/avatar",
+              "host": ["{{baseUrl}}"],
+              "path": ["candidates", "avatar"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "CV Management",
+      "item": [
+        {
+          "name": "Upload CV",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "cv",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/candidates/cv",
+              "host": ["{{baseUrl}}"],
+              "path": ["candidates", "cv"]
+            }
+          }
+        },
+        {
+          "name": "Get CVs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/candidates/cv",
+              "host": ["{{baseUrl}}"],
+              "path": ["candidates", "cv"]
+            }
+          }
+        },
+        {
+          "name": "Set Default CV",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/candidates/cv/{{cvId}}/default",
+              "host": ["{{baseUrl}}"],
+              "path": ["candidates", "cv", "{{cvId}}", "default"]
+            }
+          }
+        },
+        {
+          "name": "Delete CV",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/candidates/cv/{{cvId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["candidates", "cv", "{{cvId}}"]
+            }
+          }
+        },
+        {
+          "name": "Analyze CV",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/candidates/cv/{{cvId}}/analyze",
+              "host": ["{{baseUrl}}"],
+              "path": ["candidates", "cv", "{{cvId}}", "analyze"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Education & Experience",
+      "item": [
+        {
+          "name": "Add Education",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"institution\": \"Ho Chi Minh City University of Technology\",\n  \"degree\": \"Bachelor of Computer Science\",\n  \"fieldOfStudy\": \"Software Engineering\",\n  \"startDate\": \"2017-09-01\",\n  \"endDate\": \"2021-06-30\",\n  \"gpa\": 3.5\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/candidates/education",
+              "host": ["{{baseUrl}}"],
+              "path": ["candidates", "education"]
+            }
+          }
+        },
+        {
+          "name": "Add Experience",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company\": \"TechCorp Vietnam\",\n  \"position\": \"Junior Software Developer\",\n  \"description\": \"Developed web applications using React and Node.js\",\n  \"startDate\": \"2021-07-01\",\n  \"endDate\": \"2023-12-31\",\n  \"technologies\": [\"React\", \"Node.js\", \"MongoDB\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/candidates/experience",
+              "host": ["{{baseUrl}}"],
+              "path": ["candidates", "experience"]
+            }
+          }
+        },
+        {
+          "name": "Update Skills",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"skills\": [\n    {\n      \"name\": \"JavaScript\",\n      \"level\": \"advanced\",\n      \"yearsOfExperience\": 3\n    },\n    {\n      \"name\": \"React\",\n      \"level\": \"intermediate\",\n      \"yearsOfExperience\": 2\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/candidates/skills",
+              "host": ["{{baseUrl}}"],
+              "path": ["candidates", "skills"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Job Applications",
+      "item": [
+        {
+          "name": "Apply for Job",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.data && response.data._id) {",
+                  "        pm.collectionVariables.set('applicationId', response.data._id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": \"{{jobId}}\",\n  \"coverLetter\": \"I am very interested in this position and believe my skills would be a great fit.\",\n  \"cvId\": \"{{cvId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/applications",
+              "host": ["{{baseUrl}}"],
+              "path": ["applications"]
+            }
+          }
+        },
+        {
+          "name": "Get Candidate Applications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/applications/candidate?page=1&limit=10&status=pending",
+              "host": ["{{baseUrl}}"],
+              "path": ["applications", "candidate"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "status",
+                  "value": "pending"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Application By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/applications/{{applicationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["applications", "{{applicationId}}"]
+            }
+          }
+        },
+        {
+          "name": "Withdraw Application",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Found another opportunity\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/applications/{{applicationId}}/withdraw",
+              "host": ["{{baseUrl}}"],
+              "path": ["applications", "{{applicationId}}", "withdraw"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Saved Jobs",
+      "item": [
+        {
+          "name": "Save Job",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.data && response.data._id) {",
+                  "        pm.collectionVariables.set('savedJobId', response.data._id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": \"{{jobId}}\",\n  \"folder\": \"Favorites\",\n  \"tags\": [\"remote\", \"javascript\"],\n  \"notes\": \"Interesting position, good salary range\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/saved-jobs",
+              "host": ["{{baseUrl}}"],
+              "path": ["saved-jobs"]
+            }
+          }
+        },
+        {
+          "name": "Get Saved Jobs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/saved-jobs?page=1&limit=10&folder=Favorites",
+              "host": ["{{baseUrl}}"],
+              "path": ["saved-jobs"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "folder",
+                  "value": "Favorites"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Saved Job",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"folder\": \"Applied\",\n  \"notes\": \"Already applied for this position\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/saved-jobs/{{savedJobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["saved-jobs", "{{savedJobId}}"]
+            }
+          }
+        },
+        {
+          "name": "Remove Saved Job",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/saved-jobs/{{savedJobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["saved-jobs", "{{savedJobId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Saved Jobs Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/saved-jobs/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["saved-jobs", "stats"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Statistics",
+      "item": [
+        {
+          "name": "Get Candidate Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/candidates/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["candidates", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Get Application Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/applications/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["applications", "stats"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

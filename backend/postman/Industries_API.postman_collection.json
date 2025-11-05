@@ -1,0 +1,322 @@
+{
+  "info": {
+    "name": "Industries API",
+    "_postman_id": "industries-api-collection",
+    "description": "Industry management and discovery API with multilingual support",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api/industries",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Public Endpoints",
+      "item": [
+        {
+          "name": "Get All Industries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/?page=1&limit=50&visible=true",
+              "host": ["{{baseUrl}}"],
+              "path": [""],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "visible",
+                  "value": "true",
+                  "description": "Filter by visibility"
+                }
+              ]
+            },
+            "description": "Get all industries with pagination and filtering"
+          }
+        },
+        {
+          "name": "Get Active Industries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/active",
+              "host": ["{{baseUrl}}"],
+              "path": ["active"]
+            },
+            "description": "Get only active/visible industries"
+          }
+        },
+        {
+          "name": "Search Industries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search?q=technology&lang=en",
+              "host": ["{{baseUrl}}"],
+              "path": ["search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "technology",
+                  "description": "Search query"
+                },
+                {
+                  "key": "lang",
+                  "value": "en",
+                  "description": "Language: vi or en"
+                }
+              ]
+            },
+            "description": "Search industries by name or keywords (multilingual)"
+          }
+        },
+        {
+          "name": "Get Industry Trends",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/trends?limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["trends"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Get trending industries based on job posts and applications"
+          }
+        },
+        {
+          "name": "Get Industry By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:id",
+              "host": ["{{baseUrl}}"],
+              "path": [":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "INDUSTRY_ID"
+                }
+              ]
+            },
+            "description": "Get detailed industry information"
+          }
+        },
+        {
+          "name": "Get Industry Statistics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:id/stats",
+              "host": ["{{baseUrl}}"],
+              "path": [":id", "stats"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "INDUSTRY_ID"
+                }
+              ]
+            },
+            "description": "Get statistics for an industry (jobs, candidates, applications)"
+          }
+        },
+        {
+          "name": "Get Companies in Industry",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:id/companies?page=1&limit=20&verified=true",
+              "host": ["{{baseUrl}}"],
+              "path": [":id", "companies"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "verified",
+                  "value": "true",
+                  "description": "Filter verified companies"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "INDUSTRY_ID"
+                }
+              ]
+            },
+            "description": "Get all companies operating in this industry"
+          }
+        },
+        {
+          "name": "Get Jobs in Industry",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:id/jobs?page=1&limit=20&status=active",
+              "host": ["{{baseUrl}}"],
+              "path": [":id", "jobs"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "active",
+                  "description": "Filter by job status"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "INDUSTRY_ID"
+                }
+              ]
+            },
+            "description": "Get all active job posts in this industry"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin Endpoints",
+      "item": [
+        {
+          "name": "Create Industry",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"tech-software\",\n  \"parentCode\": \"tech\",\n  \"name\": {\n    \"vi\": \"Phát triển Phần mềm\",\n    \"en\": \"Software Development\"\n  },\n  \"description\": {\n    \"vi\": \"Ngành phát triển phần mềm và ứng dụng\",\n    \"en\": \"Software and application development industry\"\n  },\n  \"keywords\": [\"software\", \"programming\", \"development\", \"IT\"],\n  \"color\": \"#3b82f6\",\n  \"icon\": \"code\",\n  \"visible\": true,\n  \"sortOrder\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            },
+            "description": "Create a new industry (Admin only)"
+          }
+        },
+        {
+          "name": "Update Industry",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": {\n    \"vi\": \"Phát triển Phần mềm (Updated)\",\n    \"en\": \"Software Development (Updated)\"\n  },\n  \"description\": {\n    \"vi\": \"Mô tả đã cập nhật\",\n    \"en\": \"Updated description\"\n  },\n  \"keywords\": [\"software\", \"programming\", \"coding\", \"tech\"],\n  \"visible\": true,\n  \"sortOrder\": 2\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/:id",
+              "host": ["{{baseUrl}}"],
+              "path": [":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "INDUSTRY_ID"
+                }
+              ]
+            },
+            "description": "Update industry information (Admin only, partial update)"
+          }
+        },
+        {
+          "name": "Delete Industry",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:id",
+              "host": ["{{baseUrl}}"],
+              "path": [":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "INDUSTRY_ID"
+                }
+              ]
+            },
+            "description": "Delete an industry (Admin only)"
+          }
+        }
+      ]
+    }
+  ]
+}

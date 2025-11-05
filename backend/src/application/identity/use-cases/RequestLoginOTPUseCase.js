@@ -1,5 +1,5 @@
 const User = require('../../../infrastructure/models/User');
-const EmailService = require('../../../infrastructure/services/external/EmailService');
+const EmailService = require('../../../infrastructure/services/external/core/EmailService');
 const { logger } = require('../../../shared/utils/logger');
 const { generateAndStoreOTP } = require('../../../shared/utils/otpHelpers');
 

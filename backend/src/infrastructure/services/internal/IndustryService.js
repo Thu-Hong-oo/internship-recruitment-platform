@@ -1,14 +1,18 @@
-const IndustryRepository = require('../../repositories/IndustryRepository');
-const CompanyRepository = require('../../repositories/CompanyRepository');
-const JobRepository = require('../../repositories/JobRepository');
-const ValidationService = require('./ValidationService');
-
+/**
+ * IndustryService - Handles industry operations
+ * Dependencies injected via constructor for proper DI
+ */
 class IndustryService {
-  constructor() {
-    this.industryRepository = new IndustryRepository();
-    this.companyRepository = new CompanyRepository();
-    this.jobRepository = new JobRepository();
-    this.validationService = new ValidationService();
+  constructor(
+    industryRepository,
+    companyRepository,
+    jobRepository,
+    validationService
+  ) {
+    this.industryRepository = industryRepository;
+    this.companyRepository = companyRepository;
+    this.jobRepository = jobRepository;
+    this.validationService = validationService;
   }
 
   async createIndustry(industryData) {
@@ -377,6 +381,4 @@ class IndustryService {
   }
 }
 
-module.exports = new IndustryService();
-
-
+module.exports = IndustryService;

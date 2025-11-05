@@ -2,17 +2,14 @@ const asyncHandler = require('express-async-handler');
 const { logger } = require('../../shared/utils/logger');
 const ApplicationResponseDTO = require('../dtos/ApplicationResponseDTO');
 
-// Import use cases from DI container
-const {
-  applyForJobUseCase,
-  getCandidateApplicationsUseCase,
-} = require('../../infrastructure/config/diContainer');
-
 // @desc    Apply for job
 // @route   POST /api/applications
 // @access  Private (Candidate)
 const applyForJob = asyncHandler(async (req, res) => {
   try {
+    // Get use case from Awilix container (dependency injection)
+    const applyForJobUseCase = req.container.resolve('applyForJobUseCase');
+
     const result = await applyForJobUseCase.execute({
       candidateId: req.user.candidateId,
       jobId: req.body.jobId,
@@ -66,6 +63,11 @@ const applyForJob = asyncHandler(async (req, res) => {
 // @access  Private (Candidate)
 const getCandidateApplications = asyncHandler(async (req, res) => {
   try {
+    // Get use case from Awilix container (dependency injection)
+    const getCandidateApplicationsUseCase = req.container.resolve(
+      'getCandidateApplicationsUseCase'
+    );
+
     const result = await getCandidateApplicationsUseCase.execute({
       candidateId: req.user.candidateId,
       filters: req.query,

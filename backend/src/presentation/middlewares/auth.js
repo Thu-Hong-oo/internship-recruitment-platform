@@ -21,7 +21,9 @@ const authenticateToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log('Decoded token:', decoded);
 
-    const user = await User.findById(decoded.id);
+    const user = await User.findById(decoded.id).populate(
+      'candidateProfile employerProfile'
+    );
     console.log('User found:', !!user, user ? user.email : 'None');
     if (!user) {
       console.log('User not found for ID:', decoded.id);
@@ -46,6 +48,8 @@ const authenticateToken = async (req, res, next) => {
       email: user.email,
       role: user.role,
       status: user.status,
+      candidateId: user.candidateProfile?._id,
+      employerId: user.employerProfile?._id,
     };
 
     console.log('Authentication successful for:', user.email);

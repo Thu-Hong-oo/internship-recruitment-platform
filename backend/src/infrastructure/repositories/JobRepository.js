@@ -1,32 +1,43 @@
-const Job = require('../models/JobPost');
+const JobModel = require('../models/JobPost');
 const IJobRepository = require('../../application/recruitment/repositories/IJobRepository');
+const JobPostingMapper = require('../mappers/JobPostingMapper');
 
 /**
  * JobRepository
  * Infrastructure layer implementation of IJobRepository
+ * Converts between JobPosting Domain Entities and Mongoose Models
  */
 class JobRepository extends IJobRepository {
   async create(jobData) {
-    const job = new Job(jobData);
-    return await job.save();
+    // jobData can be either Domain Entity or plain object
+    const mongooseData =
+      jobData.constructor.name === 'JobPosting'
+        ? JobPostingMapper.toMongoose(jobData)
+        : jobData;
+
+    const doc = new JobModel(mongooseData);
+    await doc.save();
+    return JobPostingMapper.toDomain(doc);
   }
 
   async findById(jobId) {
-    return await Job.findById(jobId)
+    const doc = await JobModel.findById(jobId)
       .populate(
         'employer',
         'company.name company.logo company.industry company.description company.website company.size company.officeAddress'
       )
       .populate('postedBy', 'fullName name email avatar');
+    return JobPostingMapper.toDomain(doc);
   }
 
   async findBySlug(slug) {
-    return await Job.findOne({ slug })
+    const doc = await JobModel.findOne({ slug })
       .populate(
         'employer',
         'company.name company.logo company.industry company.description company.website company.size company.officeAddress'
       )
       .populate('postedBy', 'fullName name email avatar');
+    return JobPostingMapper.toDomain(doc);
   }
 
   async findAll(filters, options = {}) {
@@ -45,7 +56,7 @@ class JobRepository extends IJobRepository {
     const sortObj = {};
     sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
-    const jobs = await Job.find(query)
+    const jobDocs = await JobModel.find(query)
       .populate(
         'employer',
         'company.name company.logo company.industry company.description company.website company.size company.officeAddress'
@@ -55,7 +66,10 @@ class JobRepository extends IJobRepository {
       .skip(skip)
       .limit(parseInt(limit));
 
-    const total = await Job.countDocuments(query);
+    const total = await JobModel.countDocuments(query);
+
+    // Convert to domain entities
+    const jobs = jobDocs.map(doc => JobPostingMapper.toDomain(doc));
 
     return {
       jobs,
@@ -73,11 +87,14 @@ class JobRepository extends IJobRepository {
   }
 
   async updateById(jobId, updateData) {
-    return await Job.findByIdAndUpdate(jobId, updateData, { new: true });
+    const doc = await JobModel.findByIdAndUpdate(jobId, updateData, {
+      new: true,
+    });
+    return doc ? JobPostingMapper.toDomain(doc) : null;
   }
 
   async deleteById(jobId) {
-    const result = await Job.findByIdAndDelete(jobId);
+    const result = await JobModel.findByIdAndDelete(jobId);
     return !!result;
   }
 
@@ -85,12 +102,15 @@ class JobRepository extends IJobRepository {
     const { page = 1, limit = 10 } = options;
     const skip = (page - 1) * limit;
 
-    const jobs = await Job.find({ employerId })
+    const jobDocs = await JobModel.find({ employerId })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
 
-    const total = await Job.countDocuments({ employerId });
+    const total = await JobModel.countDocuments({ employerId });
+
+    // Convert to domain entities
+    const jobs = jobDocs.map(doc => JobPostingMapper.toDomain(doc));
 
     return {
       jobs,
@@ -104,24 +124,28 @@ class JobRepository extends IJobRepository {
   }
 
   async findDraftByEmployerId(employerId) {
-    return await Job.find({
+    const docs = await JobModel.find({
       employerId,
       status: 'draft',
     }).sort({ createdAt: -1 });
+
+    return docs.map(doc => JobPostingMapper.toDomain(doc));
   }
 
   async findRecent(limit = 10) {
-    return await Job.find({ status: 'published' })
+    const docs = await JobModel.find({ status: 'published' })
       .populate('employer', 'company.name company.logo')
       .sort({ createdAt: -1 })
       .limit(parseInt(limit));
+
+    return docs.map(doc => JobPostingMapper.toDomain(doc));
   }
 
   async getJobApplications(jobId, options = {}) {
     const { page = 1, limit = 10 } = options;
     const skip = (page - 1) * limit;
 
-    const job = await Job.findById(jobId).populate({
+    const jobDoc = await JobModel.findById(jobId).populate({
       path: 'applications',
       options: {
         skip,
@@ -134,12 +158,14 @@ class JobRepository extends IJobRepository {
       },
     });
 
-    if (!job) return null;
+    if (!jobDoc) return null;
 
-    const total = job.applications.length;
+    const total = jobDoc.applications.length;
 
+    // Note: applications are not domain entities yet, return as-is
+    // Will be converted when Application domain entity is created
     return {
-      applications: job.applications,
+      applications: jobDoc.applications,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -150,41 +176,43 @@ class JobRepository extends IJobRepository {
   }
 
   async getJobStats(jobId) {
-    const job = await Job.findById(jobId);
-    if (!job) return null;
+    const jobDoc = await JobModel.findById(jobId);
+    if (!jobDoc) return null;
 
-    const applicationsCount = await Job.countDocuments({
+    const applicationsCount = await JobModel.countDocuments({
       _id: jobId,
       'applications.0': { $exists: true },
     });
-    const viewsCount = job.views || 0;
+    const viewsCount = jobDoc.views || 0;
 
     return {
       applicationsCount,
       viewsCount,
-      status: job.status,
-      createdAt: job.createdAt,
+      status: jobDoc.status,
+      createdAt: jobDoc.createdAt,
     };
   }
 
   async incrementViews(jobId) {
-    return await Job.findByIdAndUpdate(
+    const doc = await JobModel.findByIdAndUpdate(
       jobId,
       { $inc: { views: 1 } },
       { new: true }
     );
+    return doc ? JobPostingMapper.toDomain(doc) : null;
   }
 
   async submitForReview(jobId) {
-    return await Job.findByIdAndUpdate(
+    const doc = await JobModel.findByIdAndUpdate(
       jobId,
       { status: 'pending_review' },
       { new: true }
     );
+    return doc ? JobPostingMapper.toDomain(doc) : null;
   }
 
   async count(criteria = {}) {
-    return await Job.countDocuments(criteria);
+    return await JobModel.countDocuments(criteria);
   }
 
   /**

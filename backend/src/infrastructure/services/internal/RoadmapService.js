@@ -1,16 +1,22 @@
-const RoadmapRepository = require('../../repositories/RoadmapRepository');
-const CandidateRepository = require('../../repositories/CandidateRepository');
-const SkillRepository = require('../../repositories/SkillRepository');
-const GeminiAIService = require('../external/GeminiAIService');
-const ValidationService = require('./ValidationService');
-const QueueService = require('../external/QueueService');
-
+/**
+ * RoadmapService - Handles roadmap generation operations
+ * Dependencies injected via constructor for proper DI
+ */
 class RoadmapService {
-  constructor() {
-    this.roadmapRepository = new RoadmapRepository();
-    this.candidateRepository = new CandidateRepository();
-    this.skillRepository = new SkillRepository();
-    this.validationService = new ValidationService();
+  constructor(
+    roadmapRepository,
+    candidateRepository,
+    skillRepository,
+    geminiAIService,
+    validationService,
+    queueService
+  ) {
+    this.roadmapRepository = roadmapRepository;
+    this.candidateRepository = candidateRepository;
+    this.skillRepository = skillRepository;
+    this.geminiAIService = geminiAIService;
+    this.validationService = validationService;
+    this.queueService = queueService;
   }
 
   async generateRoadmap(candidateId, roadmapData) {
@@ -24,7 +30,7 @@ class RoadmapService {
       }
 
       // Generate roadmap using AI
-      const roadmapContent = await GeminiAIService.generateRoadmap(
+      const roadmapContent = await this.geminiAIService.generateRoadmap(
         targetSkills,
         currentSkills,
         preferences
@@ -392,4 +398,4 @@ class RoadmapService {
   }
 }
 
-module.exports = new RoadmapService();
+module.exports = RoadmapService;

@@ -2,56 +2,36 @@ const asyncHandler = require('express-async-handler');
 const { logger } = require('../../shared/utils/logger');
 const CandidateProfileResponseDTO = require('../dtos/CandidateProfileResponseDTO');
 
-// Import use cases from DI container
-const {
-  createCandidateProfileUseCase,
-  getCandidateProfileUseCase,
-  updateCandidateProfileUseCase,
-} = require('../../infrastructure/config/diContainer');
+// Import services (only for infrastructure operations)
+const UnifiedUploadService = require('../../infrastructure/services/external/core/UnifiedUploadService');
+const User = require('../../infrastructure/models/User');
 
-// @desc    Create candidate profile
-// @route   POST /api/candidates/profile
-// @access  Private (Candidate)
-const createProfile = asyncHandler(async (req, res) => {
-  try {
-    const result = await createCandidateProfileUseCase.execute({
-      userId: req.user.id,
-      profileData: req.body,
-    });
-
-    res.status(201).json({
-      success: true,
-      message: result.message,
-      data: CandidateProfileResponseDTO.fromCandidateProfile(result.candidate),
-    });
-  } catch (error) {
-    if (error.message === 'PROFILE_ALREADY_EXISTS') {
-      return res.status(400).json({
-        success: false,
-        error: 'Hồ sơ ứng viên đã tồn tại',
-      });
-    }
-
-    logger.error('Create candidate profile error:', error);
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
+// ========================================================================
+// NOTE: CREATE PROFILE ENDPOINT REMOVED
+// Profile is now automatically created after email verification
+// See: authController.js -> verifyEmail() for auto-creation logic
+// ========================================================================
 
 // @desc    Get candidate profile
 // @route   GET /api/candidates/profile
 // @access  Private (Candidate)
 const getProfile = asyncHandler(async (req, res) => {
   try {
-    const result = await getCandidateProfileUseCase.execute({
-      candidateId: req.user.candidateId,
-    });
+    // Get use case from Awilix container (dependency injection)
+    const getCandidateProfileUseCase = req.container.resolve(
+      'getCandidateProfileUseCase'
+    );
+
+    // Use candidateId if available, otherwise use userId to find by user reference
+    const queryParam = req.user.candidateId
+      ? { candidateId: req.user.candidateId }
+      : { userId: req.user.id };
+
+    const result = await getCandidateProfileUseCase.execute(queryParam);
 
     res.status(200).json({
       success: true,
-      data: CandidateProfileResponseDTO.fromCandidateProfile(result.candidate),
+      data: new CandidateProfileResponseDTO(result.candidate).toJSON(),
     });
   } catch (error) {
     if (error.message === 'CANDIDATE_NOT_FOUND') {
@@ -74,15 +54,25 @@ const getProfile = asyncHandler(async (req, res) => {
 // @access  Private (Candidate)
 const updateProfile = asyncHandler(async (req, res) => {
   try {
+    // Get use case from Awilix container (dependency injection)
+    const updateCandidateProfileUseCase = req.container.resolve(
+      'updateCandidateProfileUseCase'
+    );
+
+    // Use candidateId if available, otherwise use userId to find by user reference
+    const queryParam = req.user.candidateId
+      ? { candidateId: req.user.candidateId }
+      : { userId: req.user.id };
+
     const result = await updateCandidateProfileUseCase.execute({
-      candidateId: req.user.candidateId,
+      ...queryParam,
       profileData: req.body,
     });
 
     res.status(200).json({
       success: true,
       message: result.message,
-      data: CandidateProfileResponseDTO.fromCandidateProfile(result.candidate),
+      data: new CandidateProfileResponseDTO(result.candidate).toJSON(),
     });
   } catch (error) {
     if (error.message === 'CANDIDATE_NOT_FOUND') {
@@ -105,6 +95,9 @@ const updateProfile = asyncHandler(async (req, res) => {
 // @access  Private (Candidate)
 const uploadCV = asyncHandler(async (req, res) => {
   try {
+    // Get use case from Awilix container (dependency injection)
+    const uploadCVUseCase = req.container.resolve('uploadCVUseCase');
+
     if (!req.file) {
       return res.status(400).json({
         success: false,
@@ -112,10 +105,10 @@ const uploadCV = asyncHandler(async (req, res) => {
       });
     }
 
-    const result = await CandidateService.uploadCV(
-      req.user.candidateId,
-      req.file
-    );
+    const result = await uploadCVUseCase.execute({
+      candidateId: req.user.candidateId,
+      file: req.file,
+    });
 
     res.status(201).json({
       success: true,
@@ -136,7 +129,14 @@ const uploadCV = asyncHandler(async (req, res) => {
 // @access  Private (Candidate)
 const getCVs = asyncHandler(async (req, res) => {
   try {
-    const result = await CandidateService.getCVs(req.user.candidateId);
+    // Get use case from Awilix container (dependency injection)
+    const getCandidateCVsUseCase = req.container.resolve(
+      'getCandidateCVsUseCase'
+    );
+
+    const result = await getCandidateCVsUseCase.execute({
+      candidateId: req.user.candidateId,
+    });
 
     res.status(200).json({
       success: true,
@@ -151,15 +151,63 @@ const getCVs = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    View/Download CV - Stream file through backend
+// @route   GET /api/candidates/cv/:cvId/file?mode=view|download
+// @access  Private (Candidate)
+const proxyCVFile = asyncHandler(async (req, res) => {
+  try {
+    const viewCVUseCase = req.container.resolve('viewCVUseCase');
+    const mode = req.query.mode || 'view';
+
+    // Fetch CV file from Cloudinary
+    const result = await viewCVUseCase.proxyFile({
+      cvId: req.params.cvId,
+      candidateId: req.user.candidateId,
+      mode,
+    });
+
+    // Set headers for PDF viewing/downloading
+    res.setHeader('Content-Type', result.mimeType);
+
+    if (mode === 'download') {
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${encodeURIComponent(result.fileName)}"`
+      );
+    } else {
+      res.setHeader(
+        'Content-Disposition',
+        `inline; filename="${encodeURIComponent(result.fileName)}"`
+      );
+    }
+
+    // Send file buffer
+    res.send(result.buffer);
+
+    logger.info('CV file streamed successfully', {
+      cvId: req.params.cvId,
+      mode,
+      fileName: result.fileName,
+    });
+  } catch (error) {
+    logger.error('Proxy CV file error:', error);
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 // @desc    Set default CV
 // @route   PUT /api/candidates/cv/:cvId/default
 // @access  Private (Candidate)
 const setDefaultCV = asyncHandler(async (req, res) => {
   try {
-    const result = await CandidateService.setDefaultCV(
-      req.user.candidateId,
-      req.params.cvId
-    );
+    const setDefaultCVUseCase = req.container.resolve('setDefaultCVUseCase');
+    const result = await setDefaultCVUseCase.execute({
+      candidateId: req.user.candidateId,
+      cvId: req.params.cvId,
+    });
 
     res.status(200).json({
       success: true,
@@ -175,15 +223,92 @@ const setDefaultCV = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Update CV name
+// @route   PATCH /api/candidates/cv/:cvId
+// @access  Private (Candidate)
+const updateCV = asyncHandler(async (req, res) => {
+  try {
+    const cvRepository = req.container.resolve('cvRepository');
+    const { fileName } = req.body; // Đổi từ originalName sang fileName để thống nhất
+
+    if (!fileName || !fileName.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Tên file không được để trống',
+      });
+    }
+
+    // Get CV
+    const cv = await cvRepository.findById(req.params.cvId);
+    if (!cv) {
+      return res.status(404).json({
+        success: false,
+        error: 'CV không tồn tại',
+      });
+    }
+
+    // Check ownership
+    if (cv.candidateId.toString() !== req.user.candidateId.toString()) {
+      return res.status(403).json({
+        success: false,
+        error: 'Không có quyền cập nhật CV này',
+      });
+    }
+
+    // Get file extension from mimeType or current name
+    let extension = '';
+    if (cv.originalName && cv.originalName.includes('.')) {
+      const parts = cv.originalName.split('.');
+      extension = `.${parts[parts.length - 1]}`;
+    } else if (cv.mimeType) {
+      if (cv.mimeType.includes('pdf')) extension = '.pdf';
+      else if (cv.mimeType.includes('word')) extension = '.docx';
+    }
+
+    // Add extension if not present
+    let newFileName = fileName.trim();
+    if (
+      extension &&
+      !newFileName.toLowerCase().endsWith(extension.toLowerCase())
+    ) {
+      newFileName = `${newFileName}${extension}`;
+    }
+
+    // Update CV name
+    const updatedCV = await cvRepository.update(req.params.cvId, {
+      originalName: newFileName,
+    });
+
+    logger.info('CV name updated', {
+      cvId: req.params.cvId,
+      oldName: cv.originalName,
+      newName: newFileName,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Đổi tên CV thành công',
+      data: updatedCV.toClientJSON(),
+    });
+  } catch (error) {
+    logger.error('Update CV error:', error);
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 // @desc    Delete CV
 // @route   DELETE /api/candidates/cv/:cvId
 // @access  Private (Candidate)
 const deleteCV = asyncHandler(async (req, res) => {
   try {
-    const result = await CandidateService.deleteCV(
-      req.user.candidateId,
-      req.params.cvId
-    );
+    const deleteCVUseCase = req.container.resolve('deleteCVUseCase');
+    const result = await deleteCVUseCase.execute({
+      candidateId: req.user.candidateId,
+      cvId: req.params.cvId,
+    });
 
     res.status(200).json({
       success: true,
@@ -203,7 +328,12 @@ const deleteCV = asyncHandler(async (req, res) => {
 // @access  Private (Candidate)
 const analyzeCV = asyncHandler(async (req, res) => {
   try {
-    const result = await CandidateService.analyzeCV(req.params.cvId);
+    const getCandidateProfileUseCase = req.container.resolve(
+      'getCandidateProfileUseCase'
+    );
+    const result = await getCandidateProfileUseCase.execute({
+      cvId: req.params.cvId,
+    });
 
     res.status(200).json({
       success: true,
@@ -219,86 +349,17 @@ const analyzeCV = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Add education
-// @route   POST /api/candidates/education
-// @access  Private (Candidate)
-const addEducation = asyncHandler(async (req, res) => {
-  try {
-    const result = await CandidateService.addEducation(
-      req.user.candidateId,
-      req.body
-    );
-
-    res.status(201).json({
-      success: true,
-      message: result.message,
-      data: CandidateProfileResponseDTO.fromCandidateProfile(result.candidate),
-    });
-  } catch (error) {
-    logger.error('Add education error:', error);
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// @desc    Add experience
-// @route   POST /api/candidates/experience
-// @access  Private (Candidate)
-const addExperience = asyncHandler(async (req, res) => {
-  try {
-    const result = await CandidateService.addExperience(
-      req.user.candidateId,
-      req.body
-    );
-
-    res.status(201).json({
-      success: true,
-      message: result.message,
-      data: CandidateProfileResponseDTO.fromCandidateProfile(result.candidate),
-    });
-  } catch (error) {
-    logger.error('Add experience error:', error);
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
-// @desc    Update skills
-// @route   PUT /api/candidates/skills
-// @access  Private (Candidate)
-const updateSkills = asyncHandler(async (req, res) => {
-  try {
-    const result = await CandidateService.updateSkills(
-      req.user.candidateId,
-      req.body.skills
-    );
-
-    res.status(200).json({
-      success: true,
-      message: result.message,
-      data: CandidateProfileResponseDTO.fromCandidateProfile(result.candidate),
-    });
-  } catch (error) {
-    logger.error('Update skills error:', error);
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
-
 // @desc    Get profile completeness
 // @route   GET /api/candidates/completeness
 // @access  Private (Candidate)
 const getProfileCompleteness = asyncHandler(async (req, res) => {
   try {
-    const result = await CandidateService.getProfileCompleteness(
-      req.user.candidateId
+    const getCandidateProfileUseCase = req.container.resolve(
+      'getCandidateProfileUseCase'
     );
+    const result = await getCandidateProfileUseCase.execute({
+      candidateId: req.user.candidateId,
+    });
 
     res.status(200).json({
       success: true,
@@ -321,9 +382,12 @@ const getProfileCompleteness = asyncHandler(async (req, res) => {
 // @access  Private (Candidate)
 const getCandidateStats = asyncHandler(async (req, res) => {
   try {
-    const result = await CandidateService.getCandidateStats(
-      req.user.candidateId
+    const getCandidateProfileUseCase = req.container.resolve(
+      'getCandidateProfileUseCase'
     );
+    const result = await getCandidateProfileUseCase.execute({
+      candidateId: req.user.candidateId,
+    });
 
     res.status(200).json({
       success: true,
@@ -343,7 +407,10 @@ const getCandidateStats = asyncHandler(async (req, res) => {
 // @access  Private (Employer)
 const searchCandidates = asyncHandler(async (req, res) => {
   try {
-    const result = await CandidateService.searchCandidates(req.query);
+    const getCandidateProfileUseCase = req.container.resolve(
+      'getCandidateProfileUseCase'
+    );
+    const result = await getCandidateProfileUseCase.execute(req.query);
 
     res.status(200).json({
       success: true,
@@ -361,18 +428,76 @@ const searchCandidates = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Upload candidate avatar
+// @route   POST /api/candidates/avatar
+// @access  Private (Candidate)
+const uploadAvatar = asyncHandler(async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'Vui lòng chọn file ảnh để upload',
+      });
+    }
+
+    // Get user ID
+    const userId = req.user.userId || req.user.id;
+
+    // UnifiedUploadService expects an object with file, type, and userId
+    const uploadResult = await UnifiedUploadService.uploadFile({
+      file: req.file,
+      type: 'avatar',
+      userId: userId,
+    });
+
+    // Update User.avatarUrl
+    await User.findByIdAndUpdate(userId, {
+      avatarUrl: uploadResult.url,
+    });
+
+    // Get updated candidate profile using use case from container
+    const getCandidateProfileUseCase = req.container.resolve(
+      'getCandidateProfileUseCase'
+    );
+    const result = await getCandidateProfileUseCase.execute({
+      userId: userId,
+    });
+
+    logger.info(`Candidate avatar uploaded successfully: ${userId}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Upload avatar thành công',
+      data: new CandidateProfileResponseDTO(result.candidate).toJSON(),
+    });
+  } catch (error) {
+    if (error.message === 'CANDIDATE_NOT_FOUND') {
+      return res.status(404).json({
+        success: false,
+        error: 'Không tìm thấy hồ sơ ứng viên',
+      });
+    }
+
+    logger.error('Upload candidate avatar error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Lỗi khi upload avatar',
+    });
+  }
+});
+
 module.exports = {
-  createProfile,
+  // createProfile removed - profile auto-created on email verification
   getProfile,
   updateProfile,
+  uploadAvatar,
   uploadCV,
   getCVs,
+  proxyCVFile,
+  updateCV,
   setDefaultCV,
   deleteCV,
   analyzeCV,
-  addEducation,
-  addExperience,
-  updateSkills,
   getProfileCompleteness,
   getCandidateStats,
   searchCandidates,

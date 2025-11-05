@@ -7,8 +7,42 @@
 class CandidateProfileResponseDTO {
   constructor(candidateProfileModel) {
     this.id = candidateProfileModel._id;
-    this.userId = candidateProfileModel.userId;
+
+    // Handle userId - extract string ID whether populated or not
+    this.userId =
+      typeof candidateProfileModel.userId === 'object' &&
+      candidateProfileModel.userId?._id
+        ? candidateProfileModel.userId._id.toString()
+        : candidateProfileModel.userId?.toString() ||
+          candidateProfileModel.userId;
+
     this.personalInfo = candidateProfileModel.personalInfo || {};
+
+    // Get avatar from User model (populated userId)
+    this.avatarUrl = null;
+    if (
+      candidateProfileModel.userId &&
+      typeof candidateProfileModel.userId === 'object'
+    ) {
+      // userId is populated User object - priority order:
+      // 1. avatarUrl (newly uploaded)
+      // 2. avatar (legacy field)
+      // 3. Google profile picture (from OAuth)
+      this.avatarUrl =
+        candidateProfileModel.userId.avatarUrl ||
+        candidateProfileModel.userId.avatar ||
+        candidateProfileModel.userId.googleProfile?.profilePicture ||
+        null;
+    }
+    // Fallback: check if avatar exists in personalInfo
+    if (!this.avatarUrl && this.personalInfo.avatarUrl) {
+      this.avatarUrl = this.personalInfo.avatarUrl;
+    }
+    // If still no avatar, set explicit null (better than undefined for API)
+    if (!this.avatarUrl) {
+      this.avatarUrl = null;
+    }
+
     this.professionalInfo = candidateProfileModel.professionalInfo || {};
     this.education = candidateProfileModel.education || [];
     this.experience = candidateProfileModel.experience || [];
@@ -19,7 +53,8 @@ class CandidateProfileResponseDTO {
     this.achievements = candidateProfileModel.achievements || [];
     this.preferences = candidateProfileModel.preferences || {};
     this.socialLinks = candidateProfileModel.socialLinks || {};
-    this.resume = candidateProfileModel.resume || null;
+    // CVs are managed separately - use GET /api/candidates/cv
+    this.cvs = candidateProfileModel.cvs || [];
     this.portfolio = candidateProfileModel.portfolio || null;
     this.profileCompleteness = candidateProfileModel.profileCompleteness || 0;
     this.isOpenToWork =
@@ -51,6 +86,7 @@ class CandidateProfileResponseDTO {
     return {
       id: this.id,
       userId: this.userId,
+      avatarUrl: this.avatarUrl, // Include avatar URL in response
       personalInfo: this.personalInfo,
       professionalInfo: this.professionalInfo,
       education: this.education,
@@ -62,7 +98,7 @@ class CandidateProfileResponseDTO {
       achievements: this.achievements,
       preferences: this.preferences,
       socialLinks: this.socialLinks,
-      resume: this.resume,
+      cvs: this.cvs, // Array of CV objects from CV collection
       portfolio: this.portfolio,
       profileCompleteness: this.profileCompleteness,
       isOpenToWork: this.isOpenToWork,

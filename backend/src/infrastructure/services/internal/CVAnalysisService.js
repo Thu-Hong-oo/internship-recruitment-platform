@@ -1,16 +1,20 @@
-const CVAnalysisRepository = require('../../repositories/CVAnalysisRepository');
-const CVRepository = require('../../repositories/CVRepository');
-const CandidateRepository = require('../../repositories/CandidateRepository');
-const GeminiAIService = require('../external/GeminiAIService');
-const ValidationService = require('./ValidationService');
-
+/**
+ * CVAnalysisService - Handles CV analysis operations
+ * Dependencies injected via constructor for proper DI
+ */
 class CVAnalysisService {
-  constructor() {
-    this.cvAnalysisRepository = new CVAnalysisRepository();
-    this.cvRepository = new CVRepository();
-    this.candidateRepository = new CandidateRepository();
-    this.geminiAIService = new GeminiAIService();
-    this.validationService = new ValidationService();
+  constructor(
+    cvAnalysisRepository,
+    cvRepository,
+    candidateRepository,
+    geminiAIService,
+    validationService
+  ) {
+    this.cvAnalysisRepository = cvAnalysisRepository;
+    this.cvRepository = cvRepository;
+    this.candidateRepository = candidateRepository;
+    this.geminiAIService = geminiAIService;
+    this.validationService = validationService;
   }
 
   async analyzeCV(cvId) {
@@ -365,6 +369,4 @@ class CVAnalysisService {
   }
 }
 
-module.exports = new CVAnalysisService();
-
-
+module.exports = CVAnalysisService;

@@ -1,0 +1,233 @@
+{
+  "info": {
+    "name": "Notifications API (Updated)",
+    "_postman_id": "notifications-api-updated-collection",
+    "description": "Notification management API with PATCH updates",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api/notifications",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Notification Management",
+      "item": [
+        {
+          "name": "Get User Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/?page=1&limit=20&type=application&isRead=false",
+              "host": ["{{baseUrl}}"],
+              "path": [""],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "type",
+                  "value": "application",
+                  "description": "Filter by type: application, message, system, job"
+                },
+                {
+                  "key": "isRead",
+                  "value": "false",
+                  "description": "Filter by read status"
+                }
+              ]
+            },
+            "description": "Get all notifications for logged-in user"
+          }
+        },
+        {
+          "name": "Get Notification By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:id",
+              "host": ["{{baseUrl}}"],
+              "path": [":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "NOTIFICATION_ID"
+                }
+              ]
+            },
+            "description": "Get notification details"
+          }
+        },
+        {
+          "name": "Mark Notification as Read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:id/read",
+              "host": ["{{baseUrl}}"],
+              "path": [":id", "read"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "NOTIFICATION_ID"
+                }
+              ]
+            },
+            "description": "Mark a specific notification as read"
+          }
+        },
+        {
+          "name": "Mark All Notifications as Read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/read-all",
+              "host": ["{{baseUrl}}"],
+              "path": ["read-all"]
+            },
+            "description": "Mark all notifications as read for current user"
+          }
+        },
+        {
+          "name": "Delete Notification",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:id",
+              "host": ["{{baseUrl}}"],
+              "path": [":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "NOTIFICATION_ID"
+                }
+              ]
+            },
+            "description": "Delete a notification"
+          }
+        },
+        {
+          "name": "Create Notification (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"USER_ID\",\n  \"type\": \"system\",\n  \"title\": \"System Maintenance\",\n  \"message\": \"System will be under maintenance tonight\",\n  \"priority\": \"high\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            },
+            "description": "Create a notification (Admin only)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Settings",
+      "item": [
+        {
+          "name": "Get Notification Settings",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/settings",
+              "host": ["{{baseUrl}}"],
+              "path": ["settings"]
+            },
+            "description": "Get user's notification preferences"
+          }
+        },
+        {
+          "name": "Update Notification Settings",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": {\n    \"enabled\": true,\n    \"application\": true,\n    \"message\": true,\n    \"job\": false,\n    \"system\": true\n  },\n  \"push\": {\n    \"enabled\": true,\n    \"application\": true,\n    \"message\": true,\n    \"job\": true,\n    \"system\": false\n  },\n  \"inApp\": {\n    \"enabled\": true,\n    \"application\": true,\n    \"message\": true,\n    \"job\": true,\n    \"system\": true\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/settings",
+              "host": ["{{baseUrl}}"],
+              "path": ["settings"]
+            },
+            "description": "Update notification preferences (partial update)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stats",
+      "item": [
+        {
+          "name": "Get Unread Notification Count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/unread-count",
+              "host": ["{{baseUrl}}"],
+              "path": ["unread-count"]
+            },
+            "description": "Get total unread notification count"
+          }
+        },
+        {
+          "name": "Get Notification Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["stats"]
+            },
+            "description": "Get notification statistics (total, read, unread by type)"
+          }
+        }
+      ]
+    }
+  ]
+}

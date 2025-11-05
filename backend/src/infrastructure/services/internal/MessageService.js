@@ -1,14 +1,18 @@
-const MessageRepository = require('../../repositories/MessageRepository');
-const ConversationRepository = require('../../repositories/ConversationRepository');
-const UserRepository = require('../../repositories/UserRepository');
-const ValidationService = require('./ValidationService');
-
+/**
+ * MessageService - Handles message operations
+ * Dependencies injected via constructor for proper DI
+ */
 class MessageService {
-  constructor() {
-    this.messageRepository = new MessageRepository();
-    this.conversationRepository = new ConversationRepository();
-    this.userRepository = new UserRepository();
-    this.validationService = new ValidationService();
+  constructor(
+    messageRepository,
+    conversationRepository,
+    userRepository,
+    validationService
+  ) {
+    this.messageRepository = messageRepository;
+    this.conversationRepository = conversationRepository;
+    this.userRepository = userRepository;
+    this.validationService = validationService;
   }
 
   async sendMessage(messageData) {
@@ -414,6 +418,4 @@ class MessageService {
   }
 }
 
-module.exports = new MessageService();
-
-
+module.exports = MessageService;

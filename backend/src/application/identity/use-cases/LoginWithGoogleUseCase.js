@@ -1,4 +1,4 @@
-const googleAuthService = require('../../../infrastructure/services/external/GoogleAuthService');
+const googleAuthService = require('../../../infrastructure/services/external/core/GoogleAuthService');
 const { logger } = require('../../../shared/utils/logger');
 
 class LoginWithGoogleUseCase {

@@ -23,13 +23,17 @@ router.route('/').post(authorize('candidate'), applyForJob);
 
 router.route('/:id').get(getApplicationById);
 
-router.route('/:id/status').put(authorize('employer'), updateApplicationStatus);
+router
+  .route('/:id/status')
+  .patch(authorize('employer'), updateApplicationStatus); // PATCH for status change
 
-router.route('/:id/withdraw').put(authorize('candidate'), withdrawApplication);
+router
+  .route('/:id/withdraw')
+  .patch(authorize('candidate'), withdrawApplication); // PATCH for status change
 
-router.route('/:id/view').put(authorize('employer'), markApplicationAsViewed);
+router.route('/:id/view').patch(authorize('employer'), markApplicationAsViewed); // PATCH for marking viewed
 
-router.route('/:id/notes').put(authorize('employer'), addEmployerNotes);
+router.route('/:id/notes').patch(authorize('employer'), addEmployerNotes); // PATCH for adding notes
 
 // Candidate routes
 router

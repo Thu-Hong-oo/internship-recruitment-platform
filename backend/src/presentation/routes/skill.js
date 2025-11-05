@@ -46,7 +46,7 @@ router.route('/').post(authorize('admin'), createSkill);
 
 router
   .route('/:id')
-  .put(authorize('admin'), updateSkill)
+  .patch(authorize('admin'), updateSkill) // Changed from PUT to PATCH - partial update of skill data
   .delete(authorize('admin'), deleteSkill);
 
 module.exports = router;

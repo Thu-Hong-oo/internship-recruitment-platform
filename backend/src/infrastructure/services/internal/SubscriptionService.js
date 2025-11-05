@@ -1,14 +1,18 @@
-const SubscriptionRepository = require('../../repositories/SubscriptionRepository');
-const PlanRepository = require('../../repositories/PlanRepository');
-const UserRepository = require('../../repositories/UserRepository');
-const ValidationService = require('./ValidationService');
-
+/**
+ * SubscriptionService - Handles user subscription operations
+ * Dependencies injected via constructor for proper DI
+ */
 class SubscriptionService {
-  constructor() {
-    this.subscriptionRepository = new SubscriptionRepository();
-    this.planRepository = new PlanRepository();
-    this.userRepository = new UserRepository();
-    this.validationService = new ValidationService();
+  constructor(
+    subscriptionRepository,
+    planRepository,
+    userRepository,
+    validationService
+  ) {
+    this.subscriptionRepository = subscriptionRepository;
+    this.planRepository = planRepository;
+    this.userRepository = userRepository;
+    this.validationService = validationService;
   }
 
   async createSubscription(subscriptionData) {
@@ -431,4 +435,4 @@ class SubscriptionService {
   }
 }
 
-module.exports = new SubscriptionService();
+module.exports = SubscriptionService;

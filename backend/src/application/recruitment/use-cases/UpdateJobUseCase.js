@@ -1,7 +1,9 @@
 const { logger } = require('../../../shared/utils/logger');
+const JobPostingMapper = require('../../../infrastructure/mappers/JobPostingMapper');
 
 /**
  * Use case for updating a job post
+ * Uses JobPosting Domain Entity with business rules
  */
 class UpdateJobUseCase {
   /**
@@ -25,15 +27,22 @@ class UpdateJobUseCase {
     try {
       logger.info('Updating job', { jobId, employerId });
 
-      // Get existing job
-      const existingJob = await this.jobRepository.findById(jobId);
-      if (!existingJob) {
+      // Get existing job as domain entity
+      const jobPosting = await this.jobRepository.findById(jobId);
+      if (!jobPosting) {
         throw new Error('JOB_NOT_FOUND');
       }
 
       // Check authorization
-      if (existingJob.employerId.toString() !== employerId) {
+      if (jobPosting.employerId.toString() !== employerId) {
         throw new Error('UNAUTHORIZED');
+      }
+
+      // Check if job can be edited (business rule from domain entity)
+      if (!jobPosting.canBeEdited()) {
+        throw new Error(
+          'JOB_CANNOT_BE_EDITED: Job is closed and cannot be modified'
+        );
       }
 
       // Validate update data if provided
@@ -46,8 +55,46 @@ class UpdateJobUseCase {
         }
       }
 
-      // Update job
-      const updatedJob = await this.jobRepository.updateById(jobId, updateData);
+      // Apply business logic through domain entity
+      if (updateData.salaryMin || updateData.salaryMax) {
+        jobPosting.setSalaryRange(
+          updateData.salaryMin || jobPosting.salaryMin,
+          updateData.salaryMax || jobPosting.salaryMax,
+          updateData.salaryCurrency || jobPosting.salaryCurrency
+        );
+      }
+
+      // Update other properties
+      if (updateData.title) jobPosting.title = updateData.title;
+      if (updateData.description)
+        jobPosting.description = updateData.description;
+      if (updateData.location) jobPosting.location = updateData.location;
+      if (updateData.jobType) jobPosting.jobType = updateData.jobType;
+      if (updateData.experience) jobPosting.experience = updateData.experience;
+      if (updateData.education) jobPosting.education = updateData.education;
+      if (updateData.benefits) jobPosting.benefits = updateData.benefits;
+      if (updateData.deadline)
+        jobPosting.deadline = new Date(updateData.deadline);
+      if (updateData.numberOfPositions)
+        jobPosting.numberOfPositions = updateData.numberOfPositions;
+
+      // Handle requirements array
+      if (updateData.requirements) {
+        jobPosting.requirements = [];
+        updateData.requirements.forEach(req => jobPosting.addRequirement(req));
+      }
+
+      // Handle skills array
+      if (updateData.skills) {
+        jobPosting.skills = [];
+        updateData.skills.forEach(skill => jobPosting.addSkill(skill));
+      }
+
+      // Save through repository
+      const updatedJob = await this.jobRepository.updateById(
+        jobId,
+        JobPostingMapper.toMongoose(jobPosting)
+      );
       if (!updatedJob) {
         throw new Error('JOB_UPDATE_FAILED');
       }
@@ -56,7 +103,7 @@ class UpdateJobUseCase {
 
       return {
         success: true,
-        job: updatedJob,
+        job: updatedJob, // Domain entity
         message: 'Job updated successfully',
       };
     } catch (error) {

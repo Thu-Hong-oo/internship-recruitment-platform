@@ -2,7 +2,7 @@ const User = require('../../../infrastructure/models/User');
 const CandidateProfile = require('../../../infrastructure/models/CandidateProfile');
 const EmployerProfile = require('../../../infrastructure/models/EmployerProfile');
 const { logger } = require('../../../shared/utils/logger');
-const EmailService = require('../../../infrastructure/services/external/EmailService');
+const EmailService = require('../../../infrastructure/services/external/core/EmailService');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 

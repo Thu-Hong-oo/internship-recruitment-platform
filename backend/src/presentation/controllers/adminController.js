@@ -1,21 +1,5 @@
 const asyncHandler = require('express-async-handler');
 const { logger } = require('../../shared/utils/logger');
-const {
-  getSystemDashboardUseCase,
-  getAllUsersUseCase,
-  getUserByIdUseCase,
-  updateUserStatusUseCase,
-  deleteUserUseCase,
-  getSystemStatsUseCase,
-  getSystemLogsUseCase,
-  getSystemHealthUseCase,
-  getQueueStatusUseCase,
-  clearQueueUseCase,
-  getSystemSettingsUseCase,
-  updateSystemSettingsUseCase,
-  sendSystemNotificationUseCase,
-  getSystemReportsUseCase,
-} = require('../../infrastructure/config/diContainer');
 
 // @desc    Get system dashboard
 // @route   GET /api/admin/dashboard

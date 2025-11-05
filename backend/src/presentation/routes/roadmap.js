@@ -31,8 +31,8 @@ router.route('/:id').get(getRoadmapById).delete(deleteRoadmap);
 router
   .route('/:id/progress')
   .get(getRoadmapProgress)
-  .put(updateRoadmapProgress);
+  .patch(updateRoadmapProgress); // PATCH for progress update
 
-router.route('/:id/phases/:phaseId/complete').put(completeRoadmapPhase);
+router.route('/:id/phases/:phaseId/complete').patch(completeRoadmapPhase); // PATCH for completing phase
 
 module.exports = router;

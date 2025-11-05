@@ -4,12 +4,6 @@ const JobResponseDTO = require('../dtos/JobResponseDTO');
 const ApplicationResponseDTO = require('../dtos/ApplicationResponseDTO');
 
 // Import use cases from DI container
-const {
-  getAllJobsUseCase,
-  getJobUseCase,
-  updateJobUseCase,
-  deleteJobUseCase,
-} = require('../../infrastructure/config/diContainer');
 
 // @desc    Get all jobs with filtering and pagination (supports text search)
 // @route   GET /api/jobs

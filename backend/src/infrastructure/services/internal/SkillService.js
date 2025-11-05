@@ -1,12 +1,12 @@
-const SkillRepository = require('../../repositories/SkillRepository');
-const CandidateRepository = require('../../repositories/CandidateRepository');
-const ValidationService = require('./ValidationService');
-
+/**
+ * SkillService - Handles skill management operations
+ * Dependencies injected via constructor for proper DI
+ */
 class SkillService {
-  constructor() {
-    this.skillRepository = new SkillRepository();
-    this.candidateRepository = new CandidateRepository();
-    this.validationService = new ValidationService();
+  constructor(skillRepository, candidateRepository, validationService) {
+    this.skillRepository = skillRepository;
+    this.candidateRepository = candidateRepository;
+    this.validationService = validationService;
   }
 
   async getAllSkills(filters = {}) {
@@ -365,4 +365,4 @@ class SkillService {
   }
 }
 
-module.exports = new SkillService();
+module.exports = SkillService;

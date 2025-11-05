@@ -1,51 +1,79 @@
-const Plan = require('../models/Plan');
-
 /**
  * PlanRepository
- * Infrastructure layer repository for Plan entity
+ * Infrastructure Layer - Returns domain entities
  */
+const PlanModel = require('../models/Plan');
+const PlanMapper = require('../mappers/PlanMapper');
+
 class PlanRepository {
   async findById(id) {
-    return await Plan.findById(id);
+    const doc = await PlanModel.findById(id);
+    return PlanMapper.toDomain(doc);
   }
 
   async findByName(name) {
-    return await Plan.findOne({ name });
-  }
-
-  async findByType(type) {
-    return await Plan.find({ type });
-  }
-
-  async findAll() {
-    return await Plan.find();
-  }
-
-  async create(planData) {
-    const plan = new Plan(planData);
-    return await plan.save();
-  }
-
-  async update(id, planData) {
-    return await Plan.findByIdAndUpdate(id, planData, { new: true });
-  }
-
-  async delete(id) {
-    return await Plan.findByIdAndDelete(id);
-  }
-
-  async findByIds(ids) {
-    return await Plan.find({ _id: { $in: ids } });
+    const doc = await PlanModel.findOne({ name });
+    return PlanMapper.toDomain(doc);
   }
 
   async findActive() {
-    return await Plan.find({ isActive: true });
+    const docs = await PlanModel.find({ isActive: true }).sort({
+      sortOrder: 1,
+    });
+    return PlanMapper.toDomainArray(docs);
   }
 
-  async findByPriceRange(minPrice, maxPrice) {
-    return await Plan.find({
-      price: { $gte: minPrice, $lte: maxPrice },
+  async findAll() {
+    const docs = await PlanModel.find().sort({ sortOrder: 1 });
+    return PlanMapper.toDomainArray(docs);
+  }
+
+  async create(plan) {
+    const data = PlanMapper.toMongoose(plan);
+    const doc = new PlanModel(data);
+    const saved = await doc.save();
+    return PlanMapper.toDomain(saved);
+  }
+
+  async update(id, plan) {
+    const data = PlanMapper.toMongooseUpdate(plan);
+    const updated = await PlanModel.findByIdAndUpdate(id, data, {
+      new: true,
+      runValidators: true,
     });
+    return PlanMapper.toDomain(updated);
+  }
+
+  async delete(id) {
+    const result = await PlanModel.findByIdAndDelete(id);
+    return result !== null;
+  }
+
+  async activate(id) {
+    const updated = await PlanModel.findByIdAndUpdate(
+      id,
+      { isActive: true, updatedAt: new Date() },
+      { new: true }
+    );
+    return PlanMapper.toDomain(updated);
+  }
+
+  async deactivate(id) {
+    const updated = await PlanModel.findByIdAndUpdate(
+      id,
+      { isActive: false, updatedAt: new Date() },
+      { new: true }
+    );
+    return PlanMapper.toDomain(updated);
+  }
+
+  async exists(id) {
+    const count = await PlanModel.countDocuments({ _id: id });
+    return count > 0;
+  }
+
+  async countActive() {
+    return await PlanModel.countDocuments({ isActive: true });
   }
 }
 

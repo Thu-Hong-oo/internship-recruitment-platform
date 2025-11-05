@@ -1,0 +1,169 @@
+{
+  "info": {
+    "name": "Saved Jobs API (Updated)",
+    "_postman_id": "saved-jobs-api-updated-collection",
+    "description": "Saved jobs management API for candidates with PATCH updates",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api/saved-jobs",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Save Job",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"jobId\": \"JOB_POST_ID\",\n  \"folder\": \"Interested\",\n  \"tags\": [\"remote\", \"high-salary\"],\n  \"notes\": \"Great company culture, good benefits\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/",
+          "host": ["{{baseUrl}}"],
+          "path": [""]
+        },
+        "description": "Save a job for later review"
+      }
+    },
+    {
+      "name": "Get Saved Jobs",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/?page=1&limit=20&folder=Interested&tags=remote",
+          "host": ["{{baseUrl}}"],
+          "path": [""],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            },
+            {
+              "key": "folder",
+              "value": "Interested",
+              "description": "Filter by folder name"
+            },
+            {
+              "key": "tags",
+              "value": "remote",
+              "description": "Filter by tags"
+            }
+          ]
+        },
+        "description": "Get all saved jobs with filtering and pagination"
+      }
+    },
+    {
+      "name": "Update Saved Job",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"folder\": \"Applied\",\n  \"tags\": [\"remote\", \"high-salary\", \"applied\"],\n  \"notes\": \"Applied on 2024-11-05, waiting for response\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/:id",
+          "host": ["{{baseUrl}}"],
+          "path": [":id"],
+          "variable": [
+            {
+              "key": "id",
+              "value": "SAVED_JOB_ID"
+            }
+          ]
+        },
+        "description": "Update saved job metadata (folder, tags, notes) - partial update"
+      }
+    },
+    {
+      "name": "Remove Saved Job",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/:id",
+          "host": ["{{baseUrl}}"],
+          "path": [":id"],
+          "variable": [
+            {
+              "key": "id",
+              "value": "SAVED_JOB_ID"
+            }
+          ]
+        },
+        "description": "Remove a saved job"
+      }
+    },
+    {
+      "name": "Bulk Remove Saved Jobs",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"savedJobIds\": [\"ID1\", \"ID2\", \"ID3\"]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/bulk",
+          "host": ["{{baseUrl}}"],
+          "path": ["bulk"]
+        },
+        "description": "Remove multiple saved jobs at once"
+      }
+    },
+    {
+      "name": "Get Saved Jobs Stats",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/stats",
+          "host": ["{{baseUrl}}"],
+          "path": ["stats"]
+        },
+        "description": "Get saved jobs statistics (total, by folder, by tags)"
+      }
+    }
+  ]
+}

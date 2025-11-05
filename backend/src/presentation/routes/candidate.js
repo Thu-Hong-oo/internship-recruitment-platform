@@ -3,17 +3,16 @@ const router = express.Router();
 const { protect, authorize } = require('../middlewares/auth');
 const upload = require('../middlewares/upload');
 const {
-  createProfile,
   getProfile,
   updateProfile,
+  uploadAvatar,
   uploadCV,
   getCVs,
+  proxyCVFile,
+  updateCV,
   setDefaultCV,
   deleteCV,
   analyzeCV,
-  addEducation,
-  addExperience,
-  updateSkills,
   getProfileCompleteness,
   getCandidateStats,
 } = require('../controllers/candidateController');
@@ -22,26 +21,23 @@ const {
 router.use(protect);
 router.use(authorize('candidate'));
 
-// Profile routes
-router.route('/profile').post(createProfile).get(getProfile).put(updateProfile);
+// Profile routes - POST removed (profile auto-created on email verification)
+router.route('/profile').get(getProfile).patch(updateProfile); // PATCH for partial update
+
+// Avatar upload route
+router.route('/avatar').post(upload.upload.single('avatar'), uploadAvatar);
 
 // CV routes
 router.route('/cv').post(upload.upload.single('cv'), uploadCV).get(getCVs);
 
-router.route('/cv/:cvId/default').put(setDefaultCV);
+// View/Download CV - Stream through backend
+router.route('/cv/:cvId/view').get(proxyCVFile); // ?mode=download để tải về, mặc định là xem
 
-router.route('/cv/:cvId').delete(deleteCV);
+router.route('/cv/:cvId').patch(updateCV).delete(deleteCV); // PATCH to update CV name
+
+router.route('/cv/:cvId/default').patch(setDefaultCV); // PATCH for status change
 
 router.route('/cv/:cvId/analyze').post(analyzeCV);
-
-// Education routes
-router.route('/education').post(addEducation);
-
-// Experience routes
-router.route('/experience').post(addExperience);
-
-// Skills routes
-router.route('/skills').put(updateSkills);
 
 // Stats and completeness routes
 router.route('/completeness').get(getProfileCompleteness);

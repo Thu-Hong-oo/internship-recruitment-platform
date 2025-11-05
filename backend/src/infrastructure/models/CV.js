@@ -28,11 +28,41 @@ const CVSchema = new mongoose.Schema(
 );
 
 CVSchema.methods.getDownloadUrl = function () {
-  return this.cloudinaryUrl;
+  // Force download với fl_attachment - dùng raw/upload cho file types khác image
+  if (!this.cloudinaryPublicId) return this.cloudinaryUrl;
+
+  // Get file extension
+  let extension = '';
+  if (this.originalName) {
+    const parts = this.originalName.split('.');
+    extension = parts.length > 1 ? `.${parts[parts.length - 1]}` : '';
+  }
+  if (!extension && this.mimeType) {
+    if (this.mimeType.includes('pdf')) extension = '.pdf';
+    else if (this.mimeType.includes('word')) extension = '.docx';
+  }
+
+  const baseUrl = 'https://res.cloudinary.com/du10thaqs/raw/upload';
+  return `${baseUrl}/fl_attachment/${this.cloudinaryPublicId}${extension}`;
 };
 
 CVSchema.methods.getPreviewUrl = function () {
-  return this.cloudinaryUrl;
+  // Xem trực tiếp trong browser - dùng raw/upload
+  if (!this.cloudinaryPublicId) return this.cloudinaryUrl;
+
+  // Get file extension
+  let extension = '';
+  if (this.originalName) {
+    const parts = this.originalName.split('.');
+    extension = parts.length > 1 ? `.${parts[parts.length - 1]}` : '';
+  }
+  if (!extension && this.mimeType) {
+    if (this.mimeType.includes('pdf')) extension = '.pdf';
+    else if (this.mimeType.includes('word')) extension = '.docx';
+  }
+
+  const baseUrl = 'https://res.cloudinary.com/du10thaqs/raw/upload';
+  return `${baseUrl}/${this.cloudinaryPublicId}${extension}`;
 };
 
 CVSchema.methods.canBeAnalyzed = function () {
@@ -56,6 +86,24 @@ CVSchema.methods.setAsDefault = async function () {
     .findByIdAndUpdate(this.candidateId, { defaultCV: this._id });
 
   return this;
+};
+
+// Format CV for API response
+CVSchema.methods.toClientJSON = function () {
+  return {
+    id: this._id,
+    fileName: this.originalName,
+    fileUrl: this.cloudinaryUrl,
+    downloadUrl: this.getDownloadUrl(),
+    previewUrl: this.getPreviewUrl(),
+    fileSize: this.fileSize,
+    mimeType: this.mimeType,
+    isDefault: this.isDefault,
+    analysisStatus: this.analysisStatus,
+    uploadedAt: this.uploadedAt,
+    createdAt: this.createdAt,
+    updatedAt: this.updatedAt,
+  };
 };
 
 module.exports = mongoose.model('CV', CVSchema);

@@ -89,9 +89,9 @@ UserSchema.methods.isActive = function () {
   return this.status === UserStatus.ACTIVE;
 };
 
-// Virtual field for display full name
-UserSchema.virtual('displayFullName').get(function () {
-  return this.fullName || this.email.split('@')[0];
-});
+// // Virtual field for display full name
+// UserSchema.virtual('displayFullName').get(function () {
+//   return this.fullName || (this.email ? this.email.split('@')[0] : 'Unknown');
+// });
 
 module.exports = mongoose.model('User', UserSchema);

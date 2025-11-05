@@ -1,52 +1,133 @@
 /**
- * SavedJob Entity
- * Domain: Supporting
- * Represents a job saved by a user for later reference
+ * SavedJob Domain Entity
+ *
+ * Represents a job saved by a candidate for later reference.
+ * Contains save metadata, notes, and reminder information.
+ *
+ * Following Clean Architecture principles:
+ * - No dependencies on infrastructure layer
+ * - Business logic encapsulated within entity
+ * - Constructor accepts only required fields
+ * - Optional fields set to null (not undefined)
+ * - No default values in constructor
  */
 class SavedJob {
-  constructor(props) {
-    this.id = props.id;
-    this.userId = props.userId;
-    this.jobId = props.jobId;
-    this.savedJobStatus = props.savedJobStatus;
-    this.notes = props.notes || '';
-    this.savedAt = props.savedAt;
-    this.reminderDate = props.reminderDate;
-    this.tags = props.tags || [];
+  constructor(
+    savedJobId,
+    candidateId,
+    jobId,
+    notes = null,
+    tags = null,
+    reminderDate = null,
+    savedAt = null,
+    createdAt = null,
+    updatedAt = null
+  ) {
+    // Required fields
+    this.savedJobId = savedJobId;
+    this.candidateId = candidateId;
+    this.jobId = jobId;
+
+    // Optional fields
+    this.notes = notes;
+    this.tags = tags; // Array of tags
+    this.reminderDate = reminderDate;
+
+    // Timestamps
+    this.savedAt = savedAt;
+    this.createdAt = createdAt;
+    this.updatedAt = updatedAt;
 
     this.validate();
   }
 
+  /**
+   * Validates the saved job entity
+   * @throws {Error} if validation fails
+   */
   validate() {
-    if (!this.userId) {
-      throw new Error('User ID is required');
+    if (!this.candidateId) {
+      throw new Error('Candidate ID is required');
     }
     if (!this.jobId) {
       throw new Error('Job ID is required');
     }
-    if (!this.savedJobStatus) {
-      throw new Error('Saved job status is required');
+  }
+
+  /**
+   * Adds or updates notes
+   * @param {string} notes - Notes text
+   */
+  addNotes(notes) {
+    this.notes = notes;
+    this.updatedAt = new Date();
+  }
+
+  /**
+   * Removes notes
+   */
+  removeNotes() {
+    this.notes = null;
+    this.updatedAt = new Date();
+  }
+
+  /**
+   * Adds a tag
+   * @param {string} tag - Tag to add
+   */
+  addTag(tag) {
+    if (!this.tags) {
+      this.tags = [];
+    }
+    if (!this.tags.includes(tag)) {
+      this.tags.push(tag);
+      this.updatedAt = new Date();
     }
   }
 
-  isActive() {
-    return this.savedJobStatus === 'ACTIVE';
+  /**
+   * Removes a tag
+   * @param {string} tag - Tag to remove
+   */
+  removeTag(tag) {
+    if (this.tags) {
+      this.tags = this.tags.filter(t => t !== tag);
+      this.updatedAt = new Date();
+    }
   }
 
-  isArchived() {
-    return this.savedJobStatus === 'ARCHIVED';
+  /**
+   * Sets reminder date
+   * @param {Date} date - Reminder date
+   */
+  setReminder(date) {
+    this.reminderDate = date;
+    this.updatedAt = new Date();
   }
 
-  archive() {
-    this.savedJobStatus = 'ARCHIVED';
+  /**
+   * Removes reminder
+   */
+  removeReminder() {
+    this.reminderDate = null;
+    this.updatedAt = new Date();
   }
 
-  activate() {
-    this.savedJobStatus = 'ACTIVE';
+  /**
+   * Checks if reminder is set
+   * @returns {boolean} True if reminder is set
+   */
+  hasReminder() {
+    return this.reminderDate !== null;
   }
 
-  delete() {
-    this.savedJobStatus = 'DELETED';
+  /**
+   * Checks if reminder is due
+   * @returns {boolean} True if reminder date has passed
+   */
+  isReminderDue() {
+    if (!this.reminderDate) return false;
+    return new Date() >= new Date(this.reminderDate);
   }
 
   addNote(note) {
@@ -84,7 +165,7 @@ class SavedJob {
       savedAt: this.savedAt,
       reminderDate: this.reminderDate,
       tags: this.tags,
-      isActive: this.isActive()
+      isActive: this.isActive(),
     };
   }
 }

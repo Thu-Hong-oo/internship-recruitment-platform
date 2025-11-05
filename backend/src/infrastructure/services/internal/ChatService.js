@@ -1,15 +1,20 @@
-const ConversationRepository = require('../../repositories/ConversationRepository');
-const MessageRepository = require('../../repositories/MessageRepository');
-const UserRepository = require('../../repositories/UserRepository');
-const ValidationService = require('./ValidationService');
-const SocketService = require('../external/SocketService');
-
+/**
+ * ChatService - Handles chat and messaging operations
+ * Dependencies injected via constructor for proper DI
+ */
 class ChatService {
-  constructor() {
-    this.conversationRepository = new ConversationRepository();
-    this.messageRepository = new MessageRepository();
-    this.userRepository = new UserRepository();
-    this.validationService = new ValidationService();
+  constructor(
+    conversationRepository,
+    messageRepository,
+    userRepository,
+    validationService,
+    socketService
+  ) {
+    this.conversationRepository = conversationRepository;
+    this.messageRepository = messageRepository;
+    this.userRepository = userRepository;
+    this.validationService = validationService;
+    this.socketService = socketService;
   }
 
   async createConversation(userId, conversationData) {
@@ -432,5 +437,4 @@ class ChatService {
   }
 }
 
-module.exports = new ChatService();
-
+module.exports = ChatService;

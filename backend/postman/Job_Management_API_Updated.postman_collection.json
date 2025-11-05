@@ -1,0 +1,280 @@
+{
+  "info": {
+    "name": "Job Management API (Updated)",
+    "_postman_id": "job-management-api-updated-collection",
+    "description": "Job posting management API with PATCH updates",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api/jobs",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Public Endpoints",
+      "item": [
+        {
+          "name": "Get All Job Posts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/?page=1&limit=20&status=active&location=Ho Chi Minh",
+              "host": ["{{baseUrl}}"],
+              "path": [""],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "active",
+                  "description": "Filter by status: draft, active, closed"
+                },
+                {
+                  "key": "location",
+                  "value": "Ho Chi Minh",
+                  "description": "Filter by location"
+                }
+              ]
+            },
+            "description": "Get all public job posts with filtering"
+          }
+        },
+        {
+          "name": "Search Job Posts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/search?q=nodejs&location=remote&salary_min=20000000&jobType=full-time",
+              "host": ["{{baseUrl}}"],
+              "path": ["search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "nodejs",
+                  "description": "Search query"
+                },
+                {
+                  "key": "location",
+                  "value": "remote"
+                },
+                {
+                  "key": "salary_min",
+                  "value": "20000000"
+                },
+                {
+                  "key": "jobType",
+                  "value": "full-time",
+                  "description": "full-time, part-time, contract, internship"
+                }
+              ]
+            },
+            "description": "Search job posts with filters"
+          }
+        },
+        {
+          "name": "Get Job Post By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:id",
+              "host": ["{{baseUrl}}"],
+              "path": [":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "JOB_POST_ID"
+                }
+              ]
+            },
+            "description": "Get detailed job post information"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Employer Endpoints",
+      "item": [
+        {
+          "name": "Create Job Post",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Senior Backend Developer\",\n  \"description\": \"We are looking for an experienced backend developer...\",\n  \"requirements\": [\n    \"5+ years of experience in Node.js\",\n    \"Strong knowledge of MongoDB\",\n    \"Experience with microservices architecture\"\n  ],\n  \"responsibilities\": [\n    \"Design and develop scalable APIs\",\n    \"Lead technical discussions\",\n    \"Mentor junior developers\"\n  ],\n  \"skills\": [\"Node.js\", \"MongoDB\", \"Docker\", \"AWS\"],\n  \"location\": \"Ho Chi Minh City\",\n  \"jobType\": \"full-time\",\n  \"experienceLevel\": \"senior\",\n  \"salary\": {\n    \"min\": 25000000,\n    \"max\": 40000000,\n    \"currency\": \"VND\"\n  },\n  \"benefits\": [\n    \"Competitive salary\",\n    \"Health insurance\",\n    \"Flexible working hours\"\n  ],\n  \"deadline\": \"2024-12-31\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            },
+            "description": "Create a new job post (Employer only)"
+          }
+        },
+        {
+          "name": "Get Employer Job Posts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/employer?status=active&page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["employer"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "active"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Get all job posts for logged-in employer"
+          }
+        },
+        {
+          "name": "Update Job Post",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Senior Backend Developer (Updated)\",\n  \"salary\": {\n    \"min\": 30000000,\n    \"max\": 45000000,\n    \"currency\": \"VND\"\n  },\n  \"deadline\": \"2025-01-31\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/:id",
+              "host": ["{{baseUrl}}"],
+              "path": [":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "JOB_POST_ID"
+                }
+              ]
+            },
+            "description": "Update job post (partial update)"
+          }
+        },
+        {
+          "name": "Publish Job Post",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:id/publish",
+              "host": ["{{baseUrl}}"],
+              "path": [":id", "publish"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "JOB_POST_ID"
+                }
+              ]
+            },
+            "description": "Publish job post (change status from draft to active)"
+          }
+        },
+        {
+          "name": "Close Job Post",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:id/close",
+              "host": ["{{baseUrl}}"],
+              "path": [":id", "close"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "JOB_POST_ID"
+                }
+              ]
+            },
+            "description": "Close job post (stop accepting applications)"
+          }
+        },
+        {
+          "name": "Delete Job Post",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:id",
+              "host": ["{{baseUrl}}"],
+              "path": [":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "JOB_POST_ID"
+                }
+              ]
+            },
+            "description": "Delete job post"
+          }
+        },
+        {
+          "name": "Get Job Post Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/:id/stats",
+              "host": ["{{baseUrl}}"],
+              "path": [":id", "stats"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "JOB_POST_ID"
+                }
+              ]
+            },
+            "description": "Get statistics for a specific job post (views, applications, etc.)"
+          }
+        }
+      ]
+    }
+  ]
+}

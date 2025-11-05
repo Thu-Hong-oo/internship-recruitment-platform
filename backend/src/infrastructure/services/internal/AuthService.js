@@ -1,13 +1,15 @@
 const bcrypt = require('bcryptjs');
-const UserRepository = require('../../repositories/UserRepository');
-const JWTService = require('../external/JWTService');
-const EmailService = require('../external/EmailService');
-const ValidationService = require('./ValidationService');
 
+/**
+ * AuthService - Handles authentication operations
+ * Dependencies injected via constructor for proper DI
+ */
 class AuthService {
-  constructor() {
-    this.userRepository = new UserRepository();
-    this.validationService = new ValidationService();
+  constructor(userRepository, validationService, jwtService, emailService) {
+    this.userRepository = userRepository;
+    this.validationService = validationService;
+    this.jwtService = jwtService;
+    this.emailService = emailService;
   }
 
   async register(registerData) {
@@ -43,15 +45,18 @@ class AuthService {
       const user = await this.userRepository.create(userData);
 
       // Generate email verification token
-      const verificationToken = JWTService.generateEmailVerificationToken(
+      const verificationToken = this.jwtService.generateEmailVerificationToken(
         user._id
       );
 
       // Send verification email
-      await EmailService.sendVerificationEmail(user.email, verificationToken);
+      await this.emailService.sendVerificationEmail(
+        user.email,
+        verificationToken
+      );
 
       // Generate tokens
-      const tokens = JWTService.generateTokens(user);
+      const tokens = this.jwtService.generateTokens(user);
 
       return {
         success: true,
@@ -94,7 +99,7 @@ class AuthService {
       await this.userRepository.updateLastLogin(user._id);
 
       // Generate tokens
-      const tokens = JWTService.generateTokens(user);
+      const tokens = this.jwtService.generateTokens(user);
 
       return {
         success: true,
@@ -115,7 +120,7 @@ class AuthService {
 
   async verifyEmail(token) {
     try {
-      const decoded = JWTService.verifyEmailVerificationToken(token);
+      const decoded = this.jwtService.verifyEmailVerificationToken(token);
       const userId = decoded.id || decoded.userId;
       const user = await this.userRepository.findById(userId);
 
@@ -147,7 +152,7 @@ class AuthService {
       }
 
       // Generate password reset token
-      const resetToken = JWTService.generatePasswordResetToken(user._id);
+      const resetToken = this.jwtService.generatePasswordResetToken(user._id);
 
       // Send password reset email
       await EmailService.sendPasswordResetEmail(user.email, resetToken);
@@ -408,4 +413,4 @@ class AuthService {
   }
 }
 
-module.exports = new AuthService();
+module.exports = AuthService;

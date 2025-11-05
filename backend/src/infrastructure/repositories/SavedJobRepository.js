@@ -1,50 +1,68 @@
-const SavedJob = require('../models/SavedJob');
+const SavedJobModel = require('../models/SavedJob');
 const ISavedJobRepository = require('../../domain/supporting/repositories/ISavedJobRepository');
+const SavedJobMapper = require('../mappers/SavedJobMapper');
 
 /**
  * SavedJobRepository
  * Infrastructure layer implementation of ISavedJobRepository
+ * Uses SavedJobMapper to convert between domain entities and Mongoose documents
  */
 class SavedJobRepository extends ISavedJobRepository {
   async findById(id) {
-    return await SavedJob.findById(id);
+    const savedJobDoc = await SavedJobModel.findById(id);
+    return savedJobDoc ? SavedJobMapper.toDomain(savedJobDoc) : null;
   }
 
-  async findByUser(userId) {
-    return await SavedJob.find({ userId }).populate('jobId');
+  async findByCandidate(candidateId) {
+    const savedJobDocs = await SavedJobModel.find({ candidateId }).populate(
+      'jobId'
+    );
+    return SavedJobMapper.toDomainArray(savedJobDocs);
   }
 
   async findByJob(jobId) {
-    return await SavedJob.find({ jobId });
+    const savedJobDocs = await SavedJobModel.find({ jobId });
+    return SavedJobMapper.toDomainArray(savedJobDocs);
   }
 
   async findAll() {
-    return await SavedJob.find().populate('userId jobId');
+    const savedJobDocs = await SavedJobModel.find().populate(
+      'candidateId jobId'
+    );
+    return SavedJobMapper.toDomainArray(savedJobDocs);
   }
 
-  async create(savedJobData) {
-    const savedJob = new SavedJob(savedJobData);
-    return await savedJob.save();
+  async create(savedJobEntity) {
+    const savedJobData = SavedJobMapper.toMongoose(savedJobEntity);
+    const savedJob = new SavedJobModel(savedJobData);
+    const savedDoc = await savedJob.save();
+    return SavedJobMapper.toDomain(savedDoc);
   }
 
   async delete(id) {
-    return await SavedJob.findByIdAndDelete(id);
+    const deletedDoc = await SavedJobModel.findByIdAndDelete(id);
+    return deletedDoc ? SavedJobMapper.toDomain(deletedDoc) : null;
   }
 
-  async findByUserAndJob(userId, jobId) {
-    return await SavedJob.findOne({ userId, jobId });
+  async findByCandidateAndJob(candidateId, jobId) {
+    const savedJobDoc = await SavedJobModel.findOne({ candidateId, jobId });
+    return savedJobDoc ? SavedJobMapper.toDomain(savedJobDoc) : null;
   }
 
   async countByJob(jobId) {
-    return await SavedJob.countDocuments({ jobId });
+    return await SavedJobModel.countDocuments({ jobId });
   }
 
-  async countByUser(userId) {
-    return await SavedJob.countDocuments({ userId });
+  async countByCandidate(candidateId) {
+    return await SavedJobModel.countDocuments({ candidateId });
   }
 
-  async deleteByUserAndJob(userId, jobId) {
-    return await SavedJob.findOneAndDelete({ userId, jobId });
+  async deleteByCandidateAndJob(candidateId, jobId) {
+    const deletedDoc = await SavedJobModel.findOneAndDelete({
+      candidateId,
+      jobId,
+    });
+    return deletedDoc ? SavedJobMapper.toDomain(deletedDoc) : null;
   }
 }
 

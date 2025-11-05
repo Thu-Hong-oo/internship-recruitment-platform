@@ -3,54 +3,30 @@ const { logger } = require('../../shared/utils/logger');
 const EmployerProfileResponseDTO = require('../dtos/EmployerProfileResponseDTO');
 const CompanyResponseDTO = require('../dtos/CompanyResponseDTO');
 
-// Import use cases from DI container
-const {
-  createEmployerProfileUseCase,
-  getEmployerProfileUseCase,
-  updateEmployerProfileUseCase,
-} = require('../../infrastructure/config/diContainer');
-
-// @desc    Create employer profile
-// @route   POST /api/employers/profile
-// @access  Private (Employer)
-const createProfile = asyncHandler(async (req, res) => {
-  try {
-    const result = await createEmployerProfileUseCase.execute({
-      userId: req.user.id,
-      profileData: req.body,
-    });
-
-    res.status(201).json({
-      success: true,
-      message: result.message,
-      data: EmployerProfileResponseDTO.fromEmployerProfile(
-        result.employer
-      ).toJSON(),
-    });
-  } catch (error) {
-    if (error.message === 'PROFILE_ALREADY_EXISTS') {
-      return res.status(400).json({
-        success: false,
-        error: 'Hồ sơ nhà tuyển dụng đã tồn tại',
-      });
-    }
-
-    logger.error('Create employer profile error:', error);
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
+// NOTE: Profile creation is now handled automatically during user registration
+// See RegisterUserUseCase.createUserProfile() for implementation
 
 // @desc    Get employer profile
 // @route   GET /api/employers/profile
 // @access  Private (Employer)
 const getProfile = asyncHandler(async (req, res) => {
   try {
+    const getEmployerProfileUseCase = req.container.resolve(
+      'getEmployerProfileUseCase'
+    );
+
     const result = await getEmployerProfileUseCase.execute({
       userId: req.user.id,
     });
+
+    // If profile not created yet, return flag for frontend to show profile creation form
+    if (result.requiresProfileCreation) {
+      return res.status(200).json({
+        success: true,
+        requiresProfileCreation: true,
+        message: 'Vui lòng hoàn thành đăng ký thông tin công ty',
+      });
+    }
 
     res.status(200).json({
       success: true,
@@ -75,10 +51,14 @@ const getProfile = asyncHandler(async (req, res) => {
 });
 
 // @desc    Update employer profile
-// @route   PUT /api/employers/profile
+// @route   PATCH /api/employers/profile
 // @access  Private (Employer)
 const updateProfile = asyncHandler(async (req, res) => {
   try {
+    const updateEmployerProfileUseCase = req.container.resolve(
+      'updateEmployerProfileUseCase'
+    );
+
     const result = await updateEmployerProfileUseCase.execute({
       userId: req.user.id,
       profileData: req.body,
@@ -107,36 +87,22 @@ const updateProfile = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Create company
-// @route   POST /api/employers/company
-// @access  Private (Employer)
-const createCompany = asyncHandler(async (req, res) => {
-  try {
-    const result = await EmployerService.createCompany(
-      req.user.employerId,
-      req.body
-    );
-
-    res.status(201).json({
-      success: true,
-      message: result.message,
-      data: CompanyResponseDTO.fromCompany(result.company).toJSON(),
-    });
-  } catch (error) {
-    logger.error('Create company error:', error);
-    res.status(400).json({
-      success: false,
-      error: error.message,
-    });
-  }
-});
+// NOTE: Company creation is now handled through profile updates
+// Employers can update their company info via updateProfile endpoint
 
 // @desc    Get company
 // @route   GET /api/employers/company
 // @access  Private (Employer)
 const getCompany = asyncHandler(async (req, res) => {
   try {
-    const result = await EmployerService.getCompany(req.user.employerId);
+    // Get use case from Awilix container (dependency injection)
+    const getEmployerProfileUseCase = req.container.resolve(
+      'getEmployerProfileUseCase'
+    );
+
+    const result = await getEmployerProfileUseCase.execute({
+      employerId: req.user.employerId,
+    });
 
     res.status(200).json({
       success: true,
@@ -156,10 +122,15 @@ const getCompany = asyncHandler(async (req, res) => {
 // @access  Private (Employer)
 const updateCompany = asyncHandler(async (req, res) => {
   try {
-    const result = await EmployerService.updateCompany(
-      req.user.employerId,
-      req.body
+    // Get use case from Awilix container (dependency injection)
+    const updateEmployerProfileUseCase = req.container.resolve(
+      'updateEmployerProfileUseCase'
     );
+
+    const result = await updateEmployerProfileUseCase.execute({
+      employerId: req.user.employerId,
+      companyData: req.body,
+    });
 
     res.status(200).json({
       success: true,
@@ -180,7 +151,14 @@ const updateCompany = asyncHandler(async (req, res) => {
 // @access  Private (Employer)
 const getEmployerStats = asyncHandler(async (req, res) => {
   try {
-    const result = await EmployerService.getEmployerStats(req.user.employerId);
+    // Get use case from Awilix container (dependency injection)
+    const getEmployerProfileUseCase = req.container.resolve(
+      'getEmployerProfileUseCase'
+    );
+
+    const result = await getEmployerProfileUseCase.execute({
+      employerId: req.user.employerId,
+    });
 
     res.status(200).json({
       success: true,
@@ -200,7 +178,14 @@ const getEmployerStats = asyncHandler(async (req, res) => {
 // @access  Private (Employer)
 const getDashboard = asyncHandler(async (req, res) => {
   try {
-    const result = await EmployerService.getDashboard(req.user.employerId);
+    // Get use case from Awilix container (dependency injection)
+    const getEmployerProfileUseCase = req.container.resolve(
+      'getEmployerProfileUseCase'
+    );
+
+    const result = await getEmployerProfileUseCase.execute({
+      employerId: req.user.employerId,
+    });
 
     res.status(200).json({
       success: true,
@@ -216,10 +201,8 @@ const getDashboard = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  createProfile,
   getProfile,
   updateProfile,
-  createCompany,
   getCompany,
   updateCompany,
   getEmployerStats,

@@ -5,20 +5,29 @@ class UpdateCandidateProfileUseCase {
     this.candidateRepository = candidateRepository;
   }
 
-  async execute({ candidateId, profileData }) {
+  async execute({ userId, candidateId, profileData }) {
     try {
-      const candidate = await this.candidateRepository.findById(candidateId);
+      let candidate;
+
+      if (candidateId) {
+        candidate = await this.candidateRepository.findById(candidateId);
+      } else if (userId) {
+        candidate = await this.candidateRepository.findByUserId(userId);
+      } else {
+        throw new Error('MISSING_REQUIRED_PARAMETER');
+      }
 
       if (!candidate) {
         throw new Error('CANDIDATE_NOT_FOUND');
       }
 
       const updatedCandidate = await this.candidateRepository.update(
-        candidateId,
+        candidate._id,
         profileData
       );
 
-      logger.info(`Candidate profile updated: ${candidateId}`);
+      const logId = candidateId || `user:${userId}`;
+      logger.info(`Candidate profile updated: ${logId}`);
 
       return {
         message: 'Hồ sơ ứng viên đã được cập nhật thành công',

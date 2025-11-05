@@ -6,6 +6,12 @@ const path = require('path');
 
 require('dotenv').config();
 
+// Awilix DI Container - Composition Root
+const {
+  container,
+  containerMiddleware,
+} = require('./src/infrastructure/config/container');
+
 // Security & Performance middleware
 const helmet = require('helmet');
 const compression = require('compression'); //Nén response để tối ưu performance
@@ -132,13 +138,7 @@ initializeRedis().then(async () => {
     } = require('./src/infrastructure/config/initializeServices');
     await initializeRedisServices(redisClient);
     console.log('OTP services initialized successfully');
-
-    // Initialize identity use cases after OTP services are ready
-    const {
-      initializeIdentityUseCases,
-    } = require('./src/infrastructure/config/diContainer');
-    initializeIdentityUseCases();
-    console.log('Identity use cases initialized successfully');
+    // Identity use cases are now registered in container-minimal.js via Awilix DI
   } catch (error) {
     console.error('Failed to initialize services:', error.message);
   }
@@ -155,6 +155,9 @@ app.use(responseTime);
 // Logging
 app.use(accessLogger);
 app.use(errorLogger);
+
+// Awilix DI Container middleware - BEFORE routes
+app.use(containerMiddleware);
 
 // Security middleware
 const securityMiddleware = createSecurityMiddleware(

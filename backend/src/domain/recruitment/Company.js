@@ -3,28 +3,35 @@ const CompanySize = require('./CompanySize');
 const VerificationStatus = require('./VerificationStatus');
 const Address = require('./Address');
 
+/**
+ * Company Domain Entity (Aggregate Root)
+ * Pure business logic - no defaults, no infrastructure concerns
+ */
 class Company {
   constructor(companyId, name, ownerId, address) {
+    // Required fields only in constructor
     this.companyId = companyId;
     this.name = name;
-    this.description = '';
-    this.website = '';
-    this.industry = '';
-    this.size = CompanySize.STARTUP;
-    this.isVerified = false;
-    this.verificationStatus = VerificationStatus.PENDING;
     this.ownerId = ownerId;
-    this.taxCode = '';
-    this.taxCodeImageUrl = '';
-    this.businessLicense = '';
-    this.businessLicenseNumber = '';
-    this.businessLicenseImageUrl = '';
-    this.establishedDate = null;
     this.address = address;
-    this.phone = '';
-    this.email = '';
-    this.logoUrl = '';
-    this.members = []; // List of Employer members
+
+    // Optional fields - no defaults
+    this.description = null;
+    this.website = null;
+    this.industry = null;
+    this.size = null;
+    this.isVerified = null;
+    this.verificationStatus = null;
+    this.taxCode = null;
+    this.taxCodeImageUrl = null;
+    this.businessLicense = null;
+    this.businessLicenseNumber = null;
+    this.businessLicenseImageUrl = null;
+    this.establishedDate = null;
+    this.phone = null;
+    this.email = null;
+    this.logoUrl = null;
+    this.members = null;
   }
 
   updateInfo(name, description) {

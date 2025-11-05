@@ -1,12 +1,12 @@
-const LearningRoadmapRepository = require('../../repositories/LearningRoadmapRepository');
-const UserRepository = require('../../repositories/UserRepository');
-const ValidationService = require('./ValidationService');
-
+/**
+ * LearningRoadmapService - Handles learning roadmap operations
+ * Dependencies injected via constructor for proper DI
+ */
 class LearningRoadmapService {
-  constructor() {
-    this.learningRoadmapRepository = new LearningRoadmapRepository();
-    this.userRepository = new UserRepository();
-    this.validationService = new ValidationService();
+  constructor(learningRoadmapRepository, userRepository, validationService) {
+    this.learningRoadmapRepository = learningRoadmapRepository;
+    this.userRepository = userRepository;
+    this.validationService = validationService;
   }
 
   async createLearningRoadmap(roadmapData) {
@@ -431,4 +431,4 @@ class LearningRoadmapService {
   }
 }
 
-module.exports = new LearningRoadmapService();
+module.exports = LearningRoadmapService;

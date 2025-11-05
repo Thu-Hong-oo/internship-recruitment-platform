@@ -26,11 +26,11 @@ router
 
 router.route('/conversations/:id').get(getConversationById);
 
-router.route('/conversations/:id/archive').put(archiveConversation);
+router.route('/conversations/:id/archive').patch(archiveConversation); // PATCH for status change
 
-router.route('/conversations/:id/unarchive').put(unarchiveConversation);
+router.route('/conversations/:id/unarchive').patch(unarchiveConversation); // PATCH for status change
 
-router.route('/conversations/:id/read').put(markMessagesAsRead);
+router.route('/conversations/:id/read').patch(markMessagesAsRead); // PATCH for marking read
 
 // Message routes
 router
@@ -38,7 +38,7 @@ router
   .post(sendMessage)
   .get(getConversationMessages);
 
-router.route('/messages/:id').put(editMessage).delete(deleteMessage);
+router.route('/messages/:id').patch(editMessage).delete(deleteMessage); // PATCH for partial edit
 
 // Stats routes
 router.route('/unread-count').get(getUnreadMessageCount);

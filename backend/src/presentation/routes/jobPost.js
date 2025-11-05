@@ -29,11 +29,11 @@ router.route('/').post(createJobPost);
 
 router.route('/employer').get(getEmployerJobPosts);
 
-router.route('/:id').put(updateJobPost).delete(deleteJobPost);
+router.route('/:id').patch(updateJobPost).delete(deleteJobPost); // PATCH for partial update
 
-router.route('/:id/publish').put(publishJobPost);
+router.route('/:id/publish').patch(publishJobPost); // PATCH for status change
 
-router.route('/:id/close').put(closeJobPost);
+router.route('/:id/close').patch(closeJobPost); // PATCH for status change
 
 router.route('/:id/stats').get(getJobPostStats);
 

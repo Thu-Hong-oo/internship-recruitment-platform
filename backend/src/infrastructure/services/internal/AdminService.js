@@ -1,22 +1,28 @@
-const UserRepository = require('../../repositories/UserRepository');
-const JobRepository = require('../../repositories/JobRepository');
-const ApplicationRepository = require('../../repositories/ApplicationRepository');
-const CandidateRepository = require('../../repositories/CandidateRepository');
-const EmployerRepository = require('../../repositories/EmployerRepository');
-const CompanyRepository = require('../../repositories/CompanyRepository');
-const NotificationRepository = require('../../repositories/NotificationRepository');
-const QueueService = require('../external/QueueService');
-const EmailService = require('../external/EmailService');
-
+/**
+ * AdminService - Handles admin operations
+ * Dependencies injected via constructor for proper DI
+ */
 class AdminService {
-  constructor() {
-    this.userRepository = new UserRepository();
-    this.jobRepository = new JobRepository();
-    this.applicationRepository = new ApplicationRepository();
-    this.candidateRepository = new CandidateRepository();
-    this.employerRepository = new EmployerRepository();
-    this.companyRepository = new CompanyRepository();
-    this.notificationRepository = new NotificationRepository();
+  constructor(
+    userRepository,
+    jobRepository,
+    applicationRepository,
+    candidateRepository,
+    employerRepository,
+    companyRepository,
+    notificationRepository,
+    queueService,
+    emailService
+  ) {
+    this.userRepository = userRepository;
+    this.jobRepository = jobRepository;
+    this.applicationRepository = applicationRepository;
+    this.candidateRepository = candidateRepository;
+    this.employerRepository = employerRepository;
+    this.companyRepository = companyRepository;
+    this.notificationRepository = notificationRepository;
+    this.queueService = queueService;
+    this.emailService = emailService;
   }
 
   async getSystemDashboard() {
@@ -499,4 +505,4 @@ class AdminService {
   }
 }
 
-module.exports = new AdminService();
+module.exports = AdminService;

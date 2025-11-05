@@ -25,15 +25,15 @@ router
 
 router.route('/:id').get(getNotificationById).delete(deleteNotification);
 
-router.route('/:id/read').put(markNotificationAsRead);
+router.route('/:id/read').patch(markNotificationAsRead); // PATCH for marking read
 
-router.route('/read-all').put(markAllNotificationsAsRead);
+router.route('/read-all').patch(markAllNotificationsAsRead); // PATCH for bulk status change
 
 // Settings routes
 router
   .route('/settings')
   .get(getNotificationSettings)
-  .put(updateNotificationSettings);
+  .patch(updateNotificationSettings); // PATCH for partial settings update
 
 // Stats routes
 router.route('/unread-count').get(getUnreadNotificationCount);
