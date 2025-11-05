@@ -1,0 +1,133 @@
+@startuml UC004_Manage_Job_Applications_Activity
+!pragma useVerticalIf on
+title UC004 - Quản lý ứng viên đã ứng tuyển
+
+skinparam backgroundColor White
+skinparam Shadowing false
+skinparam ConditionEndStyle hline
+skinparam swimlaneWidth 400
+skinparam BoxPadding 10
+skinparam ParticipantPadding 20
+
+skinparam activity {
+    BackgroundColor #87CEEB
+    BorderColor #000000
+    BorderThickness 2
+    FontColor Black
+    FontSize 11
+    RoundCorner 15
+    DiamondBackgroundColor #87CEEB
+    DiamondBorderColor #000000
+    DiamondBorderThickness 2
+    DiamondFontColor Black
+    StartColor Black
+    EndColor Black
+    BarColor Black
+}
+
+skinparam rectangle {
+    BackgroundColor #87CEEB
+    BorderColor #000000
+    BorderThickness 2
+    RoundCorner 15
+}
+
+skinparam arrow {
+    Color Black
+    Thickness 1.5
+    FontColor Black
+    FontSize 10
+}
+
+skinparam partition {
+    BackgroundColor White
+    BorderColor Black
+    BorderThickness 2
+    FontColor Black
+    FontStyle bold
+    FontSize 12
+}
+
+|#White|Nhà tuyển dụng|
+|#White|Hệ thống|
+
+start
+-[hidden]right-> 
+|Nhà tuyển dụng|
+:Chọn quản lý ứng viên của 1 bài đăng
+tuyển dụng cụ thể;
+
+-[#Black]right->
+|Hệ thống|
+:Hiển thị danh sách ứng viên đã ứng tuyển;
+
+if (Có ứng viên nộp hồ sơ?) then (False)
+  -[#Black]down->
+  |Hệ thống|
+  :Hiển thị thông báo:
+  "Chưa có ứng viên nào nộp hồ sơ
+  cho vị trí này.";
+else (True)
+  -[#Black]up->
+  |Nhà tuyển dụng|
+  :Nhấp vào một ứng viên để xem
+  chi tiết hồ sơ;
+  
+  -[#Black]right->
+  |Hệ thống|
+  :Hiển thị chi tiết hồ sơ ứng viên
+  (CV, thông tin cá nhân);
+  
+  -[#Black]left->
+  |Nhà tuyển dụng|
+  :Thay đổi trạng thái hồ sơ
+  (Mới, Đã xem, Hẹn phỏng vấn, Từ chối);
+  
+  -[#Black]right->
+  |Hệ thống|
+  :Cập nhật trạng thái hồ sơ;
+  
+  if (Cập nhật thành công?) then (True)
+    -[#Black]down->
+    |Hệ thống|
+    :Hỏi nhà tuyển dụng có muốn hệ thống
+    hỗ trợ gửi thông báo/email cho ứng viên?;
+    
+    -[#Black]left->
+    |Nhà tuyển dụng|
+    :Chọn một trong hai tùy chọn:
+    "Có, gửi thông báo/email tự động"
+    hoặc "Không, tôi sẽ tự liên hệ sau";
+    
+    if (Chọn "Có"?) then (True)
+      -[#Black]right->
+      |Hệ thống|
+      :Hiển thị màn hình nhập nội dung
+      hoặc mẫu thông báo/email;
+      
+      -[#Black]left->
+      |Nhà tuyển dụng|
+      :Chỉnh sửa và xác nhận gửi;
+      
+      -[#Black]right->
+      |Hệ thống|
+      :Gửi thông báo và/hoặc email
+      đến ứng viên;
+    else (False)
+      -[#Black]down->
+      |Hệ thống|
+      :Hiển thị trạng thái mới nhất
+      của ứng viên trên giao diện;
+    endif
+  else (False)
+    -[#Black]right->
+    |Hệ thống|
+    :Hiển thị thông báo lỗi:
+    "Đã có lỗi xảy ra khi cập nhật trạng thái.
+    Vui lòng thử lại sau.";
+  endif
+endif
+
+stop
+
+@enduml

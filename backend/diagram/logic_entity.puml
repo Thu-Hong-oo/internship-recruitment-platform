@@ -1,0 +1,635 @@
+@startuml
+!define PRIVATE -
+!define PUBLIC +
+!define PROTECTED #
+
+skinparam classAttributeIconSize 0
+skinparam class {
+    BackgroundColor WhiteSmoke
+    BorderColor Black
+    ArrowColor Black
+}
+skinparam linetype ortho
+
+' ============================================
+' 1. DOMAIN: IDENTITY (Nguoi dung & Xac thuc)
+' ============================================
+rectangle "DOMAIN 1: IDENTITY" as IdentityDomain {
+
+    abstract class User {
+        # userId: String
+        # fullName: String
+        # email: String
+        # avatarUrl: String
+        # status: UserStatus
+        # provider: AuthProvider
+        __
+        + updateProfile(fullName, avatarUrl): void
+        + suspend(): void
+        + reactivate(): void
+        + isActive(): Boolean
+    }
+
+    enum UserStatus {
+        PENDING_VERIFICATION
+        ACTIVE
+        SUSPENDED
+    }
+
+    enum AuthProvider {
+        EMAIL
+        GOOGLE
+    }
+
+    class Credential {
+        - password: String
+        - refreshToken: String
+        - passwordResetToken: String
+        - resetTokenExpiresAt: DateTime
+        - lastPasswordChangeAt: DateTime
+        __
+        + validatePassword(pw: String): Boolean
+        + changePassword(newHash: String): void
+        + generatePasswordResetToken(): String
+        + isResetTokenValid(): Boolean
+        + revokeRefreshToken(): void
+    }
+
+    class Candidate extends User {
+        - headline: String
+        - bio: String
+        - portfolioUrl: String
+        - linkedInUrl: String
+        - desiredLocationCodes: List<String>
+        - defaultCvFileId: String
+        - profileCompleteness: Integer
+        - isOpenToWork: Boolean
+        __
+        + updateCandidateProfile(headline, bio, ...): void
+        + calculateProfileCompleteness(): Integer
+        + setIsOpenToWork(status: Boolean): void
+        + addWorkExperience(data): WorkExperience
+        + addEducation(data): Education
+        + addSkill(skill, level, years): CandidateSkill
+        + uploadCV(fileInfo): CVFile
+        + setDefaultCV(cvFileId: String): void
+        + saveJob(job): SavedJob
+        + unsaveJob(savedJobId): void
+        + followCompany(company): FollowedCompany
+        + unfollowCompany(followedCompanyId): void
+    }
+
+    class Employer extends User {
+        - jobTitle: String
+    }
+
+    class Admin extends User {
+        - permissions: List<String>
+        __
+        + approveCompany(company: Company): void
+        + rejectCompany(company: Company): void
+        + suspendUser(user: User): void
+        + verifyUser(user: User): void
+    }
+
+    User --> UserStatus
+    User --> AuthProvider
+}
+
+' ============================================
+' 2. DOMAIN: CORE RECRUITMENT (Tuyen dung loi)
+' ============================================
+rectangle "DOMAIN 2: CORE RECRUITMENT" as CoreDomain {
+
+    class Company {
+        - companyId: String
+        - companyName: String
+        - taxCode: String
+        - description: String
+        - websiteUrl: String
+        - logoUrl: String
+        - companyHotline: String
+        - companyEmail: String
+        - foundedYear: Integer
+        - verificationStatus: String
+        - companySize: CompanySize
+        __
+        + updateInfo(name, desc, taxCode, ...): void
+        + requestVerification(): void
+        + addOfficeLocation(address: Address): void
+        + getOfficeLocations(): List<Address>
+    }
+
+    enum CompanySize {
+        SIZE_1_50
+        SIZE_51_200
+        SIZE_201_500
+        SIZE_501_1000
+        SIZE_1000_PLUS
+    }
+
+    class JobPosting {
+        - jobId: String
+        - title: String
+        - description: String
+        - minSalary: Double
+        - maxSalary: Double
+        - requiredExperienceLevel: String
+        - employmentType: EmploymentType
+        - requiredEducation: EducationLevel
+        - viewsCount: Integer
+        - applicationsCount: Integer
+        - status: JobStatus
+        - workFormat: WorkFormat
+        - expiresAt: DateTime
+        __
+        + publish(): void
+        + close(): void
+        + updateDetails(title, desc, ...): void
+        + isExpired(): Boolean
+        + daysUntilExpiry(): Integer
+        + incrementViews(): void
+        + addSkillRequirement(skill, level, isPreferred): JobSkillRequirement
+        + setWorkLocation(address: Address): void
+        + getWorkLocation(): Address
+    }
+
+    enum JobStatus {
+        DRAFT
+        OPEN
+        CLOSED
+    }
+    
+    enum WorkFormat {
+        ON_SITE
+        HYBRID
+        REMOTE
+    }
+    
+    enum EmploymentType {
+        FULL_TIME
+        PART_TIME
+        CONTRACT
+        INTERNSHIP
+    }
+    
+    enum EducationLevel {
+        HIGH_SCHOOL
+        BACHELOR
+        MASTER
+        PHD
+    }
+
+    class JobApplication {
+        - applicationId: String
+        - attachedCvUrl: String
+        - coverLetterText: String
+        - appliedAt: DateTime
+        - status: ApplicationStatus
+        __
+        + withdraw(): void
+        + shortlist(): void
+        + reject(): void
+        + makeOffer(): void
+    }
+
+    enum ApplicationStatus {
+        SUBMITTED
+        REVIEWING
+        SHORTLISTED
+        REJECTED
+        OFFERED
+        WITHDRAWN
+    }
+
+    class WorkExperience {
+        - workExperienceId: String
+        - jobTitle: String
+        - companyName: String
+        - description: String
+        - startDate: Date
+        - endDate: Date
+        - isCurrentJob: Boolean
+        - responsibilities: List<String>
+        __
+        + getDurationInMonths(): Integer
+        + isValid(): Boolean
+        + overlapsWithOther(other: WorkExperience): Boolean
+    }
+
+    class Education {
+        - educationId: String
+        - major: String
+        - gpa: Double
+        - gradYear: Integer
+        - startDate: Date
+        - endDate: Date
+        __
+        + getDurationInYears(): Integer
+        + isValid(): Boolean
+        + isGraduated(): Boolean
+    }
+
+    JobPosting --> JobStatus
+    JobPosting --> WorkFormat
+    JobPosting --> EmploymentType
+    JobPosting --> EducationLevel
+    JobApplication --> ApplicationStatus
+    Company --> CompanySize
+}
+
+' ============================================
+' 3. DOMAIN: MASTER DATA (Du lieu chu cho AI)
+' ============================================
+rectangle "DOMAIN 3: MASTER DATA" as MasterDataDomain {
+
+    class Skill {
+        - skillId: String
+        - slug: String
+        - skillName: String
+        - description: String
+        - aliases: List<String>
+        - path: String
+        - level: Integer
+        __
+        + matchesAlias(searchTerm: String): Boolean
+        + getFullHierarchy(): List<Skill>
+        + getAllDescendants(): List<Skill>
+        + isAncestorOf(other: Skill): Boolean
+    }
+
+    class Industry {
+        - industryId: String
+        - slug: String
+        - industryName: String
+        - path: String
+        - level: Integer
+        __
+        + getFullHierarchy(): List<Industry>
+        + isLeafNode(): Boolean
+        + getAllDescendants(): List<Industry>
+        + isAncestorOf(other: Industry): Boolean
+    }
+
+    class Address << (V,Orchid) >> {
+        - street: String
+        - wardName: String
+        - districtName: String
+        - provinceName: String
+        - wardCode: String
+        - districtCode: String
+        - provinceCode: String
+        __
+        + getFormattedString(): String
+    }
+
+    class Institution {
+        - institutionId: String
+        - schoolName: String
+        - logoUrl: String
+        - websiteUrl: String
+        - location: String
+        - type: InstitutionType
+        - ranking: Integer
+        __
+        + isVerified(): Boolean
+    }
+
+    enum InstitutionType {
+        UNIVERSITY
+        COLLEGE
+        VOCATIONAL
+    }
+
+    class Degree {
+        - degreeId: String
+        - degreeName: String
+        - level: DegreeLevel
+        __
+        + compareTo(other: Degree): Integer
+    }
+
+    enum DegreeLevel {
+        ASSOCIATE
+        BACHELOR
+        MASTER
+        PHD
+    }
+
+    class FieldOfStudy {
+        - fieldOfStudyId: String
+        - fieldName: String
+        - description: String
+        __
+        + isRelatedTo(other: FieldOfStudy): Boolean
+    }
+
+    class JobSkillRequirement {
+        - level: SkillLevel
+        - isPreferred: Boolean
+    }
+
+    class CandidateSkill {
+        - level: SkillLevel
+        - yearsOfExperience: Integer
+        - lastUsedYear: Integer
+        __
+        + isRecent(): Boolean
+    }
+
+    enum SkillLevel {
+        BEGINNER
+        INTERMEDIATE
+        ADVANCED
+        EXPERT
+    }
+
+    JobSkillRequirement --> SkillLevel
+    CandidateSkill --> SkillLevel
+    Institution --> InstitutionType
+    Degree --> DegreeLevel
+}
+
+' ============================================
+' 4. DOMAIN: NLP & PARSING (Ket qua tu Gemini)
+' ============================================
+rectangle "DOMAIN 4: NLP & PARSING" as NLPDomain {
+
+    class CVFile {
+        - cvFileId: String
+        - fileName: String
+        - fileUrl: String
+        - fileType: String
+        - parsingStatus: ParsingStatus
+    }
+    
+    enum ParsingStatus {
+        PENDING
+        PROCESSING
+        COMPLETED_NEEDS_REVIEW
+        FAILED
+        REVIEW_COMPLETED
+    }
+
+    class CVParsingResult {
+        - resultId: String
+        - rawTextContent: String
+        - extractedData: String
+        - confidence: Double
+        __
+        + getExtractedField(fieldName: String): Object
+        + hasHighConfidence(): Boolean
+        + markAsReviewed(): void
+        + exportToProfile(): void
+    }
+}
+
+' ============================================
+' 5. DOMAIN: AI MATCHING (Vector & So khop)
+' ============================================
+rectangle "DOMAIN 5: AI MATCHING" as AIDomain {
+
+    class VectorEmbedding {
+        - ownerId: String
+        - ownerType: OwnerType
+        - vector: List<Float>
+        - dimensions: Integer
+        - modelVersion: String
+        __
+        + calculateSimilarity(other: VectorEmbedding): Double
+        + needsRefresh(): Boolean
+        + updateVector(newVector: List<Float>): void
+    }
+
+    enum OwnerType {
+        CANDIDATE
+        JOB
+    }
+
+    class MatchResult {
+        - matchResultId: String
+        - overallScore: Double
+        - skillMatchScore: Double
+        - experienceMatchScore: Double
+        - educationMatchScore: Double
+        - locationMatchScore: Double
+        - reasoning: String
+        __
+        + isStrongMatch(): Boolean
+        + getMatchLevel(): MatchLevel
+        + generateExplanation(): String
+    }
+    
+    enum MatchLevel {
+        EXCELLENT
+        GOOD
+        FAIR
+        POOR
+    }
+
+    VectorEmbedding --> OwnerType
+    MatchResult --> MatchLevel
+}
+
+' ============================================
+' 6. DOMAIN: LEARNING (Lo trinh Ky nang)
+' ============================================
+rectangle "DOMAIN 6: LEARNING" as LearningDomain {
+
+    class LearningRoadmap {
+        - roadmapId: String
+        - targetJobTitle: String
+        - title: String
+        - overview: String
+        - estimatedHours: Integer
+        __
+        + addWeek(theme, goals): RoadmapWeek
+        + markCompleted(): void
+    }
+
+    class RoadmapWeek {
+        - roadmapWeekId: String
+        - weekNumber: Integer
+        - theme: String
+        - goals: List<String>
+        - completionCriteria: String
+        - isCompleted: Boolean
+        __
+        + addResource(title, url, type): LearningResource
+        + markCompleted(): void
+    }
+
+    class LearningResource {
+        - resourceId: String
+        - type: ResourceType
+        - title: String
+        - url: String
+        - duration: String
+    }
+
+    enum ResourceType {
+        COURSE
+        VIDEO
+        ARTICLE
+    }
+
+    LearningResource --> ResourceType
+}
+
+' ============================================
+' 7. DOMAIN: SUPPORTING (Luu & Theo doi)
+' ============================================
+rectangle "DOMAIN 7: SUPPORTING" as SupportDomain {
+
+    class SavedJob {
+    }
+
+    class FollowedCompany {
+        - notifyNewJobs: Boolean
+    }
+}
+
+' ============================================
+' 8. DOMAIN: NOTIFICATION (Thong bao)
+' ============================================
+rectangle "DOMAIN 8: NOTIFICATION" as NotificationDomain {
+
+    class Notification {
+        - notificationId: String
+        - title: String
+        - message: String
+        - type: NotificationType
+        - priority: NotificationPriority
+        - isRead: Boolean
+        - relatedEntityType: EntityType
+        - relatedEntityId: String
+        - actionUrl: String
+        __
+        + markAsRead(): void
+        + markAsUnread(): void
+    }
+    
+    enum EntityType {
+        JOB_APPLICATION
+        JOB_POSTING
+        CV_FILE
+        LEARNING_ROADMAP
+        COMPANY
+    }
+
+    enum NotificationType {
+        APPLICATION_SUBMITTED
+        APPLICATION_REVIEWED
+        APPLICATION_SHORTLISTED
+        APPLICATION_REJECTED
+        APPLICATION_OFFERED
+        JOB_EXPIRED_SOON
+        NEW_JOB_MATCH
+        COMPANY_FOLLOWED_NEW_JOB
+        CV_PARSING_COMPLETED
+        CV_PARSING_FAILED
+        PROFILE_INCOMPLETE_REMINDER
+        LEARNING_ROADMAP_READY
+        SYSTEM_ANNOUNCEMENT
+    }
+
+    enum NotificationPriority {
+        LOW
+        NORMAL
+        HIGH
+        URGENT
+    }
+
+    class NotificationPreference {
+        - email: Boolean
+        - inApp: Boolean
+        - applicationUpdates: Boolean
+        - jobRecommendations: Boolean
+        - companyNews: Boolean
+        - learningReminders: Boolean
+        - systemAnnouncements: Boolean
+        __
+        + updatePreference(key, value): void
+    }
+
+    Notification --> NotificationType
+    Notification --> NotificationPriority
+    Notification --> EntityType
+}
+
+
+' ============================================
+' CAC MOI QUAN HE CHINH
+' ============================================
+
+' --- 1. Quan he Nguoi dung ---
+User "1" o-- "0..1" Credential
+User <|-- Candidate
+User <|-- Employer
+User <|-- Admin
+
+' --- 2. Quan he Cong ty & Tuyen dung ---
+Company "1" o-- "0..*" Employer
+Company "1" o-- "0..*" JobPosting
+Company "1" *-- "0..*" Address
+Employer "1" o-- "0..*" JobPosting
+JobPosting "1" *-- "0..1" Address : workLocation
+
+' --- 3. Quan he Nop don ---
+Candidate "1" o-- "0..*" JobApplication
+JobPosting "1" o-- "0..*" JobApplication
+
+' --- 4. Quan he CV & Ho so ---
+Candidate "1" *-- "0..*" CVFile
+Candidate "1" ..> "0..1" CVFile : default
+Candidate "1" *-- "0..*" WorkExperience
+Candidate "1" *-- "0..*" Education
+Education "1" -- "1" Institution
+Education "1" -- "1" Degree
+Education "1" -- "1" FieldOfStudy
+
+' --- 4b. Quan he NLP & Parsing ---
+CVFile "1" o-- "0..1" CVParsingResult
+CVParsingResult "1" -- "1" Candidate : reviewedBy
+
+' --- 5. Quan he Ky nang ---
+Candidate "1" -- "0..*" CandidateSkill
+Skill "1" -- "0..*" CandidateSkill
+JobPosting "1" -- "0..*" JobSkillRequirement
+Skill "1" -- "0..*" JobSkillRequirement
+Skill "1" o-- "0..*" Skill : parent
+
+' --- 5b. Quan he Industry ---
+Company "1" o-- "1" Industry
+Industry "1" o-- "0..*" Industry : parent
+
+' --- 6. Quan he AI Matching ---
+Candidate "1" -- "0..1" VectorEmbedding
+JobPosting "1" -- "1" VectorEmbedding
+Candidate "1" -- "0..*" MatchResult
+JobPosting "1" -- "0..*" MatchResult
+JobApplication "1" -- "0..1" MatchResult : optional reference
+
+
+ JobApplication "1" -- "0..1" MatchResult
+
+' --- 7. Quan he Lo trinh & Hoc tap ---
+MatchResult "1" -- "0..1" LearningRoadmap
+Candidate "1" o-- "0..*" LearningRoadmap
+LearningRoadmap "1" *-- "1..*" RoadmapWeek
+RoadmapWeek "1" *-- "1..*" LearningResource
+
+' --- 8. Quan he Ho tro ---
+Candidate "1" -- "0..*" SavedJob
+JobPosting "1" -- "0..*" SavedJob
+Candidate "1" -- "0..*" FollowedCompany
+Company "1" -- "0..*" FollowedCompany
+
+' --- 9. Quan he Thong bao ---
+User "1" o-- "0..*" Notification
+User "1" -- "0..1" NotificationPreference
+JobApplication "1" -- "0..*" Notification : triggers
+JobPosting "1" -- "0..*" Notification : triggers
+CVFile "1" -- "0..*" Notification : triggers
+
+@enduml

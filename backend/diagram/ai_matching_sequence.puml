@@ -1,0 +1,60 @@
+@startuml AI_Matching_Sequence_Diagram
+!define PRIVATE -
+!define PUBLIC +
+
+skinparam classAttributeIconSize 0
+skinparam class {
+    BackgroundColor WhiteSmoke
+    BorderColor Black
+    ArrowColor Black
+}
+skinparam linetype ortho
+
+title AI Matching Process for Job Seekers
+
+actor "Employer" as Employer
+participant "JobPosting" as JobPosting
+participant "AIMatchingService" as AIMatching
+participant "Candidate" as Candidate
+participant "MatchResult" as MatchResult
+participant "NotificationService" as NotificationSvc
+participant "Employer" as Employer2
+participant "Candidate" as Candidate2
+
+== Job Posting Creation ==
+Employer -> JobPosting: Create job posting with requirements
+JobPosting --> Employer: Job posted successfully
+
+== AI Matching Trigger ==
+loop Daily/Periodic Scan
+    AIMatching -> Candidate: Check if job seeking enabled
+    alt Job Seeking Enabled
+        AIMatching -> JobPosting: Analyze job requirements
+        AIMatching -> Candidate: Analyze candidate profile & skills
+        AIMatching -> AIMatching: Calculate compatibility score
+        AIMatching -> MatchResult: Create match result
+        MatchResult --> AIMatching: Match result created
+        
+        alt High Match Score
+            AIMatching -> NotificationSvc: Send match notification to employer
+            NotificationSvc -> Employer2: "New candidate match found!"
+            AIMatching -> NotificationSvc: Send match notification to candidate
+            NotificationSvc -> Candidate2: "You match a job posting!"
+        end
+    end
+end
+
+== Match Review ==
+Employer2 -> MatchResult: View match details
+Candidate2 -> MatchResult: View match details
+
+note right
+    **AI Matching Process:**
+    1. System scans candidates with job seeking enabled
+    2. Analyzes job requirements vs candidate profiles
+    3. Calculates match scores using AI algorithms
+    4. Notifies both parties for high matches
+    5. Allows review and potential application
+end note
+
+@enduml

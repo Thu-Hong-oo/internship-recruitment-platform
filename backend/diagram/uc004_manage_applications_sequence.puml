@@ -1,0 +1,132 @@
+@startuml UC004_Manage_Job_Applications_Sequence
+title UC004 - Quản lý ứng viên đã ứng tuyển (Sơ đồ tuần tự)
+
+skinparam backgroundColor White
+skinparam guillemet false
+hide footbox
+
+skinparam boundary {
+    BackgroundColor #77cef2
+    FontColor Black
+    FontStyle bold
+}
+skinparam control {
+    BackgroundColor #77cef2
+    FontColor Black
+    FontStyle bold
+}
+skinparam entity {
+    BackgroundColor #77cef2
+    FontColor Black
+    FontStyle bold
+}
+skinparam actor {
+    BackgroundColor #72c9f4
+    FontStyle bold
+    FontColor Black
+}
+
+' Màu xanh cho activation bar
+skinparam sequence {
+    LifeLineBackgroundColor #77cef2
+}
+
+actor Employer as "Nhà tuyển dụng"
+boundary Frontend as "Giao diện người dùng"
+control ApplicationController as "ApplicationController"
+control RecruitmentService as "RecruitmentService"
+entity JobApplicationRepo as "JobApplicationRepo"
+control NotificationService as "NotificationService"
+actor Candidate as "Ứng viên"
+
+' Điều kiện tiên quyết: nhà tuyển dụng đã đăng nhập
+
+activate Employer #77cef2
+
+== Luồng chính: xem và quản lý ứng viên ==
+Employer -> Frontend: Chọn quản lý ứng viên của 1 bài đăng tuyển dụng cụ thể
+activate Frontend
+Frontend -> ApplicationController: getJobApplications(jobId)
+activate ApplicationController
+ApplicationController -> RecruitmentService: getApplicationsForJob(jobId)
+activate RecruitmentService
+RecruitmentService -> JobApplicationRepo: findByJobId(jobId)
+activate JobApplicationRepo
+JobApplicationRepo --> RecruitmentService: [list of applications]
+deactivate JobApplicationRepo
+RecruitmentService --> ApplicationController: applicationsList
+deactivate RecruitmentService
+ApplicationController --> Frontend: renderApplicationsList(applicationsList)
+deactivate ApplicationController
+
+alt Có ứng viên nộp hồ sơ
+    Frontend -> Employer: Hiển thị danh sách ứng viên
+    Employer -> Frontend: Nhấp vào một ứng viên để xem chi tiết
+    Frontend -> ApplicationController: getApplicationDetails(applicationId)
+    activate ApplicationController
+    ApplicationController -> RecruitmentService: getApplicationDetails(applicationId)
+    activate RecruitmentService
+    RecruitmentService -> JobApplicationRepo: findById(applicationId)
+    activate JobApplicationRepo
+    JobApplicationRepo --> RecruitmentService: applicationDetails (CV, info)
+    deactivate JobApplicationRepo
+    RecruitmentService --> ApplicationController: applicationDetails
+    deactivate RecruitmentService
+    ApplicationController --> Frontend: renderApplicationDetails(applicationDetails)
+    deactivate ApplicationController
+    Frontend -> Employer: Hiển thị chi tiết hồ sơ ứng viên
+    Employer -> Frontend: Thay đổi trạng thái hồ sơ (Mới, Đã xem, Hẹn phỏng vấn, Từ chối)
+    Frontend -> ApplicationController: updateApplicationStatus(applicationId, newStatus)
+    activate ApplicationController
+    ApplicationController -> RecruitmentService: updateStatus(applicationId, newStatus)
+    activate RecruitmentService
+    RecruitmentService -> JobApplicationRepo: updateStatus(applicationId, newStatus)
+    activate JobApplicationRepo
+    JobApplicationRepo --> RecruitmentService: updatedApplication
+    deactivate JobApplicationRepo
+    RecruitmentService --> ApplicationController: success
+    deactivate RecruitmentService
+    ApplicationController --> Frontend: statusUpdated
+    deactivate ApplicationController
+    Frontend -> Employer: Hỏi có muốn gửi thông báo/email cho ứng viên?
+    
+    alt Chọn gửi thông báo
+        Employer -> Frontend: Chọn "Có, gửi thông báo/email tự động"
+        Frontend -> ApplicationController: requestNotificationModal(applicationId)
+        activate ApplicationController
+        ApplicationController --> Frontend: renderNotificationModal
+        deactivate ApplicationController
+        Frontend -> Employer: Hiển thị màn hình nhập nội dung
+        Employer -> Frontend: Chỉnh sửa và xác nhận gửi
+        Frontend -> ApplicationController: sendNotification(applicationId, message)
+        activate ApplicationController
+        ApplicationController -> NotificationService: sendNotificationToCandidate(applicationId, message)
+        activate NotificationService
+        NotificationService -> Candidate: deliverNotification(message)
+        activate Candidate
+        deactivate Candidate
+        NotificationService --> ApplicationController: sent
+        deactivate NotificationService
+        ApplicationController --> Frontend: notificationSent
+        deactivate ApplicationController
+        Frontend -> Employer: Thông báo gửi thành công
+    else Chọn không gửi
+        Employer -> Frontend: Chọn "Không, tôi sẽ tự liên hệ sau"
+        Frontend -> Employer: Hiển thị trạng thái mới nhất
+    end
+    
+else Không có ứng viên
+    Frontend -> Employer: Hiển thị thông báo: "Chưa có ứng viên nào nộp hồ sơ cho vị trí này."
+end
+
+== Luồng ngoại lệ: lỗi cập nhật ==
+alt Lỗi cập nhật trạng thái
+    RecruitmentService -> ApplicationController: error
+    ApplicationController --> Frontend: showError("Đã có lỗi xảy ra khi cập nhật trạng thái. Vui lòng thử lại sau.")
+    Frontend -> Employer: Hiển thị thông báo lỗi
+end
+
+deactivate Employer
+
+@enduml</content>
+<parameter name="filePath">d:\KhoaLuan_Internship\internship-recruitment-platform\backend\diagram\uc004_manage_applications_sequence.puml

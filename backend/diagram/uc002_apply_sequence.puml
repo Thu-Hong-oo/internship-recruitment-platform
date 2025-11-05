@@ -1,0 +1,151 @@
+@startuml UC002_Apply_To_Job_Sequence
+
+skinparam backgroundColor White
+skinparam guillemet false
+hide footbox
+
+skinparam boundary {
+    BackgroundColor #77cef2
+    FontColor Black
+    FontStyle bold
+}
+skinparam control {
+    BackgroundColor #77cef2
+    FontColor Black
+    FontStyle bold
+}
+skinparam entity {
+    BackgroundColor #77cef2
+    FontColor Black
+    FontStyle bold
+}
+skinparam actor {
+    BackgroundColor #72c9f4
+    FontStyle bold
+    FontColor Black
+}
+
+' Màu xanh cho activation bar
+skinparam sequence {
+    LifeLineBackgroundColor #77cef2
+}
+
+skinparam participantPadding 20
+skinparam boxPadding 10
+
+actor Candidate as "Ứng viên"
+boundary Frontend as "Giao diện người dùng"
+boundary JobDetailsPage as "Trang chi tiết công việc"
+control ApplicationController as "ApplicationController"
+control CVService as "CVService"
+entity FileStorage as "FileStorage"
+control RecruitmentService as "RecruitmentService"
+entity JobApplicationRepo as "JobApplicationRepo"
+control NotificationService as "NotificationService"
+actor Employer as "Nhà tuyển dụng"
+
+' Điều kiện tiên quyết: ứng viên đã đăng nhập, đang ở trang chi tiết công việc
+
+activate Candidate #77cef2
+
+== Luồng chính: mở modal và chọn CV ==
+Candidate -> Frontend: Click "Apply Now"
+activate Frontend
+Frontend -> JobDetailsPage: requestApplyModal(jobId)
+activate JobDetailsPage
+JobDetailsPage -> ApplicationController: openApplyModal(jobId, candidateId)
+activate ApplicationController
+ApplicationController -> CVService: listCandidateCVs(candidateId)
+activate CVService
+CVService --> ApplicationController: [Danh sách CV (mặc định, lịch sử)]
+deactivate CVService
+ApplicationController --> Frontend: renderApplyModal(CV list, previousApplication?)
+deactivate ApplicationController
+deactivate JobDetailsPage
+deactivate Frontend
+
+alt Ứng viên chọn CV hiện có (luồng chính)
+    Candidate -> Frontend: chọn CV (hiện tại hoặc lịch sử)
+    activate Frontend
+    Candidate -> Frontend: nhấp "Xác nhận ứng tuyển"
+    Frontend -> ApplicationController: submitApplication(jobId, candidateId, cvId)
+    activate ApplicationController
+    ApplicationController -> RecruitmentService: submitApplication(jobId, candidateId, cvId)
+    activate RecruitmentService
+    RecruitmentService -> JobApplicationRepo: findByJobAndCandidate(jobId, candidateId)
+    activate JobApplicationRepo
+    
+    alt tìm thấy ứng tuyển hiện có (ứng tuyển lại)
+        JobApplicationRepo --> RecruitmentService: existingApplication
+        RecruitmentService -> JobApplicationRepo: updateApplication(existingApplication.id, cvId, appliedAt)
+    else không có ứng tuyển hiện có (lần đầu)
+        JobApplicationRepo --> RecruitmentService: notFound
+        RecruitmentService -> JobApplicationRepo: createApplication(jobId, candidateId, cvId, appliedAt)
+    end
+    
+    JobApplicationRepo --> RecruitmentService: savedApplication
+    deactivate JobApplicationRepo
+    RecruitmentService -> NotificationService: notifyEmployerOfApplication(jobId, savedApplication.id)
+    activate NotificationService
+    NotificationService -> Employer: deliverNotification(applicationId, jobId)
+    deactivate NotificationService
+    RecruitmentService --> ApplicationController: success(savedApplication)
+    deactivate RecruitmentService
+    ApplicationController --> Frontend: showSuccess("Ứng tuyển thành công!")
+    deactivate ApplicationController
+    Frontend -> Candidate: hiển thị modal/toast "Ứng tuyển thành công!"
+    deactivate Frontend
+end
+
+== Luồng thay thế: Ứng viên nhấp "Ứng tuyển lại" ==
+Candidate -> Frontend: Nhấn "Ứng tuyển lại"
+activate Frontend
+Frontend -> ApplicationController: openReapplyModal(jobId, candidateId)
+activate ApplicationController
+ApplicationController -> CVService: getPreviousSubmittedCV(jobId, candidateId)
+activate CVService
+CVService --> ApplicationController: previousCV (với submittedAt)
+deactivate CVService
+ApplicationController --> Frontend: renderReapplyModal(previousCV, CV list)
+deactivate ApplicationController
+deactivate Frontend
+' sau đó tiếp tục luồng chính; server sẽ cập nhật ứng tuyển hiện có thay vì tạo mới
+
+alt Ứng viên tải lên CV mới trong modal
+    Candidate -> Frontend: nhấp "Tải lên CV mới"
+    activate Frontend
+    Frontend -> FileStorage: uploadFile(file.pdf/.docx)
+    activate FileStorage
+    FileStorage --> Frontend: uploadResult(success/fail)
+    
+    alt tải lên thất bại (kích thước/loại không hợp lệ)
+        FileStorage --> Frontend: error(code)
+        Frontend -> Candidate: showError("Dung lượng file phải nhỏ hơn 5MB / chỉ pdf/docx")
+        Frontend -> Candidate: quay lại chọn file
+    else tải lên thành công
+        Frontend -> CVService: saveNewCV(candidateId, fileMeta)
+        activate CVService
+        CVService --> Frontend: newCvId
+        deactivate CVService
+        Frontend -> Candidate: tự động chọn CV mới làm mặc định
+        ' sau đó quay lại xác nhận và gửi (luồng chính)
+    end
+    deactivate FileStorage
+    deactivate Frontend
+end
+
+== Luồng ngoại lệ: lưu/cập nhật thất bại ==
+alt Lỗi Repo/Service
+    RecruitmentService -> ApplicationController: error
+    activate ApplicationController
+    ApplicationController --> Frontend: showError("Đã có lỗi xảy ra. Vui lòng thử lại sau")
+    activate Frontend
+    Frontend -> Candidate: hiển thị modal/toast lỗi
+    deactivate Frontend
+    deactivate ApplicationController
+    note right of Frontend: Không có hồ sơ ứng tuyển nào được tạo hoặc thay đổi
+end
+
+deactivate Candidate
+
+@enduml

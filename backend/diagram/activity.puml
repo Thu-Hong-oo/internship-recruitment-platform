@@ -1,0 +1,58 @@
+@startuml
+|Ứng viên|
+start
+:Đăng nhập thành công;
+:Đang ở trang danh sách việc làm;
+:Nhấn "Ứng tuyển ngay";
+
+|Hệ thống|
+:Hiển thị popup chọn CV;
+:Hiển thị 3 lựa chọn:
+a) CV hiện tại;
+b) Lịch sử CV;
+c) Tải lên CV mới;
+
+|Ứng viên|
+:Chọn CV hoặc chọn tải lên mới;
+
+|Hệ thống|
+if (Ứng viên chọn tải CV mới?) then (Có)
+  |Ứng viên|
+  :Chọn file từ máy (.pdf/.docx);
+
+  |Hệ thống|
+  :Kiểm tra định dạng và dung lượng (<5MB);
+  if (File hợp lệ?) then (Đúng)
+    :Lưu CV vào Lịch sử CV;
+    :Đặt làm CV mặc định;
+    :Quay lại bước chọn CV;
+  else (Sai)
+    :Hiển thị thông báo "File không hợp lệ";
+    :Quay lại chọn file;
+  endif
+endif
+
+|Ứng viên|
+:Nhấn "Xác nhận ứng tuyển";
+
+|Hệ thống|
+if (Ứng viên đã từng ứng tuyển?) then (Có)
+  :Hiển thị popup “Ứng tuyển lại”;
+  :Hiển thị CV cũ và lựa chọn CV mới;
+  :Ứng viên chọn CV mới;
+  :Cập nhật hồ sơ ứng tuyển hiện tại;
+else (Chưa)
+  :Tạo hồ sơ ứng tuyển mới;
+endif
+
+:Gửi thông báo cho Nhà tuyển dụng;
+:Hiển thị “Ứng tuyển thành công!”;
+
+stop
+
+|Hệ thống|
+detach
+:Không thể lưu/cập nhật hồ sơ (lỗi hệ thống);
+:Hiển thị "Đã có lỗi xảy ra. Vui lòng thử lại sau";
+stop
+@enduml

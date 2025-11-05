@@ -1,0 +1,801 @@
+@startuml Simplified_Domain_Model
+!define PRIVATE -
+!define PUBLIC +
+
+skinparam classAttributeIconSize 0
+skinparam class {
+    BackgroundColor WhiteSmoke
+    BorderColor Black
+    ArrowColor Black
+}
+skinparam linetype ortho
+
+rectangle "IDENTITY DOMAIN" as IdentityDomain {
+
+    class User <<Aggregate Root>> {
+        - userId: String
+        - email: String
+        - fullName: String
+        - avatarUrl: String
+        - password: String
+        - role: UserRole
+        - status: UserStatus
+        - lastLogin: DateTime
+        - oauthCredentials: List<OAuthCredential>
+        __
+        + changeEmail(email: String): void
+        + updateProfile(name: String): void
+        + isActive(): Boolean
+        + validatePassword(password: String): Boolean
+        + changePassword(newHash: String): void
+        + refreshOAuthToken(provider: OAuthProvider): void
+        + isOAuthExpired(provider: OAuthProvider): Boolean
+    }
+
+    enum UserRole {
+        CANDIDATE
+        EMPLOYER
+        ADMIN
+    }
+
+    enum UserStatus {
+        ACTIVE
+        SUSPENDED
+    }
+
+    enum OAuthProvider {
+        GOOGLE
+        FACEBOOK
+        GITHUB
+        LINKEDIN
+    }
+
+    class OAuthCredential <<Value Object>> {
+        - provider: OAuthProvider
+        - providerUserId: String
+        - accessToken: String
+        - refreshToken: String
+        - expiresAt: DateTime
+        __
+        + refreshToken(): void
+        + isExpired(): Boolean
+    }
+
+    class AuthenticationService <<Domain Service>> {
+        + authenticate(email: String, password: String): User
+        + getUserRole(userId: String): UserRole
+        + getEmployerProfile(userId: String): Employer
+        + getCandidateProfile(userId: String): Candidate
+    }
+
+rectangle "RECRUITMENT DOMAIN" as RecruitmentDomain {
+
+    class Company <<Aggregate Root>> {
+        - companyId: String
+        - name: String
+        - description: String
+        - website: String
+        - industry: String
+        - size: CompanySize
+        - isVerified: Boolean
+        - verificationStatus: VerificationStatus
+        - taxCode: String
+        - taxCodeImageUrl: String
+        - businessLicense: String
+        - businessLicenseNumber: String
+        - businessLicenseImageUrl: String
+        - establishedDate: DateTime
+        - address: Address
+        - phone: String
+        - email: String
+        - logoUrl: String
+        __
+        + updateInfo(name, desc): void
+        + verify(): void
+        + submitForVerification(): void
+        + updateBusinessInfo(taxCode, license): void
+        + updateAddress(address: Address): void
+        + uploadTaxCodeImage(imageUrl: String): void
+        + uploadBusinessLicenseImage(imageUrl: String): void
+        + isFullyVerified(): Boolean
+        + getOwner(): Employer
+        + addMember(member: Employer): void
+        + removeMember(memberId: String): void
+    }
+
+    enum CompanySize {
+        STARTUP
+        SMALL
+        MEDIUM
+        LARGE
+        ENTERPRISE
+    }
+
+    enum VerificationStatus {
+        PENDING
+        UNDER_REVIEW
+        VERIFIED
+        REJECTED
+        SUSPENDED
+    }
+
+    class Address <<Value Object>> {
+        - street: String
+        - ward: String
+        - district: String
+        - province: String
+        - zipCode: String
+        - country: String
+        __
+        + getFullAddress(): String
+        + isValid(): Boolean
+    }
+
+    class SalaryRange <<Value Object>> {
+        - min: Number
+        - max: Number
+        - currency: String
+        __
+        + getRange(): String
+        + isValid(): Boolean
+    }
+
+    class Employer <<Entity>> {
+        // Inherits from User: userId, email, fullName, password, role, status, lastLogin, oauthCredentials
+        - companyRole: CompanyRole
+        - memberStatus: MemberStatus
+        - invitedBy: String
+        - invitedAt: DateTime
+        - joinedAt: DateTime
+        __
+        + changeRole(newRole: CompanyRole): void
+        + activate(): void
+        + deactivate(): void
+        + hasPermission(permission: String): Boolean
+        + reviewApplication(applicationId: String, status: ApplicationStatus): void
+    }
+
+    enum CompanyRole {
+        OWNER
+        ADMIN
+        HR_MANAGER
+        RECRUITER
+        EMPLOYEE
+        VIEWER
+    }
+
+    enum MemberStatus {
+        PENDING
+        ACTIVE
+        INACTIVE
+        SUSPENDED
+    }
+
+    class CompanyInvitation <<Entity>> {
+        - invitationId: String
+        - email: String
+        - role: CompanyRole
+        - invitedBy: String
+        - invitedAt: DateTime
+        - expiresAt: DateTime
+        - status: InvitationStatus
+        - token: String
+        __
+        + accept(userId: String): Employer
+        + reject(): void
+        + expire(): void
+        + isExpired(): Boolean
+    }
+
+    enum InvitationStatus {
+        PENDING
+        ACCEPTED
+        REJECTED
+        EXPIRED
+    }
+
+    class JobPosting <<Aggregate Root>> {
+        - jobId: String
+        - title: String
+        - description: String
+        - location: String
+        - jobType: JobType
+        - status: JobStatus
+        - postedAt: DateTime
+        - benefits: String
+        - applicationDeadline: DateTime
+        - experienceYears: Integer
+        __
+        + publish(): void
+        + close(): void
+        + updateDetails(title, desc): void
+    }
+
+    enum JobType {
+        FULL_TIME
+        PART_TIME
+        CONTRACT
+        INTERNSHIP
+    }
+
+    enum JobStatus {
+        DRAFT
+        PUBLISHED
+        CLOSED
+    }
+
+    class JobApplication <<Aggregate Root>> {
+        - applicationId: String
+        - status: ApplicationStatus
+        - appliedAt: DateTime
+        - coverLetter: String
+        - attachments: List<String>
+        __
+        + submit(): void
+        + withdraw(): void
+    }
+
+    enum ApplicationStatus {
+        SUBMITTED
+        REVIEWING
+        ACCEPTED
+        REJECTED
+        WITHDRAWN
+    }
+
+    class JobFollowing <<Aggregate Root>> {
+        - followingId: String
+        - targetType: FollowingTargetType
+        __
+        + follow(): void
+        + unfollow(): void
+    }
+
+    enum FollowingTargetType {
+        JOB_POSTING
+        COMPANY
+    }
+
+    class JobSaving <<Aggregate Root>> {
+        - savingId: String
+        - savedAt: DateTime
+        __
+        + save(): void
+        + unsave(): void
+    }
+
+    class RecruitmentService <<Domain Service>> {
+        + createJobPosting(companyId: String, details: JobPosting): JobPosting
+        + submitApplication(jobId: String, candidateId: String, application: JobApplication): void
+        + inviteEmployer(companyId: String, email: String, role: CompanyRole): CompanyInvitation
+        + getJobApplications(jobId: String): List<JobApplication>
+        + updateApplicationStatus(applicationId: String, status: ApplicationStatus): void
+    }
+
+    class JobRequirement <<Value Object>> {
+        - requiredSkills: List<String>
+        - certifications: List<String>
+        - languages: List<String>
+        __
+        + hasSkill(skill: String): Boolean
+        + requiresCertification(cert: String): Boolean
+    }
+
+}
+
+class CompanyVerified <<Domain Event>> {
+    - companyId: String
+    - verifiedBy: String
+    - verifiedAt: DateTime
+    - taxCode: String
+    - businessLicense: String
+}
+
+class CompanyRejected <<Domain Event>> {
+    - companyId: String
+    - rejectedBy: String
+    - rejectedAt: DateTime
+    - reason: String
+}
+
+class EmployerInvited <<Domain Event>> {
+    - invitationId: String
+    - email: String
+    - role: CompanyRole
+    - invitedBy: String
+    - invitedAt: DateTime
+}
+
+class EmployerJoined <<Domain Event>> {
+    - memberId: String
+    - userId: String
+    - role: CompanyRole
+    - joinedAt: DateTime
+}
+
+class JobPosted <<Domain Event>> {
+    - jobId: String
+    - companyId: String
+    - postedAt: DateTime
+    - title: String
+}
+
+class ApplicationSubmitted <<Domain Event>> {
+    - applicationId: String
+    - jobId: String
+    - candidateId: String
+    - submittedAt: DateTime
+}
+
+class ApplicationReviewed <<Domain Event>> {
+    - applicationId: String
+    - reviewedBy: String
+    - status: ApplicationStatus
+    - reviewedAt: DateTime
+}
+
+rectangle "PROFILE DOMAIN" as ProfileDomain {
+
+    enum JobSeekingStatus {
+        ACTIVE
+        INACTIVE
+    }
+
+    class Education <<Value Object>> {
+        - degree: String
+        - school: String
+        - major: String
+        - graduationYear: Integer
+        - gpa: Number
+        __
+        + getFullEducation(): String
+        + isCompleted(): Boolean
+    }
+
+    class Candidate <<Aggregate Root>> {
+        // Inherits from User: userId, email, fullName, password, role, status, lastLogin, oauthCredentials
+        - headline: String
+        - bio: String
+        - skills: List<Skill>
+        - educations: List<Education>
+        - address: Address
+        - portfolioUrl: String
+        - profileCompleteness: Integer
+        - jobSeekingStatus: JobSeekingStatus
+        __
+        + updateProfile(headline, bio): void
+        + addSkill(skill: Skill): void
+        + removeSkill(skillId: String): void
+        + updateExperience(years: Integer): void
+        + addEducation(education: Education): void
+        + removeEducation(educationId: String): void
+        + updateAddress(address: Address): void
+        + calculateProfileCompleteness(): Integer
+        + activateJobSeeking(): void
+        + deactivateJobSeeking(): void
+    }
+
+    class CV <<Aggregate Root>> {
+        - cvId: String
+        - fileUrl: String
+        - fileName: String
+        - uploadedAt: DateTime
+        - isDefault: Boolean
+        __
+        + upload(file: File): void
+        + markAsDefault(): void
+    }
+
+}
+
+rectangle "MASTER DATA DOMAIN" as MasterDataDomain {
+
+    class Industry <<Aggregate Root>> {
+        - industryId: String
+        - name: String
+        - parentIndustryId: String
+        - isActive: Boolean
+        __
+        + activate(): void
+        + deactivate(): void
+    }
+
+    class Skill <<Aggregate Root>> {
+        - skillId: String
+        - skillName: String
+        - parentSkillId: String
+        - category: String
+        - isActive: Boolean
+        __
+        + activate(): void
+        + deactivate(): void
+    }
+
+    class MasterDataService <<Domain Service>> {
+        + getSubIndustries(parentIndustryId: String): List<Industry>
+        + getSubSkills(parentSkillId: String): List<Skill>
+        + getAllIndustries(): List<Industry>
+        + getAllSkills(): List<Skill>
+    }
+}
+
+rectangle "NOTIFICATION DOMAIN" as NotificationDomain {
+
+    class Notification <<Aggregate Root>> {
+        - notificationId: String
+        - type: NotificationType
+        - title: String
+        - message: String
+        - data: Map<String, Object>
+        - isRead: Boolean
+        - readAt: DateTime
+        __
+        + markAsRead(): void
+        + getFormattedMessage(): String
+    }
+
+    enum NotificationType {
+        JOB_APPLICATION_STATUS
+        NEW_JOB_MATCH
+        COMPANY_UPDATE
+        SKILL_RECOMMENDATION
+        SYSTEM_ANNOUNCEMENT
+        PROFILE_VIEW
+    }
+
+    class NotificationService <<Domain Service>> {
+        + sendNotification(userId: String, notification: Notification): void
+        + getUnreadCount(userId: String): Integer
+        + markAllAsRead(userId: String): void
+        + scheduleNotification(userId: String, notification: Notification, delay: Integer): void
+        + getNotificationHistory(userId: String, page: Integer, size: Integer): List<Notification>
+    }
+
+    class NotificationSent <<Domain Event>> {
+        - notificationId: String
+        - type: NotificationType
+        - sentAt: DateTime
+    }
+
+    class NotificationRead <<Domain Event>> {
+        - notificationId: String
+        - readAt: DateTime
+    }
+
+}
+
+rectangle "SKILL DEVELOPMENT DOMAIN" as SkillDevDomain {
+
+    enum SkillLevel {
+        BEGINNER
+        INTERMEDIATE
+        ADVANCED
+        EXPERT
+    }
+
+    class SkillRoadmap <<Aggregate Root>> {
+        - roadmapId: String
+        - targetJobTitle: String
+        - currentSkillLevel: SkillLevel
+        - targetSkillLevel: SkillLevel
+        - estimatedMonths: Integer
+        - status: RoadmapStatus
+        - completedAt: DateTime
+        - steps: List<DevelopmentStep>
+        __
+        + generateSteps(): List<DevelopmentStep>
+        + updateProgress(): void
+        + calculateCompletion(): Percentage
+        + pause(): void
+        + resume(): void
+        + complete(): void
+        + addStep(step: DevelopmentStep): void
+    }
+
+    enum RoadmapStatus {
+        ACTIVE
+        COMPLETED
+        PAUSED
+        CANCELLED
+    }
+
+    class DevelopmentStep <<Entity>> {
+        - stepId: String
+        - stepOrder: Integer
+        - title: String
+        - description: String
+        - resourceLinks: List<String>
+        - estimatedHours: Integer
+        - status: StepStatus
+        - completedAt: DateTime
+        - startedAt: DateTime
+        __
+        + markCompleted(): void
+        + markInProgress(): void
+        + addResource(link: String): void
+        + skip(): void
+    }
+
+    enum StepStatus {
+        PENDING
+        IN_PROGRESS
+        COMPLETED
+        SKIPPED
+    }
+
+    class SkillGapAnalysis <<Aggregate Root>> {
+        - analysisId: String
+        - missingSkills: List<SkillGap>
+        - recommendedCourses: List<String>
+        - priorityLevel: PriorityLevel
+        - expiresAt: DateTime
+        __
+        + getTopGaps(): List<SkillGap>
+        + generateRecommendations(): List<String>
+        + isExpired(): Boolean
+        + refresh(): void
+        + addGap(gap: SkillGap): void
+    }
+
+    enum PriorityLevel {
+        HIGH
+        MEDIUM
+        LOW
+    }
+
+    class SkillGap <<Value Object>> {
+        - currentLevel: SkillLevel
+        - requiredLevel: SkillLevel
+        - gapDescription: String
+        - timeToClose: Integer
+        - isCritical: Boolean
+        __
+        + isCritical(): Boolean
+        + getImprovementPlan(): String
+        + calculateDifficulty(): DifficultyLevel
+    }
+
+    class ProgressReport <<Value Object>> {
+        - roadmapId: String
+        - totalSteps: Integer
+        - completedSteps: Integer
+        - inProgressSteps: Integer
+        - completionPercentage: Integer
+        - estimatedCompletionDate: DateTime
+        - nextMilestone: String
+        __
+        + isOnTrack(): Boolean
+        + getTimeRemaining(): Integer
+        + getMotivationalMessage(): String
+    }
+
+    enum ResourceType {
+        COURSE
+        TUTORIAL
+        BOOK
+        VIDEO
+        ARTICLE
+        PRACTICE
+    }
+
+    class Resource <<Value Object>> {
+        - resourceUrl: String
+        - title: String
+        - description: String
+        - type: ResourceType
+        - provider: String
+        - estimatedDuration: Integer
+        - difficultyLevel: SkillLevel
+        __
+        + isAccessible(): Boolean
+        + getFormattedUrl(): String
+        + matchesSkill(skillId: String): Boolean
+    }
+
+    class SkillDevelopmentService <<Domain Service>> {
+        + generateRoadmap(candidateId: String, targetJobId: String): SkillRoadmap
+        + analyzeSkillGaps(candidateId: String, jobId: String): SkillGapAnalysis
+        + recommendCourses(skillId: String): List<String>
+        + trackProgress(roadmapId: String): ProgressReport
+        + updateStepStatus(stepId: String, status: StepStatus): void
+        + getLearningResources(skillId: String, level: SkillLevel): List<Resource>
+        + refreshAnalysis(analysisId: String): SkillGapAnalysis
+        + getRecommendedJobsForRoadmap(roadmapId: String): List<JobPosting>
+    }
+
+    class RoadmapCreated <<Domain Event>> {
+        - roadmapId: String
+        - targetJobTitle: String
+        - createdAt: DateTime
+    }
+
+    class StepCompleted <<Domain Event>> {
+        - stepId: String
+        - roadmapId: String
+        - completedAt: DateTime
+    }
+
+    class RoadmapCompleted <<Domain Event>> {
+        - roadmapId: String
+        - completedAt: DateTime
+        - totalSteps: Integer
+        - timeSpent: Integer
+    }
+
+    class GapAnalysisCompleted <<Domain Event>> {
+        - analysisId: String
+        - gapsFound: Integer
+        - completedAt: DateTime
+    }
+
+}
+
+rectangle "AI/NLP DOMAIN" as AIDomain {
+
+    class MatchResult <<Aggregate Root>> {
+        - matchId: String
+        - score: Number
+        - matchLevel: MatchLevel
+        __
+        + calculateScore(): Number
+        + getMatchLevel(): MatchLevel
+    }
+
+    enum MatchLevel {
+        EXCELLENT
+        GOOD
+        FAIR
+        POOR
+    }
+
+    class CandidateMatch <<Value Object>> {
+        - candidateName: String
+        - headline: String
+        - skills: List<String>
+        - matchScore: Number
+        - matchLevel: MatchLevel
+        - jobTitle: String
+        __
+        + isHighMatch(): Boolean
+    }
+
+    class JobRequirements <<Value Object>> {
+        - requiredSkills: List<String>
+        - experienceYears: Integer
+        - educationLevel: String
+        - certifications: List<String>
+        - languages: List<String>
+        - location: String
+        - salaryRange: SalaryRange
+        __
+        + hasSkill(skill: String): Boolean
+        + requiresExperience(years: Integer): Boolean
+    }
+
+    class AIMatchingService <<Domain Service>> {
+        + findMatches(candidateId: String): List<MatchResult>
+        + calculateCompatibility(jobId: String, candidateId: String): MatchResult
+        + getRecommendedCandidatesForEmployer(employerId: String): List<CandidateMatch>
+        + getTopMatchesForJob(jobId: String, limit: Integer): List<MatchResult>
+    }
+
+    class NLPParserService <<Domain Service>> {
+        + extractSkillsFromCV(cvId: String): List<String>
+        + parseJobDescription(jobId: String): JobRequirements
+        + analyzeCandidateProfile(candidateId: String): CandidateProfileData
+    }
+
+    class MatchGenerated <<Domain Event>> {
+        - matchId: String
+        - score: Number
+        - generatedAt: DateTime
+    }
+
+    class MatchViewed <<Domain Event>> {
+        - matchId: String
+        - viewedAt: DateTime
+    }
+
+}
+
+User "1" *-- "0..*" OAuthCredential : owns
+Company "1" o-- "0..*" Employer : has
+Company "1" *-- "1" Address : has
+Candidate "1" *-- "1" Address : has
+Candidate "1" o-- "0..*" Skill : has
+Candidate "1" *--  "0..*" Education : has
+SkillRoadmap "1" *-- "0..*" DevelopmentStep : contains
+SkillGapAnalysis "1" *-- "0..*" SkillGap : contains
+DevelopmentStep "1" o-- "0..*" Resource : uses
+
+Company "1" o-- "0..*" JobPosting : posts
+Company "1" o-- "0..*" CompanyInvitation : sends
+JobPosting "1" *-- "0..*" JobApplication : receives
+Candidate "1" o-- "0..*" CV : owns
+User "1" o-- "0..*" SkillGapAnalysis : receives
+User "1" o-- "0..*" Notification : receives
+User "1" *-- "0..*" JobFollowing : has
+User "1" *-- "0..*" JobSaving : has
+
+CompanyInvitation "1" --> "0..1" Employer : creates
+JobApplication "1" --> "1" Candidate : submitted by
+SkillGapAnalysis "1" --> "1" JobPosting : analyzes
+SkillGapAnalysis "1" --> "1" Candidate : for candidate
+SkillRoadmap "1" --> "1" Candidate : for candidate
+JobPosting "1" --> "0..*" MatchResult : generates
+MatchResult "1" --> "1" Candidate : for candidate
+MatchResult "1" --> "1" JobPosting : for job
+Company "1" o-- "0..*" Industry : operates in
+JobPosting "1" --> "1" Industry : belongs to
+Industry "1" --> "0..1" Industry : parent
+Skill "1" --> "0..1" Skill : parent
+JobFollowing "1" --> "0..1" JobPosting : follows
+JobFollowing "1" --o "0..1" Company : follows
+JobSaving "1" --> "1" JobPosting : saves
+
+Employer --|> User
+Candidate --|> User
+
+JobPosting "1" *-- "1" SalaryRange : has
+JobPosting "1" *-- "1" JobRequirement : has
+
+User --> UserRole
+User --> UserStatus
+OAuthCredential --> OAuthProvider
+Company --> CompanySize
+Company --> VerificationStatus
+Employer --> CompanyRole
+Employer --> MemberStatus
+CompanyInvitation --> InvitationStatus
+CompanyInvitation --> CompanyRole
+JobPosting --> JobType
+JobPosting --> JobStatus
+JobApplication --> ApplicationStatus
+Candidate --> JobSeekingStatus
+Notification --> NotificationType
+SkillRoadmap --> SkillLevel
+SkillRoadmap --> RoadmapStatus
+DevelopmentStep --> StepStatus
+SkillGapAnalysis --> PriorityLevel
+SkillGap --> SkillLevel
+Resource --> ResourceType
+MatchResult --> MatchLevel
+CandidateMatch --> MatchLevel
+JobFollowing --> FollowingTargetType
+
+NotificationService ..> Notification : manages
+SkillDevelopmentService ..> SkillRoadmap : manages
+SkillDevelopmentService ..> SkillGapAnalysis : creates
+SkillDevelopmentService ..> ProgressReport : returns
+AIMatchingService ..> MatchResult : produces
+AIMatchingService ..> CandidateMatch : returns
+AIMatchingService ..> NLPParserService : uses
+NLPParserService ..> JobRequirements : parses
+NLPParserService ..> CV : parses
+AuthenticationService ..> User : authenticates
+AuthenticationService ..> Employer : retrieves
+AuthenticationService ..> Candidate : retrieves
+
+RecruitmentService ..> JobPosting : manages
+RecruitmentService ..> JobApplication : manages
+RecruitmentService ..> CompanyInvitation : manages
+
+SkillRoadmap ..> RoadmapCreated : raises
+SkillGapAnalysis ..> GapAnalysisCompleted : raises
+SkillRoadmap ..> RoadmapCompleted : raises
+DevelopmentStep ..> StepCompleted : raises
+Company ..> CompanyVerified : raises
+Company ..> CompanyRejected : raises
+Company ..> EmployerInvited : raises
+Company ..> EmployerJoined : raises
+MatchResult ..> MatchGenerated : raises
+MatchResult ..> MatchViewed : raises
+NotificationService ..> NotificationSent : publishes
+NotificationService ..> NotificationRead : publishes
+
+RecruitmentService ..> JobPosted : raises
+RecruitmentService ..> ApplicationSubmitted : raises
+RecruitmentService ..> ApplicationReviewed : raises
+
+@enduml</content>
+<parameter name="filePath">d:\KhoaLuan_Internship\internship-recruitment-platform\backend\diagram\improved_domain_model.puml
