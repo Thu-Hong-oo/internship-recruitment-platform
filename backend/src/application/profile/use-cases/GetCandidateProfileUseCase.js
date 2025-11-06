@@ -153,22 +153,37 @@ class GetCandidateProfileUseCase {
       }
 
       // Get candidate's CVs
-      const cvs = await this.cvRepository.findByCandidate(candidate._id);
+      const candidateIdToUse = candidate.profileId || candidate.id;
+      const cvs = await this.cvRepository.findByCandidate(candidateIdToUse);
 
-      // Attach CVs to candidate object
-      const candidateWithCVs = candidate.toObject
-        ? candidate.toObject()
+      logger.info('CVs retrieved:', {
+        candidateId: candidateIdToUse?.toString(),
+        cvsCount: cvs?.length || 0,
+      });
+
+      // Convert domain entity to plain object using domain method
+      // This follows Clean Architecture - use domain entity's own serialization
+      const candidateData = candidate.toPlainObject
+        ? candidate.toPlainObject()
         : candidate;
-      candidateWithCVs.cvs = cvs;
+
+      // Attach CVs to the plain object
+      candidateData.cvs = cvs || [];
+
+      logger.info('Candidate profile with CVs attached:', {
+        hasCvs: !!candidateData.cvs,
+        cvsCount: candidateData.cvs?.length || 0,
+        userId: typeof candidateData.userId,
+      });
 
       // Calculate completeness
-      const completenessData = this.calculateCompleteness(candidateWithCVs);
+      const completenessData = this.calculateCompleteness(candidateData);
 
       const logId = candidateId || `user:${userId}`;
       logger.info(`Candidate profile retrieved: ${logId}`);
 
       return {
-        candidate: candidateWithCVs,
+        candidate: candidateData,
         ...completenessData,
       };
     } catch (error) {

@@ -1,0 +1,937 @@
+{
+  "info": {
+    "name": "Employer API - Complete",
+    "description": "Complete API collection for Employer features including profile, company management, job postings, applications, and team collaboration",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "employer-api-complete-2025",
+    "version": "2.0.0",
+    "updatedAt": "2025-11-06"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{employer_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "employer_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "employer_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "company_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "job_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Register Employer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('employer_token', response.token);",
+                  "    pm.collectionVariables.set('employer_id', response.user.id);",
+                  "    console.log('Employer registered successfully');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"employer@techcorp.com\",\n  \"password\": \"SecurePass123!\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Manager\",\n  \"role\": \"employer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Register new employer account"
+          }
+        },
+        {
+          "name": "Login Employer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('employer_token', response.token);",
+                  "    pm.collectionVariables.set('employer_id', response.user.id);",
+                  "    console.log('Login successful');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"employer@techcorp.com\",\n  \"password\": \"SecurePass123!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login employer account"
+          }
+        },
+        {
+          "name": "Verify Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"employer@techcorp.com\",\n  \"otp\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/verify-email",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "verify-email"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Employer Profile",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/employers/profile",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employers", "profile"]
+            },
+            "description": "Get employer profile with company info"
+          }
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+84123456789\",\n  \"position\": \"HR Manager\",\n  \"department\": \"Human Resources\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/employers/profile",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employers", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Get Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/employers/dashboard",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employers", "dashboard"]
+            },
+            "description": "Get employer dashboard with stats: jobs, applications, views"
+          }
+        },
+        {
+          "name": "Get Employer Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/employers/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employers", "stats"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Company Management",
+      "item": [
+        {
+          "name": "Create Company",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('company_id', response.company._id || response.company.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"TechCorp Solutions\",\n  \"description\": \"Leading technology company specializing in AI and cloud solutions\",\n  \"industry\": \"Information Technology\",\n  \"size\": \"51-200\",\n  \"website\": \"https://techcorp.com\",\n  \"location\": {\n    \"address\": \"123 Tech Street\",\n    \"city\": \"Ho Chi Minh\",\n    \"country\": \"Vietnam\"\n  },\n  \"contact\": {\n    \"email\": \"hr@techcorp.com\",\n    \"phone\": \"+84123456789\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/employers/company",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employers", "company"]
+            }
+          }
+        },
+        {
+          "name": "Get Company Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/employers/company",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employers", "company"]
+            }
+          }
+        },
+        {
+          "name": "Update Company",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Leading technology company specializing in AI, cloud solutions, and digital transformation\",\n  \"benefits\": [\n    \"Health Insurance\",\n    \"Remote Work\",\n    \"Learning Budget\",\n    \"Gym Membership\"\n  ],\n  \"culture\": \"Innovation-driven, collaborative environment with focus on work-life balance\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/employers/company",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employers", "company"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Team Management",
+      "item": [
+        {
+          "name": "Get Company Members",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/employers/company/members",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employers", "company", "members"]
+            }
+          }
+        },
+        {
+          "name": "Invite Member",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"recruiter@techcorp.com\",\n  \"role\": \"recruiter\",\n  \"permissions\": {\n    \"canPostJobs\": true,\n    \"canViewApplications\": true,\n    \"canManageApplications\": true,\n    \"canManageTeam\": false\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/employers/company/members/invite",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employers", "company", "members", "invite"]
+            }
+          }
+        },
+        {
+          "name": "Get My Invitations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/employers/invitations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employers", "invitations"]
+            }
+          }
+        },
+        {
+          "name": "Accept Invitation",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/employers/invitations/accept/:token",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employers", "invitations", "accept", ":token"]
+            }
+          }
+        },
+        {
+          "name": "Update Member Permissions",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"permissions\": {\n    \"canPostJobs\": true,\n    \"canViewApplications\": true,\n    \"canManageApplications\": true,\n    \"canManageTeam\": true\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/employers/company/members/:memberId",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employers", "company", "members", ":memberId"]
+            }
+          }
+        },
+        {
+          "name": "Remove Member",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/employers/company/members/:memberId",
+              "host": ["{{base_url}}"],
+              "path": ["api", "employers", "company", "members", ":memberId"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Job Management",
+      "item": [
+        {
+          "name": "Create Job Post",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('job_id', response.job._id || response.job.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Senior Full-Stack Developer\",\n  \"description\": \"We are looking for an experienced Full-Stack Developer to join our team\",\n  \"requirements\": [\n    \"5+ years experience in web development\",\n    \"Strong knowledge of Node.js and React\",\n    \"Experience with MongoDB and PostgreSQL\",\n    \"Good understanding of REST APIs and GraphQL\"\n  ],\n  \"responsibilities\": [\n    \"Design and develop scalable web applications\",\n    \"Collaborate with cross-functional teams\",\n    \"Write clean, maintainable code\",\n    \"Mentor junior developers\"\n  ],\n  \"skills\": [\n    \"Node.js\",\n    \"React\",\n    \"MongoDB\",\n    \"PostgreSQL\",\n    \"Docker\",\n    \"AWS\"\n  ],\n  \"type\": \"fulltime\",\n  \"level\": \"senior\",\n  \"location\": \"Ho Chi Minh City\",\n  \"workType\": \"hybrid\",\n  \"salary\": {\n    \"min\": 2000,\n    \"max\": 3500,\n    \"currency\": \"USD\"\n  },\n  \"benefits\": [\n    \"Health Insurance\",\n    \"Remote Work\",\n    \"Learning Budget\",\n    \"Annual Bonus\"\n  ],\n  \"deadline\": \"2025-12-31\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/jobs",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jobs"]
+            }
+          }
+        },
+        {
+          "name": "Get My Job Posts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/jobs/employer?page=1&limit=20&status=active",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jobs", "employer"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "active"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Job Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/jobs/{{job_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jobs", "{{job_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Job Post",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Senior Full-Stack Developer (Updated)\",\n  \"salary\": {\n    \"min\": 2500,\n    \"max\": 4000,\n    \"currency\": \"USD\"\n  },\n  \"workType\": \"remote\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/jobs/{{job_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jobs", "{{job_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Publish Job",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/jobs/{{job_id}}/publish",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jobs", "{{job_id}}", "publish"]
+            }
+          }
+        },
+        {
+          "name": "Close Job",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/jobs/{{job_id}}/close",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jobs", "{{job_id}}", "close"]
+            }
+          }
+        },
+        {
+          "name": "Get Job Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/jobs/{{job_id}}/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jobs", "{{job_id}}", "stats"]
+            },
+            "description": "Get job statistics: views, applications, etc."
+          }
+        },
+        {
+          "name": "Delete Job Post",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/jobs/{{job_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "jobs", "{{job_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Application Management",
+      "item": [
+        {
+          "name": "Get Job Applications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/applications/job/{{job_id}}?page=1&limit=20&status=pending",
+              "host": ["{{base_url}}"],
+              "path": ["api", "applications", "job", "{{job_id}}"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "pending"
+                }
+              ]
+            },
+            "description": "Get all applications for a specific job"
+          }
+        },
+        {
+          "name": "Get Application Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/applications/:applicationId",
+              "host": ["{{base_url}}"],
+              "path": ["api", "applications", ":applicationId"]
+            }
+          }
+        },
+        {
+          "name": "Update Application Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"shortlisted\",\n  \"message\": \"Your profile matches our requirements. We will contact you for an interview.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/applications/:applicationId/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "applications", ":applicationId", "status"]
+            },
+            "description": "Status: pending, shortlisted, interviewing, offered, rejected, hired"
+          }
+        },
+        {
+          "name": "Mark Application as Viewed",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/applications/:applicationId/view",
+              "host": ["{{base_url}}"],
+              "path": ["api", "applications", ":applicationId", "view"]
+            }
+          }
+        },
+        {
+          "name": "Add Employer Notes",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Strong technical background. Good communication skills. Schedule for technical interview next week.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/applications/:applicationId/notes",
+              "host": ["{{base_url}}"],
+              "path": ["api", "applications", ":applicationId", "notes"]
+            }
+          }
+        },
+        {
+          "name": "Get Application Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/applications/employer/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "applications", "employer", "stats"]
+            },
+            "description": "Get employer's application statistics"
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Skills & Industries",
+      "item": [
+        {
+          "name": "Get All Skills",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/skills?page=1&limit=50",
+              "host": ["{{base_url}}"],
+              "path": ["api", "skills"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Skills",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/skills/search?q=javascript&category=programming",
+              "host": ["{{base_url}}"],
+              "path": ["api", "skills", "search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "javascript"
+                },
+                {
+                  "key": "category",
+                  "value": "programming"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Industries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/industries",
+              "host": ["{{base_url}}"],
+              "path": ["api", "industries"]
+            }
+          }
+        },
+        {
+          "name": "Get Industry Jobs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/industries/:industryId/jobs",
+              "host": ["{{base_url}}"],
+              "path": ["api", "industries", ":industryId", "jobs"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. AI & Matching",
+      "item": [
+        {
+          "name": "Match Candidate to Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"candidateId\": \"507f191e810c19729de860ea\",\n  \"jobId\": \"{{job_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai/match",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "match"]
+            },
+            "description": "AI-powered matching between candidate and job"
+          }
+        },
+        {
+          "name": "Parse Job Description",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobDescription\": \"We are seeking a Senior Full-Stack Developer with 5+ years experience in Node.js, React, and MongoDB. Must have experience with cloud platforms like AWS or Azure.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai/parse-job-description",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "parse-job-description"]
+            },
+            "description": "Extract skills and requirements from job description"
+          }
+        },
+        {
+          "name": "Get Market Insights",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ai/insights/market",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "insights", "market"]
+            },
+            "description": "Get market trends and insights"
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Notifications",
+      "item": [
+        {
+          "name": "Get My Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/notifications?page=1&limit=20&isRead=false",
+              "host": ["{{base_url}}"],
+              "path": ["api", "notifications"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "isRead",
+                  "value": "false"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Mark Notification as Read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/notifications/:notificationId/read",
+              "host": ["{{base_url}}"],
+              "path": ["api", "notifications", ":notificationId", "read"]
+            }
+          }
+        },
+        {
+          "name": "Mark All as Read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/notifications/read-all",
+              "host": ["{{base_url}}"],
+              "path": ["api", "notifications", "read-all"]
+            }
+          }
+        },
+        {
+          "name": "Get Unread Count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/notifications/unread-count",
+              "host": ["{{base_url}}"],
+              "path": ["api", "notifications", "unread-count"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Chat & Messaging",
+      "item": [
+        {
+          "name": "Get Conversations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/chat/conversations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "chat", "conversations"]
+            },
+            "description": "Get all conversations with candidates"
+          }
+        },
+        {
+          "name": "Create Conversation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"participantId\": \"507f191e810c19729de860ea\",\n  \"message\": \"Hello! Thank you for your application. We would like to schedule an interview.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/chat/conversations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "chat", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "Get Conversation Messages",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/chat/conversations/:conversationId/messages",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "chat",
+                "conversations",
+                ":conversationId",
+                "messages"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Send Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"We are impressed with your profile. Are you available for an interview next week?\",\n  \"type\": \"TEXT\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/chat/conversations/:conversationId/messages",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "chat",
+                "conversations",
+                ":conversationId",
+                "messages"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Unread Messages Count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/chat/unread-count",
+              "host": ["{{base_url}}"],
+              "path": ["api", "chat", "unread-count"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

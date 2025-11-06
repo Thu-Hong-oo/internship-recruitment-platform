@@ -328,11 +328,28 @@ const deleteCV = asyncHandler(async (req, res) => {
 // @access  Private (Candidate)
 const analyzeCV = asyncHandler(async (req, res) => {
   try {
+    // First get candidate profile to get candidateId
     const getCandidateProfileUseCase = req.container.resolve(
       'getCandidateProfileUseCase'
     );
-    const result = await getCandidateProfileUseCase.execute({
+    const profileResult = await getCandidateProfileUseCase.execute({
+      userId: req.user.id,
+    });
+
+    if (!profileResult.candidate) {
+      return res.status(404).json({
+        success: false,
+        error: 'Candidate profile not found',
+      });
+    }
+
+    // Now analyze CV with correct candidateId
+    const candidateId =
+      profileResult.candidate._id || profileResult.candidate.id;
+    const analyzeCVUseCase = req.container.resolve('analyzeCVUseCase');
+    const result = await analyzeCVUseCase.execute({
       cvId: req.params.cvId,
+      candidateId: candidateId,
     });
 
     res.status(200).json({
@@ -342,6 +359,50 @@ const analyzeCV = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     logger.error('Analyze CV error:', error);
+
+    // Handle specific error cases
+    if (error.message.includes('CV_FILE_URL_MISSING')) {
+      return res.status(400).json({
+        success: false,
+        error: 'CV_FILE_URL_MISSING',
+        message:
+          'CV file has not been uploaded yet. Please upload the CV file first before analyzing.',
+        suggestion: {
+          action: 'upload_cv',
+          endpoint: 'POST /api/candidates/cv',
+          description:
+            'Upload a new CV file with the file in multipart/form-data',
+        },
+      });
+    }
+
+    if (error.message.includes('CV_NOT_FOUND')) {
+      return res.status(404).json({
+        success: false,
+        error: 'CV_NOT_FOUND',
+        message: 'The requested CV does not exist.',
+      });
+    }
+
+    if (error.message.includes('CV_ACCESS_DENIED')) {
+      return res.status(403).json({
+        success: false,
+        error: 'CV_ACCESS_DENIED',
+        message: 'You do not have permission to analyze this CV.',
+      });
+    }
+
+    if (error.message.includes('CV_PARSING_FAILED')) {
+      return res.status(500).json({
+        success: false,
+        error: 'CV_PARSING_FAILED',
+        message:
+          'Failed to parse CV content. The file may be corrupted or in an unsupported format.',
+        supportedFormats: ['.pdf', '.docx', '.txt'],
+      });
+    }
+
+    // Generic error
     res.status(400).json({
       success: false,
       error: error.message,

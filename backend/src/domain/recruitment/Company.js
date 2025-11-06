@@ -34,6 +34,11 @@ class Company {
     this.members = null;
   }
 
+  // Getter for id (alias to companyId for consistency)
+  get id() {
+    return this.companyId;
+  }
+
   updateInfo(name, description) {
     if (name) this.name = name;
     if (description) this.description = description;

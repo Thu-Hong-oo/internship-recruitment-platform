@@ -73,6 +73,14 @@ class CV {
   }
 
   /**
+   * Gets file URL (alias for cloudinaryUrl for consistency)
+   * @returns {string|null} File URL
+   */
+  get fileUrl() {
+    return this.cloudinaryUrl;
+  }
+
+  /**
    * Gets download URL for the CV
    * @returns {string|null} Download URL or null
    */

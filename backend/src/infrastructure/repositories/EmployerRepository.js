@@ -14,7 +14,7 @@ class EmployerRepository extends IEmployerRepository {
   }
 
   async findByUserId(userId) {
-    const employerDoc = await EmployerProfileModel.findOne({ userId });
+    const employerDoc = await EmployerProfileModel.findOne({ owner: userId });
     return employerDoc ? EmployerProfileMapper.toDomain(employerDoc) : null;
   }
 

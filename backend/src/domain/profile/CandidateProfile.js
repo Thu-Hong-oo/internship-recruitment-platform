@@ -383,6 +383,38 @@ class CandidateProfile {
     const skill = this.skills.find(s => s.name === skillName);
     return skill ? skill.level : null;
   }
+
+  /**
+   * Converts domain entity to plain object
+   * This is useful for serialization and when additional properties need to be attached
+   * @returns {Object} Plain object representation of the entity
+   */
+  toPlainObject() {
+    return {
+      id: this.profileId,
+      _id: this.profileId,
+      userId: this.userId,
+      personalInfo: this.personalInfo,
+      professionalInfo: this.professionalInfo,
+      education: this.education,
+      experience: this.experience,
+      skills: this.skills,
+      preferences: this.preferences,
+      profileCompleteness: this.profileCompleteness,
+      visibility: this.visibility,
+      createdAt: this.createdAt,
+      updatedAt: this.updatedAt,
+    };
+  }
+
+  /**
+   * Alias for JSON serialization
+   * Automatically called by JSON.stringify()
+   * @returns {Object} Plain object representation
+   */
+  toJSON() {
+    return this.toPlainObject();
+  }
 }
 
 module.exports = CandidateProfile;

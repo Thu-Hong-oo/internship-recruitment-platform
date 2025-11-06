@@ -1,79 +1,229 @@
-# Documentation - Internship Recruitment Platform Backend
+# 📚 Documentation Index
 
-## Tong quan
-
-Thu muc nay chua toan bo tai lieu ky thuat cho he thong Internship Recruitment Platform Backend.
-
-## Cau truc tai lieu
-
-### Tai lieu chinh
-
-- **README.md** - Tong quan tai lieu
-- **API_DOCUMENTATION.md** - Tai lieu API endpoints
-- **ARCHITECTURE_GUIDE.md** - Huong dan kien truc he thong
-- **DEVELOPMENT_GUIDE.md** - Huong dan phat trien
-
-### Kien truc & Thiet ke
-
-- **DOMAIN_MODELS.md** - Mo ta cac Domain Models
-- **DATABASE_SCHEMA.md** - Schema co so du lieu
-- **TESTING_GUIDE.md** - Huong dan testing
-
-### Trien khai & Van hanh
-
-- **DEPLOYMENT_GUIDE.md** - Huong dan trien khai len Azure
-- **DEPLOYMENT_RECOMMENDATIONS.md** - Loi khuyen deployment cho multiple frontend apps
-- **FREE_TIER_SETUP.md** - Huong dan setup free tier (mien phi)
-
-### Domain Documentation
-
-- **identity/README.md** - Domain Identity
-- **recruitment/README.md** - Domain Recruitment
-- **ai-nlp/README.md** - Domain AI/NLP
-- **learning/README.md** - Domain Learning
-- **notification/README.md** - Domain Notification
-
-## Muc dich su dung
-
-- **Developers**: Hieu kien truc va cach phat trien (ARCHITECTURE_GUIDE.md, DEVELOPMENT_GUIDE.md)
-- **QA/Testers**: Hieu API va cach testing (API_DOCUMENTATION.md, TESTING_GUIDE.md)
-- **DevOps**: Hieu cach trien khai va cau hinh (DEPLOYMENT_GUIDE.md, DEPLOYMENT_RECOMMENDATIONS.md, FREE_TIER_SETUP.md)
-- **Database Admins**: Hieu schema va cau truc du lieu (DATABASE_SCHEMA.md)
-- **Business Analysts**: Hieu business logic va domain models (DOMAIN_MODELS.md)
-
-## Quy uoc tai lieu
-
-### Code Examples
-
-```javascript
-// Vi du code
-const example = 'Hello World';
-```
-
-### API Examples
-
-```http
-GET /api/users
-Authorization: Bearer <token>
-```
-
-## Cap nhat tai lieu
-
-Tai lieu duoc cap nhat thuong xuyen theo su phat trien cua du an:
-
-- **v1.0** (October 30, 2025): Tao cac file documentation chinh
-  - API_DOCUMENTATION.md - Tai lieu API day du
-  - ARCHITECTURE_GUIDE.md - Huong dan kien truc Clean Architecture + CQRS
-  - DEVELOPMENT_GUIDE.md - Huong dan phat trien va coding standards
-  - DOMAIN_MODELS.md - Mo ta chi tiet cac domain entities
-  - DATABASE_SCHEMA.md - Schema MongoDB va cau truc collections
-  - TESTING_GUIDE.md - Huong dan testing voi Jest va Supertest
-  - DEPLOYMENT_GUIDE.md - Huong dan trien khai len Azure
-  - DEPLOYMENT_RECOMMENDATIONS.md - Loi khuyen deployment cho multiple frontend apps
-  - FREE_TIER_SETUP.md - Huong dan setup free tier hoan toan mien phi
-
-Vui long kiem tra phien ban moi nhat truoc khi su dung.
+Welcome to the Smart Recruitment Platform Backend Documentation!
 
 ---
 
-_Generated on: October 30, 2025_
+## 📖 Available Documentation
+
+### 🚀 **[Active API Endpoints](./ACTIVE_API_ENDPOINTS.md)**
+
+Complete reference of all 34 active API endpoints currently running on the server.
+
+- Authentication (6 endpoints)
+- Candidates (4 endpoints)
+- Employers (4 endpoints)
+- Jobs (4 endpoints)
+- Applications (3 endpoints)
+- AI/NLP (4 endpoints)
+- Skills & Roadmaps (3 endpoints)
+- Notifications (2 endpoints)
+- Chat (2 endpoints)
+- Admin (2 endpoints)
+
+### 🏗️ **[Architecture Guide](./ARCHITECTURE_GUIDE.md)**
+
+Understanding the Clean Architecture implementation.
+
+- Domain Layer
+- Application Layer
+- Infrastructure Layer
+- Presentation Layer
+
+### 📊 **[Database Schema](./DATABASE_SCHEMA.md)**
+
+Complete database structure and relationships.
+
+- Entity models
+- Relationships
+- Indexes
+- Constraints
+
+### 🔌 **[API Documentation](./API_DOCUMENTATION.md)**
+
+Detailed API reference with request/response examples.
+
+- Request formats
+- Response formats
+- Error handling
+- Authentication
+
+### 🚀 **[Deployment Guide](./DEPLOYMENT_GUIDE.md)**
+
+Step-by-step deployment instructions.
+
+- Environment setup
+- Production configuration
+- Scaling strategies
+
+### 🧪 **[Testing Guide](./TESTING_GUIDE.md)**
+
+Testing strategies and examples.
+
+- Unit tests
+- Integration tests
+- E2E tests
+
+### 👨‍💻 **[Development Guide](./DEVELOPMENT_GUIDE.md)**
+
+Guidelines for developers.
+
+- Setup instructions
+- Coding standards
+- Best practices
+
+### 🎯 **[Domain Models](./DOMAIN_MODELS.md)**
+
+Domain entities and business logic.
+
+- Entity descriptions
+- Business rules
+- Validation rules
+
+---
+
+## 🎯 Quick Start
+
+### Server Information
+
+- **Base URL**: `http://localhost:3000`
+- **API Docs**: `http://localhost:3000/api-docs`
+- **Health Check**: `http://localhost:3000/health`
+
+### Authentication
+
+All endpoints (except login/register) require JWT token:
+
+```http
+Authorization: Bearer <your-jwt-token>
+```
+
+### Example Request
+
+```bash
+curl -X GET http://localhost:3000/api/jobs \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+---
+
+## 🔥 Most Used Endpoints
+
+1. **Login**: `POST /api/auth/login`
+2. **Get Jobs**: `GET /api/jobs`
+3. **Apply for Job**: `POST /api/applications`
+4. **AI Matching**: `POST /api/ai/match`
+5. **Parse CV**: `POST /api/ai/parse-cv`
+
+---
+
+## 📊 System Status
+
+**Last Updated**: November 5, 2025
+
+| Service     | Status       | Description        |
+| ----------- | ------------ | ------------------ |
+| Server      | ✅ Running   | Port 3000          |
+| Database    | ✅ Connected | MongoDB            |
+| Redis       | ✅ Connected | Cache & Queue      |
+| OTP Service | ✅ Active    | Email verification |
+| AI Services | ✅ Active    | Matching & NLP     |
+
+---
+
+## 🎓 Architecture Overview
+
+```
+┌─────────────────────────────────────────────┐
+│           Presentation Layer                │
+│  (Controllers, Routes, Middlewares)         │
+└──────────────────┬──────────────────────────┘
+                   │
+┌──────────────────▼──────────────────────────┐
+│           Application Layer                 │
+│         (Use Cases, Services)               │
+└──────────────────┬──────────────────────────┘
+                   │
+┌──────────────────▼──────────────────────────┐
+│            Domain Layer                     │
+│   (Entities, Business Rules, Value Objects) │
+└──────────────────┬──────────────────────────┘
+                   │
+┌──────────────────▼──────────────────────────┐
+│         Infrastructure Layer                │
+│    (Repositories, Database, External APIs)  │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+## 🔧 Development Tools
+
+- **Nodemon**: Auto-restart on file changes
+- **ESLint**: Code quality
+- **Prettier**: Code formatting
+- **Swagger**: API documentation
+- **Jest**: Testing framework
+
+---
+
+## 📝 Contributing
+
+Please read the [Development Guide](./DEVELOPMENT_GUIDE.md) before contributing.
+
+### Code Standards
+
+- Follow Clean Architecture principles
+- Write unit tests for all business logic
+- Use meaningful commit messages
+- Keep functions small and focused
+
+---
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**1. Server won't start**
+
+- Check MongoDB connection
+- Verify Redis is running
+- Check environment variables
+
+**2. Authentication errors**
+
+- Verify JWT token is valid
+- Check token expiration
+- Ensure proper Authorization header
+
+**3. Database errors**
+
+- Verify MongoDB is running
+- Check database connection string
+- Ensure proper indexes exist
+
+---
+
+## 📞 Support
+
+For questions or issues:
+
+1. Check the relevant documentation
+2. Review API examples
+3. Check server logs
+4. Review error messages
+
+---
+
+## 📚 External Resources
+
+- [Node.js Documentation](https://nodejs.org/docs)
+- [Express.js Guide](https://expressjs.com/guide)
+- [MongoDB Manual](https://docs.mongodb.com/manual)
+- [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
+
+---
+
+**Documentation Version**: 1.0.0  
+**Last Updated**: November 5, 2025  
+**Maintained By**: Development Team

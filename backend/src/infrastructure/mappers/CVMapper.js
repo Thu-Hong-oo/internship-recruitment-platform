@@ -27,6 +27,32 @@ class CVMapper {
   static toDomain(mongooseDoc) {
     if (!mongooseDoc) return null;
 
+    // Normalize analysis status - handle legacy string values
+    let analysisStatus = mongooseDoc.analysisStatus || ANALYSIS_STATUS.PENDING;
+
+    // Map old string values to enum values
+    const statusMap = {
+      pending: ANALYSIS_STATUS.PENDING,
+      processing: ANALYSIS_STATUS.IN_PROGRESS,
+      in_progress: ANALYSIS_STATUS.IN_PROGRESS,
+      completed: ANALYSIS_STATUS.COMPLETED,
+      failed: ANALYSIS_STATUS.FAILED,
+    };
+
+    // If it's a legacy string value, convert it
+    if (
+      typeof analysisStatus === 'string' &&
+      statusMap[analysisStatus.toLowerCase()]
+    ) {
+      analysisStatus = statusMap[analysisStatus.toLowerCase()];
+    }
+
+    // If still not a valid enum value, default to PENDING
+    const validStatuses = Object.values(ANALYSIS_STATUS);
+    if (!validStatuses.includes(analysisStatus)) {
+      analysisStatus = ANALYSIS_STATUS.PENDING;
+    }
+
     return new CV(
       mongooseDoc._id?.toString(),
       mongooseDoc.candidateId?.toString(),
@@ -37,7 +63,7 @@ class CVMapper {
       mongooseDoc.mimeType,
       mongooseDoc.isActive,
       mongooseDoc.isDefault,
-      mongooseDoc.analysisStatus || ANALYSIS_STATUS.PENDING,
+      analysisStatus,
       mongooseDoc.uploadedAt,
       mongooseDoc.createdAt,
       mongooseDoc.updatedAt

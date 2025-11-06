@@ -3,6 +3,13 @@ const CompanySize = require('../../domain/recruitment/enums/CompanySize');
 
 const CompanySchema = new mongoose.Schema(
   {
+    // Unique company identifier (for legacy compatibility)
+    companyId: {
+      type: String,
+      unique: true,
+      sparse: true, // Allow multiple null values
+    },
+
     // Owner của công ty (người tạo đầu tiên)
     owner: {
       type: mongoose.Schema.Types.ObjectId,

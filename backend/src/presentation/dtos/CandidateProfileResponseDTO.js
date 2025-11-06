@@ -6,15 +6,33 @@
 
 class CandidateProfileResponseDTO {
   constructor(candidateProfileModel) {
-    this.id = candidateProfileModel._id;
+    // Extract ID - handle both _id and id
+    const rawId = candidateProfileModel._id || candidateProfileModel.id;
+    this.id = rawId?.toString ? rawId.toString() : rawId;
 
-    // Handle userId - extract string ID whether populated or not
-    this.userId =
-      typeof candidateProfileModel.userId === 'object' &&
-      candidateProfileModel.userId?._id
-        ? candidateProfileModel.userId._id.toString()
-        : candidateProfileModel.userId?.toString() ||
-          candidateProfileModel.userId;
+    // Handle userId - PROFESSIONAL approach for all cases
+    const userIdValue = candidateProfileModel.userId;
+
+    if (!userIdValue) {
+      this.userId = null;
+    } else if (typeof userIdValue === 'string') {
+      // Case 1: Already a string (best case)
+      this.userId = userIdValue;
+    } else if (userIdValue._id) {
+      // Case 2: Populated User object with _id
+      this.userId = userIdValue._id.toString
+        ? userIdValue._id.toString()
+        : userIdValue._id;
+    } else if (
+      userIdValue.toString &&
+      typeof userIdValue.toString === 'function'
+    ) {
+      // Case 3: Mongoose ObjectId with toString method
+      this.userId = userIdValue.toString();
+    } else {
+      // Case 4: Fallback - convert to string
+      this.userId = String(userIdValue);
+    }
 
     this.personalInfo = candidateProfileModel.personalInfo || {};
 

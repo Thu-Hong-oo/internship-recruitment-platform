@@ -44,6 +44,8 @@ const JWTService = require('../services/external/core/JWTService');
 const QueueService = require('../services/external/core/QueueService');
 const SocketService = require('../services/external/core/SocketService');
 const GeminiAIService = require('../services/external/ai/GeminiAIService');
+const CVParserService = require('../services/external/cv-resume/CVParserService');
+const NLPEngine = require('../../domain/ai-nlp/services/NLPEngine');
 
 // Import internal services (classes - will be instantiated by container)
 const ValidationService = require('../services/internal/ValidationService');
@@ -93,6 +95,7 @@ const ViewCVUseCase = require('../../application/profile/use-cases/ViewCVUseCase
 const DeleteCVUseCase = require('../../application/profile/use-cases/DeleteCVUseCase');
 const SetDefaultCVUseCase = require('../../application/profile/use-cases/SetDefaultCVUseCase');
 const UploadAvatarUseCase = require('../../application/profile/use-cases/UploadAvatarUseCase');
+const AnalyzeCVUseCase = require('../../application/profile/use-cases/AnalyzeCVUseCase');
 
 // Import Employer Use Cases
 // NOTE: CreateEmployerProfileUseCase removed - profile auto-created on registration
@@ -192,6 +195,11 @@ container.register({
   queueService: asValue(QueueService),
   socketService: asValue(SocketService),
   geminiAIService: asValue(GeminiAIService),
+
+  // AI/NLP Services - Instantiated by container
+  cvParserService: asClass(CVParserService, {
+    lifetime: Lifetime.SINGLETON,
+  }),
 
   // Internal Services - Will be instantiated by container with DI
   validationService: asClass(ValidationService, {
@@ -321,6 +329,9 @@ container.register({
     injectionMode: InjectionMode.CLASSIC,
   }),
   uploadAvatarUseCase: asClass(UploadAvatarUseCase, {
+    injectionMode: InjectionMode.CLASSIC,
+  }),
+  analyzeCVUseCase: asClass(AnalyzeCVUseCase, {
     injectionMode: InjectionMode.CLASSIC,
   }),
 

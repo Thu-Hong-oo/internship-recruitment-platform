@@ -25,13 +25,12 @@ class SetDefaultCVUseCase {
         throw new Error('CV_ACCESS_DENIED');
       }
 
-      // Remove default flag from all CVs of this candidate
-      await this.cvRepository.updateMany({ candidateId }, { isDefault: false });
+      // Use repository's setAsDefault method which handles both operations
+      const updatedCV = await this.cvRepository.setAsDefault(cvId, candidateId);
 
-      // Set this CV as default
-      const updatedCV = await this.cvRepository.updateCV(cvId, {
-        isDefault: true,
-      });
+      if (!updatedCV) {
+        throw new Error('SET_DEFAULT_FAILED');
+      }
 
       logger.info(`CV set as default: ${cvId} for candidate: ${candidateId}`);
 

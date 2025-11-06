@@ -1,4 +1,5 @@
 const User = require('../../../infrastructure/models/User');
+const UserStatus = require('../../../domain/identity/enums/UserStatus');
 const { logger } = require('../../../shared/utils/logger');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
@@ -86,6 +87,7 @@ class VerifyEmailUseCase {
         role: userData.role,
         provider: 'email',
         isEmailVerified: true,
+        status: UserStatus.ACTIVE, // Set status to ACTIVE when email verified
       });
 
       // Set userId to the MongoDB _id after creation

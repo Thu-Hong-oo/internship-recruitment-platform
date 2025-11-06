@@ -2,7 +2,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const pdfParse = require('pdf-parse');
 const mammoth = require('mammoth');
-const logger = require('../../../../config/logger');
+const { logger } = require('../../../../shared/utils/logger');
 
 /**
  * CVParserService - Handles CV file parsing and text extraction
@@ -170,4 +170,4 @@ class CVParserService {
   }
 }
 
-module.exports = new CVParserService();
+module.exports = CVParserService;

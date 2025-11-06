@@ -106,6 +106,15 @@ class UserRepository extends IUserRepository {
     );
     return updatedDoc ? UserMapper.toDomain(updatedDoc) : null;
   }
+
+  async updateEmployerProfile(userId, employerProfileId) {
+    const updatedDoc = await UserModel.findByIdAndUpdate(
+      userId,
+      { employerProfile: employerProfileId },
+      { new: true }
+    );
+    return updatedDoc ? UserMapper.toDomain(updatedDoc) : null;
+  }
 }
 
 module.exports = UserRepository;
