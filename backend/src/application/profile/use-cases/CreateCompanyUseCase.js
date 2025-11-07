@@ -54,7 +54,31 @@ class CreateCompanyUseCase {
     if (!companyData.name?.trim()) {
       throw new Error('COMPANY_NAME_REQUIRED');
     }
-    // Add more validations...
+
+    // Validate business info
+    if (!companyData.businessInfo?.taxId) {
+      throw new Error('BUSINESS_INFO_TAX_ID_REQUIRED');
+    }
+    if (!companyData.businessInfo?.issueDate) {
+      throw new Error('BUSINESS_INFO_ISSUE_DATE_REQUIRED');
+    }
+    if (!companyData.businessInfo?.issuePlace) {
+      throw new Error('BUSINESS_INFO_ISSUE_PLACE_REQUIRED');
+    }
+
+    // Validate legal representative
+    if (!companyData.legalRepresentative?.fullName) {
+      throw new Error('LEGAL_REPRESENTATIVE_FULL_NAME_REQUIRED');
+    }
+    if (!companyData.legalRepresentative?.position) {
+      throw new Error('LEGAL_REPRESENTATIVE_POSITION_REQUIRED');
+    }
+    if (!companyData.legalRepresentative?.phone) {
+      throw new Error('LEGAL_REPRESENTATIVE_PHONE_REQUIRED');
+    }
+    if (!companyData.legalRepresentative?.email) {
+      throw new Error('LEGAL_REPRESENTATIVE_EMAIL_REQUIRED');
+    }
   }
 
   async _checkUserEligibility(userId) {
@@ -97,11 +121,37 @@ class CreateCompanyUseCase {
 
     // Business info
     if (companyData.businessInfo?.taxId) {
-      company.taxCode = companyData.businessInfo.taxId;
+      company.businessInfo.taxId = companyData.businessInfo.taxId;
+    }
+    if (companyData.businessInfo?.issueDate) {
+      company.businessInfo.issueDate = new Date(
+        companyData.businessInfo.issueDate
+      );
+    }
+    if (companyData.businessInfo?.issuePlace) {
+      company.businessInfo.issuePlace = companyData.businessInfo.issuePlace;
     }
     if (companyData.businessInfo?.registrationNumber) {
+      company.businessInfo.registrationNumber =
+        companyData.businessInfo.registrationNumber;
       company.businessLicenseNumber =
         companyData.businessInfo.registrationNumber;
+    }
+
+    // Legal representative
+    if (companyData.legalRepresentative?.fullName) {
+      company.legalRepresentative.fullName =
+        companyData.legalRepresentative.fullName;
+    }
+    if (companyData.legalRepresentative?.position) {
+      company.legalRepresentative.position =
+        companyData.legalRepresentative.position;
+    }
+    if (companyData.legalRepresentative?.phone) {
+      company.legalRepresentative.phone = companyData.legalRepresentative.phone;
+    }
+    if (companyData.legalRepresentative?.email) {
+      company.legalRepresentative.email = companyData.legalRepresentative.email;
     }
 
     // Initialize verification status

@@ -3,12 +3,36 @@ const { logger } = require('../../shared/utils/logger');
 const SkillService = require('../../infrastructure/services/internal/SkillService');
 const SkillResponseDTO = require('../dtos/SkillResponseDTO');
 
-// @desc    Get all skills
+const skillService = new SkillService();
+
+// @desc    Get all skills with filtering via query params
 // @route   GET /api/skills
+// @route   GET /api/skills?type=popular
+// @route   GET /api/skills?type=trending
+// @route   GET /api/skills?search=javascript
+// @route   GET /api/skills?category=frontend
 // @access  Public
 const getAllSkills = asyncHandler(async (req, res) => {
   try {
-    const result = await SkillService.getAllSkills(req.query);
+    const { type, search, category, page, limit } = req.query;
+    let result;
+
+    // Route based on query parameter 'type'
+    if (type === 'popular') {
+      result = await skillService.getPopularSkills({ page, limit });
+    } else if (type === 'trending') {
+      result = await skillService.getTrendingSkills({ page, limit });
+    } else if (search) {
+      result = await skillService.searchSkills({ search, page, limit });
+    } else if (category) {
+      result = await skillService.getSkillsByCategory(category, {
+        page,
+        limit,
+      });
+    } else {
+      // Default: get all skills
+      result = await skillService.getAllSkills(req.query);
+    }
 
     res.status(200).json({
       success: true,
@@ -29,7 +53,7 @@ const getAllSkills = asyncHandler(async (req, res) => {
 // @access  Public
 const getSkillById = asyncHandler(async (req, res) => {
   try {
-    const result = await SkillService.getSkillById(req.params.id);
+    const result = await skillService.getSkillById(req.params.id);
 
     res.status(200).json({
       success: true,
@@ -49,7 +73,7 @@ const getSkillById = asyncHandler(async (req, res) => {
 // @access  Public
 const searchSkills = asyncHandler(async (req, res) => {
   try {
-    const result = await SkillService.searchSkills(req.query);
+    const result = await skillService.searchSkills(req.query);
 
     res.status(200).json({
       success: true,
@@ -70,7 +94,7 @@ const searchSkills = asyncHandler(async (req, res) => {
 // @access  Public
 const getSkillCategories = asyncHandler(async (req, res) => {
   try {
-    const result = await SkillService.getSkillCategories(req.query);
+    const result = await skillService.getSkillCategories(req.query);
 
     res.status(200).json({
       success: true,
@@ -91,7 +115,7 @@ const getSkillCategories = asyncHandler(async (req, res) => {
 // @access  Public
 const getSkillsByCategory = asyncHandler(async (req, res) => {
   try {
-    const result = await SkillService.getSkillsByCategory(
+    const result = await skillService.getSkillsByCategory(
       req.params.categoryId,
       req.query
     );
@@ -115,7 +139,7 @@ const getSkillsByCategory = asyncHandler(async (req, res) => {
 // @access  Public
 const getPopularSkills = asyncHandler(async (req, res) => {
   try {
-    const result = await SkillService.getPopularSkills(req.query);
+    const result = await skillService.getPopularSkills(req.query);
 
     res.status(200).json({
       success: true,
@@ -135,7 +159,7 @@ const getPopularSkills = asyncHandler(async (req, res) => {
 // @access  Public
 const getTrendingSkills = asyncHandler(async (req, res) => {
   try {
-    const result = await SkillService.getTrendingSkills(req.query);
+    const result = await skillService.getTrendingSkills(req.query);
 
     res.status(200).json({
       success: true,
@@ -155,7 +179,7 @@ const getTrendingSkills = asyncHandler(async (req, res) => {
 // @access  Private (Candidate)
 const getSkillRecommendations = asyncHandler(async (req, res) => {
   try {
-    const result = await SkillService.getSkillRecommendations(
+    const result = await skillService.getSkillRecommendations(
       req.user.candidateId,
       req.query
     );

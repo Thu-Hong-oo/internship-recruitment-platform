@@ -9,6 +9,8 @@ const fileFilter = (req, file, cb) => {
   // Define allowed file types by field
   const allowedTypes = {
     avatar: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+    logo: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+    coverImage: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
     resume: [
       'application/pdf',
       'application/msword',
@@ -63,6 +65,9 @@ const upload = multer({
 const uploadAvatar = upload.single('avatar');
 const uploadResume = upload.single('resume');
 const uploadDocument = upload.single('document');
+const uploadLogo = upload.single('logo');
+const uploadCoverImage = upload.single('coverImage');
+const uploadProfileCoverImage = upload.single('coverImage');
 const uploadMultiple = upload.array('files', 5);
 
 // Error handling middleware for multer
@@ -103,6 +108,9 @@ module.exports = {
   uploadAvatar,
   uploadResume,
   uploadDocument,
+  uploadLogo,
+  uploadCoverImage,
+  uploadProfileCoverImage,
   uploadMultiple,
   handleMulterError,
 };

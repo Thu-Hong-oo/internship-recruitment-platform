@@ -29,26 +29,34 @@ class CompanyMapper {
     );
 
     // Basic fields
-    company.description = mongooseDoc.description;
-    company.website = mongooseDoc.website;
-    company.industry = mongooseDoc.industry;
-    company.size = mongooseDoc.size;
-    company.logoUrl = mongooseDoc.logoUrl;
-    company.email = mongooseDoc.email;
-    company.phone = mongooseDoc.phone;
+    // Keep existing values if not provided in update
+    company.description = mongooseDoc.description ?? company.description;
+    company.website = mongooseDoc.website ?? company.website;
+    company.industry = mongooseDoc.industry ?? company.industry;
+    company.size = mongooseDoc.size ?? company.size;
+    company.logo = mongooseDoc.logo ?? company.logo;
+    company.coverImage = mongooseDoc.coverImage ?? company.coverImage;
+    company.email = mongooseDoc.email ?? company.email;
+    company.phone = mongooseDoc.phone ?? company.phone;
 
-    // Date với null check đúng
-    company.establishedDate =
-      mongooseDoc.foundedYear != null
-        ? new Date(mongooseDoc.foundedYear, 0, 1)
-        : null;
+    // Handle foundedYear
+    company.foundedYear = mongooseDoc.foundedYear;
 
-    // Business info
-    if (mongooseDoc.businessInfo) {
-      company.taxCode = mongooseDoc.businessInfo.taxId;
-      company.businessLicenseNumber =
-        mongooseDoc.businessInfo.registrationNumber;
-    }
+    // Map and store sensitive information
+    company.businessInfo = mongooseDoc.businessInfo
+      ? { ...mongooseDoc.businessInfo }
+      : null;
+    company.existingBusinessInfo = company.businessInfo;
+
+    company.legalRepresentative = mongooseDoc.legalRepresentative
+      ? { ...mongooseDoc.legalRepresentative }
+      : null;
+    company.existingLegalRepresentative = company.legalRepresentative;
+
+    company.socialMedia = mongooseDoc.socialMedia
+      ? { ...mongooseDoc.socialMedia }
+      : null;
+    company.existingSocialMedia = company.socialMedia;
 
     // Verification - map without defaults
     company.isVerified = mongooseDoc.verification?.isVerified;
@@ -64,18 +72,24 @@ class CompanyMapper {
       status: domainEntity.verificationStatus,
     };
 
+    // Map companyId if it exists
+    if (domainEntity.companyId) {
+      data.companyId = domainEntity.companyId;
+    }
+
     // Optional fields - chỉ gán nếu có giá trị
     this._assignIfDefined(data, 'description', domainEntity.description);
     this._assignIfDefined(data, 'website', domainEntity.website);
     this._assignIfDefined(data, 'industry', domainEntity.industry);
     this._assignIfDefined(data, 'size', domainEntity.size);
     this._assignIfDefined(data, 'logo', domainEntity.logoUrl);
+    this._assignIfDefined(data, 'coverImage', domainEntity.coverImageUrl);
     this._assignIfDefined(data, 'email', domainEntity.email);
     this._assignIfDefined(data, 'phone', domainEntity.phone);
 
-    // Date
-    if (domainEntity.establishedDate) {
-      data.foundedYear = domainEntity.establishedDate.getFullYear();
+    // Handle foundedYear
+    if (domainEntity.foundedYear) {
+      data.foundedYear = domainEntity.foundedYear;
     }
 
     // Address - sử dụng method từ value object
@@ -83,17 +97,52 @@ class CompanyMapper {
       data.address = domainEntity.address.toPlainObject();
     }
 
-    // Business info - chỉ tạo object khi có data thực sự
-    const businessInfo = {};
-    if (domainEntity.taxCode !== undefined) {
-      businessInfo.taxId = domainEntity.taxCode;
+    // Handle sensitive information with proper merging
+    if (domainEntity.businessInfo || domainEntity.existingBusinessInfo) {
+      data.businessInfo = {
+        ...(domainEntity.existingBusinessInfo || {}),
+        ...(domainEntity.businessInfo || {}),
+      };
     }
-    if (domainEntity.businessLicenseNumber !== undefined) {
-      businessInfo.registrationNumber = domainEntity.businessLicenseNumber;
+
+    if (
+      domainEntity.legalRepresentative ||
+      domainEntity.existingLegalRepresentative
+    ) {
+      data.legalRepresentative = {
+        ...(domainEntity.existingLegalRepresentative || {}),
+        ...(domainEntity.legalRepresentative || {}),
+      };
     }
-    if (Object.keys(businessInfo).length > 0) {
-      data.businessInfo = businessInfo;
+
+    if (domainEntity.socialMedia || domainEntity.existingSocialMedia) {
+      data.socialMedia = {
+        ...(domainEntity.existingSocialMedia || {}),
+        ...(domainEntity.socialMedia || {}),
+      };
     }
+    data.businessInfo = domainEntity.businessInfo
+      ? {
+          ...(domainEntity.existingBusinessInfo || {}),
+          ...domainEntity.businessInfo,
+        }
+      : domainEntity.existingBusinessInfo || {};
+
+    // Preserve and merge legal representative info
+    data.legalRepresentative = domainEntity.legalRepresentative
+      ? {
+          ...(domainEntity.existingLegalRepresentative || {}),
+          ...domainEntity.legalRepresentative,
+        }
+      : domainEntity.existingLegalRepresentative || {};
+
+    // Preserve and merge social media
+    data.socialMedia = domainEntity.socialMedia
+      ? {
+          ...(domainEntity.existingSocialMedia || {}),
+          ...domainEntity.socialMedia,
+        }
+      : domainEntity.existingSocialMedia || {};
 
     // Verification
     if (domainEntity.isVerified !== undefined) {

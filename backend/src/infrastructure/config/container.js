@@ -106,6 +106,9 @@ const InviteMemberUseCase = require('../../application/profile/use-cases/InviteM
 const AcceptInvitationUseCase = require('../../application/profile/use-cases/AcceptInvitationUseCase');
 const GetCompanyMembersUseCase = require('../../application/profile/use-cases/GetCompanyMembersUseCase');
 const UpdateMemberPermissionsUseCase = require('../../application/profile/use-cases/UpdateMemberPermissionsUseCase');
+const UploadCompanyDocumentUseCase = require('../../application/profile/use-cases/UploadCompanyDocumentUseCase');
+const GetCompanyDocumentsUseCase = require('../../application/profile/use-cases/GetCompanyDocumentsUseCase');
+const DeleteCompanyDocumentUseCase = require('../../application/profile/use-cases/DeleteCompanyDocumentUseCase');
 
 // Import Recruitment Use Cases
 const ApplyForJobUseCase = require('../../application/recruitment/use-cases/ApplyForJobUseCase');
@@ -358,6 +361,17 @@ container.register({
     injectionMode: InjectionMode.CLASSIC,
   }),
   updateMemberPermissionsUseCase: asClass(UpdateMemberPermissionsUseCase, {
+    injectionMode: InjectionMode.CLASSIC,
+  }),
+
+  // Company Document Verification Use Cases
+  uploadCompanyDocumentUseCase: asClass(UploadCompanyDocumentUseCase, {
+    injectionMode: InjectionMode.CLASSIC,
+  }),
+  getCompanyDocumentsUseCase: asClass(GetCompanyDocumentsUseCase, {
+    injectionMode: InjectionMode.CLASSIC,
+  }),
+  deleteCompanyDocumentUseCase: asClass(DeleteCompanyDocumentUseCase, {
     injectionMode: InjectionMode.CLASSIC,
   }),
 

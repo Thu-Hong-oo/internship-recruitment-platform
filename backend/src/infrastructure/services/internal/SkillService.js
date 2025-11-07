@@ -1,12 +1,20 @@
 /**
  * SkillService - Handles skill management operations
- * Dependencies injected via constructor for proper DI
+ * Follows Clean Architecture using Repository Pattern
  */
+const SkillRepository = require('../../repositories/SkillRepository');
+const CandidateRepository = require('../../repositories/CandidateRepository');
+const ValidationService = require('./ValidationService');
+
 class SkillService {
-  constructor(skillRepository, candidateRepository, validationService) {
-    this.skillRepository = skillRepository;
-    this.candidateRepository = candidateRepository;
-    this.validationService = validationService;
+  constructor() {
+    if (!SkillService.instance) {
+      this.skillRepository = new SkillRepository();
+      this.candidateRepository = new CandidateRepository();
+      this.validationService = new ValidationService();
+      SkillService.instance = this;
+    }
+    return SkillService.instance;
   }
 
   async getAllSkills(filters = {}) {

@@ -3,34 +3,26 @@ const router = express.Router();
 const { protect, authorize } = require('../middlewares/auth');
 const {
   getAllIndustries,
-  getActiveIndustries,
-  searchIndustries,
-  getIndustryTrends,
   getIndustryById,
-  getIndustryStats,
-  getIndustryCompanies,
-  getIndustryJobs,
   createIndustry,
   updateIndustry,
   deleteIndustry,
 } = require('../controllers/industryController');
 
-// Public routes
+// Public routes - Consolidated with query parameters
+// GET /api/industries                    → All industries
+// GET /api/industries?type=active        → Active industries
+// GET /api/industries?type=trends        → Industry trends
+// GET /api/industries?search=software    → Search industries
+// GET /api/industries?includeStats=true  → Industries with stats
 router.route('/').get(getAllIndustries);
 
-router.route('/active').get(getActiveIndustries);
-
-router.route('/search').get(searchIndustries);
-
-router.route('/trends').get(getIndustryTrends);
-
+// Industry details with sub-resources via query params
+// GET /api/industries/:id                → Industry details
+// GET /api/industries/:id?include=stats  → Include statistics
+// GET /api/industries/:id?include=companies → Include companies
+// GET /api/industries/:id?include=jobs   → Include jobs
 router.route('/:id').get(getIndustryById);
-
-router.route('/:id/stats').get(getIndustryStats);
-
-router.route('/:id/companies').get(getIndustryCompanies);
-
-router.route('/:id/jobs').get(getIndustryJobs);
 
 // Admin routes
 router.route('/').post(protect, authorize('admin'), createIndustry);

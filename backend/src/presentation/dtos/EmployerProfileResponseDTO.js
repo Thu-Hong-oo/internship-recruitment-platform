@@ -4,14 +4,25 @@
  */
 class EmployerProfileResponseDTO {
   constructor(employerProfileModel) {
-    this.id = employerProfileModel._id;
-    this.owner = employerProfileModel.owner;
-    this.company = employerProfileModel.company || {};
+    this.id = employerProfileModel.profileId || employerProfileModel._id;
+    this.owner = employerProfileModel.userId || employerProfileModel.owner;
+
+    // Only include essential company information
+    const company = employerProfileModel.company || {};
+    this.company = {
+      id: company._id,
+      name: company.name,
+      logo: company.logo,
+      coverImage: company.coverImage,
+      industry: company.industry,
+      size: company.size,
+      status: company.status,
+    };
+
     this.position = employerProfileModel.position || {};
     this.contact = employerProfileModel.contact || {};
-    this.legalRepresentative = employerProfileModel.legalRepresentative || {};
-    this.businessInfo = employerProfileModel.businessInfo || {};
-    this.verification = employerProfileModel.verification || {};
+    this.role = employerProfileModel.role;
+    this.permissions = employerProfileModel.permissions || {};
     this.status = employerProfileModel.status;
     this.createdAt = employerProfileModel.createdAt;
     this.updatedAt = employerProfileModel.updatedAt;
@@ -46,6 +57,8 @@ class EmployerProfileResponseDTO {
       legalRepresentative: this.legalRepresentative,
       businessInfo: this.businessInfo,
       verification: this.verification,
+      role: this.role,
+      permissions: this.permissions,
       status: this.status,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,

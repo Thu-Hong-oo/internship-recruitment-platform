@@ -9,12 +9,19 @@ const EmployerProfileMapper = require('../mappers/EmployerProfileMapper');
  */
 class EmployerRepository extends IEmployerRepository {
   async findById(id) {
-    const employerDoc = await EmployerProfileModel.findById(id);
+    const employerDoc = await EmployerProfileModel.findById(id).populate(
+      'company'
+    );
     return employerDoc ? EmployerProfileMapper.toDomain(employerDoc) : null;
   }
 
   async findByUserId(userId) {
-    const employerDoc = await EmployerProfileModel.findOne({ owner: userId });
+    const employerDoc = await EmployerProfileModel.findOne({
+      owner: userId,
+    }).populate({
+      path: 'company',
+      populate: { path: 'owner', select: 'name email' },
+    });
     return employerDoc ? EmployerProfileMapper.toDomain(employerDoc) : null;
   }
 
@@ -45,7 +52,7 @@ class EmployerRepository extends IEmployerRepository {
       {
         new: true,
       }
-    );
+    ).populate('company');
     return updatedDoc ? EmployerProfileMapper.toDomain(updatedDoc) : null;
   }
 

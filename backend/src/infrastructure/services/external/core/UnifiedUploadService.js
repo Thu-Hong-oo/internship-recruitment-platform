@@ -29,8 +29,8 @@ class UnifiedUploadService {
           { quality: 90, fetch_format: 'auto' },
         ],
       },
-      cover: {
-        folder: 'internbridge/covers',
+      coverImage: {
+        folder: 'internbridge/cover-images',
         resource_type: 'image',
         allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
         max_size: 10 * 1024 * 1024, // 10MB

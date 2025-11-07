@@ -30,8 +30,20 @@ class Company {
     this.establishedDate = null;
     this.phone = null;
     this.email = null;
-    this.logoUrl = null;
+    this.logo = null;
+    this.coverImage = null;
     this.members = null;
+
+    // Required business fields
+    // Store existing data separately
+    this.existingBusinessInfo = null;
+    this.existingLegalRepresentative = null;
+    this.existingSocialMedia = null;
+
+    // Current update data
+    this.businessInfo = null;
+    this.legalRepresentative = null;
+    this.socialMedia = null;
   }
 
   // Getter for id (alias to companyId for consistency)

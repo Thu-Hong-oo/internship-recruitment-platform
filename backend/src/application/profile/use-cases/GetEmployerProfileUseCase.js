@@ -30,7 +30,7 @@ class GetEmployerProfileUseCase {
         };
       }
 
-      logger.info(`Employer profile retrieved: ${employer._id}`);
+      logger.info(`Employer profile retrieved: ${employer.profileId}`);
 
       return {
         employer,

@@ -566,10 +566,84 @@ const resendEmailVerification = asyncHandler(async (req, res) => {
   }
 
   try {
-    // Resend email verification not implemented yet
-    res.status(501).json({
-      success: false,
-      error: 'Resend email verification chưa được triển khai',
+    // Check if user exists in MongoDB (already registered and verified/unverified)
+    let existingUser = await User.findOne({ email });
+    let userData = null;
+    let fullName = 'User';
+
+    if (existingUser) {
+      // User exists in MongoDB
+      // Check if already verified
+      if (existingUser.isEmailVerified) {
+        logger.info('Resend verification attempt for already verified email', {
+          email,
+        });
+        throw new Error('EMAIL_ALREADY_VERIFIED');
+      }
+      fullName = existingUser.fullName || 'User';
+    } else {
+      // User not in MongoDB, check Redis for pending registration
+      const userDataString = await otpService.get(`user_registration:${email}`);
+      if (!userDataString) {
+        logger.warn('Resend verification attempt for non-existent email', {
+          email,
+        });
+        throw new Error('USER_NOT_FOUND');
+      }
+
+      // Parse user data from Redis
+      userData = JSON.parse(userDataString);
+      fullName = userData.fullName || 'User';
+      logger.info('Found pending registration in Redis', { email });
+    }
+
+    // Check cooldown
+    if (!otpCooldownService) {
+      logger.warn(
+        'OTP cooldown service not available, skipping cooldown check'
+      );
+    } else {
+      const cooldownRemaining = await otpCooldownService.getRemainingCooldown(
+        'email_verification',
+        email
+      );
+      if (cooldownRemaining > 0) {
+        logger.warn('Resend verification blocked by cooldown', {
+          email,
+          remainingTime: cooldownRemaining,
+        });
+        throw new Error(`COOLDOWN_ACTIVE:${cooldownRemaining}`);
+      }
+    }
+
+    // Generate new OTP (same logic as RegisterUserUseCase)
+    const verificationToken = crypto.randomBytes(20).toString('hex');
+    const verificationOtp = verificationToken.substring(0, 6).toUpperCase();
+
+    // Store OTP in Redis
+    await otpService.storeOTP('email_verification', email, verificationOtp);
+
+    // Set cooldown
+    if (otpCooldownService) {
+      await otpCooldownService.setCooldown('email_verification', email);
+    }
+
+    // Send verification email
+    await EmailService.sendVerificationEmail(
+      { email, fullName },
+      verificationOtp
+    );
+
+    logger.info('Verification email resent successfully', { email });
+
+    res.status(200).json({
+      success: true,
+      message:
+        'Email xác thực đã được gửi lại. Vui lòng kiểm tra hộp thư của bạn.',
+      data: {
+        email,
+        expiresIn: 600,
+      },
     });
   } catch (error) {
     if (error.message === 'EMAIL_ALREADY_VERIFIED') {

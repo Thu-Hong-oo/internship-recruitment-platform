@@ -1,0 +1,379 @@
+[
+  {
+    "code": "tech-software",
+    "name": {
+      "vi": "Công nghệ thông tin - Phần mềm",
+      "en": "Information Technology - Software"
+    },
+    "description": {
+      "vi": "Phát triển phần mềm, ứng dụng web, mobile và các giải pháp công nghệ",
+      "en": "Software development, web applications, mobile apps and technology solutions"
+    },
+    "icon": "💻",
+    "visible": true
+  },
+  {
+    "code": "tech-hardware",
+    "name": {
+      "vi": "Công nghệ thông tin - Phần cứng",
+      "en": "Information Technology - Hardware"
+    },
+    "description": {
+      "vi": "Thiết kế, sản xuất và bảo trì phần cứng máy tính, thiết bị điện tử",
+      "en": "Design, manufacture and maintain computer hardware and electronic devices"
+    },
+    "icon": "🖥️",
+    "visible": true
+  },
+  {
+    "code": "tech-networking",
+    "name": {
+      "vi": "Mạng máy tính - Viễn thông",
+      "en": "Computer Networking - Telecommunications"
+    },
+    "description": {
+      "vi": "Hạ tầng mạng, viễn thông, bảo mật mạng và quản trị hệ thống",
+      "en": "Network infrastructure, telecommunications, network security and system administration"
+    },
+    "icon": "🌐",
+    "visible": true
+  },
+  {
+    "code": "finance-banking",
+    "name": { "vi": "Tài chính - Ngân hàng", "en": "Finance - Banking" },
+    "description": {
+      "vi": "Dịch vụ ngân hàng, tài chính, đầu tư và quản lý tài sản",
+      "en": "Banking services, finance, investment and asset management"
+    },
+    "icon": "🏦",
+    "visible": true
+  },
+  {
+    "code": "finance-insurance",
+    "name": { "vi": "Bảo hiểm", "en": "Insurance" },
+    "description": {
+      "vi": "Dịch vụ bảo hiểm nhân thọ, phi nhân thọ và tái bảo hiểm",
+      "en": "Life insurance, non-life insurance and reinsurance services"
+    },
+    "icon": "🛡️",
+    "visible": true
+  },
+  {
+    "code": "finance-accounting",
+    "name": { "vi": "Kế toán - Kiểm toán", "en": "Accounting - Auditing" },
+    "description": {
+      "vi": "Dịch vụ kế toán, kiểm toán, tư vấn thuế và tài chính",
+      "en": "Accounting, auditing, tax consulting and financial advisory services"
+    },
+    "icon": "📊",
+    "visible": true
+  },
+  {
+    "code": "education-training",
+    "name": { "vi": "Giáo dục - Đào tạo", "en": "Education - Training" },
+    "description": {
+      "vi": "Giảng dạy, đào tạo, nghiên cứu khoa học và phát triển giáo dục",
+      "en": "Teaching, training, scientific research and educational development"
+    },
+    "icon": "🎓",
+    "visible": true
+  },
+  {
+    "code": "education-elearning",
+    "name": {
+      "vi": "E-learning - Giáo dục trực tuyến",
+      "en": "E-learning - Online Education"
+    },
+    "description": {
+      "vi": "Nền tảng học trực tuyến, khóa học số và công nghệ giáo dục",
+      "en": "Online learning platforms, digital courses and educational technology"
+    },
+    "icon": "💡",
+    "visible": true
+  },
+  {
+    "code": "healthcare-medical",
+    "name": { "vi": "Y tế - Chăm sóc sức khỏe", "en": "Healthcare - Medical" },
+    "description": {
+      "vi": "Dịch vụ y tế, bệnh viện, phòng khám và chăm sóc sức khỏe",
+      "en": "Healthcare services, hospitals, clinics and health care"
+    },
+    "icon": "🏥",
+    "visible": true
+  },
+  {
+    "code": "healthcare-pharma",
+    "name": { "vi": "Dược phẩm - Y dược", "en": "Pharmaceutical - Medicine" },
+    "description": {
+      "vi": "Sản xuất, phân phối dược phẩm và thiết bị y tế",
+      "en": "Pharmaceutical manufacturing, distribution and medical equipment"
+    },
+    "icon": "💊",
+    "visible": true
+  },
+  {
+    "code": "retail-ecommerce",
+    "name": {
+      "vi": "Bán lẻ - Thương mại điện tử",
+      "en": "Retail - E-commerce"
+    },
+    "description": {
+      "vi": "Bán lẻ truyền thống và trực tuyến, thương mại điện tử",
+      "en": "Traditional and online retail, e-commerce"
+    },
+    "icon": "🛒",
+    "visible": true
+  },
+  {
+    "code": "retail-fmcg",
+    "name": {
+      "vi": "Hàng tiêu dùng nhanh (FMCG)",
+      "en": "Fast Moving Consumer Goods (FMCG)"
+    },
+    "description": {
+      "vi": "Sản xuất và phân phối hàng tiêu dùng nhanh",
+      "en": "Fast moving consumer goods manufacturing and distribution"
+    },
+    "icon": "🥫",
+    "visible": true
+  },
+  {
+    "code": "manufacturing-auto",
+    "name": { "vi": "Sản xuất - Ô tô", "en": "Manufacturing - Automotive" },
+    "description": {
+      "vi": "Sản xuất, lắp ráp ô tô và phụ tùng xe",
+      "en": "Automotive manufacturing, assembly and auto parts"
+    },
+    "icon": "🚗",
+    "visible": true
+  },
+  {
+    "code": "manufacturing-electronics",
+    "name": { "vi": "Sản xuất - Điện tử", "en": "Manufacturing - Electronics" },
+    "description": {
+      "vi": "Sản xuất thiết bị điện tử, linh kiện và bo mạch",
+      "en": "Electronics manufacturing, components and circuit boards"
+    },
+    "icon": "📱",
+    "visible": true
+  },
+  {
+    "code": "manufacturing-textile",
+    "name": { "vi": "Sản xuất - Dệt may", "en": "Manufacturing - Textile" },
+    "description": {
+      "vi": "Sản xuất vải, may mặc và thời trang",
+      "en": "Textile manufacturing, garment and fashion production"
+    },
+    "icon": "👔",
+    "visible": true
+  },
+  {
+    "code": "construction-architecture",
+    "name": {
+      "vi": "Xây dựng - Kiến trúc",
+      "en": "Construction - Architecture"
+    },
+    "description": {
+      "vi": "Thiết kế kiến trúc, thi công xây dựng và quản lý dự án",
+      "en": "Architectural design, construction and project management"
+    },
+    "icon": "🏗️",
+    "visible": true
+  },
+  {
+    "code": "construction-realestate",
+    "name": { "vi": "Bất động sản", "en": "Real Estate" },
+    "description": {
+      "vi": "Phát triển, môi giới và quản lý bất động sản",
+      "en": "Real estate development, brokerage and property management"
+    },
+    "icon": "🏢",
+    "visible": true
+  },
+  {
+    "code": "media-marketing",
+    "name": { "vi": "Truyền thông - Marketing", "en": "Media - Marketing" },
+    "description": {
+      "vi": "Quảng cáo, marketing, PR và truyền thông đa phương tiện",
+      "en": "Advertising, marketing, PR and multimedia communications"
+    },
+    "icon": "📢",
+    "visible": true
+  },
+  {
+    "code": "media-entertainment",
+    "name": {
+      "vi": "Giải trí - Truyền hình",
+      "en": "Entertainment - Broadcasting"
+    },
+    "description": {
+      "vi": "Sản xuất nội dung, phim ảnh, truyền hình và âm nhạc",
+      "en": "Content production, film, television and music"
+    },
+    "icon": "🎬",
+    "visible": true
+  },
+  {
+    "code": "hospitality-tourism",
+    "name": { "vi": "Du lịch - Khách sạn", "en": "Tourism - Hospitality" },
+    "description": {
+      "vi": "Dịch vụ du lịch, khách sạn, resort và nhà hàng",
+      "en": "Tourism services, hotels, resorts and restaurants"
+    },
+    "icon": "🏨",
+    "visible": true
+  },
+  {
+    "code": "hospitality-fb",
+    "name": { "vi": "Ẩm thực - F&B", "en": "Food & Beverage" },
+    "description": {
+      "vi": "Nhà hàng, quán ăn, cà phê và dịch vụ ăn uống",
+      "en": "Restaurants, cafes and food & beverage services"
+    },
+    "icon": "🍽️",
+    "visible": true
+  },
+  {
+    "code": "logistics-transport",
+    "name": { "vi": "Logistics - Vận tải", "en": "Logistics - Transportation" },
+    "description": {
+      "vi": "Vận chuyển hàng hóa, kho bãi và quản lý chuỗi cung ứng",
+      "en": "Freight transport, warehousing and supply chain management"
+    },
+    "icon": "🚚",
+    "visible": true
+  },
+  {
+    "code": "logistics-delivery",
+    "name": { "vi": "Giao hàng - Chuyển phát", "en": "Delivery - Courier" },
+    "description": {
+      "vi": "Dịch vụ giao hàng nhanh và chuyển phát bưu kiện",
+      "en": "Express delivery and courier services"
+    },
+    "icon": "📦",
+    "visible": true
+  },
+  {
+    "code": "energy-oil-gas",
+    "name": { "vi": "Năng lượng - Dầu khí", "en": "Energy - Oil & Gas" },
+    "description": {
+      "vi": "Khai thác, chế biến dầu khí và năng lượng truyền thống",
+      "en": "Oil & gas extraction, processing and traditional energy"
+    },
+    "icon": "⛽",
+    "visible": true
+  },
+  {
+    "code": "energy-renewable",
+    "name": { "vi": "Năng lượng tái tạo", "en": "Renewable Energy" },
+    "description": {
+      "vi": "Năng lượng mặt trời, gió, thủy điện và sinh học",
+      "en": "Solar, wind, hydro and bio energy"
+    },
+    "icon": "♻️",
+    "visible": true
+  },
+  {
+    "code": "agriculture-farming",
+    "name": { "vi": "Nông nghiệp - Trồng trọt", "en": "Agriculture - Farming" },
+    "description": {
+      "vi": "Sản xuất nông nghiệp, trồng trọt và chăn nuôi",
+      "en": "Agricultural production, farming and livestock"
+    },
+    "icon": "🌾",
+    "visible": true
+  },
+  {
+    "code": "agriculture-agritech",
+    "name": { "vi": "Công nghệ nông nghiệp", "en": "Agricultural Technology" },
+    "description": {
+      "vi": "Ứng dụng công nghệ cao trong nông nghiệp",
+      "en": "High-tech applications in agriculture"
+    },
+    "icon": "🚜",
+    "visible": true
+  },
+  {
+    "code": "consulting-management",
+    "name": { "vi": "Tư vấn - Quản lý", "en": "Consulting - Management" },
+    "description": {
+      "vi": "Tư vấn quản lý, chiến lược và phát triển doanh nghiệp",
+      "en": "Management consulting, strategy and business development"
+    },
+    "icon": "💼",
+    "visible": true
+  },
+  {
+    "code": "consulting-hr",
+    "name": { "vi": "Tư vấn - Nhân sự", "en": "Human Resources Consulting" },
+    "description": {
+      "vi": "Tư vấn nhân sự, tuyển dụng và đào tạo",
+      "en": "HR consulting, recruitment and training services"
+    },
+    "icon": "👥",
+    "visible": true
+  },
+  {
+    "code": "legal-law",
+    "name": { "vi": "Luật - Pháp lý", "en": "Legal - Law" },
+    "description": {
+      "vi": "Dịch vụ pháp lý, tư vấn luật và đại diện pháp lý",
+      "en": "Legal services, law consulting and legal representation"
+    },
+    "icon": "⚖️",
+    "visible": true
+  },
+  {
+    "code": "government-public",
+    "name": {
+      "vi": "Chính phủ - Công quyền",
+      "en": "Government - Public Sector"
+    },
+    "description": {
+      "vi": "Cơ quan nhà nước, tổ chức công quyền và dịch vụ công",
+      "en": "Government agencies, public authorities and public services"
+    },
+    "icon": "🏛️",
+    "visible": true
+  },
+  {
+    "code": "ngo-nonprofit",
+    "name": { "vi": "Phi lợi nhuận - NGO", "en": "Non-profit - NGO" },
+    "description": {
+      "vi": "Tổ chức phi chính phủ, từ thiện và phát triển cộng đồng",
+      "en": "Non-governmental organizations, charity and community development"
+    },
+    "icon": "🤝",
+    "visible": true
+  },
+  {
+    "code": "sports-fitness",
+    "name": { "vi": "Thể thao - Thể hình", "en": "Sports - Fitness" },
+    "description": {
+      "vi": "Phòng tập gym, yoga, các môn thể thao và huấn luyện",
+      "en": "Gyms, yoga, sports facilities and training"
+    },
+    "icon": "⚽",
+    "visible": true
+  },
+  {
+    "code": "beauty-wellness",
+    "name": { "vi": "Làm đẹp - Spa", "en": "Beauty - Wellness" },
+    "description": {
+      "vi": "Spa, thẩm mỹ viện, salon tóc và chăm sóc sắc đẹp",
+      "en": "Spa, beauty clinics, hair salons and beauty care"
+    },
+    "icon": "💆",
+    "visible": true
+  },
+  {
+    "code": "gaming-esports",
+    "name": { "vi": "Game - Esports", "en": "Gaming - Esports" },
+    "description": {
+      "vi": "Phát triển game, thi đấu esports và streaming",
+      "en": "Game development, esports competitions and streaming"
+    },
+    "icon": "🎮",
+    "visible": true
+  }
+]

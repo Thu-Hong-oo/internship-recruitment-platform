@@ -1,11 +1,41 @@
 const asyncHandler = require('express-async-handler');
 const { logger } = require('../../shared/utils/logger');
+const CompanyResponseDTO = require('../dtos/CompanyResponseDTO');
 
 // @desc    Create company (first-time setup)
 // @route   POST /api/employers/company
 // @access  Private (Employer without company)
 const createCompany = asyncHandler(async (req, res) => {
   try {
+    // Check if user already has employer profile with a valid company
+    const getEmployerProfileUseCase = req.container.resolve(
+      'getEmployerProfileUseCase'
+    );
+    const profileResult = await getEmployerProfileUseCase.execute({
+      userId: req.user.id,
+    });
+
+    // Debug logging
+    console.log('Employer profile result:', {
+      requiresProfileCreation: profileResult.requiresProfileCreation,
+      hasEmployer: !!profileResult.employer,
+      employerCompanyId: profileResult.employer?.companyId,
+      hasCompany: !!profileResult.employer?.company,
+    });
+
+    // If user has employer profile and it has a company that actually exists, redirect to update instead
+    if (
+      !profileResult.requiresProfileCreation &&
+      profileResult.employer?.companyId &&
+      profileResult.employer?.company
+    ) {
+      return res.status(400).json({
+        success: false,
+        error:
+          'Bạn đã có công ty rồi. Vui lòng sử dụng PUT /api/employers/company để cập nhật thông tin công ty.',
+      });
+    }
+
     const createCompanyUseCase = req.container.resolve('createCompanyUseCase');
 
     const result = await createCompanyUseCase.execute({
@@ -17,18 +47,7 @@ const createCompany = asyncHandler(async (req, res) => {
       success: true,
       message: 'Công ty đã được tạo thành công',
       data: {
-        company: {
-          id: result.company.companyId,
-          name: result.company.name,
-          industry: result.company.industry,
-          size: result.company.size,
-          website: result.company.website,
-          email: result.company.email,
-          phone: result.company.phone,
-          address: result.company.address,
-          isVerified: result.company.isVerified,
-          status: result.company.verificationStatus,
-        },
+        company: CompanyResponseDTO.fromCompany(result.company).toJSON(),
         profile: result.profile,
       },
     });
@@ -36,7 +55,8 @@ const createCompany = asyncHandler(async (req, res) => {
     if (error.message === 'USER_ALREADY_HAS_COMPANY') {
       return res.status(400).json({
         success: false,
-        error: 'Bạn đã có công ty rồi',
+        error:
+          'Bạn đã có công ty rồi. Vui lòng cập nhật thông tin công ty hiện có.',
       });
     }
 
@@ -82,24 +102,7 @@ const getCompany = asyncHandler(async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: {
-        id: company.companyId,
-        name: company.name,
-        description: company.description,
-        industry: company.industry,
-        size: company.size,
-        website: company.website,
-        email: company.email,
-        phone: company.phone,
-        logo: company.logoUrl,
-        address: company.address,
-        businessInfo: {
-          taxCode: company.taxCode,
-          registrationNumber: company.businessLicenseNumber,
-        },
-        isVerified: company.isVerified,
-        status: company.verificationStatus,
-      },
+      data: CompanyResponseDTO.fromCompany(company).toJSON(),
     });
   } catch (error) {
     logger.error('Get company error:', error);
@@ -134,28 +137,17 @@ const updateCompany = asyncHandler(async (req, res) => {
       });
     }
 
-    // Update company
+    // Update company using companyId
     const companyRepository = req.container.resolve('companyRepository');
     const updatedCompany = await companyRepository.update(
-      profileResult.employer.company,
+      profileResult.employer.companyId,
       req.body
     );
 
     res.status(200).json({
       success: true,
       message: 'Cập nhật thông tin công ty thành công',
-      data: {
-        id: updatedCompany.companyId,
-        name: updatedCompany.name,
-        description: updatedCompany.description,
-        industry: updatedCompany.industry,
-        size: updatedCompany.size,
-        website: updatedCompany.website,
-        email: updatedCompany.email,
-        phone: updatedCompany.phone,
-        logo: updatedCompany.logoUrl,
-        address: updatedCompany.address,
-      },
+      data: CompanyResponseDTO.fromCompany(updatedCompany).toJSON(),
     });
   } catch (error) {
     logger.error('Update company error:', error);

@@ -16,7 +16,9 @@ class EmployerProfileMapper {
     const profile = new EmployerProfile(
       mongooseDoc._id.toString(),
       mongooseDoc.owner?.toString() || mongooseDoc.owner,
-      mongooseDoc.company?.toString() || mongooseDoc.company
+      mongooseDoc.company?._id?.toString() ||
+        mongooseDoc.company?.toString() ||
+        mongooseDoc.company
     );
 
     // Map fields directly without defaults
@@ -53,6 +55,11 @@ class EmployerProfileMapper {
         phone: mongooseDoc.contact.phone,
         email: mongooseDoc.contact.email,
       };
+    }
+
+    // Company object (populated)
+    if (mongooseDoc.company) {
+      profile.company = mongooseDoc.company;
     }
 
     // Timestamps

@@ -9,7 +9,9 @@ const CompanyMapper = require('../mappers/CompanyMapper');
  */
 class CompanyRepository extends ICompanyRepository {
   async findById(id) {
-    const doc = await CompanyModel.findById(id).populate('owner', 'name email');
+    const doc = await CompanyModel.findById(id)
+      .populate('owner', 'name email')
+      .select('+logo +coverImage +verification');
     return CompanyMapper.toDomain(doc);
   }
 
@@ -20,6 +22,11 @@ class CompanyRepository extends ICompanyRepository {
 
   async findByTaxCode(taxCode) {
     const doc = await CompanyModel.findOne({ 'businessInfo.taxId': taxCode });
+    return CompanyMapper.toDomain(doc);
+  }
+
+  async findByOwner(ownerId) {
+    const doc = await CompanyModel.findOne({ owner: ownerId });
     return CompanyMapper.toDomain(doc);
   }
 

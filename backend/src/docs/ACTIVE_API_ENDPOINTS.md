@@ -1,28 +1,28 @@
 # 🚀 Active API Endpoints
 
-**Server Status**: ✅ Running on `http://localhost:3000`  
-**Documentation**: http://localhost:3000/api-docs  
-**Health Check**: http://localhost:3000/health  
+**Server Status**: ✅ Running on `http://localhost:5001`  
+**Documentation**: http://localhost:5001/api-docs  
+**Health Check**: http://localhost:5001/health  
 **Environment**: Development  
-**Last Updated**: November 6, 2025
+**Last Updated**: November 7, 2025
 
 ---
 
-## � Endpoint Count Summary
+## 📊 Endpoint Count Summary
 
 > **⚠️ Important Note**: This document lists **endpoint groups** (functional features), not individual HTTP methods.
 >
 > - **34 Endpoint Groups** = Major functional features documented below
-> - **~149 Total HTTP Endpoints** = All GET/POST/PATCH/DELETE methods combined
+> - **~152 Total HTTP Endpoints** = All GET/POST/PATCH/DELETE methods combined
 > - See [ENDPOINT_COUNT_CLARIFICATION.md](../../ENDPOINT_COUNT_CLARIFICATION.md) for detailed breakdown
 
 ---
 
-## �📋 Table of Contents
+## 📋 Table of Contents
 
 1. [Authentication](#authentication) - 12 endpoints
 2. [Candidates](#candidates) - 13 endpoints
-3. [Employers](#employers) - 16 endpoints
+3. [Employers](#employers) - 19 endpoints (+3 document verification)
 4. [Jobs](#jobs) - 10 endpoints
 5. [Applications](#applications) - 10 endpoints
 6. [AI/NLP](#ainlp) - 7 endpoints
@@ -36,7 +36,7 @@
 14. [Public Access](#public-access) - 1 endpoint
 15. [System Health](#system-health) - 1 endpoint
 
-**Total**: 149 HTTP Endpoints across 15 groups
+**Total**: 152 HTTP Endpoints across 15 groups
 
 ---
 
@@ -150,35 +150,146 @@ Authorization: Bearer <token>
 
 Base URL: `/api/employers`
 
-| Method | Endpoint             | Description                | Status    |
-| ------ | -------------------- | -------------------------- | --------- |
-| GET    | `/api/employers`     | Get all employers          | ✅ Active |
-| POST   | `/api/employers`     | Create employer profile    | ✅ Active |
-| GET    | `/api/employers/:id` | Get employer profile by ID | ✅ Active |
-| PUT    | `/api/employers/:id` | Update employer profile    | ✅ Active |
+| Method                    | Endpoint                                    | Description                         | Status    |
+| ------------------------- | ------------------------------------------- | ----------------------------------- | --------- |
+| GET                       | `/api/employers/profile`                    | Get employer profile                | ✅ Active |
+| PATCH                     | `/api/employers/profile`                    | Update employer profile & company   | ✅ Active |
+| GET                       | `/api/employers/company`                    | Get company information             | ✅ Active |
+| PATCH                     | `/api/employers/company`                    | Update company information          | ✅ Active |
+| GET                       | `/api/employers/stats`                      | Get employer statistics             | ✅ Active |
+| GET                       | `/api/employers/dashboard`                  | Get employer dashboard data         | ✅ Active |
+| **Document Verification** |                                             |                                     |           |
+| GET                       | `/api/employers/documents`                  | Get documents & verification status | ✅ Active |
+| POST                      | `/api/employers/documents/upload`           | Upload verification document        | ✅ Active |
+| DELETE                    | `/api/employers/documents/:documentType`    | Delete verification document        | ✅ Active |
+| **Company Members**       |                                             |                                     |           |
+| GET                       | `/api/employers/company/members`            | Get company members                 | ✅ Active |
+| POST                      | `/api/employers/company/members/invite`     | Invite member to company            | ✅ Active |
+| PATCH                     | `/api/employers/company/members/:memberId`  | Update member permissions           | ✅ Active |
+| DELETE                    | `/api/employers/company/members/:memberId`  | Remove member from company          | ✅ Active |
+| **Invitations**           |                                             |                                     |           |
+| GET                       | `/api/employers/invitations`                | Get my invitations                  | ✅ Active |
+| POST                      | `/api/employers/invitations/accept/:token`  | Accept invitation                   | ✅ Active |
+| POST                      | `/api/employers/invitations/reject/:token`  | Reject invitation                   | ✅ Active |
+| DELETE                    | `/api/employers/invitations/:invitationId`  | Cancel invitation                   | ✅ Active |
+| GET                       | `/api/employers/invitations/preview/:token` | Preview invitation (public)         | ✅ Active |
 
 ### Request Examples
 
-**Create Employer Profile:**
+**Get Employer Profile:**
+
+```http
+GET /api/employers/profile
+Authorization: Bearer <token>
+```
+
+**Update Employer Profile & Company:**
 
 ```json
-POST /api/employers
+PATCH /api/employers/profile
 Authorization: Bearer <token>
 {
-  "companyName": "Tech Corp Vietnam",
-  "companySize": "51-200",
-  "industry": "Information Technology",
-  "website": "https://techcorp.vn",
-  "description": "Leading IT company in Vietnam",
-  "address": "District 1, Ho Chi Minh City"
+  "company": {
+    "name": "Tech Corp Vietnam",
+    "industry": "technology",
+    "size": "51-200",
+    "website": "https://techcorp.vn",
+    "description": "Leading IT company"
+  },
+  "address": {
+    "street": "123 Le Loi",
+    "district": "District 1",
+    "city": "Ho Chi Minh City"
+  },
+  "businessInfo": {
+    "registrationNumber": "0123456789",
+    "taxId": "0123456789-001",
+    "issueDate": "2020-01-15",
+    "issuePlace": "Sở KHĐT TP.HCM"
+  },
+  "position": {
+    "title": "CEO",
+    "level": "executive"
+  }
 }
 ```
 
-**Get Employer Details:**
+**Upload Verification Document:**
 
 ```http
-GET /api/employers/507f1f77bcf86cd799439011
+POST /api/employers/documents/upload
 Authorization: Bearer <token>
+Content-Type: multipart/form-data
+
+document: [FILE] business-license.pdf
+documentType: "business-license"
+metadata: {
+  "documentNumber": "0123456789",
+  "issueDate": "2020-01-15",
+  "issuePlace": "Sở Kế hoạch và Đầu tư TP. HCM"
+}
+```
+
+**Get Documents & Verification Status:**
+
+```http
+GET /api/employers/documents
+Authorization: Bearer <token>
+
+Response:
+{
+  "success": true,
+  "data": {
+    "documents": [
+      {
+        "type": "business-license",
+        "url": "https://cloudinary.com/...",
+        "uploadedAt": "2025-11-07T10:00:00Z"
+      }
+    ],
+    "verificationProgress": {
+      "percentage": 50,
+      "uploadedRequired": 1,
+      "totalRequired": 2,
+      "missingRequired": ["tax-certificate"]
+    },
+    "verification": {
+      "isVerified": false,
+      "steps": {
+        "businessInfo": false,
+        "documents": false
+      }
+    }
+  }
+}
+```
+
+**Delete Document:**
+
+```http
+DELETE /api/employers/documents/business-license
+Authorization: Bearer <token>
+```
+
+**Invite Company Member:**
+
+```json
+POST /api/employers/company/members/invite
+Authorization: Bearer <token>
+{
+  "email": "member@company.com",
+  "position": {
+    "title": "HR Manager",
+    "level": "manager",
+    "department": "Human Resources"
+  },
+  "permissions": {
+    "canPostJobs": true,
+    "canEditJobs": true,
+    "canViewApplications": true,
+    "canReviewApplications": true
+  }
+}
 ```
 
 ---

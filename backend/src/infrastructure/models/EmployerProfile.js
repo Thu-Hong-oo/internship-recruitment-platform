@@ -53,6 +53,14 @@ const EmployerProfileSchema = new mongoose.Schema(
       email: { type: String },
     },
 
+    // Legal representative (for employer profile)
+    legalRepresentative: {
+      fullName: { type: String },
+      position: { type: String },
+      phone: { type: String },
+      email: { type: String },
+    },
+
     // Status
     status: {
       type: String,

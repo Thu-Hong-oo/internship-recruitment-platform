@@ -6,27 +6,48 @@ class CompanyResponseDTO {
   constructor(companyModel) {
     this.id = companyModel._id;
     this.companyId = companyModel.companyId;
-    this.companyName = companyModel.companyName;
     this.name = companyModel.name;
     this.legalName = companyModel.legalName;
-    this.taxCode = companyModel.taxCode;
-    this.description = companyModel.description;
-    this.websiteUrl = companyModel.websiteUrl;
-    this.logoUrl = companyModel.logoUrl;
-    this.companyHotline = companyModel.companyHotline;
-    this.companyEmail = companyModel.companyEmail;
-    this.foundedYear = companyModel.foundedYear;
-    this.verificationStatus = companyModel.verificationStatus;
-    this.companySize = companyModel.companySize;
-    this.size = companyModel.size;
     this.industry = companyModel.industry;
-    this.location = companyModel.location || {};
-    this.contact = companyModel.contact || {};
+    this.size = companyModel.size;
+    this.description = companyModel.description;
+    this.website = companyModel.website;
+    this.logo = companyModel.logo;
+    this.coverImage = companyModel.coverImage;
+    this.phone = companyModel.phone;
+    this.email = companyModel.email;
+    this.foundedYear = companyModel.foundedYear;
+
+    // Address mapping
+    this.address = companyModel.address || {};
+
+    // Business info mapping
+    this.businessInfo = companyModel.businessInfo || {};
+
+    // Legal representative mapping
+    this.legalRepresentative = companyModel.legalRepresentative || {};
+
+    // Social media mapping
     this.socialMedia = companyModel.socialMedia || {};
-    this.isVerified = companyModel.isVerified;
-    this.verifiedAt = companyModel.verifiedAt;
+
+    // Verification mapping
+    this.isVerified = companyModel.verification?.isVerified || false;
+    this.verificationStatus = companyModel.verification?.isVerified
+      ? 'verified'
+      : 'pending';
+    this.verifiedAt = companyModel.verification?.verifiedAt;
+    this.verificationSteps = companyModel.verification?.steps || {};
+    this.verificationDocuments = companyModel.verification?.documents || [];
+
+    // Status
+    this.status = companyModel.status;
+
+    // Timestamps
     this.createdAt = companyModel.createdAt;
     this.updatedAt = companyModel.updatedAt;
+
+    // Owner reference
+    this.owner = companyModel.owner;
   }
 
   /**
@@ -50,25 +71,28 @@ class CompanyResponseDTO {
     return {
       id: this.id,
       companyId: this.companyId,
-      companyName: this.companyName,
       name: this.name,
       legalName: this.legalName,
-      taxCode: this.taxCode,
-      description: this.description,
-      websiteUrl: this.websiteUrl,
-      logoUrl: this.logoUrl,
-      companyHotline: this.companyHotline,
-      companyEmail: this.companyEmail,
-      foundedYear: this.foundedYear,
-      verificationStatus: this.verificationStatus,
-      companySize: this.companySize,
-      size: this.size,
       industry: this.industry,
-      location: this.location,
-      contact: this.contact,
+      size: this.size,
+      description: this.description,
+      website: this.website,
+      logo: this.logo,
+      coverImage: this.coverImage,
+      phone: this.phone,
+      email: this.email,
+      foundedYear: this.foundedYear,
+      address: this.address,
+      businessInfo: this.businessInfo,
+      legalRepresentative: this.legalRepresentative,
       socialMedia: this.socialMedia,
       isVerified: this.isVerified,
+      verificationStatus: this.verificationStatus,
       verifiedAt: this.verifiedAt,
+      verificationSteps: this.verificationSteps,
+      verificationDocuments: this.verificationDocuments,
+      status: this.status,
+      owner: this.owner,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
     };

@@ -2,6 +2,17 @@
 
 > Website ứng dụng AI hỗ trợ tìm việc intern, hỗ trợ kết nối doanh nghiệp và nguồn nhân lực mới lâu dài bằng phân tích nhu cầu tuyển dụng, CV tìm việc làm.
 
+## 📚 Tài liệu hướng dẫn
+
+### 🔥 Quick Links
+
+- 📖 **[DOCUMENTATION_INDEX.md](./DOCUMENTATION_INDEX.md)** - Chỉ mục tài liệu đầy đủ
+- 🇻🇳 **[HUONG_DAN_EMPLOYER.md](./HUONG_DAN_EMPLOYER.md)** - Hướng dẫn Nhà tuyển dụng (Tiếng Việt)
+- 🇬🇧 **[EMPLOYER_GUIDE.md](./EMPLOYER_GUIDE.md)** - Employer Guide (English)
+- 🔌 **[ACTIVE_API_ENDPOINTS.md](./ACTIVE_API_ENDPOINTS.md)** - 152 Active Endpoints
+
+---
+
 ## ⭐ Clean Architecture - 56% Complete!
 
 **Status**: ✅ Core domains migrated to Clean Architecture  
@@ -374,6 +385,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **[PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md)** - Cấu trúc thư mục tổng quan
 - **[API_ENDPOINTS_STRUCTURE.md](./API_ENDPOINTS_STRUCTURE.md)** - Chi tiết API endpoints hiện tại
 - **[API_ENDPOINTS_COMPLETE.md](./API_ENDPOINTS_COMPLETE.md)** - Danh sách đầy đủ endpoints
+- **[ACTIVE_API_ENDPOINTS.md](./ACTIVE_API_ENDPOINTS.md)** - 📍 Danh sách endpoints đang hoạt động (152 endpoints)
 - **[src/application/README.md](./src/application/README.md)** - Hướng dẫn Use Case pattern
 
 ### 📋 Hướng dẫn phát triển
@@ -382,6 +394,17 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **[docs/DEVELOPMENT_GUIDE.md](./docs/DEVELOPMENT_GUIDE.md)** - Hướng dẫn phát triển
 - **[docs/TESTING_GUIDE.md](./docs/TESTING_GUIDE.md)** - Hướng dẫn testing
 - **[docs/API_DOCUMENTATION.md](./docs/API_DOCUMENTATION.md)** - Tài liệu API chi tiết
+
+### 👥 Hướng dẫn người dùng
+
+- **[HUONG_DAN_EMPLOYER.md](./HUONG_DAN_EMPLOYER.md)** - 🇻🇳 Hướng dẫn cho Nhà tuyển dụng (Tiếng Việt)
+- **[EMPLOYER_GUIDE.md](./EMPLOYER_GUIDE.md)** - 🇬🇧 Employer Guide (English)
+  - Đăng ký & Đăng nhập
+  - Quản lý hồ sơ công ty
+  - Xác minh giấy tờ (Business License, Tax Certificate)
+  - Quản lý tin tuyển dụng
+  - Xử lý đơn ứng tuyển
+  - Quản lý thành viên công ty
 
 ### 🚀 Triển khai & DevOps
 

@@ -1,0 +1,188 @@
+{
+  "info": {
+    "name": "Company Document Verification API",
+    "description": "API endpoints for uploading and managing company verification documents",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get Documents & Verification Status",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{employer_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/employers/documents",
+          "host": ["{{base_url}}"],
+          "path": ["api", "employers", "documents"]
+        },
+        "description": "Get all uploaded documents and verification progress"
+      },
+      "response": []
+    },
+    {
+      "name": "Upload Business License",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{employer_token}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "document",
+              "type": "file",
+              "src": "/path/to/business-license.pdf"
+            },
+            {
+              "key": "documentType",
+              "value": "business-license",
+              "type": "text"
+            },
+            {
+              "key": "metadata",
+              "value": "{\n  \"documentNumber\": \"0123456789\",\n  \"issueDate\": \"2020-01-15\",\n  \"issuePlace\": \"Sở Kế hoạch và Đầu tư TP. HCM\"\n}",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{base_url}}/api/employers/documents/upload",
+          "host": ["{{base_url}}"],
+          "path": ["api", "employers", "documents", "upload"]
+        },
+        "description": "Upload business registration certificate"
+      },
+      "response": []
+    },
+    {
+      "name": "Upload Tax Certificate",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{employer_token}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "document",
+              "type": "file",
+              "src": "/path/to/tax-certificate.pdf"
+            },
+            {
+              "key": "documentType",
+              "value": "tax-certificate",
+              "type": "text"
+            },
+            {
+              "key": "metadata",
+              "value": "{\n  \"documentNumber\": \"0123456789-001\",\n  \"issueDate\": \"2020-01-20\"\n}",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{base_url}}/api/employers/documents/upload",
+          "host": ["{{base_url}}"],
+          "path": ["api", "employers", "documents", "upload"]
+        },
+        "description": "Upload tax registration certificate"
+      },
+      "response": []
+    },
+    {
+      "name": "Upload Legal Representative ID",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{employer_token}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "document",
+              "type": "file",
+              "src": "/path/to/id-card.jpg"
+            },
+            {
+              "key": "documentType",
+              "value": "legal-representative-id",
+              "type": "text"
+            },
+            {
+              "key": "metadata",
+              "value": "{\n  \"documentNumber\": \"079012345678\",\n  \"issueDate\": \"2019-05-10\",\n  \"issuePlace\": \"Công an TP. HCM\"\n}",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{base_url}}/api/employers/documents/upload",
+          "host": ["{{base_url}}"],
+          "path": ["api", "employers", "documents", "upload"]
+        },
+        "description": "Upload legal representative ID card (optional)"
+      },
+      "response": []
+    },
+    {
+      "name": "Delete Document",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{employer_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/employers/documents/:documentType",
+          "host": ["{{base_url}}"],
+          "path": ["api", "employers", "documents", ":documentType"],
+          "variable": [
+            {
+              "key": "documentType",
+              "value": "business-license",
+              "description": "Type of document to delete (e.g., business-license, tax-certificate)"
+            }
+          ]
+        },
+        "description": "Delete a specific document by type"
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5001",
+      "type": "string"
+    },
+    {
+      "key": "employer_token",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

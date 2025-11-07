@@ -2,12 +2,30 @@ const asyncHandler = require('express-async-handler');
 const { logger } = require('../../shared/utils/logger');
 const IndustryService = require('../../infrastructure/services/internal/IndustryService');
 
-// @desc    Get all industries
+const industryService = new IndustryService();
+
+// @desc    Get all industries with filtering via query params
 // @route   GET /api/industries
+// @route   GET /api/industries?type=active
+// @route   GET /api/industries?type=trends
+// @route   GET /api/industries?search=software
 // @access  Public
 const getAllIndustries = asyncHandler(async (req, res) => {
   try {
-    const result = await IndustryService.getAllIndustries(req.query);
+    const { type, search, includeStats } = req.query;
+    let result;
+
+    // Route based on query parameter 'type'
+    if (type === 'active') {
+      result = await industryService.getActiveIndustries();
+    } else if (type === 'trends') {
+      result = await industryService.getIndustryTrends();
+    } else if (search) {
+      result = await industryService.searchIndustries(search);
+    } else {
+      // Default: get all industries
+      result = await industryService.getAllIndustries(req.query);
+    }
 
     res.status(200).json({
       success: true,
@@ -28,7 +46,7 @@ const getAllIndustries = asyncHandler(async (req, res) => {
 // @access  Public
 const getActiveIndustries = asyncHandler(async (req, res) => {
   try {
-    const result = await IndustryService.getActiveIndustries();
+    const result = await industryService.getActiveIndustries();
 
     res.status(200).json({
       success: true,
@@ -57,7 +75,7 @@ const searchIndustries = asyncHandler(async (req, res) => {
       });
     }
 
-    const result = await IndustryService.searchIndustries(q);
+    const result = await industryService.searchIndustries(q);
 
     res.status(200).json({
       success: true,
@@ -77,7 +95,7 @@ const searchIndustries = asyncHandler(async (req, res) => {
 // @access  Public
 const getIndustryTrends = asyncHandler(async (req, res) => {
   try {
-    const result = await IndustryService.getIndustryTrends();
+    const result = await industryService.getIndustryTrends();
 
     res.status(200).json({
       success: true,
@@ -92,17 +110,54 @@ const getIndustryTrends = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Get industry by ID
+// @desc    Get industry by ID with optional sub-resources
 // @route   GET /api/industries/:id
+// @route   GET /api/industries/:id?include=stats,companies,jobs
 // @access  Public
 const getIndustryById = asyncHandler(async (req, res) => {
   try {
-    const result = await IndustryService.getIndustryById(req.params.id);
+    const { include, lang = 'vi' } = req.query;
 
-    res.status(200).json({
+    // Get base industry data
+    const result = await industryService.getIndustryById(req.params.id, lang);
+
+    // Check which additional data to include
+    const includes = include ? include.split(',').map(i => i.trim()) : [];
+
+    // Prepare response with basic data
+    const response = {
       success: true,
       data: result.industry,
-    });
+    };
+
+    // Add requested additional data
+    if (includes.includes('stats')) {
+      const stats = await industryService.getIndustryStats(req.params.id);
+      response.stats = stats.stats;
+    }
+
+    if (includes.includes('companies')) {
+      const companies = await industryService.getIndustryCompanies(
+        req.params.id,
+        {
+          page: req.query.companyPage || 1,
+          limit: req.query.companyLimit || 10,
+        }
+      );
+      response.companies = companies.companies;
+      response.companiesPagination = companies.pagination;
+    }
+
+    if (includes.includes('jobs')) {
+      const jobs = await industryService.getIndustryJobs(req.params.id, {
+        page: req.query.jobPage || 1,
+        limit: req.query.jobLimit || 10,
+      });
+      response.jobs = jobs.jobs;
+      response.jobsPagination = jobs.pagination;
+    }
+
+    res.status(200).json(response);
   } catch (error) {
     logger.error('Get industry by ID error:', error);
     res.status(404).json({
@@ -117,7 +172,7 @@ const getIndustryById = asyncHandler(async (req, res) => {
 // @access  Public
 const getIndustryStats = asyncHandler(async (req, res) => {
   try {
-    const result = await IndustryService.getIndustryStats(req.params.id);
+    const result = await industryService.getIndustryStats(req.params.id);
 
     res.status(200).json({
       success: true,
@@ -137,7 +192,7 @@ const getIndustryStats = asyncHandler(async (req, res) => {
 // @access  Public
 const getIndustryCompanies = asyncHandler(async (req, res) => {
   try {
-    const result = await IndustryService.getIndustryCompanies(
+    const result = await industryService.getIndustryCompanies(
       req.params.id,
       req.query
     );
@@ -161,7 +216,7 @@ const getIndustryCompanies = asyncHandler(async (req, res) => {
 // @access  Public
 const getIndustryJobs = asyncHandler(async (req, res) => {
   try {
-    const result = await IndustryService.getIndustryJobs(
+    const result = await industryService.getIndustryJobs(
       req.params.id,
       req.query
     );
@@ -185,7 +240,7 @@ const getIndustryJobs = asyncHandler(async (req, res) => {
 // @access  Private (Admin)
 const createIndustry = asyncHandler(async (req, res) => {
   try {
-    const result = await IndustryService.createIndustry(req.body);
+    const result = await industryService.createIndustry(req.body);
 
     res.status(201).json({
       success: true,
@@ -194,7 +249,11 @@ const createIndustry = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     logger.error('Create industry error:', error);
-    res.status(400).json({
+
+    // Return 409 Conflict for duplicate code, 400 for other validation errors
+    const statusCode = error.message.includes('already exists') ? 409 : 400;
+
+    res.status(statusCode).json({
       success: false,
       error: error.message,
     });
@@ -206,7 +265,7 @@ const createIndustry = asyncHandler(async (req, res) => {
 // @access  Private (Admin)
 const updateIndustry = asyncHandler(async (req, res) => {
   try {
-    const result = await IndustryService.updateIndustry(
+    const result = await industryService.updateIndustry(
       req.params.id,
       req.body
     );
@@ -230,7 +289,7 @@ const updateIndustry = asyncHandler(async (req, res) => {
 // @access  Private (Admin)
 const deleteIndustry = asyncHandler(async (req, res) => {
   try {
-    const result = await IndustryService.deleteIndustry(req.params.id);
+    const result = await industryService.deleteIndustry(req.params.id);
 
     res.status(200).json({
       success: true,

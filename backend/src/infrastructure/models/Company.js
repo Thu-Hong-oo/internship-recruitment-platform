@@ -30,6 +30,7 @@ const CompanySchema = new mongoose.Schema(
     email: { type: String },
     phone: { type: String },
     logo: { type: String },
+    coverImage: { type: String },
     foundedYear: { type: Number },
 
     // Address

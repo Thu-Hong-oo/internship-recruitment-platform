@@ -1,4 +1,7 @@
 const User = require('../../../infrastructure/models/User');
+const CandidateProfile = require('../../../infrastructure/models/CandidateProfile');
+const EmployerProfile = require('../../../infrastructure/models/EmployerProfile');
+const Company = require('../../../infrastructure/models/Company');
 const UserStatus = require('../../../domain/identity/enums/UserStatus');
 const { logger } = require('../../../shared/utils/logger');
 const crypto = require('crypto');
@@ -94,6 +97,9 @@ class VerifyEmailUseCase {
       user.userId = user._id.toString();
       await user.save();
 
+      // Create user profile based on role
+      await this._createUserProfile(user, userData.role);
+
       // Clean up Redis data
       await this.otpService.delete(`user_registration:${email}`);
 
@@ -113,6 +119,34 @@ class VerifyEmailUseCase {
         email,
       });
       throw new Error('USER_CREATION_FAILED');
+    }
+  }
+
+  /**
+   * Create user profile based on role (Candidate only for now)
+   * Employer profiles are created on-demand via UpdateEmployerProfileUseCase
+   */
+  async _createUserProfile(user, role) {
+    try {
+      if (role === 'candidate') {
+        const candidateProfile = await CandidateProfile.create({
+          userId: user._id,
+          personalInfo: { fullName: user.fullName },
+        });
+        user.candidateProfile = candidateProfile._id;
+        await user.save();
+        logger.info(`Candidate profile created for user: ${user._id}`);
+      }
+      // Note: Employer profiles are NOT auto-created
+      // They will be created when user first accesses employer features
+      // This allows for proper company setup flow
+    } catch (error) {
+      logger.error('Failed to create user profile', {
+        error: error.message,
+        userId: user._id,
+        role,
+      });
+      // Don't throw - profile creation failure shouldn't block verification
     }
   }
 }

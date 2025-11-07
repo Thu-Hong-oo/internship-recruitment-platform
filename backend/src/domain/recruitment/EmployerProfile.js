@@ -19,6 +19,7 @@ class EmployerProfile {
     this.contact = null;
     this.status = null;
     this.joinedAt = null;
+    this.company = null; // Populated company object
 
     // Timestamps
     this.createdAt = null;
