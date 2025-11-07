@@ -1,6 +1,3 @@
-// Directly use provinces.open-api.vn
-// Docs/examples: `https://provinces.open-api.vn/api/p/` and `https://provinces.open-api.vn/api/p/{code}?depth=2` and `https://provinces.open-api.vn/api/d/{code}?depth=2`
-
 export const getCities = async (): Promise<
   { value: string; label: string }[]
 > => {

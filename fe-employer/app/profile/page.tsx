@@ -17,6 +17,7 @@ import { ArrowLeft, Save, User, Building, Edit3 } from "lucide-react";
 import { User as UserType, getUserData, getToken } from "@/lib/userStorage";
 import { EMPLOYER_LEVEL_LABEL } from "@/lib/labels";
 import { getEmployerProfile } from "@/lib/api";
+import { updateEmployerProfile } from "@/lib/profileAPI";
 import { useVerificationContext } from "@/contexts/VerificationContext";
 
 interface ProfileData {
@@ -141,22 +142,10 @@ export default function ProfilePage() {
         return;
       }
 
-      const response = await fetch(
-        "http://localhost:3000/api/employers/profile",
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            contact: formData.contact,
-            position: formData.position,
-          }),
-        }
-      );
-
-      const data = await response.json();
+      const data = await updateEmployerProfile(token, {
+        contact: formData.contact,
+        position: formData.position,
+      });
 
       if (data.success) {
         setSuccess("Cập nhật thông tin thành công!");
