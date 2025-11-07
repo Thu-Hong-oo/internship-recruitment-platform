@@ -162,6 +162,7 @@ app.use(containerMiddleware);
 // Security middleware
 const securityMiddleware = createSecurityMiddleware(
   process.env.NODE_ENV || 'development'
+
 );
 app.use(securityMiddleware);
 
