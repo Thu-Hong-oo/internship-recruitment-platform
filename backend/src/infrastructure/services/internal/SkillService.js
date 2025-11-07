@@ -19,33 +19,25 @@ class SkillService {
 
   async getAllSkills(filters = {}) {
     try {
-      const { page = 1, limit = 20, category, search } = filters;
+      const { page = 1, limit = 20, search } = filters;
       const skip = (page - 1) * limit;
 
       const query = {};
-      if (category) query.category = category;
+      // By default only include active skills. Caller may pass includeInactive=true to override.
+      if (!filters.includeInactive) query.isActive = true;
       if (search) query.name = { $regex: search, $options: 'i' };
 
       const skills = await this.skillRepository.find(query, {
         skip,
         limit,
         sort: { popularity: -1 },
-        populate: ['category'],
       });
 
       const total = await this.skillRepository.count(query);
 
       return {
         success: true,
-        skills: skills.map(skill => ({
-          id: skill._id,
-          name: skill.name,
-          description: skill.description,
-          category: skill.category,
-          popularity: skill.popularity,
-          isActive: skill.isActive,
-          createdAt: skill.createdAt,
-        })),
+        skills: skills,
         pagination: {
           page,
           limit,
@@ -58,9 +50,25 @@ class SkillService {
     }
   }
 
-  async getSkillById(skillId) {
+  async getSkillById(idOrSlugOrName) {
     try {
-      const skill = await this.skillRepository.findById(skillId, ['category']);
+      let skill;
+
+      // Try to find by slug first (more user-friendly)
+      skill = await this.skillRepository.findBySlug(idOrSlugOrName);
+
+      // If not found by slug, try by name
+      if (!skill) {
+        skill = await this.skillRepository.findByName(idOrSlugOrName);
+      }
+
+      // If not found by name, try by ObjectId
+      if (!skill) {
+        const mongoose = require('mongoose');
+        if (mongoose.Types.ObjectId.isValid(idOrSlugOrName)) {
+          skill = await this.skillRepository.findById(idOrSlugOrName);
+        }
+      }
 
       if (!skill) {
         throw new Error('Skill not found');
@@ -68,15 +76,7 @@ class SkillService {
 
       return {
         success: true,
-        skill: {
-          id: skill._id,
-          name: skill.name,
-          description: skill.description,
-          category: skill.category,
-          popularity: skill.popularity,
-          isActive: skill.isActive,
-          createdAt: skill.createdAt,
-        },
+        skill: skill,
       };
     } catch (error) {
       throw new Error(`Get skill by ID failed: ${error.message}`);
@@ -102,13 +102,7 @@ class SkillService {
 
       return {
         success: true,
-        skills: skills.map(skill => ({
-          id: skill._id,
-          name: skill.name,
-          description: skill.description,
-          category: skill.category,
-          popularity: skill.popularity,
-        })),
+        skills: skills,
         pagination: {
           page: 1,
           limit,
@@ -296,6 +290,24 @@ class SkillService {
 
   async createSkill(skillData) {
     try {
+      // Check if skill name already exists
+      const existingSkill = await this.skillRepository.findByName(
+        skillData.name
+      );
+      if (existingSkill) {
+        throw new Error('Skill with this name already exists');
+      }
+
+      // Check if skill slug already exists
+      if (skillData.slug) {
+        const existingSlugSkill = await this.skillRepository.findBySlug(
+          skillData.slug
+        );
+        if (existingSlugSkill) {
+          throw new Error('Skill with this slug already exists');
+        }
+      }
+
       // Validate skill data
       const validation = this.validationService.validateSkill(skillData);
       if (!validation.isValid) {
@@ -304,23 +316,27 @@ class SkillService {
         );
       }
 
-      // Create skill
-      const skill = await this.skillRepository.create({
-        ...skillData,
-        isActive: true,
-        popularity: 0,
+      // Create skill directly from Model (bypass entity validation for now)
+      const SkillModel = require('../../models/Skill');
+      const newSkill = new SkillModel({
+        name: skillData.name,
+        slug: skillData.slug,
+        description: skillData.description,
+        parentId: skillData.parentId,
+        embedding: skillData.embedding,
+        popularity: skillData.popularity || 0,
+        isActive: skillData.isActive !== false,
+        demandLevel: skillData.demandLevel || 'medium',
+        trend: skillData.trend || 'stable',
+        level: skillData.level || 0,
+        path: skillData.path || [],
       });
+
+      const savedSkill = await newSkill.save();
 
       return {
         success: true,
-        skill: {
-          id: skill._id,
-          name: skill.name,
-          description: skill.description,
-          category: skill.category,
-          popularity: skill.popularity,
-          isActive: skill.isActive,
-        },
+        skill: savedSkill,
         message: 'Skill created successfully',
       };
     } catch (error) {
@@ -328,29 +344,68 @@ class SkillService {
     }
   }
 
-  async updateSkill(skillId, updates) {
+  async updateSkill(idOrSlugOrName, updates) {
     try {
-      // Validate updates
-      const validation = this.validationService.validateSkill(updates);
+      let skill;
+
+      // Try to find by slug first (more user-friendly)
+      skill = await this.skillRepository.findBySlug(idOrSlugOrName);
+
+      // If not found by slug, try by name
+      if (!skill) {
+        skill = await this.skillRepository.findByName(idOrSlugOrName);
+      }
+
+      // If not found by name, try by ObjectId
+      if (!skill) {
+        const mongoose = require('mongoose');
+        if (mongoose.Types.ObjectId.isValid(idOrSlugOrName)) {
+          skill = await this.skillRepository.findById(idOrSlugOrName);
+        }
+      }
+
+      if (!skill) {
+        throw new Error('Skill not found');
+      }
+
+      // Validate updates (only provided fields)
+      const validation = this.validationService.validateSkillUpdate(updates);
       if (!validation.isValid) {
         throw new Error(
           `Skill validation failed: ${validation.errors.join(', ')}`
         );
       }
 
-      // Update skill
-      const updatedSkill = await this.skillRepository.update(skillId, updates);
+      // For partial updates, merge with existing data and validate the complete object
+      const mergedData = {
+        name: skill.name,
+        slug: skill.slug,
+        description: skill.description,
+        parentId: skill.parentId,
+        popularity: skill.popularity,
+        isActive: skill.isActive,
+        demandLevel: skill.demandLevel,
+        trend: skill.trend,
+        ...updates, // Override with provided updates
+      };
+
+      // Validate the merged data using full validation
+      const fullValidation = this.validationService.validateSkill(mergedData);
+      if (!fullValidation.isValid) {
+        throw new Error(
+          `Skill validation failed: ${fullValidation.errors.join(', ')}`
+        );
+      }
+
+      // Update skill with merged data
+      const updatedSkill = await this.skillRepository.update(
+        skill.skillId,
+        mergedData
+      );
 
       return {
         success: true,
-        skill: {
-          id: updatedSkill._id,
-          name: updatedSkill.name,
-          description: updatedSkill.description,
-          category: updatedSkill.category,
-          popularity: updatedSkill.popularity,
-          isActive: updatedSkill.isActive,
-        },
+        skill: updatedSkill,
         message: 'Skill updated successfully',
       };
     } catch (error) {
@@ -358,10 +413,40 @@ class SkillService {
     }
   }
 
-  async deleteSkill(skillId) {
+  async deleteSkill(idOrSlugOrName) {
     try {
+      let skill;
+
+      // Try to find by slug first (more user-friendly)
+      skill = await this.skillRepository.findBySlug(idOrSlugOrName);
+
+      // If not found by slug, try by name
+      if (!skill) {
+        skill = await this.skillRepository.findByName(idOrSlugOrName);
+      }
+
+      // If not found by name, try by ObjectId
+      if (!skill) {
+        const mongoose = require('mongoose');
+        if (mongoose.Types.ObjectId.isValid(idOrSlugOrName)) {
+          skill = await this.skillRepository.findById(idOrSlugOrName);
+        }
+      }
+
+      if (!skill) {
+        throw new Error('Skill not found');
+      }
+
+      // Determine underlying id (support both mongoose doc and domain entity)
+      const targetId = skill._id || skill.skillId || skill.id;
+
+      // If the skill is already inactive, return a clear error (idempotent protection)
+      if (skill.isActive === false) {
+        throw new Error('Skill already deleted');
+      }
+
       // Soft delete skill
-      await this.skillRepository.update(skillId, { isActive: false });
+      await this.skillRepository.update(targetId, { isActive: false });
 
       return {
         success: true,

@@ -10,7 +10,14 @@ const employerDocumentSchema = new mongoose.Schema(
     documentType: {
       type: String,
       required: true,
-      enum: ['businessLicense', 'taxCertificate', 'identityCard', 'other'],
+      enum: [
+        'business-license',
+        'tax-certificate',
+        'legal-representative-id',
+        'business-plan',
+        'financial-statement',
+        'other',
+      ],
     },
     fileUrl: {
       type: String,

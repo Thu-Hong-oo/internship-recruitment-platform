@@ -23,6 +23,39 @@ const testConnection = async () => {
 // Configure multer for memory storage
 const storage = multer.memoryStorage();
 
+// Upload image function
+const uploadToCloudinary = async (file, options = {}) => {
+  try {
+    const defaultOptions = {
+      folder: 'internbridge/general',
+      resource_type: 'auto',
+      ...options,
+    };
+
+    // Upload buffer to Cloudinary
+    const result = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        defaultOptions,
+        (error, result) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(result);
+          }
+        }
+      );
+
+      // Write buffer to stream
+      uploadStream.end(file.buffer);
+    });
+
+    return result;
+  } catch (error) {
+    console.error('Error uploading to Cloudinary:', error);
+    throw error;
+  }
+};
+
 // Delete image function
 const deleteImage = async publicId => {
   try {
@@ -47,4 +80,5 @@ module.exports = {
   storage,
   deleteImage,
   testConnection,
+  uploadToCloudinary,
 };

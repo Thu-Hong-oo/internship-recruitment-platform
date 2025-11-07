@@ -1,5 +1,9 @@
 const { logger } = require('../../../shared/utils/logger');
 const JobPosting = require('../../../domain/recruitment/JobPosting');
+const ValidationService = require('../../../infrastructure/services/internal/ValidationService');
+const EmployerRepository = require('../../../infrastructure/repositories/EmployerRepository');
+const CompanyRepository = require('../../../infrastructure/repositories/CompanyRepository');
+const JobRepository = require('../../../infrastructure/repositories/JobRepository');
 
 /**
  * Use case for creating a new job post
@@ -7,21 +11,17 @@ const JobPosting = require('../../../domain/recruitment/JobPosting');
  */
 class CreateJobUseCase {
   /**
-   * @param {IJobRepository} jobRepository
-   * @param {IEmployerRepository} employerRepository
-   * @param {ICompanyRepository} companyRepository
-   * @param {ValidationService} validationService
+   * Constructor - create repositories directly to avoid DI issues
    */
-  constructor(
-    jobRepository,
-    employerRepository,
-    companyRepository,
-    validationService
-  ) {
-    this.jobRepository = jobRepository;
-    this.employerRepository = employerRepository;
-    this.companyRepository = companyRepository;
-    this.validationService = validationService;
+  constructor() {
+    this.jobRepository = new JobRepository();
+    this.employerRepository = new EmployerRepository();
+    this.companyRepository = new CompanyRepository();
+    this.validationService = new ValidationService();
+    console.log(
+      'CreateJobUseCase constructor - validationService:',
+      !!this.validationService
+    );
   }
 
   /**
@@ -45,13 +45,32 @@ class CreateJobUseCase {
 
       // Get employer's company
       const employer = await this.employerRepository.findById(employerId);
+      console.log('Employer found:', employer);
+      console.log('Employer companyId:', employer?.companyId);
       if (!employer || !employer.companyId) {
         throw new Error('Employer company not found');
       }
 
+      // Validate company verification status
+      if (!employer.company || employer.company.status !== 'active') {
+        throw new Error(
+          'Company must be verified and active before posting jobs. Please complete your company verification process.'
+        );
+      }
+
+      if (
+        employer.company.verification &&
+        !employer.company.verification.isVerified
+      ) {
+        throw new Error(
+          'Company verification is required before posting jobs. Please upload required documents and wait for approval.'
+        );
+      }
+
       // Create JobPosting Domain Entity (correct constructor params)
+      const jobId = `JOB_${Date.now()}_${employerId.toString().slice(-6)}`;
       const jobPosting = new JobPosting(
-        null, // id - will be assigned by repository
+        jobId,
         jobData.title,
         jobData.description,
         employer.companyId
@@ -60,11 +79,13 @@ class CreateJobUseCase {
       // Set required fields
       jobPosting.employerId = employerId;
       jobPosting.status = 'draft';
+      console.log('JobPosting status after set:', jobPosting.status);
       jobPosting.location = jobData.location;
       jobPosting.jobType = jobData.jobType;
 
       // Set salary range if provided (using business method)
       if (jobData.salaryMin && jobData.salaryMax) {
+        console.log('Setting salary, canBeEdited:', jobPosting.canBeEdited());
         jobPosting.setSalaryRange(
           jobData.salaryMin,
           jobData.salaryMax,

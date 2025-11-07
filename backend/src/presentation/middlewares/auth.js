@@ -25,6 +25,17 @@ const authenticateToken = async (req, res, next) => {
       'candidateProfile employerProfile'
     );
     console.log('User found:', !!user, user ? user.email : 'None');
+    console.log('User employerProfile:', user?.employerProfile);
+
+    // If employerProfile not populated, try to find it by userId
+    let employerId = user?.employerProfile?._id;
+    if (!employerId && user?.role === 'employer') {
+      const EmployerRepository = require('../../infrastructure/repositories/EmployerRepository');
+      const employerRepo = new EmployerRepository();
+      const employer = await employerRepo.findByUserId(user._id);
+      employerId = employer?.profileId;
+      console.log('Found employerId from repository:', employerId);
+    }
     if (!user) {
       console.log('User not found for ID:', decoded.id);
       return res.status(401).json({
@@ -49,7 +60,7 @@ const authenticateToken = async (req, res, next) => {
       role: user.role,
       status: user.status,
       candidateId: user.candidateProfile?._id,
-      employerId: user.employerProfile?._id,
+      employerId: employerId,
     };
 
     console.log('Authentication successful for:', user.email);

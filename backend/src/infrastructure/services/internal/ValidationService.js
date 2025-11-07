@@ -86,10 +86,15 @@ class ValidationService {
     // Employment type validation
     const validEmploymentTypes = [
       'full_time',
+      'FULL_TIME',
       'part_time',
+      'PART_TIME',
       'contract',
+      'CONTRACT',
       'internship',
+      'INTERNSHIP',
       'freelance',
+      'FREELANCE',
     ];
     if (
       !jobData.employmentType ||
@@ -101,11 +106,17 @@ class ValidationService {
     // Experience level validation
     const validExperienceLevels = [
       'entry',
+      'ENTRY',
       'junior',
+      'JUNIOR',
       'mid',
+      'MID',
       'senior',
+      'SENIOR',
       'lead',
+      'LEAD',
       'executive',
+      'EXECUTIVE',
     ];
     if (
       !jobData.experienceLevel ||
@@ -379,6 +390,86 @@ class ValidationService {
       }
     }
     return sanitized;
+  }
+
+  validateSkill(skillData) {
+    const errors = [];
+
+    // Name validation
+    if (!skillData.name || typeof skillData.name !== 'string') {
+      errors.push('Skill name is required and must be a string');
+    } else if (skillData.name.trim().length === 0) {
+      errors.push('Skill name cannot be empty');
+    } else if (skillData.name.length > 100) {
+      errors.push('Skill name cannot exceed 100 characters');
+    }
+
+    // Slug validation
+    if (!skillData.slug || typeof skillData.slug !== 'string') {
+      errors.push('Skill slug is required and must be a string');
+    } else if (skillData.slug.trim().length === 0) {
+      errors.push('Skill slug cannot be empty');
+    } else if (!/^[a-z0-9-]+$/.test(skillData.slug)) {
+      errors.push(
+        'Skill slug can only contain lowercase letters, numbers, and hyphens'
+      );
+    }
+
+    // Description validation (optional)
+    if (skillData.description && typeof skillData.description !== 'string') {
+      errors.push('Skill description must be a string');
+    } else if (skillData.description && skillData.description.length > 500) {
+      errors.push('Skill description cannot exceed 500 characters');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+    };
+  }
+
+  validateSkillUpdate(updateData) {
+    const errors = [];
+
+    // Name validation (optional for updates)
+    if (updateData.name !== undefined) {
+      if (typeof updateData.name !== 'string') {
+        errors.push('Skill name must be a string');
+      } else if (updateData.name.trim().length === 0) {
+        errors.push('Skill name cannot be empty');
+      } else if (updateData.name.length > 100) {
+        errors.push('Skill name cannot exceed 100 characters');
+      }
+    }
+
+    // Slug validation (optional for updates)
+    if (updateData.slug !== undefined) {
+      if (typeof updateData.slug !== 'string') {
+        errors.push('Skill slug must be a string');
+      } else if (updateData.slug.trim().length === 0) {
+        errors.push('Skill slug cannot be empty');
+      } else if (!/^[a-z0-9-]+$/.test(updateData.slug)) {
+        errors.push(
+          'Skill slug can only contain lowercase letters, numbers, and hyphens'
+        );
+      }
+    }
+
+    // Description validation (optional)
+    if (updateData.description !== undefined) {
+      if (typeof updateData.description !== 'string') {
+        errors.push('Skill description must be a string');
+      } else if (updateData.description.length > 500) {
+        errors.push('Skill description cannot exceed 500 characters');
+      }
+    }
+
+    // Other field validations can be added here as needed
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+    };
   }
 }
 

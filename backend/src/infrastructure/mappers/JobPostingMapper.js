@@ -32,12 +32,14 @@ class JobPostingMapper {
     jobPosting.closedAt = mongooseDoc.closedAt;
     jobPosting.expiresAt = mongooseDoc.expiresAt;
 
-    // Arrays and objects
-    jobPosting.requirements = mongooseDoc.requirements;
-    jobPosting.skills = mongooseDoc.skills;
+    // Arrays and objects - convert strings back to arrays
+    jobPosting.requirements = this._parseStringOrArray(
+      mongooseDoc.requirements
+    );
+    jobPosting.skills = mongooseDoc.skills || [];
     jobPosting.experience = mongooseDoc.experience;
     jobPosting.education = mongooseDoc.education;
-    jobPosting.benefits = mongooseDoc.benefits;
+    jobPosting.benefits = this._parseStringOrArray(mongooseDoc.benefits);
 
     // Counters
     jobPosting.applicationCount = mongooseDoc.applicationCount;
@@ -56,6 +58,7 @@ class JobPostingMapper {
    */
   static toMongoose(domainEntity) {
     const data = {
+      jobId: domainEntity.jobId,
       title: domainEntity.title,
       description: domainEntity.description,
       companyId: domainEntity.companyId,
@@ -84,9 +87,14 @@ class JobPostingMapper {
 
     // Optional arrays
     if (domainEntity.requirements)
-      data.requirements = domainEntity.requirements;
+      data.requirements = Array.isArray(domainEntity.requirements)
+        ? domainEntity.requirements.join('\n')
+        : domainEntity.requirements;
     if (domainEntity.skills) data.skills = domainEntity.skills;
-    if (domainEntity.benefits) data.benefits = domainEntity.benefits;
+    if (domainEntity.benefits)
+      data.benefits = Array.isArray(domainEntity.benefits)
+        ? domainEntity.benefits.join('\n')
+        : domainEntity.benefits;
 
     // Optional fields
     if (domainEntity.experience !== undefined)
@@ -99,6 +107,19 @@ class JobPostingMapper {
       data.viewCount = domainEntity.viewCount;
 
     return data;
+  }
+
+  /**
+   * Helper method to parse string or array
+   * Converts stored strings back to arrays for domain use
+   */
+  static _parseStringOrArray(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') {
+      return value.split('\n').filter(item => item.trim().length > 0);
+    }
+    return [];
   }
 }
 

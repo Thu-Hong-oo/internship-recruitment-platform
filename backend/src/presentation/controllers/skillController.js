@@ -202,7 +202,7 @@ const getSkillRecommendations = asyncHandler(async (req, res) => {
 // @access  Public
 const getSkillStats = asyncHandler(async (req, res) => {
   try {
-    const result = await SkillService.getSkillStats();
+    const result = await skillService.getSkillStats();
 
     res.status(200).json({
       success: true,
@@ -222,7 +222,7 @@ const getSkillStats = asyncHandler(async (req, res) => {
 // @access  Private (Admin)
 const createSkill = asyncHandler(async (req, res) => {
   try {
-    const result = await SkillService.createSkill(req.body);
+    const result = await skillService.createSkill(req.body);
 
     res.status(201).json({
       success: true,
@@ -231,7 +231,11 @@ const createSkill = asyncHandler(async (req, res) => {
     });
   } catch (error) {
     logger.error('Create skill error:', error);
-    res.status(400).json({
+
+    // Return 409 Conflict for duplicate name/slug, 400 for other validation errors
+    const statusCode = error.message.includes('already exists') ? 409 : 400;
+
+    res.status(statusCode).json({
       success: false,
       error: error.message,
     });
@@ -243,7 +247,7 @@ const createSkill = asyncHandler(async (req, res) => {
 // @access  Private (Admin)
 const updateSkill = asyncHandler(async (req, res) => {
   try {
-    const result = await SkillService.updateSkill(req.params.id, req.body);
+    const result = await skillService.updateSkill(req.params.id, req.body);
 
     res.status(200).json({
       success: true,
@@ -264,7 +268,7 @@ const updateSkill = asyncHandler(async (req, res) => {
 // @access  Private (Admin)
 const deleteSkill = asyncHandler(async (req, res) => {
   try {
-    const result = await SkillService.deleteSkill(req.params.id);
+    const result = await skillService.deleteSkill(req.params.id);
 
     res.status(200).json({
       success: true,

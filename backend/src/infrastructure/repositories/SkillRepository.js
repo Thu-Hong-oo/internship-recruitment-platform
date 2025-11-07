@@ -78,6 +78,36 @@ class SkillRepository extends ISkillRepository {
     return SkillMapper.toDomainArray(skillDocs);
   }
 
+  async find(query = {}, options = {}) {
+    const { skip = 0, limit, sort = {}, populate = [] } = options;
+    let mongooseQuery = SkillModel.find(query);
+
+    if (sort && Object.keys(sort).length > 0) {
+      mongooseQuery = mongooseQuery.sort(sort);
+    }
+
+    if (skip > 0) {
+      mongooseQuery = mongooseQuery.skip(skip);
+    }
+
+    if (limit && limit > 0) {
+      mongooseQuery = mongooseQuery.limit(limit);
+    }
+
+    if (populate && populate.length > 0) {
+      populate.forEach(pop => {
+        mongooseQuery = mongooseQuery.populate(pop);
+      });
+    }
+
+    const skillDocs = await mongooseQuery;
+    return skillDocs;
+  }
+
+  async count(query = {}) {
+    return await SkillModel.countDocuments(query);
+  }
+
   async findTrending() {
     const skillDocs = await SkillModel.find({
       trend: { $in: ['growing', 'emerging'] },

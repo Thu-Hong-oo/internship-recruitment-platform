@@ -1,8 +1,8 @@
 // src/domain/recruitment/JobStatus.js
 class JobStatus {
-  static DRAFT = 'DRAFT';
-  static PUBLISHED = 'PUBLISHED';
-  static CLOSED = 'CLOSED';
+  static DRAFT = 'draft';
+  static PUBLISHED = 'published';
+  static CLOSED = 'closed';
 
   static values() {
     return [this.DRAFT, this.PUBLISHED, this.CLOSED];

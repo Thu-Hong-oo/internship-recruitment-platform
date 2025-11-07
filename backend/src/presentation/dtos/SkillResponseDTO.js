@@ -4,7 +4,7 @@
  */
 class SkillResponseDTO {
   constructor(skillModel) {
-    this.id = skillModel._id;
+    this.id = skillModel.slug;
     this.name = skillModel.name;
     this.slug = skillModel.slug;
     this.description = skillModel.description;

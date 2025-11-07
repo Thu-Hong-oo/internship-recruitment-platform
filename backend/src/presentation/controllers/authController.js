@@ -89,7 +89,8 @@ const transformUserToResponse = user => {
 // @route   POST /api/auth/register
 // @access  Public
 const register = asyncHandler(async (req, res) => {
-  const { email, password, fullName, role } = req.body;
+  const { email, password, firstName, lastName, role } = req.body;
+  const fullName = `${firstName} ${lastName}`.trim();
   const otpService = getOTPService();
 
   if (!otpService) {

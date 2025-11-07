@@ -289,6 +289,38 @@ const getSystemReports = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    Verify employer document
+// @route   PUT /api/admin/employers/:employerId/documents/:documentId/verify
+// @access  Private (Admin)
+const verifyEmployerDocument = asyncHandler(async (req, res) => {
+  try {
+    const verifyEmployerDocumentUseCase = req.container.resolve(
+      'verifyEmployerDocumentUseCase'
+    );
+
+    const result = await verifyEmployerDocumentUseCase.execute({
+      documentId: req.params.documentId,
+      adminId: req.user.id,
+      status: req.body.status,
+      rejectionReason: req.body.rejectionReason,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Document ${
+        req.body.status === 'approved' ? 'approved' : 'rejected'
+      } successfully`,
+      data: result.document,
+    });
+  } catch (error) {
+    logger.error('Verify employer document error:', error);
+    res.status(400).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 module.exports = {
   getSystemDashboard,
   getAllUsers,
@@ -304,4 +336,5 @@ module.exports = {
   updateSystemSettings,
   sendSystemNotification,
   getSystemReports,
+  verifyEmployerDocument,
 };

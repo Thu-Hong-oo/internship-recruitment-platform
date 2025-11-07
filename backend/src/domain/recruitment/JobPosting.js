@@ -219,6 +219,14 @@ class JobPosting {
   }
 
   canBeEdited() {
+    console.log(
+      'canBeEdited - status:',
+      this.status,
+      'JobStatus.DRAFT:',
+      JobStatus.DRAFT,
+      'JobStatus.PUBLISHED:',
+      JobStatus.PUBLISHED
+    );
     return (
       this.status === JobStatus.DRAFT || this.status === JobStatus.PUBLISHED
     );

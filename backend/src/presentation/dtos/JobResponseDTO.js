@@ -5,39 +5,51 @@
  */
 
 class JobResponseDTO {
-  constructor(jobPostModel) {
-    this.id = jobPostModel._id;
-    this.jobId = jobPostModel.jobId;
-    this.title = jobPostModel.title;
-    this.description = jobPostModel.description;
-    this.companyId = jobPostModel.companyId;
-    this.employmentType = jobPostModel.employmentType;
-    this.status = jobPostModel.status;
-    this.workFormat = jobPostModel.workFormat;
-    this.location = jobPostModel.location;
-    this.salaryMin = jobPostModel.salaryMin;
-    this.salaryMax = jobPostModel.salaryMax;
-    this.currency = jobPostModel.currency || 'VND';
-    this.experienceLevel = jobPostModel.experienceLevel;
-    this.requiredEducation = jobPostModel.requiredEducation;
-    this.skills = jobPostModel.skills || [];
-    this.requirements = jobPostModel.requirements;
-    this.responsibilities = jobPostModel.responsibilities;
-    this.benefits = jobPostModel.benefits;
-    this.applicationDeadline = jobPostModel.applicationDeadline;
-    this.expiresAt = jobPostModel.expiresAt;
-    this.viewsCount = jobPostModel.viewsCount || 0;
-    this.applicationsCount = jobPostModel.applicationsCount || 0;
-    this.metadata = jobPostModel.metadata || {};
-    this.createdAt = jobPostModel.createdAt;
-    this.updatedAt = jobPostModel.updatedAt;
+  constructor(jobEntity) {
+    // Handle both domain entities and mongoose models
+    const isDomainEntity = jobEntity.constructor.name === 'JobPosting';
+
+    this.id = isDomainEntity ? jobEntity.jobId : jobEntity._id;
+    this.jobId = jobEntity.jobId;
+    this.title = jobEntity.title;
+    this.description = jobEntity.description;
+    this.companyId = jobEntity.companyId;
+    this.employmentType = jobEntity.employmentType;
+    this.status = jobEntity.status;
+    this.workFormat = jobEntity.workFormat;
+    this.location = jobEntity.location;
+    this.salaryMin = jobEntity.salaryMin;
+    this.salaryMax = jobEntity.salaryMax;
+    this.currency = jobEntity.salaryCurrency || jobEntity.currency || 'VND';
+    this.experienceLevel = jobEntity.experienceLevel || jobEntity.experience;
+    this.requiredEducation = jobEntity.requiredEducation || jobEntity.education;
+    this.skills = jobEntity.skills || [];
+    this.requirements = jobEntity.requirements;
+    this.responsibilities = jobEntity.responsibilities;
+    this.benefits = jobEntity.benefits;
+    this.applicationDeadline = jobEntity.applicationDeadline;
+    this.expiresAt = jobEntity.expiresAt;
+    this.viewsCount = jobEntity.viewCount || jobEntity.viewsCount || 0;
+    this.applicationsCount =
+      jobEntity.applicationCount || jobEntity.applicationsCount || 0;
+    this.metadata = jobEntity.metadata || {};
+    this.createdAt = jobEntity.createdAt;
+    this.updatedAt = jobEntity.updatedAt;
 
     // Computed fields
     this.isActive =
-      jobPostModel.status === 'ACTIVE' || jobPostModel.status === 'active';
-    this.canApply = jobPostModel.canApply();
-    this.isExpired = jobPostModel.isExpired();
-    this.hasSalaryRange = jobPostModel.hasSalaryRange();
+      jobEntity.status === 'published' || jobEntity.status === 'PUBLISHED';
+    this.canApply = isDomainEntity
+      ? jobEntity.isPublished() && !jobEntity.isExpired()
+      : (jobEntity.status === 'published' ||
+          jobEntity.status === 'PUBLISHED') &&
+        (!jobEntity.expiresAt || jobEntity.expiresAt > new Date());
+    this.isExpired = isDomainEntity
+      ? jobEntity.isExpired()
+      : jobEntity.expiresAt && jobEntity.expiresAt <= new Date();
+    this.hasSalaryRange = isDomainEntity
+      ? jobEntity.salaryMin !== null && jobEntity.salaryMax !== null
+      : jobEntity.salaryMin !== null && jobEntity.salaryMax !== null;
   }
 
   /**

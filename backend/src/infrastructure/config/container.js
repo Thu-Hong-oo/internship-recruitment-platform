@@ -136,6 +136,7 @@ const GetSystemSettingsUseCase = require('../../application/admin/use-cases/GetS
 const UpdateSystemSettingsUseCase = require('../../application/admin/use-cases/UpdateSystemSettingsUseCase');
 const SendSystemNotificationUseCase = require('../../application/admin/use-cases/SendSystemNotificationUseCase');
 const GetSystemReportsUseCase = require('../../application/admin/use-cases/GetSystemReportsUseCase');
+const VerifyEmployerDocumentUseCase = require('../../application/admin/use-cases/VerifyEmployerDocumentUseCase');
 
 // Create container
 const container = createContainer();
@@ -380,7 +381,7 @@ container.register({
   getCandidateApplicationsUseCase: asClass(GetCandidateApplicationsUseCase),
 
   // Job Use Cases
-  createJobUseCase: asClass(CreateJobUseCase),
+  createJobUseCase: asClass(CreateJobUseCase).singleton(),
   getJobUseCase: asClass(GetJobUseCase),
   getAllJobsUseCase: asClass(GetAllJobsUseCase),
   updateJobUseCase: asClass(UpdateJobUseCase),
@@ -401,6 +402,7 @@ container.register({
   updateSystemSettingsUseCase: asClass(UpdateSystemSettingsUseCase),
   sendSystemNotificationUseCase: asClass(SendSystemNotificationUseCase),
   getSystemReportsUseCase: asClass(GetSystemReportsUseCase),
+  verifyEmployerDocumentUseCase: asClass(VerifyEmployerDocumentUseCase),
 
   // Configuration values
   databaseConfig: asValue(databaseConfig),

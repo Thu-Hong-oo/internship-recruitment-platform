@@ -6,6 +6,11 @@ const {
 } = require('../../shared/utils/errors');
 const { logger } = require('../../shared/utils/logger');
 const { uploadToCloudinary } = require('../../shared/utils/cloudinary');
+const {
+  successResponse,
+  errorResponse,
+  dataResponse,
+} = require('../../shared/utils/response');
 const EmployerDocument = require('../../infrastructure/models/EmployerDocument');
 
 /**
@@ -15,12 +20,16 @@ const EmployerDocument = require('../../infrastructure/models/EmployerDocument')
  */
 const uploadDocument = asyncHandler(async (req, res) => {
   try {
+    console.log('req.file:', req.file);
+    console.log('req.body:', req.body);
+    console.log('req.files:', req.files);
+
     // Check if file is uploaded
-    if (!req.files || !req.files.document) {
+    if (!req.file) {
       throw new BadRequestError('Vui lòng chọn file để upload');
     }
 
-    const file = req.files.document;
+    const file = req.file;
 
     // Validate file type
     const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
@@ -42,15 +51,48 @@ const uploadDocument = asyncHandler(async (req, res) => {
       resource_type: 'auto',
     });
 
-    return res.status(200).json({
-      success: true,
-      message: 'Upload tài liệu thành công',
-      data: {
-        fileUrl: result.secure_url,
-        fileName: file.name,
-        fileSize: file.size,
-        mimeType: file.mimetype,
-      },
+    // Validate documentType
+    const documentType = req.body.documentType;
+    if (!documentType || typeof documentType !== 'string') {
+      throw new BadRequestError('Loại tài liệu không hợp lệ');
+    }
+
+    // Validate documentType enum
+    const validTypes = [
+      'business-license',
+      'tax-certificate',
+      'legal-representative-id',
+      'business-plan',
+      'financial-statement',
+      'other',
+    ];
+    if (!validTypes.includes(documentType)) {
+      throw new BadRequestError(
+        `Loại tài liệu không hợp lệ. Các loại hợp lệ: ${validTypes.join(', ')}`
+      );
+    }
+
+    // Save document info to database
+    const document = new EmployerDocument({
+      employerId: req.user.id,
+      documentType: documentType,
+      fileUrl: result.secure_url,
+      fileName: file.originalname || file.name,
+      mimeType: file.mimetype,
+      fileSize: file.size,
+      status: 'pending', // Default status
+    });
+
+    await document.save();
+
+    return successResponse(res, 'Upload tài liệu thành công', {
+      id: document._id,
+      fileUrl: result.secure_url,
+      fileName: file.originalname || file.name,
+      fileSize: file.size,
+      mimeType: file.mimetype,
+      documentType: document.documentType,
+      status: document.status,
     });
   } catch (error) {
     logger.error('Upload document error:', error);
@@ -72,16 +114,10 @@ const getDocuments = asyncHandler(async (req, res) => {
       userId: req.user.id,
     });
 
-    res.status(200).json({
-      success: true,
-      data: result.data,
-    });
+    return dataResponse(res, result.data);
   } catch (error) {
     logger.error('Get documents error:', error);
-    res.status(400).json({
-      success: false,
-      error: 'Lấy danh sách tài liệu thất bại',
-    });
+    return errorResponse(res, 'Lấy danh sách tài liệu thất bại', 400);
   }
 });
 
@@ -100,16 +136,10 @@ const deleteDocument = asyncHandler(async (req, res) => {
       documentType: req.params.documentType,
     });
 
-    res.status(200).json({
-      success: true,
-      message: 'Xóa tài liệu thành công',
-    });
+    return successResponse(res, 'Xóa tài liệu thành công');
   } catch (error) {
     logger.error('Delete document error:', error);
-    res.status(400).json({
-      success: false,
-      error: 'Xóa tài liệu thất bại',
-    });
+    return errorResponse(res, 'Xóa tài liệu thất bại', 400);
   }
 });
 
@@ -129,17 +159,14 @@ const getDocumentById = asyncHandler(async (req, res) => {
       throw new NotFoundError('Không tìm thấy tài liệu');
     }
 
-    res.status(200).json({
-      success: true,
-      data: {
-        id: document._id,
-        fileUrl: document.fileUrl,
-        fileName: document.fileName,
-        fileSize: document.fileSize,
-        mimeType: document.mimeType,
-        createdAt: document.createdAt,
-        updatedAt: document.updatedAt,
-      },
+    return successResponse(res, 'Lấy thông tin tài liệu thành công', {
+      id: document._id,
+      fileUrl: document.fileUrl,
+      fileName: document.fileName,
+      fileSize: document.fileSize,
+      mimeType: document.mimeType,
+      createdAt: document.createdAt,
+      updatedAt: document.updatedAt,
     });
   } catch (error) {
     logger.error('Get document by id error:', error);
@@ -158,11 +185,11 @@ const getDocumentById = asyncHandler(async (req, res) => {
 const updateDocument = asyncHandler(async (req, res) => {
   try {
     // Check if file is uploaded
-    if (!req.files || !req.files.document) {
+    if (!req.file) {
       throw new BadRequestError('Vui lòng chọn file để cập nhật');
     }
 
-    const file = req.files.document;
+    const file = req.file;
 
     // Validate file type
     const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
@@ -201,18 +228,14 @@ const updateDocument = asyncHandler(async (req, res) => {
     document.mimeType = file.mimetype;
     await document.save();
 
-    res.status(200).json({
-      success: true,
-      message: 'Cập nhật tài liệu thành công',
-      data: {
-        id: document._id,
-        fileUrl: document.fileUrl,
-        fileName: document.fileName,
-        fileSize: document.fileSize,
-        mimeType: document.mimeType,
-        createdAt: document.createdAt,
-        updatedAt: document.updatedAt,
-      },
+    return successResponse(res, 'Cập nhật tài liệu thành công', {
+      id: document._id,
+      fileUrl: document.fileUrl,
+      fileName: document.fileName,
+      fileSize: document.fileSize,
+      mimeType: document.mimeType,
+      createdAt: document.createdAt,
+      updatedAt: document.updatedAt,
     });
   } catch (error) {
     logger.error('Update document error:', error);
@@ -255,22 +278,18 @@ const updateDocumentMetadata = asyncHandler(async (req, res) => {
 
     await document.save();
 
-    res.status(200).json({
-      success: true,
-      message: 'Cập nhật thông tin tài liệu thành công',
-      data: {
-        id: document._id,
-        fileUrl: document.fileUrl,
-        fileName: document.fileName,
-        fileSize: document.fileSize,
-        mimeType: document.mimeType,
-        title: document.title,
-        description: document.description,
-        documentType: document.documentType,
-        tags: document.tags,
-        createdAt: document.createdAt,
-        updatedAt: document.updatedAt,
-      },
+    return successResponse(res, 'Cập nhật thông tin tài liệu thành công', {
+      id: document._id,
+      fileUrl: document.fileUrl,
+      fileName: document.fileName,
+      fileSize: document.fileSize,
+      mimeType: document.mimeType,
+      title: document.title,
+      description: document.description,
+      documentType: document.documentType,
+      tags: document.tags,
+      createdAt: document.createdAt,
+      updatedAt: document.updatedAt,
     });
   } catch (error) {
     logger.error('Update document metadata error:', error);
@@ -321,22 +340,18 @@ const verifyDocument = asyncHandler(async (req, res) => {
 
     await document.save();
 
-    res.status(200).json({
-      success: true,
-      message: 'Cập nhật trạng thái xác thực thành công',
-      data: {
-        id: document._id,
-        fileUrl: document.fileUrl,
-        fileName: document.fileName,
-        fileSize: document.fileSize,
-        mimeType: document.mimeType,
-        verificationStatus: document.verificationStatus,
-        verificationNotes: document.verificationNotes,
-        verifiedAt: document.verifiedAt,
-        verifiedBy: document.verifiedBy,
-        createdAt: document.createdAt,
-        updatedAt: document.updatedAt,
-      },
+    return successResponse(res, 'Cập nhật trạng thái xác thực thành công', {
+      id: document._id,
+      fileUrl: document.fileUrl,
+      fileName: document.fileName,
+      fileSize: document.fileSize,
+      mimeType: document.mimeType,
+      verificationStatus: document.verificationStatus,
+      verificationNotes: document.verificationNotes,
+      verifiedAt: document.verifiedAt,
+      verifiedBy: document.verifiedBy,
+      createdAt: document.createdAt,
+      updatedAt: document.updatedAt,
     });
   } catch (error) {
     logger.error('Verify document error:', error);

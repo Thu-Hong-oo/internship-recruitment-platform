@@ -12,6 +12,9 @@ class EmployerRepository extends IEmployerRepository {
     const employerDoc = await EmployerProfileModel.findById(id).populate(
       'company'
     );
+    console.log('EmployerRepository.findById - id:', id);
+    console.log('EmployerRepository.findById - employerDoc:', employerDoc);
+    console.log('EmployerRepository.findById - company:', employerDoc?.company);
     return employerDoc ? EmployerProfileMapper.toDomain(employerDoc) : null;
   }
 

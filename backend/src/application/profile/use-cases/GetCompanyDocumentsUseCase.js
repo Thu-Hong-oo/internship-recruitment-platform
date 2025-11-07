@@ -3,6 +3,7 @@ const {
   getVerificationProgress,
   getDocumentTypesForIndustry,
 } = require('../../../infrastructure/config/documentTypes');
+const EmployerDocument = require('../../../infrastructure/models/EmployerDocument');
 
 /**
  * Get Company Documents Use Case
@@ -23,19 +24,19 @@ class GetCompanyDocumentsUseCase {
       }
 
       // 2. Get company
-      const company = await this.companyRepository.findById(
-        employer.company.toString()
-      );
+      const company = await this.companyRepository.findById(employer.companyId);
       if (!company) {
         throw new Error('COMPANY_NOT_FOUND');
       }
 
-      // 3. Get uploaded documents
-      const uploadedDocuments = company.verification?.documents || [];
+      // 3. Get uploaded documents from EmployerDocument collection
+      const uploadedDocuments = await EmployerDocument.find({
+        employerId: userId,
+      }).sort({ createdAt: -1 });
 
       // 4. Calculate verification progress
       const progress = getVerificationProgress(
-        uploadedDocuments,
+        uploadedDocuments.map(doc => doc.documentType),
         company.industry
       );
 
@@ -52,7 +53,7 @@ class GetCompanyDocumentsUseCase {
             name: doc.name,
             nameEn: doc.nameEn,
             description: doc.description,
-            uploaded: uploadedDocuments.some(d => d.type === doc.id),
+            uploaded: uploadedDocuments.some(d => d.documentType === doc.id),
           })),
           optionalDocuments: documentTypes.optional.map(doc => ({
             id: doc.id,

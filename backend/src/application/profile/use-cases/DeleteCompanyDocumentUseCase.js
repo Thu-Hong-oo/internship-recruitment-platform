@@ -31,9 +31,7 @@ class DeleteCompanyDocumentUseCase {
       }
 
       // 2. Get company
-      const company = await this.companyRepository.findById(
-        employer.company.toString()
-      );
+      const company = await this.companyRepository.findById(employer.companyId);
       if (!company) {
         throw new Error('COMPANY_NOT_FOUND');
       }

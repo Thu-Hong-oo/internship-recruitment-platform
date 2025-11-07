@@ -16,6 +16,7 @@ const {
   updateSystemSettings,
   sendSystemNotification,
   getSystemReports,
+  verifyEmployerDocument,
 } = require('../controllers/adminController');
 
 // Apply authentication and admin authorization to all routes
@@ -48,5 +49,10 @@ router.route('/settings').get(getSystemSettings).patch(updateSystemSettings); //
 router.route('/notifications').post(sendSystemNotification);
 
 router.route('/reports').get(getSystemReports);
+
+// Document verification routes
+router
+  .route('/employers/:employerId/documents/:documentId/verify')
+  .put(verifyEmployerDocument);
 
 module.exports = router;
