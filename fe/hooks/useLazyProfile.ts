@@ -9,7 +9,7 @@ import {
   ApiResponse,
 } from "@/lib/api";
 
-// Cache để lưu trữ dữ liệu đã tải
+// Cache để lưu trữ dữ liệu đã tải khi nhảy qua lại các tab không phải gọi api lại
 const dataCache = {
   profile: null as ProfileData | null,
   education: null as EducationResponse | null,

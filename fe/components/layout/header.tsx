@@ -207,7 +207,7 @@ export default function Header() {
                             </span>
                           </Link>
                           <Link
-                            href="/saved-jobs"
+                            href="/jobs/saved-jobs"
                             className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
                           >
                             <Bookmark className="w-4 h-4 mr-3" />
@@ -368,12 +368,6 @@ export default function Header() {
               )}
             </div>
 
-            <Link
-              href="/test"
-              className="text-foreground hover:text-primary transition-colors duration-200"
-            >
-              Test Navigation
-            </Link>
             <a
               href="#"
               className="text-foreground hover:text-primary transition-colors duration-200"
