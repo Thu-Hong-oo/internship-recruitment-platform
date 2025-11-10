@@ -1,0 +1,1239 @@
+{
+  "info": {
+    "name": "Candidate API - Complete Collection",
+    "description": "Comprehensive Postman collection for all Candidate endpoints based on new controller and routes structure",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Profile Management",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me"]
+            }
+          }
+        },
+        {
+          "name": "Update My Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"personalInfo\": {\n    \"fullName\": \"Nguyen Van A\",\n    \"phone\": \"0123456789\",\n    \"dateOfBirth\": \"1998-05-15\",\n    \"gender\": \"male\",\n    \"address\": {\n      \"street\": \"123 Nguyen Hue\",\n      \"ward\": \"Ben Nghe\",\n      \"district\": \"District 1\",\n      \"city\": \"Ho Chi Minh City\",\n      \"country\": \"Vietnam\"\n    },\n    \"bio\": \"Passionate software engineering student with focus on web development\"\n  },\n  \"education\": {\n    \"university\": {\n      \"name\": \"Ho Chi Minh University of Technology\",\n      \"major\": \"Computer Science\",\n      \"degree\": \"Bachelor\",\n      \"graduationYear\": 2024,\n      \"gpa\": 8.5\n    }\n  },\n  \"preferences\": {\n    \"locations\": [\"Ho Chi Minh City\", \"Ha Noi\"],\n    \"internshipTypes\": [\"full-time\", \"remote\"],\n    \"industries\": [\"Technology\", \"Fintech\"],\n    \"minSalary\": 5000000\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me"]
+            }
+          }
+        },
+        {
+          "name": "Delete My Profile",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me"]
+            }
+          }
+        },
+        {
+          "name": "Upload Avatar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "avatar",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/avatar",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "avatar"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Education Management",
+      "item": [
+        {
+          "name": "Add Education",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"university\",\n  \"institution\": \"Ho Chi Minh University of Technology\",\n  \"degree\": \"Bachelor of Computer Science\",\n  \"field\": \"Software Engineering\",\n  \"startDate\": \"2020-09-01\",\n  \"endDate\": \"2024-06-30\",\n  \"gpa\": 8.5,\n  \"achievements\": [\"Dean's List\", \"Outstanding Student Award\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/education",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "education"]
+            }
+          }
+        },
+        {
+          "name": "Update Education",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gpa\": 9.0,\n  \"achievements\": [\"Dean's List\", \"Outstanding Student Award\", \"Best Thesis Award\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/education/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "education", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Education",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/education/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "education", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Experience Management",
+      "item": [
+        {
+          "name": "Add Experience",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"internship\",\n  \"title\": \"Frontend Developer Intern\",\n  \"company\": \"Tech Startup ABC\",\n  \"description\": \"Developed responsive web applications using React and TypeScript\",\n  \"startDate\": \"2023-06-01\",\n  \"endDate\": \"2023-08-31\",\n  \"skills\": [\"React\", \"TypeScript\", \"CSS\"],\n  \"projects\": [\n    {\n      \"name\": \"E-commerce Dashboard\",\n      \"description\": \"Built admin dashboard for e-commerce platform\",\n      \"technologies\": [\"React\", \"Chart.js\", \"Material-UI\"]\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/experience",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "experience"]
+            }
+          }
+        },
+        {
+          "name": "Update Experience",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Developed responsive web applications using React, TypeScript and implemented CI/CD pipelines\",\n  \"skills\": [\"React\", \"TypeScript\", \"CSS\", \"Docker\", \"Jenkins\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/experience/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "experience", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Experience",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/experience/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "experience", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Skills Management",
+      "item": [
+        {
+          "name": "Add Technical Skill",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"technical\",\n  \"name\": \"React\",\n  \"level\": \"intermediate\",\n  \"projects\": [\n    {\n      \"name\": \"E-commerce Website\",\n      \"description\": \"Built with React and Redux\",\n      \"url\": \"https://github.com/user/ecommerce\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/skills",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "skills"]
+            }
+          }
+        },
+        {
+          "name": "Add Soft Skill",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"soft\",\n  \"name\": \"Communication\",\n  \"level\": \"advanced\",\n  \"selfAssessment\": 8\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/skills",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "skills"]
+            }
+          }
+        },
+        {
+          "name": "Add Language Skill",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"language\",\n  \"name\": \"English\",\n  \"level\": \"advanced\",\n  \"certificate\": \"IELTS 7.5\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/skills",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "skills"]
+            }
+          }
+        },
+        {
+          "name": "Update Skill",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"level\": \"advanced\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/skills/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "skills", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Skill",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/skills/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "skills", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Projects Management",
+      "item": [
+        {
+          "name": "Add Project",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Task Management App\",\n  \"description\": \"A full-stack web application for managing tasks and projects with real-time collaboration features\",\n  \"role\": \"Full-stack Developer\",\n  \"technologies\": [\"React\", \"Node.js\", \"MongoDB\", \"Socket.io\"],\n  \"url\": \"https://github.com/user/task-manager\",\n  \"startDate\": \"2023-01-15\",\n  \"endDate\": \"2023-03-30\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/projects",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "projects"]
+            }
+          }
+        },
+        {
+          "name": "Update Project",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"A full-stack web application for managing tasks and projects with real-time collaboration features and AI-powered task suggestions\",\n  \"technologies\": [\"React\", \"Node.js\", \"MongoDB\", \"Socket.io\", \"OpenAI API\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/projects/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "projects", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Project",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/projects/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "projects", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Certifications Management",
+      "item": [
+        {
+          "name": "Add Certification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"AWS Certified Developer\",\n  \"issuer\": \"Amazon Web Services\",\n  \"issueDate\": \"2023-05-15\",\n  \"expiryDate\": \"2026-05-15\",\n  \"credentialUrl\": \"https://aws.amazon.com/verification/12345\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/certifications",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "certifications"]
+            }
+          }
+        },
+        {
+          "name": "Update Certification",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credentialUrl\": \"https://aws.amazon.com/verification/updated-12345\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/certifications/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "certifications", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Certification",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/certifications/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "certifications", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Resume Management",
+      "item": [
+        {
+          "name": "Upload Resume",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "resume",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/resume/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "resume", "upload"]
+            }
+          }
+        },
+        {
+          "name": "Get Resume Info",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/resume",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "resume"]
+            }
+          }
+        },
+        {
+          "name": "Download Resume",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/resume/download",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "resume", "download"]
+            }
+          }
+        },
+        {
+          "name": "Delete Resume",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/resume",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "resume"]
+            }
+          }
+        },
+        {
+          "name": "Parse Resume with AI",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/resume/parse",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "resume", "parse"]
+            }
+          }
+        },
+        {
+          "name": "Get Resume Versions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/resume/versions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "resume", "versions"]
+            }
+          }
+        },
+        {
+          "name": "Generate Resume with AI",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"template\": \"modern\",\n  \"targetJob\": \"Frontend Developer\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/resume/generate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "resume", "generate"]
+            }
+          }
+        },
+        {
+          "name": "Get Resume Preview",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/resume/preview",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "resume", "preview"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Career Goals & Preferences",
+      "item": [
+        {
+          "name": "Update Career Goals",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"careerGoals\": \"Become a senior full-stack developer specializing in React and Node.js, with expertise in cloud technologies\",\n  \"targetRoles\": [\"Frontend Developer\", \"Full-stack Developer\", \"React Developer\"],\n  \"desiredIndustries\": [\"Technology\", \"Fintech\", \"E-commerce\"],\n  \"salaryExpectations\": {\n    \"min\": 8000000,\n    \"max\": 15000000\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/career-goals",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "career-goals"]
+            }
+          }
+        },
+        {
+          "name": "Update Job Preferences",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"locations\": [\"Ho Chi Minh City\", \"Ha Noi\", \"Da Nang\"],\n  \"internshipTypes\": [\"full-time\", \"remote\", \"hybrid\"],\n  \"industries\": [\"Technology\", \"Fintech\", \"Healthcare\"],\n  \"minSalary\": 7000000,\n  \"availableFrom\": \"2024-01-15\",\n  \"duration\": {\n    \"min\": 3,\n    \"max\": 6,\n    \"unit\": \"months\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/me/preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "me", "preferences"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Job Search & Applications",
+      "item": [
+        {
+          "name": "Search Jobs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/jobs/search?keyword=frontend&location=Ho Chi Minh City&industry=Technology&skills=react,javascript&jobType=Intern&salaryMin=5000000&salaryMax=10000000&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "jobs", "search"],
+              "query": [
+                {
+                  "key": "keyword",
+                  "value": "frontend"
+                },
+                {
+                  "key": "location",
+                  "value": "Ho Chi Minh City"
+                },
+                {
+                  "key": "industry",
+                  "value": "Technology"
+                },
+                {
+                  "key": "skills",
+                  "value": "react,javascript"
+                },
+                {
+                  "key": "jobType",
+                  "value": "Intern"
+                },
+                {
+                  "key": "salaryMin",
+                  "value": "5000000"
+                },
+                {
+                  "key": "salaryMax",
+                  "value": "10000000"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Job Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/jobs/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "jobs", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Apply for Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"coverLetter\": \"Dear Hiring Manager,\\n\\nI am writing to express my strong interest in the Frontend Developer Intern position at your company. With my experience in React and JavaScript, I believe I would be a great fit for this role.\\n\\nThank you for considering my application.\\n\\nBest regards,\\nNguyen Van A\",\n  \"resumeVersion\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/jobs/:id/apply",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "jobs", ":id", "apply"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get My Applications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/applications?status=pending&page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "applications"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Application Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/applications/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "applications", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Withdraw Application",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/applications/:id/withdraw",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "applications", ":id", "withdraw"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Application Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/applications/:id/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "applications", ":id", "status"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Saved Jobs",
+      "item": [
+        {
+          "name": "Save Job",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/saved-jobs/:jobId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "saved-jobs", ":jobId"],
+              "variable": [
+                {
+                  "key": "jobId",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Saved Jobs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/saved-jobs?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "saved-jobs"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Remove Saved Job",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/saved-jobs/:jobId",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "saved-jobs", ":jobId"],
+              "variable": [
+                {
+                  "key": "jobId",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Company Follow",
+      "item": [
+        {
+          "name": "Follow Company",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/companies/:companyId/follow",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "candidates",
+                "companies",
+                ":companyId",
+                "follow"
+              ],
+              "variable": [
+                {
+                  "key": "companyId",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Unfollow Company",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/companies/:companyId/unfollow",
+              "host": ["{{baseUrl}}"],
+              "path": [
+                "api",
+                "candidates",
+                "companies",
+                ":companyId",
+                "unfollow"
+              ],
+              "variable": [
+                {
+                  "key": "companyId",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Followed Companies",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/candidates/companies/following?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "candidates", "companies", "following"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

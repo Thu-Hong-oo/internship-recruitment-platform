@@ -36,6 +36,7 @@ const LearningRoadmapRepository = require('../repositories/LearningRoadmapReposi
 const RoadmapRepository = require('../repositories/RoadmapRepository');
 const PlanRepository = require('../repositories/PlanRepository');
 const SubscriptionRepository = require('../repositories/SubscriptionRepository');
+const AdminRepository = require('../repositories/AdminRepository');
 
 // Import external services (already singleton instances) - organized by category
 const UnifiedUploadService = require('../services/external/core/UnifiedUploadService');
@@ -137,6 +138,14 @@ const UpdateSystemSettingsUseCase = require('../../application/admin/use-cases/U
 const SendSystemNotificationUseCase = require('../../application/admin/use-cases/SendSystemNotificationUseCase');
 const GetSystemReportsUseCase = require('../../application/admin/use-cases/GetSystemReportsUseCase');
 const VerifyEmployerDocumentUseCase = require('../../application/admin/use-cases/VerifyEmployerDocumentUseCase');
+const GetCompanyByIdUseCase = require('../../application/admin/use-cases/GetCompanyByIdUseCase');
+const GetAllCompaniesUseCase = require('../../application/admin/use-cases/GetAllCompaniesUseCase');
+const GetAllEmployersUseCase = require('../../application/admin/use-cases/GetAllEmployersUseCase');
+const GetEmployerByIdUseCase = require('../../application/admin/use-cases/GetEmployerByIdUseCase');
+const UpdateEmployerStatusUseCase = require('../../application/admin/use-cases/UpdateEmployerStatusUseCase');
+const GetAllCandidatesUseCase = require('../../application/admin/use-cases/GetAllCandidatesUseCase');
+const GetCandidateByIdUseCase = require('../../application/admin/use-cases/GetCandidateByIdUseCase');
+const UpdateCandidateStatusUseCase = require('../../application/admin/use-cases/UpdateCandidateStatusUseCase');
 
 // Create container
 const container = createContainer();
@@ -188,6 +197,9 @@ container.register({
     lifetime: Lifetime.SINGLETON,
   }),
   subscriptionRepository: asClass(SubscriptionRepository, {
+    lifetime: Lifetime.SINGLETON,
+  }),
+  adminRepository: asClass(AdminRepository, {
     lifetime: Lifetime.SINGLETON,
   }),
 
@@ -389,7 +401,9 @@ container.register({
 
   // Admin Use Cases
   getSystemDashboardUseCase: asClass(GetSystemDashboardUseCase),
-  getAllUsersUseCase: asClass(GetAllUsersUseCase),
+  getAllUsersUseCase: asClass(GetAllUsersUseCase, {
+    injectionMode: InjectionMode.CLASSIC,
+  }),
   getUserByIdUseCase: asClass(GetUserByIdUseCase),
   updateUserStatusUseCase: asClass(UpdateUserStatusUseCase),
   deleteUserUseCase: asClass(DeleteUserUseCase),
@@ -403,6 +417,14 @@ container.register({
   sendSystemNotificationUseCase: asClass(SendSystemNotificationUseCase),
   getSystemReportsUseCase: asClass(GetSystemReportsUseCase),
   verifyEmployerDocumentUseCase: asClass(VerifyEmployerDocumentUseCase),
+  getCompanyByIdUseCase: asClass(GetCompanyByIdUseCase),
+  getAllCompaniesUseCase: asClass(GetAllCompaniesUseCase),
+  getAllEmployersUseCase: asClass(GetAllEmployersUseCase),
+  getEmployerByIdUseCase: asClass(GetEmployerByIdUseCase),
+  updateEmployerStatusUseCase: asClass(UpdateEmployerStatusUseCase),
+  getAllCandidatesUseCase: asClass(GetAllCandidatesUseCase),
+  getCandidateByIdUseCase: asClass(GetCandidateByIdUseCase),
+  updateCandidateStatusUseCase: asClass(UpdateCandidateStatusUseCase),
 
   // Configuration values
   databaseConfig: asValue(databaseConfig),

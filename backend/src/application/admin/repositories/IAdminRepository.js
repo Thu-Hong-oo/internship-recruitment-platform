@@ -83,6 +83,62 @@ class IAdminRepository {
   async getRecentActivities(limit) {
     throw new Error('Method not implemented');
   }
+
+  /**
+   * Get all employers with pagination
+   * @param {Object} options - Pagination and filter options
+   * @returns {Promise<Object>} Employers with pagination
+   */
+  async getAllEmployers(options) {
+    throw new Error('Method not implemented');
+  }
+
+  /**
+   * Get employer by ID
+   * @param {string} employerId - Employer ID
+   * @returns {Promise<Object|null>} Employer object or null
+   */
+  async getEmployerById(employerId) {
+    throw new Error('Method not implemented');
+  }
+
+  /**
+   * Update employer status
+   * @param {string} employerId - Employer ID
+   * @param {Object} updateData - Data to update
+   * @returns {Promise<Object|null>} Updated employer or null
+   */
+  async updateEmployerStatus(employerId, updateData) {
+    throw new Error('Method not implemented');
+  }
+
+  /**
+   * Get all candidates with pagination
+   * @param {Object} options - Pagination and filter options
+   * @returns {Promise<Object>} Candidates with pagination
+   */
+  async getAllCandidates(options) {
+    throw new Error('Method not implemented');
+  }
+
+  /**
+   * Get candidate by ID
+   * @param {string} candidateId - Candidate ID
+   * @returns {Promise<Object|null>} Candidate object or null
+   */
+  async getCandidateById(candidateId) {
+    throw new Error('Method not implemented');
+  }
+
+  /**
+   * Update candidate status
+   * @param {string} candidateId - Candidate ID
+   * @param {Object} updateData - Data to update
+   * @returns {Promise<Object|null>} Updated candidate or null
+   */
+  async updateCandidateStatus(candidateId, updateData) {
+    throw new Error('Method not implemented');
+  }
 }
 
 module.exports = IAdminRepository;

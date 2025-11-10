@@ -1,6 +1,8 @@
 const User = require('../models/User');
 const Job = require('../models/JobPost');
 const Application = require('../models/Application');
+const Employer = require('../models/Employer');
+const Candidate = require('../models/Candidate');
 const IAdminRepository = require('../../application/admin/repositories/IAdminRepository');
 
 /**
@@ -48,7 +50,9 @@ class AdminRepository extends IAdminRepository {
     if (role) query.role = role;
     if (status) query.status = status;
 
+    // Exclude sensitive fields like password for security
     const users = await User.find(query)
+      .select('-password') // Exclude password field
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -67,11 +71,11 @@ class AdminRepository extends IAdminRepository {
   }
 
   async getUserById(userId) {
-    return await User.findById(userId);
+    return await User.findById(userId).select('-password');
   }
 
   async updateUserById(userId, updateData) {
-    return await User.findByIdAndUpdate(userId, updateData, { new: true });
+    return await User.findByIdAndUpdate(userId, updateData, { new: true }).select('-password');
   }
 
   async deleteUserById(userId) {
@@ -294,6 +298,72 @@ class AdminRepository extends IAdminRepository {
         },
       ],
     };
+  }
+
+  async getAllEmployers(options = {}) {
+    const { page = 1, limit = 10, status } = options;
+    const skip = (page - 1) * limit;
+
+    const query = {};
+    if (status) query.status = status;
+
+    const employers = await Employer.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Employer.countDocuments(query);
+
+    return {
+      employers,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getEmployerById(employerId) {
+    return await Employer.findById(employerId);
+  }
+
+  async updateEmployerStatus(employerId, updateData) {
+    return await Employer.findByIdAndUpdate(employerId, updateData, { new: true });
+  }
+
+  async getAllCandidates(options = {}) {
+    const { page = 1, limit = 10, status } = options;
+    const skip = (page - 1) * limit;
+
+    const query = {};
+    if (status) query.status = status;
+
+    const candidates = await Candidate.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Candidate.countDocuments(query);
+
+    return {
+      candidates,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async getCandidateById(candidateId) {
+    return await Candidate.findById(candidateId);
+  }
+
+  async updateCandidateStatus(candidateId, updateData) {
+    return await Candidate.findByIdAndUpdate(candidateId, updateData, { new: true });
   }
 }
 

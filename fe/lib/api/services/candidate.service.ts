@@ -9,7 +9,7 @@ import type {
 class CandidateService {
   // Lấy profile candidate
   async getProfile(userId?: string): Promise<CandidateProfileResponse> {
-    const endpoint = userId ? `/candidates/${userId}` : "/candidates/me";
+    const endpoint = userId ? `/candidates/${userId}` : "/candidates/me/profile";
     return apiClient.get<CandidateProfileResponse>(endpoint);
   }
 
@@ -21,7 +21,7 @@ class CandidateService {
     timestamp?: string;
     requestId?: string | null;
   }> {
-    return apiClient.get(`/candidates/me`);
+    return apiClient.get(`/candidates/me/profile`);
   }
 
   // Lấy thông tin cơ bản để hiển thị tab Cá nhân (map từ /candidates/me)

@@ -1,0 +1,378 @@
+@startuml
+' =========================================================================
+' OPTIMIZED CONFIGURATION - VERTICAL LAYOUT
+' =========================================================================
+skinparam linetype ortho
+skinparam shadowing false
+set separator none
+
+
+skinparam class {
+    BorderColor #2a4c6a
+    BackgroundColor #eaf2f8
+    ArrowColor #2a4c6a
+    FontSize 13
+}
+
+hide empty members
+
+' =========================================================================
+' CORE USER MANAGEMENT
+' =========================================================================
+class User {
+    - _id : ObjectId
+    + email : String {unique}
+    - password : String {select:false}
+    + authMethod : String
+    + googleId : String {sparse}
+    + fullName : String
+    + avatar : String
+    + role : String
+    + preferences : JSON
+    + isEmailVerified : Boolean
+    + isActive : Boolean
+    + status : String
+    + candidateProfile : ObjectId
+    + employerProfile : ObjectId
+    --
+    + getSignedJwtToken() : String
+    + matchPassword() : Boolean
+    + canUsePassword() : Boolean
+}
+
+class CandidateProfile {
+    - _id : ObjectId
+    + userId : ObjectId {unique}
+    + status : String
+    + settings : JSON
+    + personalInfo : JSON
+    + targetJob : JSON
+    + education : Array<JSON>
+    + experience : Array<JSON>
+    + skills : JSON
+    + preferences : JSON
+    + resume : JSON
+    + progress : JSON
+    + analytics : JSON
+    + followedCompanies : Array<ObjectId>
+    --
+    + updateProfileCompletion()
+    + updateSkillVerification()
+    + incrementViews()
+}
+
+class EmployerProfile {
+    - _id : ObjectId
+    + owner : ObjectId {unique}
+    + company : JSON
+    + businessInfo : JSON
+    + position : JSON
+    + legalRepresentative : JSON
+    + contact : JSON
+    + members : Array<JSON>
+    + verification : JSON
+    + status : JSON
+    + stats : JSON
+    + ai : JSON
+    --
+    + addMember()
+    + removeMember()
+    + userCan() : Boolean
+    + canPostNewJob() : Boolean
+}
+
+' =========================================================================
+' JOB & APPLICATION MANAGEMENT
+' =========================================================================
+class Job {
+    - _id : ObjectId
+    + employer : ObjectId
+    + postedBy : ObjectId
+    + title : String
+    + slug : String {unique}
+    + description : String
+    + requirements : String
+    + skills : Array<String>
+    + skillIds : Array<ObjectId>
+    + industryCode : String
+    + level : String
+    + jobType : String
+    + workingMode : String
+    + location : String
+    + salaryMin : Number
+    + salaryMax : Number
+    + deadline : Date
+    + status : String
+    + views : Number
+    + stats : JSON
+    + deletedAt : Date
+}
+
+class Application {
+    - _id : ObjectId
+    + candidateId : ObjectId
+    + jobId : ObjectId
+    + status : String
+    + coverLetter : String
+    + attachments : Array<JSON>
+    + resume : JSON
+    + matchingScore : JSON
+    + interviews : Array<JSON>
+    + timeline : Array<JSON>
+    + feedback : JSON
+    + aiAnalysis : JSON
+    --
+    + updateStatus()
+    + scheduleInterview()
+    + addFeedback()
+}
+
+class SavedJob {
+    - _id : ObjectId
+    + candidateId : ObjectId
+    + jobId : ObjectId
+    + savedAt : Date
+    + notes : String
+}
+
+' =========================================================================
+' AI & ANALYSIS SYSTEM
+' =========================================================================
+class AIAnalysis {
+    - _id : ObjectId
+    + sourceType : String
+    + sourceId : ObjectId
+    + content : JSON
+    + nlpResults : JSON
+    + matchingAnalysis : JSON
+    + metadata : JSON
+}
+
+class JobRecommendation {
+    - _id : ObjectId
+    + candidateId : ObjectId
+    + recommendations : Array<JSON>
+    + filters : JSON
+    + generatedAt : Date
+    + expiresAt : Date
+    + isStale : Boolean
+}
+
+class CandidateRecommendation {
+    - _id : ObjectId
+    + jobId : ObjectId
+    + recommendations : Array<JSON>
+    + generatedAt : Date
+    + expiresAt : Date
+    + isStale : Boolean
+}
+
+' =========================================================================
+' SKILLS & LEARNING SYSTEM
+' =========================================================================
+class Skill {
+    - _id : ObjectId
+    + name : String {unique}
+    + category : String
+    + aliases : Array<String>
+    + description : String
+    + embedding : Array<Number>
+    + popularity : Number
+    + demandLevel : String
+    + trend : String
+}
+
+class SkillCategory {
+    - _id : ObjectId
+    + name : String {unique}
+    + slug : String {unique}
+    + description : String
+    + icon : String
+    + color : String
+    + parentCategory : ObjectId
+    + isActive : Boolean
+    + sortOrder : Number
+}
+
+class SkillRoadmap {
+    - _id : ObjectId
+    + internId : ObjectId
+    + targetJob : JSON
+    + analysis : JSON
+    + roadmap : JSON
+    + progress : JSON
+    + status : String
+}
+
+class SkillLearningPath {
+    - _id : ObjectId
+    + skillId : ObjectId
+    + levels : Array<JSON>
+    + prerequisites : Array<String>
+    + resources : Array<JSON>
+    + milestones : Array<JSON>
+    + careerPaths : Array<String>
+    + relatedSkills : Array<ObjectId>
+    + isActive : Boolean
+}
+
+' =========================================================================
+' COMMUNICATION & NOTIFICATIONS
+' =========================================================================
+class Notification {
+    - _id : ObjectId
+    + recipient : ObjectId
+    + sender : ObjectId
+    + type : String
+    + title : String
+    + message : String
+    + data : JSON
+    + isRead : Boolean
+}
+
+class Message {
+    - _id : ObjectId
+    + conversationId : ObjectId
+    + senderId : ObjectId
+    + content : String
+    + attachments : Array<JSON>
+    + readBy : Array<ObjectId>
+}
+
+class Conversation {
+    - _id : ObjectId
+    + participants : Array<ObjectId>
+    + lastMessageId : ObjectId
+    + lastMessageAt : Date
+    + unreadCountByUser : Map
+}
+
+' =========================================================================
+' INDUSTRY & BUSINESS CONTEXT
+' =========================================================================
+class Industry {
+    - _id : ObjectId
+    + code : String {unique}
+    + parentCode : String
+    + name : JSON
+    + description : JSON
+    + color : String
+    + icon : String
+    + keywords : Array<String>
+    + visible : Boolean
+}
+
+class CompanyFollow {
+    - _id : ObjectId
+    + candidateId : ObjectId
+    + employerId : ObjectId
+    + createdAt : Date
+    + deletedAt : Date
+}
+
+' =========================================================================
+' BILLING & WEBHOOKS
+' =========================================================================
+class Subscription {
+    - _id : ObjectId
+    + owner : ObjectId
+    + planCode : String
+    + status : String
+    + startDate : Date
+    + endDate : Date
+    + autoRenew : Boolean
+}
+
+class Invoice {
+    - _id : ObjectId
+    + owner : ObjectId
+    + amount : Number
+    + currency : String
+    + items : Array<JSON>
+    + status : String
+    + dueDate : Date
+}
+
+class Webhook {
+    - _id : ObjectId
+    + name : String
+    + url : String
+    + secret : String
+    + isActive : Boolean
+}
+
+class WebhookEvent {
+    - _id : ObjectId
+    + webhookId : ObjectId
+    + type : String
+    + payload : JSON
+    + status : String
+}
+
+' =========================================================================
+' LAYOUT HINTS - Sắp xếp vị trí các entity
+' =========================================================================
+User -[hidden]right- CandidateProfile
+CandidateProfile -[hidden]right- EmployerProfile
+Job -[hidden]right- Application
+AIAnalysis -[hidden]right- JobRecommendation
+Skill -[hidden]right- SkillCategory
+
+' =========================================================================
+' RELATIONSHIPS - CORE USER
+' =========================================================================
+User "1" -down-> "0..1" CandidateProfile : has
+User "1" -down-> "0..1" EmployerProfile : owns
+
+' =========================================================================
+' RELATIONSHIPS - JOB FLOW
+' =========================================================================
+EmployerProfile "1" -down-> "*" Job : posts
+Job "1" .down.> "*" Application : receives
+CandidateProfile "1" .right.> "*" Application : applies
+
+CandidateProfile "1" .down.> "*" SavedJob : saves
+Job "1" .left.> "*" SavedJob : savedBy
+
+Job "*" .up.> "1" Industry : belongsTo
+
+' =========================================================================
+' RELATIONSHIPS - AI SYSTEM
+' =========================================================================
+CandidateProfile "1" .down.> "*" AIAnalysis : <<CV>>
+Job "1" .down.> "*" AIAnalysis : <<Job>>
+
+CandidateProfile "1" -right-> "0..1" JobRecommendation : has
+Job "1" -right-> "0..1" CandidateRecommendation : has
+
+' =========================================================================
+' RELATIONSHIPS - SKILLS
+' =========================================================================
+SkillCategory "1" -down-> "*" Skill : contains
+SkillCategory "1" .right.> "*" SkillCategory : subcategories
+CandidateProfile "1" .down.> "*" SkillRoadmap : has
+Skill "1" -down-> "0..1" SkillLearningPath : has
+
+' =========================================================================
+' RELATIONSHIPS - COMMUNICATION
+' =========================================================================
+User "1" .down.> "*" Notification : receives
+User "*" .down.> "*" Conversation : participates
+Conversation "1" -down-> "*" Message : contains
+Conversation "1" .right.> "0..1" Message : lastMessage
+
+' =========================================================================
+' RELATIONSHIPS - BUSINESS
+' =========================================================================
+CandidateProfile "1" .down.> "*" CompanyFollow : follows
+EmployerProfile "1" .left.> "*" CompanyFollow : followedBy
+Industry "1" .right.> "*" Industry : parent/child
+
+' =========================================================================
+' RELATIONSHIPS - BILLING
+' =========================================================================
+EmployerProfile "1" -down-> "*" Subscription : has
+EmployerProfile "1" -down-> "*" Invoice : billed
+Webhook "1" -right-> "*" WebhookEvent : generates
+
+@enduml
