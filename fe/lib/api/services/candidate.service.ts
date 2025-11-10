@@ -1,4 +1,11 @@
 import { apiClient } from "../client";
+// NEW-MOCK: imports for mock data (used only when NEXT_PUBLIC_USE_MOCK=1)
+import { templates as MOCK_TEMPLATES } from "../../mocks/templates";
+import { templateLayouts as MOCK_TEMPLATE_LAYOUTS } from "../../mocks/templateLayouts";
+import {
+  sampleCVs as MOCK_SAMPLE_CVS,
+  type CVData as MockCVData,
+} from "../../mocks/cvSamples";
 import type {
   CandidateProfile,
   CandidateProfileResponse,
@@ -7,6 +14,12 @@ import type {
 } from "../types";
 
 class CandidateService {
+  // NEW-MOCK: toggle to decide using mock behavior
+  private readonly useMock =
+    typeof process !== "undefined" &&
+    typeof process.env !== "undefined" &&
+    process.env.NEXT_PUBLIC_USE_MOCK === "1";
+
   // Lấy profile candidate
   async getProfile(userId?: string): Promise<CandidateProfileResponse> {
     const endpoint = userId ? `/candidates/${userId}` : "/candidates/me";
@@ -173,6 +186,20 @@ class CandidateService {
     category?: string,
     style?: string
   ): Promise<CVTemplatesResponse> {
+    // NEW-MOCK: return mock templates when mock mode is enabled
+    if (this.useMock) {
+      return Promise.resolve({
+        success: true,
+        data: {
+          items: MOCK_TEMPLATES.map((t) => ({
+            id: String(t.id),
+            name: t.name,
+            thumbnail: t.thumbnail,
+          })),
+        },
+        message: "mock",
+      } as unknown as CVTemplatesResponse);
+    }
     const params = new URLSearchParams();
     if (category) params.append("category", category);
     if (style) params.append("style", style);
@@ -182,6 +209,75 @@ class CandidateService {
       queryString ? `?${queryString}` : ""
     }`;
     return apiClient.get<CVTemplatesResponse>(endpoint);
+  }
+
+  // NEW-MOCK: get a template layout by templateId (mock only). Backend endpoint
+  // may differ later; replace implementation when BE is ready.
+  async getTemplateLayout(templateId: number): Promise<{
+    success: boolean;
+    data: any;
+  }> {
+    if (this.useMock) {
+      return Promise.resolve({
+        success: true,
+        data: MOCK_TEMPLATE_LAYOUTS[templateId],
+      });
+    }
+    // Placeholder: adjust once backend route is specified
+    // return apiClient.get(`/candidates/me/cv-builder/templates/${templateId}/layout`);
+    return Promise.resolve({
+      success: true,
+      data: MOCK_TEMPLATE_LAYOUTS[templateId],
+    });
+  }
+
+  // NEW-MOCK: Local CV helpers for mock-only CRUD using localStorage.
+  // Replace with real endpoints later when backend is ready.
+  private readonly LOCAL_KEY = "cv_items";
+  private readLocalCVs(): MockCVData[] {
+    if (typeof window === "undefined") return MOCK_SAMPLE_CVS;
+    const raw = localStorage.getItem(this.LOCAL_KEY);
+    if (!raw) return MOCK_SAMPLE_CVS;
+    try {
+      return JSON.parse(raw) as MockCVData[];
+    } catch {
+      return MOCK_SAMPLE_CVS;
+    }
+  }
+  private writeLocalCVs(items: MockCVData[]) {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(this.LOCAL_KEY, JSON.stringify(items));
+  }
+  async listLocalCVs(): Promise<{ success: boolean; data: MockCVData[] }> {
+    if (!this.useMock) {
+      // Optional: map to real list endpoint later
+      // return apiClient.get(`/candidates/me/cv-builder/cv`);
+    }
+    const data = this.readLocalCVs();
+    return { success: true, data };
+  }
+  async getLocalCV(
+    index: number
+  ): Promise<{ success: boolean; data?: MockCVData }> {
+    const data = this.readLocalCVs();
+    return { success: true, data: data[index] };
+  }
+  async createLocalCV(
+    cv: MockCVData
+  ): Promise<{ success: boolean; id: number }> {
+    const data = this.readLocalCVs();
+    data.push(cv);
+    this.writeLocalCVs(data);
+    return { success: true, id: data.length - 1 };
+  }
+  async updateLocalCV(
+    index: number,
+    cv: MockCVData
+  ): Promise<{ success: boolean }> {
+    const data = this.readLocalCVs();
+    data[index] = cv;
+    this.writeLocalCVs(data);
+    return { success: true };
   }
 
   async generateCV(data: {
