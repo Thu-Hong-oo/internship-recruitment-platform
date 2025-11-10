@@ -1,3 +1,61 @@
+const USE_MOCK =
+  typeof window !== "undefined"
+    ? process.env.NEXT_PUBLIC_USE_MOCK === "1"
+    : process.env.NEXT_PUBLIC_USE_MOCK === "1";
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+
+type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+
+async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function http<T>(
+  url: string,
+  options?: {
+    method?: HttpMethod;
+    body?: unknown;
+    headers?: Record<string, string>;
+  }
+): Promise<T> {
+  if (USE_MOCK) {
+    // In mock mode, caller should use mock services instead of http.
+    // This is a safeguard to avoid accidental network calls.
+    throw new Error(
+      "http() should not be called in mock mode. Use mock services instead."
+    );
+  }
+  const res = await fetch(`${BASE_URL}${url}`, {
+    method: options?.method || "GET",
+    headers: {
+      "Content-Type": "application/json",
+      ...(options?.headers || {}),
+    },
+    body: options?.body ? JSON.stringify(options.body) : undefined,
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`HTTP ${res.status} ${res.statusText} - ${text}`);
+  }
+  // try json first
+  try {
+    return (await res.json()) as T;
+  } catch {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-anyd
+    return (await res.text()) as T;
+  }
+}
+
+export const mock = {
+  enabled: USE_MOCK,
+  // Simulate latency for any mock call
+  async withLatency<T>(value: T, ms = 300): Promise<T> {
+    await sleep(ms);
+    return value;
+  },
+};
+
 import { API_BASE_URL } from "./config";
 
 export class ApiClient {
