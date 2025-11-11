@@ -1,3 +1,61 @@
+const USE_MOCK =
+  typeof window !== "undefined"
+    ? process.env.NEXT_PUBLIC_USE_MOCK === "1"
+    : process.env.NEXT_PUBLIC_USE_MOCK === "1";
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+
+type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+
+async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function http<T>(
+  url: string,
+  options?: {
+    method?: HttpMethod;
+    body?: unknown;
+    headers?: Record<string, string>;
+  }
+): Promise<T> {
+  if (USE_MOCK) {
+    // In mock mode, caller should use mock services instead of http.
+    // This is a safeguard to avoid accidental network calls.
+    throw new Error(
+      "http() should not be called in mock mode. Use mock services instead."
+    );
+  }
+  const res = await fetch(`${BASE_URL}${url}`, {
+    method: options?.method || "GET",
+    headers: {
+      "Content-Type": "application/json",
+      ...(options?.headers || {}),
+    },
+    body: options?.body ? JSON.stringify(options.body) : undefined,
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`HTTP ${res.status} ${res.statusText} - ${text}`);
+  }
+  // try json first
+  try {
+    return (await res.json()) as T;
+  } catch {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-anyd
+    return (await res.text()) as T;
+  }
+}
+
+export const mock = {
+  enabled: USE_MOCK,
+  // Simulate latency for any mock call
+  async withLatency<T>(value: T, ms = 300): Promise<T> {
+    await sleep(ms);
+    return value;
+  },
+};
+
 import { API_BASE_URL } from "./config";
 
 export class ApiClient {
@@ -5,6 +63,12 @@ export class ApiClient {
   private token: string | null;
 
   constructor() {
+    // Fail fast if the API base URL is not configured
+    if (!API_BASE_URL) {
+      throw new Error(
+        "NEXT_PUBLIC_API_URL is not defined. Please check your .env.local file."
+      );
+    }
     this.baseURL = API_BASE_URL;
     this.token = null; // Initialize as null, will be set when needed
   }
@@ -33,6 +97,14 @@ export class ApiClient {
 
     const url = `${this.baseURL}${endpoint}`;
 
+    // Debug logging
+    console.log("API Request:", {
+      url,
+      method: options.method || "GET",
+      headers: options.headers,
+      body: options.body,
+    });
+
     const config: RequestInit = {
       headers: {
         ...options.headers,
@@ -59,9 +131,17 @@ export class ApiClient {
     try {
       const response = await fetch(url, config);
 
+      console.log("API Response:", {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries()),
+      });
+
       if (!response.ok) {
         //200-299 >< 400, 401, 403, 404, 500, ...
         const errorData = await response.json().catch(() => ({}));
+        console.error("API Error Response:", errorData);
         throw new Error(
           errorData.error ||
             errorData.message ||
@@ -69,10 +149,19 @@ export class ApiClient {
         );
       }
 
-      return await response.json();
-    } catch (error) {
+      const result = await response.json();
+      console.log("✅ API Success Response:", result);
+      return result;
+    } catch (error: unknown) {
       console.error("API request failed:", error);
-      throw error;
+      const errorDetails =
+        error instanceof Error
+          ? { name: error.name, message: error.message, stack: error.stack }
+          : { name: "UnknownError", message: String(error), stack: undefined };
+      console.error("Error details:", errorDetails);
+      throw error instanceof Error
+        ? error
+        : new Error("Unknown error occurred during API request");
     }
   }
 
@@ -92,6 +181,14 @@ export class ApiClient {
   public async put<T>(endpoint: string, body?: unknown): Promise<T> {
     return this.request<T>(endpoint, {
       method: "PUT",
+      body:
+        body instanceof FormData ? (body as any) : JSON.stringify(body ?? {}),
+    });
+  }
+
+  public async patch<T>(endpoint: string, body?: unknown): Promise<T> {
+    return this.request<T>(endpoint, {
+      method: "PATCH",
       body:
         body instanceof FormData ? (body as any) : JSON.stringify(body ?? {}),
     });

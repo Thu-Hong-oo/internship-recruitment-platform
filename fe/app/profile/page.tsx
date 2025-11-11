@@ -10,23 +10,25 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { useLazyProfile } from "@/hooks/useLazyProfile";
-import { useMockProfile } from "@/hooks/useMockProfile";
 import AvatarUpload from "@/components/AvatarUpload";
 import { getUserAvatar, api } from "@/lib/api";
 import { PageLayout } from "@/components/layout";
 import LazyEducationSection from "@/components/profile/LazyEducationSection";
 import LazyExperienceSection from "@/components/profile/LazyExperienceSection";
 import LazySkillsSection from "@/components/profile/LazySkillsSection";
+import AddressSelector from "@/components/ui/AddressSelector";
+import {
+  validateAddress,
+  formatAddress,
+  type AddressData,
+} from "@/lib/addressUtils";
 
 export default function ProfilePage() {
   const { user } = useAuth();
 
-  // Try real API first, fallback to mock data
-  const realApi = useLazyProfile();
-  const mockApi = useMockProfile();
-
-  // Always use real API first, fallback to mock only on error
-  const { profile, loading, errors, fetchProfile, updateProfile } = realApi;
+  // Use real API only
+  const { profile, loading, errors, fetchProfile, updateProfile } =
+    useLazyProfile();
 
   const [formData, setFormData] = useState({
     fullName:
@@ -36,6 +38,13 @@ export default function ProfilePage() {
     phone: "",
     email: user?.email || "",
     bio: "",
+    address: {
+      street: "",
+      ward: "",
+      district: "",
+      city: "",
+      country: "Vietnam",
+    } as AddressData,
   });
 
   const [settings, setSettings] = useState({
@@ -43,7 +52,7 @@ export default function ProfilePage() {
     profileVisible: true,
   });
 
-  const [apiStatus, setApiStatus] = useState<"real" | "mock" | "error">("real");
+  const [apiStatus, setApiStatus] = useState<"real" | "error">("real");
 
   // Load basic profile data on mount
   React.useEffect(() => {
@@ -61,11 +70,26 @@ export default function ProfilePage() {
             phone: basic.data.phone || prev.phone,
             email: basic.data.email || prev.email,
             bio: prev.bio,
+            address: {
+              ...prev.address,
+              ...(basic.data as any).address,
+            },
+          }));
+        }
+
+        // Also try to load address from profile data if available
+        if (profile?.personalInfo?.address) {
+          setFormData((prev) => ({
+            ...prev,
+            address: {
+              ...prev.address,
+              ...profile.personalInfo.address,
+            },
           }));
         }
       } catch (error) {
-        console.error("Real API failed, using mock data:", error);
-        setApiStatus("mock");
+        console.error("API failed:", error);
+        setApiStatus("error");
       }
     };
 
@@ -79,6 +103,13 @@ export default function ProfilePage() {
     }));
   };
 
+  const handleAddressChange = (address: AddressData) => {
+    setFormData((prev) => ({
+      ...prev,
+      address,
+    }));
+  };
+
   const handleSettingChange = (field: string, value: boolean) => {
     setSettings((prev) => ({
       ...prev,
@@ -88,17 +119,65 @@ export default function ProfilePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate address logic (không bắt buộc nhưng nếu nhập thì phải đúng thứ tự)
+    const addressValidation = validateAddress(formData.address);
+    if (!addressValidation.isValid) {
+      console.error("Address validation failed:", addressValidation.errors);
+      // Không return, chỉ log lỗi để user biết
+    }
+
     try {
-      await updateProfile("profile", {
+      // Gửi address dưới dạng object thay vì string
+      const addressObject = {
+        street: formData.address.street || "",
+        ward: formData.address.wardName || "",
+        district: formData.address.districtName || "",
+        city: formData.address.cityName || "",
+        country: formData.address.country || "Vietnam",
+      };
+
+      console.log("Submitting profile data:", {
+        fullName: formData.fullName,
+        phone: formData.phone,
+        bio: formData.bio,
+        address: addressObject,
+      });
+
+      const response = await updateProfile("profile", {
         personalInfo: {
           fullName: formData.fullName,
           phone: formData.phone,
           bio: formData.bio,
+          address: addressObject,
         },
       });
-      console.log("Profile updated successfully");
+
+      console.log("API Response:", response);
+
+      if (response.success) {
+        console.log("Profile updated successfully");
+        alert("Cập nhật thông tin thành công!");
+      } else {
+        console.error("Failed to update profile:", response.message);
+        alert("Cập nhật thất bại: " + response.message);
+      }
     } catch (error: any) {
       console.error("Error updating profile:", error);
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+      });
+
+      // Hiển thị lỗi user-friendly
+      if (error.message.includes("Failed to fetch")) {
+        alert(
+          "Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng hoặc thử lại sau."
+        );
+      } else {
+        alert("Có lỗi xảy ra: " + error.message);
+      }
     }
   };
 
@@ -119,17 +198,14 @@ export default function ProfilePage() {
       <div className="bg-gray-50 py-8">
         <div className="max-w-7xl mx-auto px-4">
           {/* API Status Banner */}
-          {apiStatus === "mock" && (
-            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+          {apiStatus === "error" && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
               <div className="flex items-center gap-2">
-                <Badge
-                  variant="outline"
-                  className="bg-yellow-100 text-yellow-800"
-                >
-                  DEMO MODE
+                <Badge variant="outline" className="bg-red-100 text-red-800">
+                  API ERROR
                 </Badge>
-                <span className="text-sm text-yellow-700">
-                  API không khả dụng, đang sử dụng dữ liệu mẫu
+                <span className="text-sm text-red-700">
+                  Không thể kết nối đến API. Vui lòng kiểm tra kết nối mạng.
                 </span>
               </div>
             </div>
@@ -366,6 +442,12 @@ export default function ProfilePage() {
                             placeholder="Viết một vài dòng giới thiệu về bản thân..."
                           />
                         </div>
+
+                        <AddressSelector
+                          value={formData.address}
+                          onChange={handleAddressChange}
+                          showValidation={true}
+                        />
 
                         <Button
                           type="submit"

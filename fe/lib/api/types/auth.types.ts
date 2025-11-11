@@ -4,7 +4,7 @@ export interface RegisterRequest {
   email: string;
   password: string;
   fullName: string;
-  role: "student" | "employer";
+  role: "candidate"
 }
 
 export interface LoginRequest {
