@@ -1,0 +1,886 @@
+{
+	"info": {
+		"_postman_id": "admin-complete-api-001",
+		"name": "Admin Complete API",
+		"description": "Complete admin API collection for managing users, employers, companies, verifications, jobs, and system settings. All endpoints require admin authentication.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{admin_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5000/api",
+			"type": "string"
+		},
+		{
+			"key": "admin_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "user_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "employer_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "company_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "job_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "verification_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "document_id",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Dashboard & Analytics",
+			"item": [
+				{
+					"name": "Get Dashboard Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/dashboard",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "dashboard"]
+						},
+						"description": "Get comprehensive dashboard statistics"
+					},
+					"response": []
+				},
+				{
+					"name": "Get User Analytics",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/analytics/users?period=30d",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "analytics", "users"],
+							"query": [
+								{
+									"key": "period",
+									"value": "30d",
+									"description": "7d, 30d, 90d, 1y"
+								}
+							]
+						},
+						"description": "Get detailed user analytics"
+					},
+					"response": []
+				}
+			],
+			"description": "Dashboard and analytics endpoints"
+		},
+		{
+			"name": "User Management",
+			"item": [
+				{
+					"name": "Get All Users",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/users?page=1&limit=50&role=all&status=active&search=&sortBy=createdAt&sortOrder=desc",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "users"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "50"
+								},
+								{
+									"key": "role",
+									"value": "all",
+									"description": "all, candidate, employer, admin"
+								},
+								{
+									"key": "status",
+									"value": "active",
+									"description": "all, active, inactive, suspended"
+								},
+								{
+									"key": "search",
+									"value": "",
+									"description": "Search by name or email"
+								},
+								{
+									"key": "sortBy",
+									"value": "createdAt"
+								},
+								{
+									"key": "sortOrder",
+									"value": "desc"
+								}
+							]
+						},
+						"description": "Get all users with filtering and pagination"
+					},
+					"response": []
+				},
+				{
+					"name": "Get User by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/users/{{user_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "users", "{{user_id}}"]
+						},
+						"description": "Get detailed user information"
+					},
+					"response": []
+				},
+				{
+					"name": "Create User",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"newuser@example.com\",\n  \"password\": \"SecurePass123!\",\n  \"firstName\": \"New\",\n  \"lastName\": \"User\",\n  \"role\": \"candidate\",\n  \"isEmailVerified\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/admin/users",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "users"]
+						},
+						"description": "Create new user (admin privilege)"
+					},
+					"response": []
+				},
+				{
+					"name": "Update User",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"Updated\",\n  \"lastName\": \"Name\",\n  \"phone\": \"+84901234567\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/admin/users/{{user_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "users", "{{user_id}}"]
+						},
+						"description": "Update user information"
+					},
+					"response": []
+				},
+				{
+					"name": "Update User Status",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"suspended\",\n  \"reason\": \"Violation of terms of service\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/admin/users/{{user_id}}/status",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "users", "{{user_id}}", "status"]
+						},
+						"description": "Update user status (active, inactive, suspended)"
+					},
+					"response": []
+				},
+				{
+					"name": "Update User Role",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"role\": \"employer\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/admin/users/{{user_id}}/role",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "users", "{{user_id}}", "role"]
+						},
+						"description": "Change user role"
+					},
+					"response": []
+				}
+			],
+			"description": "User management endpoints"
+		},
+		{
+			"name": "Employer Management",
+			"item": [
+				{
+					"name": "Get All Employers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/employers?page=1&limit=50&verificationStatus=all&search=&sortBy=createdAt&sortOrder=desc",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "employers"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "50"
+								},
+								{
+									"key": "verificationStatus",
+									"value": "all",
+									"description": "all, pending, approved, rejected"
+								},
+								{
+									"key": "search",
+									"value": ""
+								},
+								{
+									"key": "sortBy",
+									"value": "createdAt"
+								},
+								{
+									"key": "sortOrder",
+									"value": "desc"
+								}
+							]
+						},
+						"description": "Get all employer profiles"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Employer by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/employers/{{employer_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "employers", "{{employer_id}}"]
+						},
+						"description": "Get detailed employer information"
+					},
+					"response": []
+				},
+				{
+					"name": "Search Employers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/employers/search?query=tech&page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "employers", "search"],
+							"query": [
+								{
+									"key": "query",
+									"value": "tech"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						},
+						"description": "Search employers by name or company"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Employer Status",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"active\",\n  \"reason\": \"Verification completed\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/admin/employers/{{employer_id}}/status",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "employers", "{{employer_id}}", "status"]
+						},
+						"description": "Update employer status"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Employer Companies",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/employers/{{employer_id}}/companies",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "employers", "{{employer_id}}", "companies"]
+						},
+						"description": "Get companies associated with employer"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Employer Jobs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/employers/{{employer_id}}/jobs?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "employers", "{{employer_id}}", "jobs"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						},
+						"description": "Get all jobs posted by employer"
+					},
+					"response": []
+				}
+			],
+			"description": "Employer management endpoints"
+		},
+		{
+			"name": "Company Management",
+			"item": [
+				{
+					"name": "Get All Companies",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/companies?page=1&limit=50&status=all&search=&industryCode=",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "companies"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "50"
+								},
+								{
+									"key": "status",
+									"value": "all"
+								},
+								{
+									"key": "search",
+									"value": ""
+								},
+								{
+									"key": "industryCode",
+									"value": ""
+								}
+							]
+						},
+						"description": "Get all companies"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Company by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/companies/{{company_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "companies", "{{company_id}}"]
+						},
+						"description": "Get detailed company information"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Company",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"companyName\": \"Updated Company Name\",\n  \"industryCode\": \"technology\",\n  \"companySize\": \"100-500\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/admin/companies/{{company_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "companies", "{{company_id}}"]
+						},
+						"description": "Update company information"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Company Status",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"active\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/admin/companies/{{company_id}}/status",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "companies", "{{company_id}}", "status"]
+						},
+						"description": "Update company status"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Company",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/companies/{{company_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "companies", "{{company_id}}"]
+						},
+						"description": "Delete company"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Company Jobs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/companies/{{company_id}}/jobs?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "companies", "{{company_id}}", "jobs"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						},
+						"description": "Get all jobs from company"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Company Applications",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/companies/{{company_id}}/applications?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "companies", "{{company_id}}", "applications"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						},
+						"description": "Get all applications to company jobs"
+					},
+					"response": []
+				}
+			],
+			"description": "Company management endpoints"
+		},
+		{
+			"name": "Employer Verification",
+			"item": [
+				{
+					"name": "Get Pending Verifications",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/verifications?page=1&limit=20&status=pending",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "verifications"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "status",
+									"value": "pending",
+									"description": "pending, approved, rejected"
+								}
+							]
+						},
+						"description": "Get all pending employer verifications"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Verification Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/verifications/{{verification_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "verifications", "{{verification_id}}"]
+						},
+						"description": "Get detailed verification information"
+					},
+					"response": []
+				},
+				{
+					"name": "Approve/Reject Verification",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"approved\",\n  \"notes\": \"All documents verified successfully\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/admin/verifications/{{verification_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "verifications", "{{verification_id}}"]
+						},
+						"description": "Approve or reject employer verification"
+					},
+					"response": []
+				},
+				{
+					"name": "Verify Document",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"approved\",\n  \"notes\": \"Document is valid\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/admin/employers/{{employer_id}}/documents/{{document_id}}/verify",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "employers", "{{employer_id}}", "documents", "{{document_id}}", "verify"]
+						},
+						"description": "Verify individual document"
+					},
+					"response": []
+				}
+			],
+			"description": "Employer verification management"
+		},
+		{
+			"name": "Job Moderation",
+			"item": [
+				{
+					"name": "Get All Jobs (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/jobs?page=1&limit=50&status=all&search=&employerId=&companyId=",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "jobs"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "50"
+								},
+								{
+									"key": "status",
+									"value": "all"
+								},
+								{
+									"key": "search",
+									"value": ""
+								},
+								{
+									"key": "employerId",
+									"value": ""
+								},
+								{
+									"key": "companyId",
+									"value": ""
+								}
+							]
+						},
+						"description": "Get all jobs with admin privileges"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Job Details (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/jobs/{{job_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "jobs", "{{job_id}}"]
+						},
+						"description": "Get detailed job information"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Job Status",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"published\",\n  \"reason\": \"Job approved after review\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/admin/jobs/{{job_id}}/status",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "jobs", "{{job_id}}", "status"]
+						},
+						"description": "Update job status (publish, reject, close)"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Job (Admin)",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/jobs/{{job_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "jobs", "{{job_id}}"]
+						},
+						"description": "Delete job posting"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Job Applications (Admin)",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/jobs/{{job_id}}/applications?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "jobs", "{{job_id}}", "applications"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						},
+						"description": "Get all applications for a job"
+					},
+					"response": []
+				}
+			],
+			"description": "Job moderation and management"
+		},
+		{
+			"name": "System Management",
+			"item": [
+				{
+					"name": "Get System Health",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/system/health",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "system", "health"]
+						},
+						"description": "Get system health status"
+					},
+					"response": []
+				},
+				{
+					"name": "Get System Overview",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/system/overview",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "system", "overview"]
+						},
+						"description": "Get comprehensive system overview"
+					},
+					"response": []
+				},
+				{
+					"name": "Get System Logs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/admin/system/logs?level=all&page=1&limit=100&startDate=&endDate=",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "system", "logs"],
+							"query": [
+								{
+									"key": "level",
+									"value": "all",
+									"description": "all, error, warn, info"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "100"
+								},
+								{
+									"key": "startDate",
+									"value": ""
+								},
+								{
+									"key": "endDate",
+									"value": ""
+								}
+							]
+						},
+						"description": "Get system logs"
+					},
+					"response": []
+				},
+				{
+					"name": "Update System Settings",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"maintenanceMode\": false,\n  \"allowRegistration\": true,\n  \"requireEmailVerification\": true,\n  \"maxUploadSize\": 10485760\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/admin/system/settings",
+							"host": ["{{base_url}}"],
+							"path": ["admin", "system", "settings"]
+						},
+						"description": "Update system-wide settings"
+					},
+					"response": []
+				}
+			],
+			"description": "System monitoring and configuration"
+		}
+	]
+}

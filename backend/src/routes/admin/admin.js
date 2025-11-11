@@ -148,4 +148,10 @@ router.put('/system/settings', updateSystemSettings);
 
 router.use('/industries', require('./industriesAdmin'));
 
+// ========================================
+// SKILL MANAGEMENT
+// ========================================
+
+router.use('/skills', require('./skillsAdmin'));
+
 module.exports = router;

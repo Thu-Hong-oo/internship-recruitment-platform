@@ -1,0 +1,179 @@
+{
+	"info": {
+		"_postman_id": "skills-public-api-001",
+		"name": "Skills Public API",
+		"description": "Public API for browsing, searching, and filtering skills. Used by frontend for skill selection and discovery.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5000/api",
+			"type": "string"
+		},
+		{
+			"key": "skill_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "category",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Public Skills Access",
+			"item": [
+				{
+					"name": "Get All Skills",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/skills?page=1&limit=100&category=&search=&sortBy=name&sortOrder=asc",
+							"host": ["{{base_url}}"],
+							"path": ["skills"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "100"
+								},
+								{
+									"key": "category",
+									"value": "",
+									"description": "Filter by category"
+								},
+								{
+									"key": "search",
+									"value": "",
+									"description": "Search term"
+								},
+								{
+									"key": "sortBy",
+									"value": "name",
+									"description": "name, popularity"
+								},
+								{
+									"key": "sortOrder",
+									"value": "asc",
+									"description": "asc, desc"
+								}
+							]
+						},
+						"description": "Get all available skills (public access)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Skill by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/skills/{{skill_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["skills", "{{skill_id}}"]
+						},
+						"description": "Get detailed information about a specific skill"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Skill Categories",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/skills/categories",
+							"host": ["{{base_url}}"],
+							"path": ["skills", "categories"]
+						},
+						"description": "Get all available skill categories"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Skills by Category",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/skills/category/{{category}}?page=1&limit=50",
+							"host": ["{{base_url}}"],
+							"path": ["skills", "category", "{{category}}"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "50"
+								}
+							]
+						},
+						"description": "Get all skills in a specific category"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Popular Skills",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/skills/popular?limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["skills", "popular"],
+							"query": [
+								{
+									"key": "limit",
+									"value": "20",
+									"description": "Number of popular skills to return"
+								}
+							]
+						},
+						"description": "Get most popular/frequently used skills"
+					},
+					"response": []
+				},
+				{
+					"name": "Search Skills",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/skills/search?q=javascript&page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["skills", "search"],
+							"query": [
+								{
+									"key": "q",
+									"value": "javascript",
+									"description": "Search query"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						},
+						"description": "Search for skills by name or keywords"
+					},
+					"response": []
+				}
+			],
+			"description": "Public endpoints for skill browsing and discovery"
+		}
+	]
+}

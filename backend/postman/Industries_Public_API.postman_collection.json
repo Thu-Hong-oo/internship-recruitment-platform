@@ -1,0 +1,121 @@
+{
+	"info": {
+		"_postman_id": "industries-public-api-001",
+		"name": "Industries Public API",
+		"description": "Public API for browsing industries. Used by frontend for industry selection in job postings and company profiles.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5000/api",
+			"type": "string"
+		},
+		{
+			"key": "industry_code",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Public Industries Access",
+			"item": [
+				{
+					"name": "Get All Industries",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/industries?q=&parent=&includeHidden=false",
+							"host": ["{{base_url}}"],
+							"path": ["industries"],
+							"query": [
+								{
+									"key": "q",
+									"value": "",
+									"description": "Search query"
+								},
+								{
+									"key": "parent",
+									"value": "",
+									"description": "Parent industry code (use 'root' for top-level)"
+								},
+								{
+									"key": "includeHidden",
+									"value": "false",
+									"description": "Include hidden industries (admin only)"
+								}
+							]
+						},
+						"description": "Get all visible industries (public access)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Root Industries",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/industries?parent=root",
+							"host": ["{{base_url}}"],
+							"path": ["industries"],
+							"query": [
+								{
+									"key": "parent",
+									"value": "root"
+								}
+							]
+						},
+						"description": "Get top-level industries (no parent)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Sub-industries",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/industries?parent={{industry_code}}",
+							"host": ["{{base_url}}"],
+							"path": ["industries"],
+							"query": [
+								{
+									"key": "parent",
+									"value": "{{industry_code}}",
+									"description": "Parent industry code"
+								}
+							]
+						},
+						"description": "Get sub-industries of a specific industry"
+					},
+					"response": []
+				},
+				{
+					"name": "Search Industries",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/industries?q=technology",
+							"host": ["{{base_url}}"],
+							"path": ["industries"],
+							"query": [
+								{
+									"key": "q",
+									"value": "technology",
+									"description": "Search by industry name"
+								}
+							]
+						},
+						"description": "Search industries by name"
+					},
+					"response": []
+				}
+			],
+			"description": "Public endpoints for industry browsing"
+		}
+	]
+}

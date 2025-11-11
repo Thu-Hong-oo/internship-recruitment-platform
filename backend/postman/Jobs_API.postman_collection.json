@@ -1,0 +1,517 @@
+{
+	"info": {
+		"_postman_id": "jobs-api-collection-001",
+		"name": "Jobs API - Complete",
+		"description": "Complete API collection for job posting management including CRUD operations, applications, employer-specific endpoints, and public job browsing",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{auth_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5000/api",
+			"type": "string"
+		},
+		{
+			"key": "auth_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "employer_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "candidate_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "job_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "job_slug",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Public - Browse Jobs",
+			"item": [
+				{
+					"name": "Get All Jobs",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs?page=1&limit=20&status=published&employmentType=full-time&location=Ho Chi Minh&minSalary=10000000&maxSalary=30000000&experienceLevel=junior&industryCode=technology&skills=React,Node.js&sortBy=createdAt&sortOrder=desc",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1",
+									"description": "Page number"
+								},
+								{
+									"key": "limit",
+									"value": "20",
+									"description": "Items per page"
+								},
+								{
+									"key": "status",
+									"value": "published",
+									"description": "Job status filter"
+								},
+								{
+									"key": "employmentType",
+									"value": "full-time",
+									"description": "full-time, part-time, contract, internship"
+								},
+								{
+									"key": "location",
+									"value": "Ho Chi Minh",
+									"description": "City or location"
+								},
+								{
+									"key": "minSalary",
+									"value": "10000000",
+									"description": "Minimum salary"
+								},
+								{
+									"key": "maxSalary",
+									"value": "30000000",
+									"description": "Maximum salary"
+								},
+								{
+									"key": "experienceLevel",
+									"value": "junior",
+									"description": "entry, junior, mid, senior, lead"
+								},
+								{
+									"key": "industryCode",
+									"value": "technology",
+									"description": "Industry code"
+								},
+								{
+									"key": "skills",
+									"value": "React,Node.js",
+									"description": "Comma-separated skills"
+								},
+								{
+									"key": "sortBy",
+									"value": "createdAt",
+									"description": "Sort field"
+								},
+								{
+									"key": "sortOrder",
+									"value": "desc",
+									"description": "asc or desc"
+								}
+							]
+						},
+						"description": "Get all published jobs with advanced filtering options"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Recent Jobs",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs/recent?limit=10",
+							"host": ["{{base_url}}"],
+							"path": ["jobs", "recent"],
+							"query": [
+								{
+									"key": "limit",
+									"value": "10",
+									"description": "Number of recent jobs"
+								}
+							]
+						},
+						"description": "Get most recently posted jobs"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Job by ID",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs/{{job_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["jobs", "{{job_id}}"]
+						},
+						"description": "Get detailed information about a specific job"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Job by Slug",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs/slug/{{job_slug}}",
+							"host": ["{{base_url}}"],
+							"path": ["jobs", "slug", "{{job_slug}}"]
+						},
+						"description": "Get job by SEO-friendly slug"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Job Company Info",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs/{{job_id}}/company",
+							"host": ["{{base_url}}"],
+							"path": ["jobs", "{{job_id}}", "company"]
+						},
+						"description": "Get company information for a job"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Job Stats",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs/{{job_id}}/stats",
+							"host": ["{{base_url}}"],
+							"path": ["jobs", "{{job_id}}", "stats"]
+						},
+						"description": "Get job statistics (views, applications, etc.)"
+					},
+					"response": []
+				},
+				{
+					"name": "Increment Job Views",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs/{{job_id}}/view",
+							"host": ["{{base_url}}"],
+							"path": ["jobs", "{{job_id}}", "view"]
+						},
+						"description": "Track job view count (public endpoint)"
+					},
+					"response": []
+				}
+			],
+			"description": "Public endpoints for browsing and viewing jobs"
+		},
+		{
+			"name": "Employer - Job Management",
+			"item": [
+				{
+					"name": "Create Job",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{employer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Senior Full Stack Developer\",\n  \"slug\": \"senior-full-stack-developer-2024\",\n  \"description\": \"We are looking for an experienced Full Stack Developer to join our growing team.\",\n  \"requirements\": [\n    \"5+ years of experience with React and Node.js\",\n    \"Strong understanding of TypeScript\",\n    \"Experience with MongoDB and PostgreSQL\",\n    \"Excellent problem-solving skills\"\n  ],\n  \"responsibilities\": [\n    \"Design and develop scalable web applications\",\n    \"Collaborate with cross-functional teams\",\n    \"Write clean, maintainable code\",\n    \"Mentor junior developers\"\n  ],\n  \"skills\": [\"React\", \"Node.js\", \"TypeScript\", \"MongoDB\", \"PostgreSQL\"],\n  \"skillIds\": [],\n  \"employmentType\": \"full-time\",\n  \"experienceLevel\": \"senior\",\n  \"location\": {\n    \"city\": \"Ho Chi Minh City\",\n    \"district\": \"District 1\",\n    \"address\": \"123 Nguyen Hue Street\",\n    \"remoteOption\": \"hybrid\"\n  },\n  \"salary\": {\n    \"min\": 30000000,\n    \"max\": 50000000,\n    \"currency\": \"VND\",\n    \"period\": \"monthly\",\n    \"isNegotiable\": true\n  },\n  \"benefits\": [\n    \"Competitive salary\",\n    \"Health insurance\",\n    \"13th month salary\",\n    \"Annual bonus\",\n    \"Flexible working hours\"\n  ],\n  \"industryCode\": \"technology\",\n  \"subIndustryCode\": \"software-development\",\n  \"numberOfPositions\": 2,\n  \"applicationDeadline\": \"2024-12-31T23:59:59.999Z\",\n  \"startDate\": \"2024-11-15T00:00:00.000Z\",\n  \"workingHours\": {\n    \"start\": \"09:00\",\n    \"end\": \"18:00\",\n    \"daysPerWeek\": 5\n  },\n  \"companyInfo\": {\n    \"name\": \"Tech Innovations Inc.\",\n    \"website\": \"https://techinnovations.com\",\n    \"size\": \"100-500\",\n    \"description\": \"Leading technology company in Vietnam\"\n  },\n  \"status\": \"draft\",\n  \"isUrgent\": false,\n  \"isFeatured\": false\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs",
+							"host": ["{{base_url}}"],
+							"path": ["jobs"]
+						},
+						"description": "Create a new job posting (employer only, requires profile)"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Job",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{employer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Senior Full Stack Developer (Updated)\",\n  \"description\": \"Updated job description with more details...\",\n  \"salary\": {\n    \"min\": 35000000,\n    \"max\": 55000000,\n    \"currency\": \"VND\",\n    \"period\": \"monthly\",\n    \"isNegotiable\": true\n  },\n  \"skills\": [\"React\", \"Node.js\", \"TypeScript\", \"MongoDB\", \"PostgreSQL\", \"Docker\"],\n  \"numberOfPositions\": 3,\n  \"status\": \"published\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs/{{job_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["jobs", "{{job_id}}"]
+						},
+						"description": "Update existing job posting"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Job",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{employer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs/{{job_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["jobs", "{{job_id}}"]
+						},
+						"description": "Delete a job posting"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Employer Jobs",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{employer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs/employer?status=all&page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["jobs", "employer"],
+							"query": [
+								{
+									"key": "status",
+									"value": "all",
+									"description": "all, draft, published, closed, expired"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						},
+						"description": "Get all jobs posted by the authenticated employer"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Draft Jobs",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{employer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs/drafts?page=1&limit=10",
+							"host": ["{{base_url}}"],
+							"path": ["jobs", "drafts"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						},
+						"description": "Get all draft jobs for the authenticated employer"
+					},
+					"response": []
+				},
+				{
+					"name": "Submit Job for Review",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{employer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs/employer/{{job_id}}/submit",
+							"host": ["{{base_url}}"],
+							"path": ["jobs", "employer", "{{job_id}}", "submit"]
+						},
+						"description": "Submit job for admin review (requires verified employer)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Job Applications",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{employer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/jobs/{{job_id}}/applications?status=all&page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["jobs", "{{job_id}}", "applications"],
+							"query": [
+								{
+									"key": "status",
+									"value": "all",
+									"description": "all, pending, reviewing, shortlisted, rejected, hired"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						},
+						"description": "Get all applications for a specific job (verified employer only)"
+					},
+					"response": []
+				}
+			],
+			"description": "Employer-specific job management endpoints"
+		},
+		{
+			"name": "Candidate - Job Application",
+			"item": [
+				{
+					"name": "Apply for Job",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{candidate_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"coverLetter\": \"Dear Hiring Manager,\\n\\nI am writing to express my strong interest in the Senior Full Stack Developer position at your company. With over 5 years of experience in developing scalable web applications using React and Node.js, I am confident that I would be a valuable addition to your team.\\n\\nMy experience includes:\\n- Building and deploying production-ready applications\\n- Leading development teams\\n- Implementing best practices and code standards\\n- Working with modern tech stacks\\n\\nI am particularly excited about this opportunity because of your company's innovative approach to technology solutions. I believe my skills and experience align perfectly with your requirements.\\n\\nThank you for considering my application. I look forward to discussing how I can contribute to your team.\\n\\nBest regards,\\nJohn Doe\",\n  \"resumeId\": \"current\",\n  \"additionalInfo\": {\n    \"availableStartDate\": \"2024-12-01\",\n    \"expectedSalary\": 35000000,\n    \"noticePeriod\": \"1 month\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs/{{job_id}}/apply",
+							"host": ["{{base_url}}"],
+							"path": ["jobs", "{{job_id}}", "apply"]
+						},
+						"description": "Apply for a job (candidate only)"
+					},
+					"response": []
+				}
+			],
+			"description": "Candidate job application endpoints"
+		}
+	]
+}

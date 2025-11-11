@@ -1,0 +1,277 @@
+{
+  "info": {
+    "name": "Admin - Industries Management",
+    "description": "Complete CRUD operations and analytics for Industries management by Admin",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "internship-platform-admin"
+  },
+  "item": [
+    {
+      "name": "Industries CRUD",
+      "item": [
+        {
+          "name": "Get All Industries",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/industries?includeStats=true",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "industries"],
+              "query": [
+                { "key": "q", "value": "", "disabled": true, "description": "Search query" },
+                { "key": "parent", "value": "", "disabled": true, "description": "root|industry_code" },
+                { "key": "includeStats", "value": "true", "description": "Include real-time stats" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Industry Hierarchy",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/industries/hierarchy",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "industries", "hierarchy"]
+            }
+          }
+        },
+        {
+          "name": "Get Industry by Code",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/industries/{{industry_code}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "industries", "{{industry_code}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Industry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"technology\",\n  \"parentCode\": null,\n  \"name\": {\n    \"vi\": \"Công nghệ thông tin\",\n    \"en\": \"Information Technology\"\n  },\n  \"description\": {\n    \"vi\": \"Ngành công nghệ thông tin và phần mềm\",\n    \"en\": \"Information technology and software industry\"\n  },\n  \"color\": \"#3b82f6\",\n  \"icon\": \"laptop\",\n  \"keywords\": [\"IT\", \"Software\", \"Tech\", \"Digital\"],\n  \"visible\": true,\n  \"sortOrder\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/industries",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "industries"]
+            }
+          }
+        },
+        {
+          "name": "Create Sub-Industry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"software-dev\",\n  \"parentCode\": \"technology\",\n  \"name\": {\n    \"vi\": \"Phát triển phần mềm\",\n    \"en\": \"Software Development\"\n  },\n  \"description\": {\n    \"vi\": \"Phát triển ứng dụng và phần mềm\",\n    \"en\": \"Application and software development\"\n  },\n  \"color\": \"#3b82f6\",\n  \"keywords\": [\"Programming\", \"Coding\", \"Development\"],\n  \"visible\": true,\n  \"sortOrder\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/industries",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "industries"]
+            }
+          }
+        },
+        {
+          "name": "Update Industry",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": {\n    \"vi\": \"Mô tả cập nhật\",\n    \"en\": \"Updated description\"\n  },\n  \"visible\": true,\n  \"sortOrder\": 2\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/industries/{{industry_code}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "industries", "{{industry_code}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Industry",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/industries/{{industry_code}}?force=false",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "industries", "{{industry_code}}"],
+              "query": [
+                { "key": "force", "value": "false", "description": "Force delete even if in use" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analytics & Stats",
+      "item": [
+        {
+          "name": "Get Industry Analytics Overview",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/industries/analytics/overview",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "industries", "analytics", "overview"]
+            }
+          }
+        },
+        {
+          "name": "Sync Industry Stats",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/industries/analytics/sync",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "industries", "analytics", "sync"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bulk Operations",
+      "item": [
+        {
+          "name": "Bulk Create Industries",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"industries\": [\n    {\n      \"code\": \"finance\",\n      \"name\": {\n        \"vi\": \"Tài chính - Ngân hàng\",\n        \"en\": \"Finance & Banking\"\n      },\n      \"description\": {\n        \"vi\": \"Ngành tài chính và ngân hàng\",\n        \"en\": \"Finance and banking industry\"\n      },\n      \"visible\": true,\n      \"sortOrder\": 2\n    },\n    {\n      \"code\": \"healthcare\",\n      \"name\": {\n        \"vi\": \"Y tế - Chăm sóc sức khỏe\",\n        \"en\": \"Healthcare\"\n      },\n      \"description\": {\n        \"vi\": \"Ngành y tế và chăm sóc sức khỏe\",\n        \"en\": \"Healthcare industry\"\n      },\n      \"visible\": true,\n      \"sortOrder\": 3\n    },\n    {\n      \"code\": \"education\",\n      \"name\": {\n        \"vi\": \"Giáo dục - Đào tạo\",\n        \"en\": \"Education & Training\"\n      },\n      \"description\": {\n        \"vi\": \"Ngành giáo dục và đào tạo\",\n        \"en\": \"Education and training industry\"\n      },\n      \"visible\": true,\n      \"sortOrder\": 4\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/industries/bulk",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "industries", "bulk"]
+            }
+          }
+        },
+        {
+          "name": "Update Sort Order",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"updates\": [\n    {\n      \"code\": \"technology\",\n      \"sortOrder\": 1\n    },\n    {\n      \"code\": \"finance\",\n      \"sortOrder\": 2\n    },\n    {\n      \"code\": \"healthcare\",\n      \"sortOrder\": 3\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/industries/sort-order",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "industries", "sort-order"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "industry_code",
+      "value": "technology",
+      "type": "string"
+    }
+  ]
+}

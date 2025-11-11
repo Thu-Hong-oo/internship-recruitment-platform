@@ -1,0 +1,204 @@
+{
+	"info": {
+		"_postman_id": "saved-jobs-api-001",
+		"name": "Saved Jobs API",
+		"description": "Complete saved jobs management API for candidates. Save, manage, and organize favorite job postings.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{candidate_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5000/api",
+			"type": "string"
+		},
+		{
+			"key": "candidate_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "saved_job_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "job_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "category",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Saved Jobs Management",
+			"item": [
+				{
+					"name": "Get All Saved Jobs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/saved-jobs?page=1&limit=20&sortBy=createdAt&sortOrder=desc",
+							"host": ["{{base_url}}"],
+							"path": ["saved-jobs"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "sortBy",
+									"value": "createdAt",
+									"description": "createdAt, jobTitle, company"
+								},
+								{
+									"key": "sortOrder",
+									"value": "desc",
+									"description": "asc, desc"
+								}
+							]
+						},
+						"description": "Get all saved jobs for the authenticated candidate"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Saved Jobs Count",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/saved-jobs/count",
+							"host": ["{{base_url}}"],
+							"path": ["saved-jobs", "count"]
+						},
+						"description": "Get total count of saved jobs"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Saved Jobs by Category",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/saved-jobs/category/{{category}}?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["saved-jobs", "category", "{{category}}"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						},
+						"description": "Get saved jobs filtered by category"
+					},
+					"response": []
+				},
+				{
+					"name": "Check if Job is Saved",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/saved-jobs/check/{{job_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["saved-jobs", "check", "{{job_id}}"]
+						},
+						"description": "Check if a specific job is saved by the candidate"
+					},
+					"response": []
+				},
+				{
+					"name": "Save a Job",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"jobId\": \"{{job_id}}\",\n  \"notes\": \"Interesting position with good benefits\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/saved-jobs",
+							"host": ["{{base_url}}"],
+							"path": ["saved-jobs"]
+						},
+						"description": "Save a job to favorites"
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Saved Job by ID",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/saved-jobs/{{saved_job_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["saved-jobs", "{{saved_job_id}}"]
+						},
+						"description": "Remove a saved job using saved job record ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Saved Job by Job ID",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/saved-jobs/job/{{job_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["saved-jobs", "job", "{{job_id}}"]
+						},
+						"description": "Remove a saved job using the original job ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Clear All Saved Jobs",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/saved-jobs",
+							"host": ["{{base_url}}"],
+							"path": ["saved-jobs"]
+						},
+						"description": "Remove all saved jobs for the candidate"
+					},
+					"response": []
+				}
+			],
+			"description": "Complete saved jobs CRUD operations"
+		}
+	]
+}
