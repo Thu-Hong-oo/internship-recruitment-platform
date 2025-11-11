@@ -132,7 +132,6 @@ const UserSchema = new mongoose.Schema(
     emailStatus: {
       type: String,
       enum: ['unknown', 'delivered', 'bounced', 'invalid'],
-      default: 'unknown',
     },
     emailDeliveredAt: Date,
     emailBounceAt: Date,

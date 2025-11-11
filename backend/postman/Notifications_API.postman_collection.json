@@ -1,0 +1,257 @@
+{
+	"info": {
+		"_postman_id": "notifications-api-001",
+		"name": "Notifications API",
+		"description": "Complete notification management API for users. Includes notification CRUD, preferences, and admin broadcast features.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{user_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5000/api",
+			"type": "string"
+		},
+		{
+			"key": "user_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "admin_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "notification_id",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "User Notifications",
+			"item": [
+				{
+					"name": "Get All User Notifications",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/notifications?page=1&limit=20&read=all&type=all",
+							"host": ["{{base_url}}"],
+							"path": ["notifications"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "read",
+									"value": "all",
+									"description": "all, read, unread"
+								},
+								{
+									"key": "type",
+									"value": "all",
+									"description": "all, info, success, warning, error"
+								}
+							]
+						},
+						"description": "Get all notifications for the authenticated user"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Notification by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/notifications/{{notification_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["notifications", "{{notification_id}}"]
+						},
+						"description": "Get detailed information about a specific notification"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Notification",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"New Job Alert\",\n  \"message\": \"A new job matching your profile has been posted\",\n  \"type\": \"info\",\n  \"link\": \"/jobs/123\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/notifications",
+							"host": ["{{base_url}}"],
+							"path": ["notifications"]
+						},
+						"description": "Create a new notification"
+					},
+					"response": []
+				},
+				{
+					"name": "Mark Notification as Read",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/notifications/{{notification_id}}/read",
+							"host": ["{{base_url}}"],
+							"path": ["notifications", "{{notification_id}}", "read"]
+						},
+						"description": "Mark a specific notification as read"
+					},
+					"response": []
+				},
+				{
+					"name": "Mark All Notifications as Read",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/notifications/read-all",
+							"host": ["{{base_url}}"],
+							"path": ["notifications", "read-all"]
+						},
+						"description": "Mark all user notifications as read"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Notification",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/notifications/{{notification_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["notifications", "{{notification_id}}"]
+						},
+						"description": "Delete a specific notification"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete All Notifications",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/notifications",
+							"host": ["{{base_url}}"],
+							"path": ["notifications"]
+						},
+						"description": "Delete all user notifications"
+					},
+					"response": []
+				}
+			],
+			"description": "Notification CRUD operations"
+		},
+		{
+			"name": "Notification Preferences",
+			"item": [
+				{
+					"name": "Get Notification Preferences",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/notifications/preferences",
+							"host": ["{{base_url}}"],
+							"path": ["notifications", "preferences"]
+						},
+						"description": "Get user notification preferences"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Notification Preferences",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"emailNotifications\": true,\n  \"pushNotifications\": true,\n  \"jobAlerts\": true,\n  \"applicationUpdates\": true,\n  \"messageNotifications\": false,\n  \"systemUpdates\": true\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/notifications/preferences",
+							"host": ["{{base_url}}"],
+							"path": ["notifications", "preferences"]
+						},
+						"description": "Update user notification preferences"
+					},
+					"response": []
+				}
+			],
+			"description": "Notification preference management"
+		},
+		{
+			"name": "Admin Operations",
+			"item": [
+				{
+					"name": "Broadcast Notification (Admin)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{admin_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"System Maintenance\",\n  \"message\": \"The system will be down for maintenance on Sunday, 3 AM - 5 AM\",\n  \"type\": \"warning\",\n  \"targetRole\": \"all\",\n  \"link\": \"/announcements/maintenance\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/notifications/broadcast",
+							"host": ["{{base_url}}"],
+							"path": ["notifications", "broadcast"]
+						},
+						"description": "Send notification to all users or specific role (admin only)"
+					},
+					"response": []
+				}
+			],
+			"description": "Admin-only notification operations"
+		}
+	]
+}

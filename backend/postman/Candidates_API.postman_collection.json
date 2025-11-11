@@ -1,0 +1,761 @@
+{
+	"info": {
+		"_postman_id": "candidates-api-collection-001",
+		"name": "Candidates API - Complete",
+		"description": "Complete API collection for candidate profile management, resume operations, CV builder, job applications, and more. All endpoints require candidate authentication.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{candidate_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5000/api",
+			"type": "string"
+		},
+		{
+			"key": "candidate_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "resume_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "job_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "application_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "section_item_id",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Profile Management",
+			"item": [
+				{
+					"name": "Get Candidate Profile",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/candidates/me?include=education,experience,skills,projects,certifications,resume",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me"],
+							"query": [
+								{
+									"key": "include",
+									"value": "education,experience,skills,projects,certifications,resume",
+									"description": "Comma-separated list of sections to include"
+								}
+							]
+						},
+						"description": "Get complete candidate profile with flexible includes"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Profile",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"section\": \"profile\",\n  \"data\": {\n    \"personalInfo\": {\n      \"fullName\": \"Nguyen Van A\",\n      \"email\": \"nguyenvana@example.com\",\n      \"phone\": \"+84901234567\",\n      \"dateOfBirth\": \"1998-05-15\",\n      \"gender\": \"male\",\n      \"address\": {\n        \"street\": \"123 Le Loi Street\",\n        \"city\": \"Ho Chi Minh City\",\n        \"district\": \"District 1\",\n        \"country\": \"Vietnam\"\n      },\n      \"nationality\": \"Vietnamese\",\n      \"linkedIn\": \"https://linkedin.com/in/nguyenvana\",\n      \"github\": \"https://github.com/nguyenvana\",\n      \"portfolio\": \"https://nguyenvana.dev\"\n    },\n    \"summary\": \"Passionate Full Stack Developer with 3+ years of experience building scalable web applications. Specialized in React, Node.js, and cloud technologies.\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/candidates/me",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me"]
+						},
+						"description": "Update candidate profile (section: profile, visibility, preferences)"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Visibility Settings",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"section\": \"visibility\",\n  \"data\": {\n    \"profileVisibility\": \"public\",\n    \"showEmail\": false,\n    \"showPhone\": false,\n    \"searchable\": true\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/candidates/me",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me"]
+						},
+						"description": "Update profile visibility settings"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Preferences",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"section\": \"preferences\",\n  \"data\": {\n    \"jobPreferences\": {\n      \"desiredJobTitles\": [\"Full Stack Developer\", \"Senior Frontend Developer\"],\n      \"desiredIndustries\": [\"technology\", \"fintech\"],\n      \"preferredLocations\": [\"Ho Chi Minh City\", \"Hanoi\"],\n      \"employmentTypes\": [\"full-time\", \"contract\"],\n      \"minSalary\": 25000000,\n      \"remotePreference\": \"hybrid\",\n      \"willingToRelocate\": true\n    },\n    \"notifications\": {\n      \"emailNotifications\": true,\n      \"jobAlerts\": true,\n      \"applicationUpdates\": true,\n      \"marketingEmails\": false\n    }\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/candidates/me",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me"]
+						},
+						"description": "Update job preferences and notification settings"
+					},
+					"response": []
+				}
+			],
+			"description": "Core profile management endpoints"
+		},
+		{
+			"name": "Resume Management",
+			"item": [
+				{
+					"name": "Upload Resume (File)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": "/path/to/resume.pdf",
+									"description": "Resume file (PDF, DOC, DOCX)"
+								},
+								{
+									"key": "action",
+									"value": "upload",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/candidates/me/resume",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me", "resume"]
+						},
+						"description": "Upload resume file"
+					},
+					"response": []
+				},
+				{
+					"name": "Parse Resume (AI)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": "/path/to/resume.pdf"
+								},
+								{
+									"key": "action",
+									"value": "parse",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/candidates/me/resume",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me", "resume"]
+						},
+						"description": "Parse resume using AI to extract structured data"
+					},
+					"response": []
+				},
+				{
+					"name": "Generate Smart Resume",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"template\": \"modern\",\n  \"targetJob\": \"Senior Full Stack Developer\",\n  \"format\": \"pdf\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/candidates/me/resume/generate",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me", "resume", "generate"]
+						},
+						"description": "Generate AI-enhanced resume from profile data"
+					},
+					"response": []
+				},
+				{
+					"name": "Generate Targeted Resume for Job",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"template\": \"modern\",\n  \"format\": \"pdf\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/candidates/me/resume/generate/{{job_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me", "resume", "generate", "{{job_id}}"]
+						},
+						"description": "Generate resume optimized for specific job posting"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Resume Data",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/candidates/me/resume?version=all",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me", "resume"],
+							"query": [
+								{
+									"key": "version",
+									"value": "all",
+									"description": "all, current, or specific ID"
+								}
+							]
+						},
+						"description": "Get resume data (current and history)"
+					},
+					"response": []
+				},
+				{
+					"name": "Download Resume",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/candidates/me/resume?id=current&action=download",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me", "resume"],
+							"query": [
+								{
+									"key": "id",
+									"value": "current",
+									"description": "current or ObjectId"
+								},
+								{
+									"key": "action",
+									"value": "download"
+								}
+							]
+						},
+						"description": "Download resume file"
+					},
+					"response": []
+				},
+				{
+					"name": "View Resume in Browser",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/candidates/me/resume/view/current",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me", "resume", "view", "current"]
+						},
+						"description": "Stream CV for viewing in browser"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Resume",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/candidates/me/resume/{{resume_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me", "resume", "{{resume_id}}"]
+						},
+						"description": "Delete resume (current or from history)"
+					},
+					"response": []
+				},
+				{
+					"name": "Set Resume as Current",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/candidates/me/resume/set-current/{{resume_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me", "resume", "set-current", "{{resume_id}}"]
+						},
+						"description": "Set a resume from history as current"
+					},
+					"response": []
+				},
+				{
+					"name": "Rename Resume",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"id\": \"current\",\n  \"displayName\": \"My Updated Resume 2024\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/candidates/me/resume/rename",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me", "resume", "rename"]
+						},
+						"description": "Rename resume display name"
+					},
+					"response": []
+				}
+			],
+			"description": "Resume upload, generation, and management"
+		},
+		{
+			"name": "CV Builder",
+			"item": [
+				{
+					"name": "Get CV Builder Data",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/candidates/me/cv-builder",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me", "cv-builder"]
+						},
+						"description": "Get CV builder data for interactive editor"
+					},
+					"response": []
+				},
+				{
+					"name": "Update CV Builder Data",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"personalInfo\": {\n    \"fullName\": \"Nguyen Van A\",\n    \"email\": \"nguyenvana@example.com\",\n    \"phone\": \"+84901234567\"\n  },\n  \"education\": [\n    {\n      \"institution\": \"Ho Chi Minh City University of Technology\",\n      \"degree\": \"Bachelor of Computer Science\",\n      \"fieldOfStudy\": \"Software Engineering\",\n      \"startDate\": \"2016-09\",\n      \"endDate\": \"2020-06\",\n      \"gpa\": 3.5\n    }\n  ],\n  \"experience\": [\n    {\n      \"company\": \"Tech Solutions Inc.\",\n      \"position\": \"Full Stack Developer\",\n      \"startDate\": \"2020-07\",\n      \"endDate\": \"present\",\n      \"description\": \"Developed and maintained web applications using React and Node.js\"\n    }\n  ],\n  \"skills\": {\n    \"technical\": [\n      {\"name\": \"React\", \"level\": \"advanced\"},\n      {\"name\": \"Node.js\", \"level\": \"advanced\"},\n      {\"name\": \"TypeScript\", \"level\": \"intermediate\"}\n    ]\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/candidates/me/cv-builder",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me", "cv-builder"]
+						},
+						"description": "Update CV builder data"
+					},
+					"response": []
+				},
+				{
+					"name": "Generate Smart CV",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"template\": \"modern\",\n  \"targetJob\": \"Full Stack Developer\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/candidates/me/cv-builder/generate",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me", "cv-builder", "generate"]
+						},
+						"description": "Generate smart CV from builder data"
+					},
+					"response": []
+				},
+				{
+					"name": "Get CV Templates",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/candidates/me/cv-builder/templates",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me", "cv-builder", "templates"]
+						},
+						"description": "Get available CV templates"
+					},
+					"response": []
+				},
+				{
+					"name": "Export CV to PDF",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"template\": \"modern\",\n  \"data\": {}\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/candidates/me/cv-builder/export-pdf",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me", "cv-builder", "export-pdf"]
+						},
+						"description": "Export CV to PDF format"
+					},
+					"response": []
+				},
+				{
+					"name": "Export PDF Direct",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"template\": \"modern\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/candidates/me/cv-builder/export-pdf-direct",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me", "cv-builder", "export-pdf-direct"]
+						},
+						"description": "Direct PDF export"
+					},
+					"response": []
+				}
+			],
+			"description": "Interactive CV builder endpoints"
+		},
+		{
+			"name": "Profile Sections",
+			"item": [
+				{
+					"name": "Get Section",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/candidates/me/education",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me", "education"]
+						},
+						"description": "Get specific section (education, experience, skills, projects, certifications)"
+					},
+					"response": []
+				},
+				{
+					"name": "Add to Section",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"institution\": \"Ho Chi Minh City University of Technology\",\n  \"degree\": \"Bachelor of Computer Science\",\n  \"fieldOfStudy\": \"Software Engineering\",\n  \"startDate\": \"2016-09-01\",\n  \"endDate\": \"2020-06-30\",\n  \"gpa\": 3.5,\n  \"achievements\": [\n    \"Dean's List all semesters\",\n    \"Best Thesis Award\"\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/candidates/me/education",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me", "education"]
+						},
+						"description": "Add new entry to section"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Section Entry",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"institution\": \"Ho Chi Minh City University of Technology (Updated)\",\n  \"gpa\": 3.7\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/candidates/me/education/{{section_item_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me", "education", "{{section_item_id}}"]
+						},
+						"description": "Update specific entry in section"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Section Entry",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/candidates/me/education/{{section_item_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "me", "education", "{{section_item_id}}"]
+						},
+						"description": "Delete entry from section"
+					},
+					"response": []
+				}
+			],
+			"description": "Manage profile sections (education, experience, skills, projects, certifications)"
+		},
+		{
+			"name": "Job Applications",
+			"item": [
+				{
+					"name": "Get My Applications",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/candidates/applications?status=all&page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "applications"],
+							"query": [
+								{
+									"key": "status",
+									"value": "all",
+									"description": "all, pending, reviewing, shortlisted, rejected, hired"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						},
+						"description": "Get all job applications submitted by candidate"
+					},
+					"response": []
+				},
+				{
+					"name": "Apply for Job",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"jobId\": \"{{job_id}}\",\n  \"coverLetter\": \"Dear Hiring Manager, I am very interested in this position...\",\n  \"resumeId\": \"current\",\n  \"additionalInfo\": {\n    \"availableStartDate\": \"2024-12-01\",\n    \"expectedSalary\": 30000000\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/candidates/applications",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "applications"]
+						},
+						"description": "Submit job application"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Application",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"coverLetter\": \"Updated cover letter...\",\n  \"additionalInfo\": {\n    \"availableStartDate\": \"2024-11-15\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/candidates/applications/{{application_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "applications", "{{application_id}}"]
+						},
+						"description": "Update application before deadline"
+					},
+					"response": []
+				}
+			],
+			"description": "Job application management"
+		},
+		{
+			"name": "Job & Company Actions",
+			"item": [
+				{
+					"name": "Browse Jobs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/candidates/jobs?page=1&limit=20&skills=React,Node.js",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "jobs"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "skills",
+									"value": "React,Node.js"
+								}
+							]
+						},
+						"description": "Browse available jobs"
+					},
+					"response": []
+				},
+				{
+					"name": "Job Action (Save/Unsave)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"action\": \"save\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/candidates/jobs/{{job_id}}/action",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "jobs", "{{job_id}}", "action"]
+						},
+						"description": "Perform action on job (save, unsave)"
+					},
+					"response": []
+				},
+				{
+					"name": "Company Action (Follow/Unfollow)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"action\": \"follow\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/candidates/companies/{{company_id}}/action",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "companies", "{{company_id}}", "action"]
+						},
+						"description": "Perform action on company (follow, unfollow)"
+					},
+					"response": []
+				},
+				{
+					"name": "Browse Companies",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/candidates/companies?page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["candidates", "companies"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						},
+						"description": "Browse companies"
+					},
+					"response": []
+				}
+			],
+			"description": "Job and company interaction endpoints"
+		}
+	]
+}

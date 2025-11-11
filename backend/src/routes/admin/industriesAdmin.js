@@ -1,83 +1,101 @@
 const express = require('express');
 const router = express.Router();
-const Industry = require('../../models/Industry');
+const {
+  getAllIndustries,
+  getIndustryByCode,
+  createIndustry,
+  updateIndustry,
+  deleteIndustry,
+  getIndustryAnalytics,
+  syncIndustryStats,
+  bulkCreateIndustries,
+  getIndustryHierarchy,
+  updateIndustrySortOrder,
+} = require('../../controllers/admin/industriesAdminController');
 
 // NOTE: parent admin router already applies protect + authorize('admin')
 
-// List (including hidden) with query
-router.get('/', async (req, res, next) => {
-  try {
-    const { q, parent } = req.query;
-    const filter = {};
-    if (parent) filter.parentCode = parent === 'root' ? null : parent;
-    if (q) filter.$text = { $search: q };
-    const items = await Industry.find(filter).sort({
-      sortOrder: 1,
-      'name.vi': 1,
-    });
-    res.json({ success: true, data: items });
-  } catch (err) {
-    next(err);
-  }
-});
+// ========================================
+// INDUSTRY MANAGEMENT CRUD
+// ========================================
 
-// Create
-router.post('/', async (req, res, next) => {
-  try {
-    const created = await Industry.create(req.body);
-    res.status(201).json({ success: true, data: created });
-  } catch (err) {
-    next(err);
-  }
-});
+/**
+ * @route   GET /api/admin/industries
+ * @desc    Get all industries with filters (including hidden)
+ * @access  Private/Admin
+ * @query   ?q=search&parent=root|code&includeStats=true
+ */
+router.get('/', getAllIndustries);
 
-// Read by code
-router.get('/:code', async (req, res, next) => {
-  try {
-    const item = await Industry.findOne({ code: req.params.code });
-    if (!item)
-      return res
-        .status(404)
-        .json({ success: false, error: 'Industry not found' });
-    res.json({ success: true, data: item });
-  } catch (err) {
-    next(err);
-  }
-});
+/**
+ * @route   GET /api/admin/industries/hierarchy
+ * @desc    Get industry hierarchy tree
+ * @access  Private/Admin
+ */
+router.get('/hierarchy', getIndustryHierarchy);
 
-// Update
-router.put('/:code', async (req, res, next) => {
-  try {
-    const updated = await Industry.findOneAndUpdate(
-      { code: req.params.code },
-      req.body,
-      {
-        new: true,
-        runValidators: true,
-      }
-    );
-    if (!updated)
-      return res
-        .status(404)
-        .json({ success: false, error: 'Industry not found' });
-    res.json({ success: true, data: updated });
-  } catch (err) {
-    next(err);
-  }
-});
+/**
+ * @route   GET /api/admin/industries/:code
+ * @desc    Get industry by code with detailed stats
+ * @access  Private/Admin
+ */
+router.get('/:code', getIndustryByCode);
 
-// Delete
-router.delete('/:code', async (req, res, next) => {
-  try {
-    const deleted = await Industry.findOneAndDelete({ code: req.params.code });
-    if (!deleted)
-      return res
-        .status(404)
-        .json({ success: false, error: 'Industry not found' });
-    res.json({ success: true });
-  } catch (err) {
-    next(err);
-  }
-});
+/**
+ * @route   POST /api/admin/industries
+ * @desc    Create new industry
+ * @access  Private/Admin
+ * @body    { code, name, description, parentCode, ... }
+ */
+router.post('/', createIndustry);
+
+/**
+ * @route   PUT /api/admin/industries/:code
+ * @desc    Update industry
+ * @access  Private/Admin
+ * @body    Partial industry data
+ */
+router.put('/:code', updateIndustry);
+
+/**
+ * @route   DELETE /api/admin/industries/:code
+ * @desc    Delete industry (with validation)
+ * @access  Private/Admin
+ */
+router.delete('/:code', deleteIndustry);
+
+// ========================================
+// ANALYTICS & BULK OPERATIONS
+// ========================================
+
+/**
+ * @route   GET /api/admin/industries/analytics/overview
+ * @desc    Get industry analytics overview
+ * @access  Private/Admin
+ */
+router.get('/analytics/overview', getIndustryAnalytics);
+
+/**
+ * @route   POST /api/admin/industries/analytics/sync
+ * @desc    Sync industry statistics from jobs and profiles
+ * @access  Private/Admin
+ */
+router.post('/analytics/sync', syncIndustryStats);
+
+/**
+ * @route   POST /api/admin/industries/bulk
+ * @desc    Bulk create industries
+ * @access  Private/Admin
+ * @body    { industries: [{ code, name, ... }] }
+ */
+router.post('/bulk', bulkCreateIndustries);
+
+/**
+ * @route   PUT /api/admin/industries/sort-order
+ * @desc    Update sort order for multiple industries
+ * @access  Private/Admin
+ * @body    { updates: [{ code, sortOrder }] }
+ */
+router.put('/sort-order', updateIndustrySortOrder);
 
 module.exports = router;

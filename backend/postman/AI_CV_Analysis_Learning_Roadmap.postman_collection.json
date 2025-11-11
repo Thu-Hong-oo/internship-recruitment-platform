@@ -1,0 +1,419 @@
+{
+  "info": {
+    "name": "AI - CV Analysis & Learning Roadmap (NLP)",
+    "description": "NLP-based CV analysis, skill gap identification, and personalized learning roadmap generation using Skills and Industries data",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "internship-platform-ai"
+  },
+  "item": [
+    {
+      "name": "CV Analysis",
+      "item": [
+        {
+          "name": "Analyze CV from File",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "cv",
+                  "type": "file",
+                  "src": "",
+                  "description": "CV file (PDF, DOC, DOCX)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai/analyze-cv",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "analyze-cv"]
+            }
+          }
+        },
+        {
+          "name": "Analyze CV from Text",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rawCVText\": \"CURRICULUM VITAE\\n\\nName: John Doe\\nEmail: john.doe@example.com\\n\\nSKILLS:\\n- JavaScript, React, Node.js\\n- HTML, CSS, Tailwind\\n- MongoDB, PostgreSQL\\n- Git, Docker\\n\\nEXPERIENCE:\\nSoftware Engineer at Tech Company (2021-2023)\\n- Developed web applications using React and Node.js\\n- Implemented RESTful APIs\\n- Collaborated with cross-functional teams\\n\\nEDUCATION:\\nBachelor of Computer Science (2017-2021)\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai/analyze-cv-text",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "analyze-cv-text"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Job Matching & Analysis",
+      "item": [
+        {
+          "name": "Get Job Recommendations",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"limit\": 10,\n  \"minScore\": 60\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai/job-recommendations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "job-recommendations"]
+            }
+          }
+        },
+        {
+          "name": "Analyze Job Match",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": \"{{job_id}}\",\n  \"targetJobDescription\": \"We are looking for a Full Stack Developer with 3+ years of experience in React, Node.js, and cloud technologies.\",\n  \"targetJobTitle\": \"Full Stack Developer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai/analyze-job-match",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "analyze-job-match"]
+            }
+          }
+        },
+        {
+          "name": "Analyze Job Description",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobDescription\": \"We are seeking a talented Full Stack Developer to join our team. You will work on developing scalable web applications using modern technologies.\\n\\nRequired Skills:\\n- 3+ years of experience with React and Node.js\\n- Strong knowledge of TypeScript\\n- Experience with cloud platforms (AWS/Azure)\\n- Proficiency in database design (MongoDB, PostgreSQL)\\n- Understanding of microservices architecture\\n\\nPreferred Skills:\\n- Experience with Docker and Kubernetes\\n- Knowledge of CI/CD pipelines\\n- Familiarity with GraphQL\\n\\nResponsibilities:\\n- Design and implement new features\\n- Write clean, maintainable code\\n- Collaborate with cross-functional teams\\n- Participate in code reviews\",\n  \"targetJob\": \"Full Stack Developer\",\n  \"companyInfo\": {\n    \"name\": \"Tech Innovators Inc.\",\n    \"industry\": \"technology\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai/analyze-job-description",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "analyze-job-description"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Skill Gap Analysis",
+      "item": [
+        {
+          "name": "Analyze Skill Gaps (with Job Description)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetJobDescription\": \"We are looking for a Senior Full Stack Developer with expertise in:\\n- React, Next.js, TypeScript\\n- Node.js, Express, NestJS\\n- MongoDB, PostgreSQL, Redis\\n- AWS services (EC2, S3, Lambda)\\n- Docker, Kubernetes\\n- Microservices architecture\\n- GraphQL and REST APIs\\n- CI/CD pipelines\\n- Agile methodologies\",\n  \"targetJobTitle\": \"Senior Full Stack Developer\",\n  \"industry\": \"technology\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai/skill-gap-analysis",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "skill-gap-analysis"]
+            }
+          }
+        },
+        {
+          "name": "Analyze Skill Gaps (with Job ID)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": \"{{job_id}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai/skill-gap-analysis",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "skill-gap-analysis"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Learning Roadmap Generation",
+      "item": [
+        {
+          "name": "Generate Skill Roadmap (Basic)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetRole\": \"Full Stack Developer\",\n  \"targetSkills\": [\n    \"React\",\n    \"Node.js\",\n    \"TypeScript\",\n    \"MongoDB\",\n    \"Docker\"\n  ],\n  \"timeframe\": 12,\n  \"currentLevel\": \"intermediate\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai/skill-roadmap",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "skill-roadmap"]
+            }
+          }
+        },
+        {
+          "name": "Generate Skill Roadmap (Advanced with Job)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetJobTitle\": \"Senior Full Stack Developer\",\n  \"targetJobDescription\": \"We need a developer with strong skills in React, Node.js, cloud technologies (AWS), database management, and DevOps practices. Experience with microservices architecture and CI/CD is essential.\",\n  \"skillGaps\": [\n    {\n      \"skill\": \"TypeScript\",\n      \"currentLevel\": \"beginner\",\n      \"targetLevel\": \"advanced\",\n      \"priority\": \"high\"\n    },\n    {\n      \"skill\": \"AWS\",\n      \"currentLevel\": \"none\",\n      \"targetLevel\": \"intermediate\",\n      \"priority\": \"critical\"\n    },\n    {\n      \"skill\": \"Kubernetes\",\n      \"currentLevel\": \"none\",\n      \"targetLevel\": \"intermediate\",\n      \"priority\": \"high\"\n    },\n    {\n      \"skill\": \"GraphQL\",\n      \"currentLevel\": \"beginner\",\n      \"targetLevel\": \"intermediate\",\n      \"priority\": \"medium\"\n    }\n  ],\n  \"timeframe\": 16,\n  \"learningPreferences\": {\n    \"focus\": \"practical\",\n    \"pace\": \"intensive\",\n    \"learningStyle\": \"project-based\",\n    \"budget\": \"moderate\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai/skill-roadmap",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "skill-roadmap"]
+            }
+          }
+        },
+        {
+          "name": "Generate Career Change Roadmap",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetJobTitle\": \"DevOps Engineer\",\n  \"targetJobDescription\": \"Seeking a DevOps Engineer to manage our cloud infrastructure, implement CI/CD pipelines, and ensure system reliability. Must have experience with AWS, Docker, Kubernetes, and infrastructure as code.\",\n  \"timeframe\": 24,\n  \"currentLevel\": \"beginner\",\n  \"learningPreferences\": {\n    \"focus\": \"comprehensive\",\n    \"pace\": \"moderate\",\n    \"learningStyle\": \"structured\",\n    \"certifications\": true\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai/skill-roadmap",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "skill-roadmap"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "AI Suggestions",
+      "item": [
+        {
+          "name": "Get Career Objective Suggestions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stepType\": \"careerObjective\",\n  \"currentData\": {\n    \"targetJob\": \"Full Stack Developer\"\n  },\n  \"context\": {\n    \"experience\": \"3 years\",\n    \"education\": \"Bachelor's in Computer Science\",\n    \"industry\": \"technology\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai/suggestions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "suggestions"]
+            }
+          }
+        },
+        {
+          "name": "Get Skills Suggestions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stepType\": \"skills\",\n  \"currentData\": {},\n  \"context\": {\n    \"targetJob\": \"Backend Developer\",\n    \"experience\": \"2 years as Frontend Developer\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai/suggestions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "suggestions"]
+            }
+          }
+        },
+        {
+          "name": "Enhance Experience Description",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stepType\": \"experience\",\n  \"currentData\": {\n    \"position\": \"Software Developer\",\n    \"company\": \"Tech Solutions\",\n    \"description\": \"Worked on web applications and fixed bugs\"\n  },\n  \"context\": {}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai/suggestions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "suggestions"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Candidate Insights",
+      "item": [
+        {
+          "name": "Get Candidate Insights",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/ai/candidate-insights",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "candidate-insights"]
+            }
+          }
+        },
+        {
+          "name": "Get AI Insights",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/ai/insights",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "insights"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "job_id",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

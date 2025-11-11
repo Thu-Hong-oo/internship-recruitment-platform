@@ -1,0 +1,439 @@
+{
+  "info": {
+    "name": "Admin - Skills Management",
+    "description": "Complete CRUD operations and analytics for Skills management by Admin",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "internship-platform-admin"
+  },
+  "item": [
+    {
+      "name": "Skills CRUD",
+      "item": [
+        {
+          "name": "Get All Skills",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills?page=1&limit=50&status=all&sortBy=popularity&sortOrder=desc",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50" },
+                { "key": "status", "value": "all", "description": "all|active|inactive" },
+                { "key": "category", "value": "", "disabled": true },
+                { "key": "search", "value": "", "disabled": true },
+                { "key": "sortBy", "value": "popularity" },
+                { "key": "sortOrder", "value": "desc" },
+                { "key": "demandLevel", "value": "", "disabled": true },
+                { "key": "trend", "value": "", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Skill by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/{{skill_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "{{skill_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Skill",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"React\",\n  \"category\": \"frontend\",\n  \"description\": \"A JavaScript library for building user interfaces\",\n  \"aliases\": [\"ReactJS\", \"React.js\"],\n  \"demandLevel\": \"high\",\n  \"trend\": \"growing\",\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills"]
+            }
+          }
+        },
+        {
+          "name": "Update Skill",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"demandLevel\": \"critical\",\n  \"trend\": \"emerging\",\n  \"popularity\": 150\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/{{skill_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "{{skill_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Skill",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/{{skill_id}}?force=false",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "{{skill_id}}"],
+              "query": [
+                { "key": "force", "value": "false", "description": "Force delete even if in use" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bulk Operations",
+      "item": [
+        {
+          "name": "Bulk Create Skills",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"skills\": [\n    {\n      \"name\": \"Vue.js\",\n      \"category\": \"frontend\",\n      \"description\": \"Progressive JavaScript framework\",\n      \"demandLevel\": \"high\",\n      \"trend\": \"growing\"\n    },\n    {\n      \"name\": \"Docker\",\n      \"category\": \"devops\",\n      \"description\": \"Container platform\",\n      \"demandLevel\": \"critical\",\n      \"trend\": \"stable\"\n    },\n    {\n      \"name\": \"Kubernetes\",\n      \"category\": \"devops\",\n      \"description\": \"Container orchestration\",\n      \"demandLevel\": \"high\",\n      \"trend\": \"growing\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/bulk/create",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "bulk", "create"]
+            }
+          }
+        },
+        {
+          "name": "Batch Update Skills",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"updates\": [\n    {\n      \"id\": \"{{skill_id_1}}\",\n      \"data\": { \"demandLevel\": \"critical\" }\n    },\n    {\n      \"id\": \"{{skill_id_2}}\",\n      \"data\": { \"trend\": \"growing\" }\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/bulk/update",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "bulk", "update"]
+            }
+          }
+        },
+        {
+          "name": "Batch Delete Skills",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": [\n    \"{{skill_id_1}}\",\n    \"{{skill_id_2}}\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/bulk/delete?force=false",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "bulk", "delete"],
+              "query": [
+                { "key": "force", "value": "false" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Categories Management",
+      "item": [
+        {
+          "name": "Get All Categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/categories/list",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "categories", "list"]
+            }
+          }
+        },
+        {
+          "name": "Get Skills by Category",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/categories/{{category}}?page=1&limit=50",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "categories", "{{category}}"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "50" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Skill Category",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"backend\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/categories/{{skill_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "categories", "{{skill_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analytics & Insights",
+      "item": [
+        {
+          "name": "Get Skill Analytics Overview",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/analytics/overview",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "analytics", "overview"]
+            }
+          }
+        },
+        {
+          "name": "Get Skill Trends",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/analytics/trends?period=30d",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "analytics", "trends"],
+              "query": [
+                { "key": "period", "value": "30d", "description": "30d|90d|1y" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Sync Skill Popularity",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/analytics/sync",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "analytics", "sync"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Skill Relationships",
+      "item": [
+        {
+          "name": "Get Related Skills",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/{{skill_id}}/related",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "{{skill_id}}", "related"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Export / Import",
+      "item": [
+        {
+          "name": "Export Skills (JSON)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/export?format=json",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "export"],
+              "query": [
+                { "key": "format", "value": "json", "description": "json|csv" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Export Skills (CSV)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/export?format=csv",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "export"],
+              "query": [
+                { "key": "format", "value": "csv" }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "skill_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "category",
+      "value": "frontend",
+      "type": "string"
+    },
+    {
+      "key": "skill_id_1",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "skill_id_2",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

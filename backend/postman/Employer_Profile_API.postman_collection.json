@@ -1,0 +1,443 @@
+{
+	"info": {
+		"_postman_id": "employer-profile-api-001",
+		"name": "Employer Profile API - Complete",
+		"description": "Complete API collection for employer profile management including verification, document uploads, company info, jobs, applications, and analytics. All endpoints require employer authentication.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{employer_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5000/api",
+			"type": "string"
+		},
+		{
+			"key": "employer_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "document_id",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Profile Management",
+			"item": [
+				{
+					"name": "Get Employer Profile",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/employer-profiles/profile",
+							"host": ["{{base_url}}"],
+							"path": ["employer-profiles", "profile"]
+						},
+						"description": "Get complete employer profile including verification status"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"contactPerson\": {\n    \"name\": \"Nguyen Van B\",\n    \"position\": \"HR Manager\",\n    \"email\": \"hr@company.com\",\n    \"phone\": \"+84901234567\"\n  },\n  \"preferences\": {\n    \"emailNotifications\": true,\n    \"applicationAlerts\": true\n  }\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/employer-profiles/profile",
+							"host": ["{{base_url}}"],
+							"path": ["employer-profiles", "profile"]
+						},
+						"description": "Update employer profile information"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Company Info",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/employer-profiles/company",
+							"host": ["{{base_url}}"],
+							"path": ["employer-profiles", "company"]
+						},
+						"description": "Get company information"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Company Info",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"companyName\": \"Tech Innovations Vietnam Co., Ltd.\",\n  \"businessName\": \"Tech Innovations Vietnam\",\n  \"taxCode\": \"0123456789\",\n  \"companySize\": \"100-500\",\n  \"industryCode\": \"technology\",\n  \"website\": \"https://techinnovations.vn\",\n  \"description\": \"Leading technology company specializing in innovative software solutions.\",\n  \"foundedYear\": 2015,\n  \"address\": {\n    \"street\": \"123 Le Duan Street\",\n    \"city\": \"Ho Chi Minh City\",\n    \"district\": \"District 1\",\n    \"country\": \"Vietnam\",\n    \"zipCode\": \"70000\"\n  },\n  \"socialMedia\": {\n    \"facebook\": \"https://facebook.com/techinnovations\",\n    \"linkedin\": \"https://linkedin.com/company/techinnovations\",\n    \"twitter\": \"https://twitter.com/techinnovations\"\n  },\n  \"benefits\": [\n    \"Competitive salary\",\n    \"Health insurance\",\n    \"Annual bonus\",\n    \"Team building activities\",\n    \"Professional development opportunities\"\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/employer-profiles/company",
+							"host": ["{{base_url}}"],
+							"path": ["employer-profiles", "company"]
+						},
+						"description": "Update company information"
+					},
+					"response": []
+				}
+			],
+			"description": "Employer profile and company information management"
+		},
+		{
+			"name": "Images & Media",
+			"item": [
+				{
+					"name": "Upload Company Logo",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "logo",
+									"type": "file",
+									"src": "/path/to/logo.png",
+									"description": "Company logo (JPG, PNG, GIF, WEBP, max 5MB)"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/employer-profiles/upload-logo",
+							"host": ["{{base_url}}"],
+							"path": ["employer-profiles", "upload-logo"]
+						},
+						"description": "Upload company logo (max 5MB)"
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Cover Image",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "coverImage",
+									"type": "file",
+									"src": "/path/to/cover.jpg",
+									"description": "Cover image (JPG, PNG, GIF, WEBP, max 10MB)"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/employer-profiles/upload-cover-image",
+							"host": ["{{base_url}}"],
+							"path": ["employer-profiles", "upload-cover-image"]
+						},
+						"description": "Upload company cover image (max 10MB)"
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Logo",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/employer-profiles/logo",
+							"host": ["{{base_url}}"],
+							"path": ["employer-profiles", "logo"]
+						},
+						"description": "Remove company logo"
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Cover Image",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/employer-profiles/cover-image",
+							"host": ["{{base_url}}"],
+							"path": ["employer-profiles", "cover-image"]
+						},
+						"description": "Remove company cover image"
+					},
+					"response": []
+				}
+			],
+			"description": "Company images and media management"
+		},
+		{
+			"name": "Verification & Documents",
+			"item": [
+				{
+					"name": "Get Verification Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/employer-profiles/verification-status",
+							"host": ["{{base_url}}"],
+							"path": ["employer-profiles", "verification-status"]
+						},
+						"description": "Get current verification status and submitted documents"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Document Types",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/employer-profiles/document-types",
+							"host": ["{{base_url}}"],
+							"path": ["employer-profiles", "document-types"]
+						},
+						"description": "Get list of required document types for verification"
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Business License",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "document",
+									"type": "file",
+									"src": "/path/to/business-license.pdf",
+									"description": "Business license (PDF or Image, max 20MB)"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/employer-profiles/documents/business-license",
+							"host": ["{{base_url}}"],
+							"path": ["employer-profiles", "documents", "business-license"]
+						},
+						"description": "Upload business license document for verification"
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Tax Certificate",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "document",
+									"type": "file",
+									"src": "/path/to/tax-certificate.pdf",
+									"description": "Tax certificate (PDF or Image, max 20MB)"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/employer-profiles/documents/tax-certificate",
+							"host": ["{{base_url}}"],
+							"path": ["employer-profiles", "documents", "tax-certificate"]
+						},
+						"description": "Upload tax certificate document for verification"
+					},
+					"response": []
+				},
+				{
+					"name": "Remove Document",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/employer-profiles/documents/{{document_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["employer-profiles", "documents", "{{document_id}}"]
+						},
+						"description": "Remove uploaded verification document"
+					},
+					"response": []
+				}
+			],
+			"description": "Employer verification and document management"
+		},
+		{
+			"name": "Jobs & Applications",
+			"item": [
+				{
+					"name": "Get Posted Jobs",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/employer-profiles/jobs?status=all&page=1&limit=20",
+							"host": ["{{base_url}}"],
+							"path": ["employer-profiles", "jobs"],
+							"query": [
+								{
+									"key": "status",
+									"value": "all",
+									"description": "all, draft, published, closed, expired"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								}
+							]
+						},
+						"description": "Get all jobs posted by employer"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Applications",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/employer-profiles/applications?jobId=&status=all&page=1&limit=20&sortBy=createdAt&sortOrder=desc",
+							"host": ["{{base_url}}"],
+							"path": ["employer-profiles", "applications"],
+							"query": [
+								{
+									"key": "jobId",
+									"value": "",
+									"description": "Filter by specific job ID"
+								},
+								{
+									"key": "status",
+									"value": "all",
+									"description": "all, pending, reviewing, shortlisted, rejected, hired"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "sortBy",
+									"value": "createdAt"
+								},
+								{
+									"key": "sortOrder",
+									"value": "desc"
+								}
+							]
+						},
+						"description": "Get all applications received (verified employer only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Recommended Candidates",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/employer-profiles/recommended-candidates?jobId=&skills=React,Node.js&experienceLevel=junior&limit=10",
+							"host": ["{{base_url}}"],
+							"path": ["employer-profiles", "recommended-candidates"],
+							"query": [
+								{
+									"key": "jobId",
+									"value": "",
+									"description": "Get candidates for specific job"
+								},
+								{
+									"key": "skills",
+									"value": "React,Node.js",
+									"description": "Filter by skills"
+								},
+								{
+									"key": "experienceLevel",
+									"value": "junior",
+									"description": "entry, junior, mid, senior, lead"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						},
+						"description": "Get AI-recommended candidates (verified employer only)"
+					},
+					"response": []
+				}
+			],
+			"description": "Jobs and applications management for employers"
+		},
+		{
+			"name": "Analytics & Insights",
+			"item": [
+				{
+					"name": "Get Analytics",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/employer-profiles/analytics?period=30d&jobId=",
+							"host": ["{{base_url}}"],
+							"path": ["employer-profiles", "analytics"],
+							"query": [
+								{
+									"key": "period",
+									"value": "30d",
+									"description": "7d, 30d, 90d, 1y"
+								},
+								{
+									"key": "jobId",
+									"value": "",
+									"description": "Filter by specific job"
+								}
+							]
+						},
+						"description": "Get comprehensive analytics and insights (verified employer only)"
+					},
+					"response": []
+				}
+			],
+			"description": "Analytics and business insights for employers"
+		}
+	]
+}

@@ -1,0 +1,436 @@
+{
+	"info": {
+		"_postman_id": "users-api-001",
+		"name": "Users API",
+		"description": "Complete user management API including profile, preferences, account management, and notifications.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{user_token}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:5000/api",
+			"type": "string"
+		},
+		{
+			"key": "user_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "employer_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "user_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "notification_id",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "Profile Management",
+			"item": [
+				{
+					"name": "Get User Profile",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/users/profile",
+							"host": ["{{base_url}}"],
+							"path": ["users", "profile"]
+						},
+						"description": "Get authenticated user's profile"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"phone\": \"+84901234567\",\n  \"dateOfBirth\": \"1995-05-15\",\n  \"address\": \"123 Nguyen Hue, District 1, Ho Chi Minh City\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/users/profile",
+							"host": ["{{base_url}}"],
+							"path": ["users", "profile"]
+						},
+						"description": "Update user profile information"
+					},
+					"response": []
+				},
+				{
+					"name": "Upload Avatar",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "avatar",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/users/avatar",
+							"host": ["{{base_url}}"],
+							"path": ["users", "avatar"]
+						},
+						"description": "Upload user avatar image (max 5MB)"
+					},
+					"response": []
+				},
+				{
+					"name": "Get User by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/users/{{user_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["users", "{{user_id}}"]
+						},
+						"description": "Get user information by ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Public User Profile (Employer)",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{employer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/users/{{user_id}}/public-profile",
+							"host": ["{{base_url}}"],
+							"path": ["users", "{{user_id}}", "public-profile"]
+						},
+						"description": "Get public profile of a candidate (employer only)"
+					},
+					"response": []
+				}
+			],
+			"description": "User profile operations"
+		},
+		{
+			"name": "Account Management",
+			"item": [
+				{
+					"name": "Change Password",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"currentPassword\": \"OldPassword123!\",\n  \"newPassword\": \"NewPassword123!\",\n  \"confirmPassword\": \"NewPassword123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/users/password",
+							"host": ["{{base_url}}"],
+							"path": ["users", "password"]
+						},
+						"description": "Change user password"
+					},
+					"response": []
+				},
+				{
+					"name": "Link Google Account",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"googleToken\": \"google_oauth_token_here\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/users/link-google",
+							"host": ["{{base_url}}"],
+							"path": ["users", "link-google"]
+						},
+						"description": "Link Google account to existing user"
+					},
+					"response": []
+				},
+				{
+					"name": "Unlink Google Account",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/users/unlink-google",
+							"host": ["{{base_url}}"],
+							"path": ["users", "unlink-google"]
+						},
+						"description": "Unlink Google account from user"
+					},
+					"response": []
+				},
+				{
+					"name": "Deactivate Account",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"reason\": \"Taking a break from job search\",\n  \"password\": \"MyPassword123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/users/deactivate",
+							"host": ["{{base_url}}"],
+							"path": ["users", "deactivate"]
+						},
+						"description": "Deactivate user account"
+					},
+					"response": []
+				},
+				{
+					"name": "Reactivate Account",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"password\": \"MyPassword123!\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/users/reactivate",
+							"host": ["{{base_url}}"],
+							"path": ["users", "reactivate"]
+						},
+						"description": "Reactivate user account"
+					},
+					"response": []
+				}
+			],
+			"description": "Account security and management"
+		},
+		{
+			"name": "User Preferences & Stats",
+			"item": [
+				{
+					"name": "Update User Preferences",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"language\": \"vi\",\n  \"theme\": \"dark\",\n  \"emailNotifications\": true,\n  \"jobAlerts\": true,\n  \"newsletterSubscription\": false\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/users/preferences",
+							"host": ["{{base_url}}"],
+							"path": ["users", "preferences"]
+						},
+						"description": "Update user preferences"
+					},
+					"response": []
+				},
+				{
+					"name": "Get User Stats",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/users/stats",
+							"host": ["{{base_url}}"],
+							"path": ["users", "stats"]
+						},
+						"description": "Get user statistics (applications, saved jobs, etc.)"
+					},
+					"response": []
+				}
+			],
+			"description": "User preferences and statistics"
+		},
+		{
+			"name": "User Notifications",
+			"item": [
+				{
+					"name": "Get User Notifications",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/users/notifications?page=1&limit=20&read=all",
+							"host": ["{{base_url}}"],
+							"path": ["users", "notifications"],
+							"query": [
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "20"
+								},
+								{
+									"key": "read",
+									"value": "all",
+									"description": "all, read, unread"
+								}
+							]
+						},
+						"description": "Get all notifications for user"
+					},
+					"response": []
+				},
+				{
+					"name": "Mark Notification as Read",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"notificationId\": \"{{notification_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/users/notifications/read",
+							"host": ["{{base_url}}"],
+							"path": ["users", "notifications", "read"]
+						},
+						"description": "Mark notification as read"
+					},
+					"response": []
+				},
+				{
+					"name": "Mark All Notifications as Read",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/users/notifications/read-all",
+							"host": ["{{base_url}}"],
+							"path": ["users", "notifications", "read-all"]
+						},
+						"description": "Mark all notifications as read"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Notification",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"notificationId\": \"{{notification_id}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/users/notifications",
+							"host": ["{{base_url}}"],
+							"path": ["users", "notifications"]
+						},
+						"description": "Delete notification"
+					},
+					"response": []
+				}
+			],
+			"description": "User notification operations"
+		},
+		{
+			"name": "Debug & Utilities",
+			"item": [
+				{
+					"name": "Debug Token",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/users/debug-token",
+							"host": ["{{base_url}}"],
+							"path": ["users", "debug-token"]
+						},
+						"description": "Debug endpoint to verify token information"
+					},
+					"response": []
+				},
+				{
+					"name": "Compare Profiles",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/users/compare-profiles",
+							"host": ["{{base_url}}"],
+							"path": ["users", "compare-profiles"]
+						},
+						"description": "Compare user profiles endpoint"
+					},
+					"response": []
+				}
+			],
+			"description": "Debug and utility endpoints"
+		}
+	]
+}
