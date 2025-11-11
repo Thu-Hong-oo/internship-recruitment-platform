@@ -5,8 +5,8 @@ export type Template = {
 };
 
 export const templates: Template[] = [
-  { id: 1, name: "Professional Blue", thumbnail: "/templates/pro_blue.png" },
-  { id: 2, name: "Creative Minimal", thumbnail: "/templates/creative_minimal.png" },
+  { id: 1, name: "Travel Pink", thumbnail: "/templates/travel_pink.png" },
+  { id: 2, name: "Travel Classic", thumbnail: "/templates/travel_classic.png" },
 ];
 
 export function getTemplateById(id: number): Template | undefined {

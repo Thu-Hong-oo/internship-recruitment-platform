@@ -1,6 +1,8 @@
 import { useMemo, useRef } from "react";
 import { templateLayouts } from "../../lib/mocks/templateLayouts";
 import type { CVData } from "../../lib/mocks/cvSamples";
+import Template1Renderer from "./renderers/Template1";
+import Template2Renderer from "./renderers/Template2";
 
 type Props = {
   data: CVData;
@@ -28,7 +30,29 @@ export default function LivePreview({ data, containerRef, editable = false, onCh
   return (
     <div className="w-full overflow-auto">
       <div style={pageStyle} ref={containerRef || undefined}>
-        {layout.sections.map((s, idx) => {
+        {/* Delegate to template-specific renderer for richer layout */}
+        {data.templateId === 1 && (
+          <Template1Renderer
+            data={data}
+            editable={editable}
+            onChangeText={onChangeText}
+            onFocusField={onFocusField}
+            onBlurField={onBlurField}
+          />
+        )}
+        {data.templateId === 2 && (
+          <Template2Renderer
+            data={data}
+            editable={editable}
+            onChangeText={onChangeText}
+            onFocusField={onFocusField}
+            onBlurField={onBlurField}
+          />
+        )}
+        {/* Fallback to generic absolute layout if unknown template */}
+        {![1, 2].includes(data.templateId) && (
+          <>
+          {layout.sections.map((s, idx) => {
           const style: React.CSSProperties = {
             position: "absolute",
             left: s.x,
@@ -226,8 +250,123 @@ export default function LivePreview({ data, containerRef, editable = false, onCh
               </div>
             );
           }
-          return null;
-        })}
+          if (s.type === "languages") {
+            return (
+              <div key={idx} style={style}>
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>Ngôn ngữ</div>
+                <div style={{ display: "grid", gap: 8, fontSize: 12 }}>
+                  {(data.languages || []).map((lang, i) => (
+                    <div key={i}>
+                      <div
+                        {...commonEditableProps(["languages", i, "name"])}
+                        style={{ ...(commonEditableProps(["languages", i, "name"]).style as any), fontWeight: 600, display: "inline" }}
+                      >
+                        {lang.name || "Ngôn ngữ"}
+                      </div>
+                      <div style={{ color: "#6b7280" }}>
+                        <span
+                          {...commonEditableProps(["languages", i, "level"])}
+                          style={{ ...(commonEditableProps(["languages", i, "level"]).style as any), display: "inline" }}
+                        >
+                          {lang.level || ""}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          }
+          if (s.type === "certifications") {
+            return (
+              <div key={idx} style={style}>
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>Chứng chỉ</div>
+                <div style={{ display: "grid", gap: 8, fontSize: 12 }}>
+                  {(data.certifications || []).map((c, i) => (
+                    <div key={i} style={{ background: "#fff", border: `1px solid ${layout.colors.primary}33`, borderRadius: 8, padding: 8 }}>
+                      <div
+                        {...commonEditableProps(["certifications", i, "name"])}
+                        style={{ ...(commonEditableProps(["certifications", i, "name"]).style as any), fontWeight: 600 }}
+                      >
+                        {c.name || "Tên chứng chỉ"}
+                      </div>
+                      <div style={{ color: "#6b7280" }}>
+                        <span
+                          {...commonEditableProps(["certifications", i, "issuer"])}
+                          style={{ ...(commonEditableProps(["certifications", i, "issuer"]).style as any), display: "inline" }}
+                        >
+                          {c.issuer || ""}
+                        </span>
+                        {c.year ? " • " : " "}
+                        <span
+                          {...commonEditableProps(["certifications", i, "year"])}
+                          style={{ ...(commonEditableProps(["certifications", i, "year"]).style as any), display: "inline" }}
+                        >
+                          {c.year || ""}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          }
+          if (s.type === "projects") {
+            return (
+              <div key={idx} style={style}>
+                <div style={{ fontWeight: 700, marginBottom: 6 }}>Dự án nổi bật</div>
+                <div style={{ display: "grid", gap: 8, fontSize: 12 }}>
+                  {(data.projects || []).map((p, i) => (
+                    <div key={i} style={{ background: "#fff", borderLeft: `4px solid ${layout.colors.primary}`, borderRadius: 8, padding: 8 }}>
+                      <div
+                        {...commonEditableProps(["projects", i, "title"])}
+                        style={{ ...(commonEditableProps(["projects", i, "title"]).style as any), fontWeight: 600 }}
+                      >
+                        {p.title || "Tên dự án"}
+                      </div>
+                      <div
+                        {...commonEditableProps(["projects", i, "description"])}
+                        style={{ ...(commonEditableProps(["projects", i, "description"]).style as any), color: "#6b7280" }}
+                      >
+                        {p.description || ""}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          }
+          if (s.type === "social") {
+            return (
+              <div key={idx} style={style}>
+                <div style={{ fontWeight: 700, marginBottom: 6, color: "#fff", background: layout.colors.primary, padding: "6px 8px", borderRadius: 6 }}>
+                  Kết nối
+                </div>
+                <div style={{ display: "grid", gap: 6, fontSize: 12 }}>
+                  {(data.social || []).map((s, i) => (
+                    <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <span
+                        {...commonEditableProps(["social", i, "label"])}
+                        style={{ ...(commonEditableProps(["social", i, "label"]).style as any), fontWeight: 600 }}
+                      >
+                        {s.label || "Link"}
+                      </span>
+                      <span
+                        {...commonEditableProps(["social", i, "url"])}
+                        style={{ ...(commonEditableProps(["social", i, "url"]).style as any), color: layout.colors.primary }}
+                      >
+                        {s.url || "#"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          }
+            return null;
+          })}
+          </>
+        )}
       </div>
     </div>
   );
