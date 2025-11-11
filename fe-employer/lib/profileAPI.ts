@@ -18,6 +18,19 @@ export interface VerificationStatusResponse {
   };
 }
 
+export interface UpdateEmployerProfilePayload {
+  contact: {
+    name: string;
+    phone: string;
+    email: string;
+  };
+  position: {
+    title: string;
+    level: string;
+    department: string;
+  };
+}
+
 // Get employer verification status
 export const getVerificationStatus = async (
   token: string
@@ -103,6 +116,36 @@ export const getVerificationStatus = async (
     return {
       success: false,
       message: error?.message || "Không thể kết nối máy chủ",
+    };
+  }
+};
+
+// Update employer profile
+export const updateEmployerProfile = async (
+  token: string,
+  payload: UpdateEmployerProfilePayload
+) => {
+  try {
+    if (!token) {
+      return { success: false, error: "Token không hợp lệ" };
+    }
+
+    const response = await fetch(`${API_BASE_URL}/employers/profile`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+
+    return data;
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error?.message || "Không thể kết nối máy chủ",
     };
   }
 };

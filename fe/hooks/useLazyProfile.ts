@@ -6,9 +6,10 @@ import {
   EducationResponse,
   ExperienceResponse,
   SkillsResponse,
+  ApiResponse,
 } from "@/lib/api";
 
-// Cache để lưu trữ dữ liệu đã tải
+// Cache để lưu trữ dữ liệu đã tải khi nhảy qua lại các tab không phải gọi api lại
 const dataCache = {
   profile: null as ProfileData | null,
   education: null as EducationResponse | null,
@@ -171,29 +172,40 @@ export const useLazyProfile = () => {
   }, [makeRequest]);
 
   // Update profile
-  const updateProfile = useCallback(async (section: string, data: any) => {
-    try {
-      const response = await profileAPI.updateProfile(section, data);
-      dataCache.profile = response.data;
-      setProfile(response.data);
-      return response.data;
-    } catch (err: any) {
-      setErrors((prev) => ({
-        ...prev,
-        profile: err.message || "Failed to update profile",
-      }));
-      throw err;
-    }
-  }, []);
+  const updateProfile = useCallback(
+    async (section: string, data: any): Promise<ApiResponse<ProfileData>> => {
+      try {
+        const response = await profileAPI.updateProfile(section, data);
+        dataCache.profile = response.data;
+        setProfile(response.data);
+        return response; // Trả về toàn bộ response thay vì chỉ data
+      } catch (err: any) {
+        setErrors((prev) => ({
+          ...prev,
+          profile: err.message || "Failed to update profile",
+        }));
+        throw err;
+      }
+    },
+    []
+  );
 
   // Add education
   const addEducation = useCallback(
     async (data: any) => {
       try {
         const response = await makeRequest(() => profileAPI.addEducation(data));
-        dataCache.education = response.data;
-        setEducation(response.data);
-        return response.data;
+
+        // After adding, we need to refetch the full education data
+        // because the response only contains the new entry, not the full structure
+        const fullEducationResponse = await makeRequest(() =>
+          profileAPI.getEducation()
+        );
+        console.log("Full education after add:", fullEducationResponse.data);
+
+        dataCache.education = fullEducationResponse.data;
+        setEducation(fullEducationResponse.data);
+        return fullEducationResponse.data;
       } catch (err: any) {
         setErrors((prev) => ({
           ...prev,
@@ -212,9 +224,15 @@ export const useLazyProfile = () => {
         const response = await makeRequest(() =>
           profileAPI.updateEducation(id, data)
         );
-        dataCache.education = response.data;
-        setEducation(response.data);
-        return response.data;
+
+        // After updating, refetch the full education data
+        const fullEducationResponse = await makeRequest(() =>
+          profileAPI.getEducation()
+        );
+
+        dataCache.education = fullEducationResponse.data;
+        setEducation(fullEducationResponse.data);
+        return fullEducationResponse.data;
       } catch (err: any) {
         setErrors((prev) => ({
           ...prev,
