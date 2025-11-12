@@ -124,69 +124,8 @@ export default function HomePage({ onSearch }: HomePageProps) {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Left Sidebar */}
-          <div className="lg:col-span-1">
-            {/* Job Categories */}
-            <Card className="mb-6 card-hover">
-              <CardContent className="p-6">
-                <h3 className="font-semibold mb-4 text-foreground">
-                  Việc làm theo danh mục
-                </h3>
-                <div className="space-y-3">
-                  {[
-                    "Công nghệ (tech)",
-                    "Kinh doanh (business)",
-                    "Marketing",
-                    "Thiết kế (design)",
-                    "Dữ liệu (data)",
-                    "Tài chính (finance)",
-                    "Nhân sự (hr)",
-                    "Bán hàng (sales)",
-                    "Bất động sản (real-estate)",
-                    "Giáo dục (education)",
-                    "Y tế (healthcare)",
-                    "Sản xuất (manufacturing)",
-                    "Bán lẻ (retail)",
-                    "Khác (other)",
-                  ].map((category, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between py-2 hover:text-primary cursor-pointer transition-colors duration-200"
-                    >
-                      <span className="text-sm">{category}</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 text-center">
-                  <span className="text-sm text-muted-foreground">1/5</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Promotional Banner */}
-            <Card className="card-hover">
-              <CardContent className="p-0">
-                <div className="relative overflow-hidden rounded-lg">
-                  <img
-                    src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-DlIFJsqt0nRO6qQPLHt8ABEMDjP6jk.png"
-                    alt="Career promotion"
-                    className="w-full h-48 object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                  <div className="absolute bottom-4 left-4 text-white">
-                    <h4 className="font-semibold">THROUGH FINANCE!</h4>
-                    <p className="text-sm opacity-90">
-                      CLICK HERE EXPLORE YOUR CAREER
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* Main Content */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-3">
             {/* Featured Jobs (from API) */}
             <div className="mb-8">
               <div className="flex items-center justify-between mb-6">

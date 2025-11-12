@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Search, MapPin, ChevronDown, X } from "lucide-react";
+import { Search, MapPin, ChevronDown, X, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { industriesAPI, Industry } from "@/lib/api";
 
 interface HeroSectionProps {
   onSearch?: (keyword: string) => void;
@@ -18,22 +19,193 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
   const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showJobCategoryModal, setShowJobCategoryModal] = useState(false);
-  const JOB_CATEGORIES: { value: string; label: string }[] = [
-    { value: "tech", label: "Công nghệ (tech)" },
-    { value: "business", label: "Kinh doanh (business)" },
-    { value: "marketing", label: "Marketing" },
-    { value: "design", label: "Thiết kế (design)" },
-    { value: "data", label: "Dữ liệu (data)" },
-    { value: "finance", label: "Tài chính (finance)" },
-    { value: "hr", label: "Nhân sự (hr)" },
-    { value: "sales", label: "Bán hàng (sales)" },
-    { value: "real-estate", label: "Bất động sản (real-estate)" },
-    { value: "education", label: "Giáo dục (education)" },
-    { value: "healthcare", label: "Y tế (healthcare)" },
-    { value: "manufacturing", label: "Sản xuất (manufacturing)" },
-    { value: "retail", label: "Bán lẻ (retail)" },
-    { value: "other", label: "Khác (other)" },
-  ];
+
+  // Industries state
+  const [industries, setIndustries] = useState<Industry[]>([]);
+  const [loadingIndustries, setLoadingIndustries] = useState(false);
+  const [currentIndustryPage, setCurrentIndustryPage] = useState(1);
+  const industriesPerPage = 5;
+  const [hoveredIndustry, setHoveredIndustry] = useState<Industry | null>(null);
+  const [subIndustries, setSubIndustries] = useState<Industry[]>([]);
+  const [loadingSubIndustries, setLoadingSubIndustries] = useState(false);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [searchResults, setSearchResults] = useState<Industry[]>([]);
+  const [selectedIndustries, setSelectedIndustries] = useState<Set<string>>(
+    new Set()
+  );
+  const [allIndustriesMap, setAllIndustriesMap] = useState<
+    Map<string, Industry>
+  >(new Map());
+
+  // Fetch industries on mount
+  useEffect(() => {
+    const fetchIndustries = async () => {
+      try {
+        setLoadingIndustries(true);
+        const data = await industriesAPI.getRootIndustries();
+        setIndustries(data);
+        // Build map for quick lookup
+        const map = new Map<string, Industry>();
+        data.forEach((industry) => map.set(industry.code, industry));
+        setAllIndustriesMap(map);
+      } catch (error) {
+        console.error("Failed to fetch industries:", error);
+        setIndustries([]);
+      } finally {
+        setLoadingIndustries(false);
+      }
+    };
+    fetchIndustries();
+  }, []);
+
+  // Search industries when search query changes
+  useEffect(() => {
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // If search query is empty, reset
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    // Debounce search API call
+    searchTimeoutRef.current = setTimeout(async () => {
+      try {
+        setLoadingIndustries(true);
+        const data = await industriesAPI.searchIndustries(searchQuery.trim());
+        setSearchResults(data);
+        // Update map with search results
+        setAllIndustriesMap((prevMap) => {
+          const map = new Map(prevMap);
+          data.forEach((industry: Industry) =>
+            map.set(industry.code, industry)
+          );
+          return map;
+        });
+      } catch (error) {
+        console.error("Failed to search industries:", error);
+        setSearchResults([]);
+      } finally {
+        setLoadingIndustries(false);
+      }
+    }, 300); // 300ms debounce
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery]);
+
+  // Build breadcrumb path for an industry
+  const buildBreadcrumbPath = (industry: Industry): string[] => {
+    const path: string[] = [];
+    let current: Industry | undefined = industry;
+
+    // Build path by traversing parent codes
+    while (current) {
+      path.unshift(current.name.vi.toUpperCase());
+      if (current.parentCode) {
+        current = allIndustriesMap.get(current.parentCode);
+      } else {
+        break;
+      }
+    }
+
+    return path;
+  };
+
+  // Toggle industry selection
+  const toggleIndustrySelection = (industryCode: string) => {
+    setSelectedIndustries((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(industryCode)) {
+        newSet.delete(industryCode);
+      } else {
+        newSet.add(industryCode);
+      }
+      return newSet;
+    });
+  };
+
+  // Clear all selections
+  const clearAllSelections = () => {
+    setSelectedIndustries(new Set());
+  };
+
+  // Fetch sub-industries when hovering over an industry
+  useEffect(() => {
+    if (!hoveredIndustry) {
+      setSubIndustries([]);
+      return;
+    }
+
+    const fetchSubIndustries = async () => {
+      try {
+        setLoadingSubIndustries(true);
+        const response = await industriesAPI.getIndustries(
+          hoveredIndustry.code
+        );
+        if (response.success && response.data) {
+          setSubIndustries(response.data);
+          // Update map with sub-industries
+          setAllIndustriesMap((prevMap) => {
+            const map = new Map(prevMap);
+            response.data.forEach((industry: Industry) =>
+              map.set(industry.code, industry)
+            );
+            return map;
+          });
+        } else {
+          setSubIndustries([]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch sub-industries:", error);
+        setSubIndustries([]);
+      } finally {
+        setLoadingSubIndustries(false);
+      }
+    };
+
+    // Debounce để tránh fetch quá nhiều khi hover nhanh
+    const timeoutId = setTimeout(() => {
+      fetchSubIndustries();
+    }, 200);
+
+    return () => clearTimeout(timeoutId);
+  }, [hoveredIndustry]);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Calculate pagination
+  const totalIndustryPages = Math.ceil(industries.length / industriesPerPage);
+  const startIndex = (currentIndustryPage - 1) * industriesPerPage;
+  const endIndex = startIndex + industriesPerPage;
+  const displayedIndustries = industries.slice(startIndex, endIndex);
+
+  // Filter industries by search query
+  const filteredIndustries = searchQuery
+    ? industries.filter(
+        (industry) =>
+          industry.name.vi.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          industry.name.en?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : displayedIndustries;
 
   const handleSearch = () => {
     if (onSearch) {
@@ -103,105 +275,284 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
                             Chọn Nhóm nghề, Nghề hoặc Chuyên môn
                           </h2>
                           <button
-                            onClick={() => setShowJobCategoryModal(false)}
+                            onClick={() => {
+                              setShowJobCategoryModal(false);
+                              setSearchQuery("");
+                              setSelectedIndustries(new Set());
+                            }}
+                            className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
                           >
                             <X className="w-5 h-5" />
+                            <span className="text-sm">Đóng</span>
                           </button>
                         </div>
                         <div className="relative mt-3">
                           <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
                           <Input
                             placeholder="Nhập từ khóa tìm kiếm"
-                            className="pl-10"
+                            className="pl-10 pr-10"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
                           />
+                          {searchQuery && (
+                            <button
+                              onClick={() => setSearchQuery("")}
+                              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
-                      <div className="grid grid-cols-3 divide-x max-h-[60vh] overflow-y-auto">
-                        <div className="p-4">
-                          <h3 className="font-semibold mb-3 text-gray-900">
-                            NHÓM NGHỀ
-                          </h3>
-                          <div className="space-y-1">
-                            {JOB_CATEGORIES.map((c) => (
-                              <label
-                                key={c.value}
-                                className="flex items-center justify-between p-2 rounded hover:bg-gray-50 cursor-pointer"
-                              >
-                                <div className="flex items-center">
-                                  <Checkbox className="mr-3" />
-                                  <span className="text-sm">{c.label}</span>
-                                </div>
-                                <button
-                                  className="text-primary text-xs ml-2 hover:underline"
-                                  onClick={() => {
-                                    setShowJobCategoryModal(false);
-                                    router.push(
-                                      `/search?category=${encodeURIComponent(
-                                        c.value
-                                      )}`
-                                    );
-                                  }}
-                                >
-                                  Xem
-                                </button>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="p-4">
-                          <h3 className="font-semibold mb-3 text-gray-900">
-                            NGHỀ
-                          </h3>
-                          <div className="space-y-1">
-                            {[
-                              {
-                                name: "Software Engineering",
-                                checked: false,
-                              },
-                              { name: "Software Testing", checked: false },
-                              {
-                                name: "Artificial Intelligence (AI)",
-                                checked: false,
-                              },
-                            ].map((job) => (
-                              <label
-                                key={job.name}
-                                className="flex items-center p-2 rounded hover:bg-gray-50 cursor-pointer"
-                              >
-                                <Checkbox
-                                  checked={job.checked}
-                                  className="mr-3"
-                                />
-                                <span className="text-sm font-medium">
-                                  {job.name}
-                                </span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="p-4">
-                          <h3 className="font-semibold mb-3 text-gray-900">
-                            VỊ TRÍ CHUYÊN MÔN
-                          </h3>
-                          <div className="flex flex-wrap gap-2">
-                            {[
-                              "Software Engineer",
-                              "Backend Developer",
-                              "Frontend Developer",
-                              "Mobile Developer",
-                              "Fullstack Developer",
-                              "Blockchain Engineer",
-                            ].map((position) => (
-                              <div
-                                key={position}
-                                className="px-2 py-1 text-xs border border-gray-300 rounded"
-                              >
-                                {position}
+                      {searchQuery.trim() ? (
+                        // Search mode: single column with breadcrumbs
+                        <div className="max-h-[60vh] overflow-y-auto">
+                          <div className="p-4">
+                            {loadingIndustries ? (
+                              <div className="text-sm text-muted-foreground py-4">
+                                Đang tải...
                               </div>
-                            ))}
+                            ) : searchResults.length > 0 ? (
+                              <div className="space-y-1">
+                                {searchResults.map((industry) => {
+                                  const breadcrumb =
+                                    buildBreadcrumbPath(industry);
+                                  const isSelected = selectedIndustries.has(
+                                    industry.code
+                                  );
+                                  return (
+                                    <label
+                                      key={industry._id}
+                                      className="flex items-start p-3 rounded hover:bg-gray-50 cursor-pointer border border-transparent hover:border-gray-200"
+                                    >
+                                      <Checkbox
+                                        checked={isSelected}
+                                        onCheckedChange={() =>
+                                          toggleIndustrySelection(industry.code)
+                                        }
+                                        className="mr-3 mt-1"
+                                      />
+                                      <div className="flex-1">
+                                        <div className="text-sm font-medium text-gray-900">
+                                          {industry.name.vi}
+                                        </div>
+                                        {breadcrumb.length > 1 && (
+                                          <div className="text-xs text-muted-foreground mt-1">
+                                            {breadcrumb.join(" > ")}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <div className="text-sm text-muted-foreground py-4 text-center">
+                                Không tìm thấy kết quả
+                              </div>
+                            )}
                           </div>
                         </div>
-                      </div>
+                      ) : (
+                        // Normal mode: 3 columns
+                        <div className="grid grid-cols-3 divide-x max-h-[60vh] overflow-y-auto">
+                          <div className="p-4">
+                            <h3 className="font-semibold mb-3 text-gray-900">
+                              NHÓM NGHỀ
+                            </h3>
+                            {loadingIndustries ? (
+                              <div className="text-sm text-muted-foreground py-4">
+                                Đang tải danh mục...
+                              </div>
+                            ) : (
+                              <>
+                                <div className="space-y-1">
+                                  {filteredIndustries.map((industry) => (
+                                    <label
+                                      key={industry._id}
+                                      className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${
+                                        hoveredIndustry?._id === industry._id
+                                          ? "bg-primary/5"
+                                          : "hover:bg-gray-50"
+                                      }`}
+                                      onMouseEnter={() => {
+                                        if (hoverTimeoutRef.current) {
+                                          clearTimeout(hoverTimeoutRef.current);
+                                          hoverTimeoutRef.current = null;
+                                        }
+                                        setHoveredIndustry(industry);
+                                      }}
+                                      onMouseLeave={() => {
+                                        hoverTimeoutRef.current = setTimeout(
+                                          () => {
+                                            setHoveredIndustry(null);
+                                          },
+                                          200
+                                        );
+                                      }}
+                                    >
+                                      <div className="flex items-center">
+                                        <Checkbox className="mr-3" />
+                                        <span className="text-sm">
+                                          {industry.name.vi}
+                                          {industry.name.en &&
+                                            ` (${industry.name.en})`}
+                                        </span>
+                                      </div>
+                                      <button
+                                        className="text-primary text-xs ml-2 hover:underline"
+                                        onClick={() => {
+                                          setShowJobCategoryModal(false);
+                                          const params = new URLSearchParams();
+                                          params.set("industry", industry.code);
+                                          router.push(
+                                            `/search?${params.toString()}`
+                                          );
+                                        }}
+                                      >
+                                        Xem
+                                      </button>
+                                    </label>
+                                  ))}
+                                </div>
+                                {!searchQuery && totalIndustryPages > 1 && (
+                                  <div className="mt-4 flex items-center justify-between">
+                                    <button
+                                      onClick={() =>
+                                        setCurrentIndustryPage((prev) =>
+                                          Math.max(1, prev - 1)
+                                        )
+                                      }
+                                      disabled={currentIndustryPage === 1}
+                                      className="px-2 py-1 text-sm text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                      ←
+                                    </button>
+                                    <span className="text-sm text-muted-foreground">
+                                      {currentIndustryPage}/{totalIndustryPages}
+                                    </span>
+                                    <button
+                                      onClick={() =>
+                                        setCurrentIndustryPage((prev) =>
+                                          Math.min(totalIndustryPages, prev + 1)
+                                        )
+                                      }
+                                      disabled={
+                                        currentIndustryPage >=
+                                        totalIndustryPages
+                                      }
+                                      className="px-2 py-1 text-sm text-muted-foreground hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                      →
+                                    </button>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                          <div
+                            className="p-4"
+                            onMouseEnter={() => {
+                              if (hoverTimeoutRef.current) {
+                                clearTimeout(hoverTimeoutRef.current);
+                                hoverTimeoutRef.current = null;
+                              }
+                            }}
+                            onMouseLeave={() => {
+                              setHoveredIndustry(null);
+                            }}
+                          >
+                            <h3 className="font-semibold mb-3 text-gray-900">
+                              NGHỀ
+                            </h3>
+                            {loadingSubIndustries ? (
+                              <div className="text-sm text-muted-foreground py-4">
+                                Đang tải...
+                              </div>
+                            ) : hoveredIndustry && subIndustries.length > 0 ? (
+                              <div className="space-y-1">
+                                {subIndustries
+                                  .slice(0, 10)
+                                  .map((subIndustry) => (
+                                    <label
+                                      key={subIndustry._id}
+                                      className="flex items-center p-2 rounded hover:bg-gray-50 cursor-pointer"
+                                      onClick={() => {
+                                        setShowJobCategoryModal(false);
+                                        const params = new URLSearchParams();
+                                        params.set(
+                                          "industry",
+                                          subIndustry.code
+                                        );
+                                        router.push(
+                                          `/search?${params.toString()}`
+                                        );
+                                      }}
+                                    >
+                                      <Checkbox className="mr-3" />
+                                      <span className="text-sm font-medium">
+                                        {subIndustry.name.vi}
+                                      </span>
+                                    </label>
+                                  ))}
+                              </div>
+                            ) : (
+                              <div className="text-sm text-muted-foreground py-4">
+                                {hoveredIndustry
+                                  ? "Chưa có danh mục con"
+                                  : "Hover vào nhóm nghề để xem"}
+                              </div>
+                            )}
+                          </div>
+                          <div
+                            className="p-4"
+                            onMouseEnter={() => {
+                              if (hoverTimeoutRef.current) {
+                                clearTimeout(hoverTimeoutRef.current);
+                                hoverTimeoutRef.current = null;
+                              }
+                            }}
+                            onMouseLeave={() => {
+                              setHoveredIndustry(null);
+                            }}
+                          >
+                            <h3 className="font-semibold mb-3 text-gray-900">
+                              VỊ TRÍ CHUYÊN MÔN
+                            </h3>
+                            {hoveredIndustry && subIndustries.length > 0 ? (
+                              <div className="flex flex-wrap gap-2">
+                                {subIndustries
+                                  .slice(0, 7)
+                                  .map((subIndustry) => (
+                                    <button
+                                      key={subIndustry._id}
+                                      onClick={() => {
+                                        setShowJobCategoryModal(false);
+                                        const params = new URLSearchParams();
+                                        params.set(
+                                          "industry",
+                                          subIndustry.code
+                                        );
+                                        router.push(
+                                          `/search?${params.toString()}`
+                                        );
+                                      }}
+                                      className="px-2 py-1 text-xs border border-gray-300 rounded hover:bg-primary hover:text-white hover:border-primary transition-colors"
+                                    >
+                                      {subIndustry.name.vi}
+                                    </button>
+                                  ))}
+                              </div>
+                            ) : (
+                              <div className="text-sm text-muted-foreground py-4">
+                                {hoveredIndustry
+                                  ? "Chưa có vị trí chuyên môn"
+                                  : "Hover vào nhóm nghề để xem"}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                       <div className="p-4 border-t border-gray-200 flex justify-between items-center sticky bottom-0 bg-white rounded-b-xl">
                         <div className="text-sm text-gray-600">
                           Bạn gặp vấn đề với Danh mục Nghề?{" "}
@@ -210,11 +561,46 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
                           </span>
                         </div>
                         <div className="flex gap-2">
-                          <Button variant="outline">Bỏ chọn tất cả</Button>
-                          <Button variant="outline">Hủy</Button>
+                          {searchQuery.trim() &&
+                            selectedIndustries.size > 0 && (
+                              <Button
+                                variant="outline"
+                                onClick={clearAllSelections}
+                              >
+                                Bỏ chọn tất cả ({selectedIndustries.size})
+                              </Button>
+                            )}
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setShowJobCategoryModal(false);
+                              setSearchQuery("");
+                              setSelectedIndustries(new Set());
+                            }}
+                          >
+                            Hủy
+                          </Button>
                           <Button
                             className="bg-primary hover:brightness-110"
-                            onClick={() => setShowJobCategoryModal(false)}
+                            onClick={() => {
+                              if (searchQuery.trim()) {
+                                // Navigate with selected industries
+                                const params = new URLSearchParams();
+                                Array.from(selectedIndustries).forEach(
+                                  (code) => {
+                                    params.append("industry", code);
+                                  }
+                                );
+                                router.push(`/search?${params.toString()}`);
+                              }
+                              setShowJobCategoryModal(false);
+                              setSearchQuery("");
+                              setSelectedIndustries(new Set());
+                            }}
+                            disabled={
+                              !!searchQuery.trim() &&
+                              selectedIndustries.size === 0
+                            }
                           >
                             Chọn
                           </Button>
