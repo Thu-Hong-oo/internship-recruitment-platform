@@ -33,10 +33,9 @@ import {
   AccordionContent,
 } from "@/components/ui/accordion";
 import Link from "next/link"; // link to other page
-import { truncate } from "fs/promises";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
-import { getUserAvatar } from "@/lib/api";
+import { getUserAvatar, industriesAPI, Industry } from "@/lib/api";
 
 // Custom hook để quản lý dropdown
 const useDropdown = (delay = 150) => {
@@ -80,23 +79,26 @@ export default function Header() {
 
   // Đăng nhập khi có user trong context
 
-  // Mock data cho các vị trí việc làm (sẽ thay bằng API call sau)
-  const jobPositions = [
-    { id: 1, name: "Nhân viên kinh doanh" },
-    { id: 2, name: "Lao động phổ thông" },
-    { id: 3, name: "Kế toán" },
-    { id: 4, name: "Marketing" },
-    { id: 5, name: "Hành chính nhân sự" },
-    { id: 6, name: "Chăm sóc khách hàng" },
-    { id: 7, name: "Ngân hàng" },
-    { id: 8, name: "IT" },
-    { id: 9, name: "Senior" },
-    { id: 10, name: "Kỹ sư xây dựng" },
-    { id: 11, name: "Thiết kế đồ họa" },
-    { id: 12, name: "Bất động sản" },
-    { id: 13, name: "Giáo dục" },
-    { id: 14, name: "Telesales" },
-  ];
+  // State cho industries
+  const [jobPositions, setJobPositions] = useState<Industry[]>([]);
+  const [loadingPositions, setLoadingPositions] = useState(false);
+
+  // Fetch industries on mount
+  useEffect(() => {
+    const fetchIndustries = async () => {
+      try {
+        setLoadingPositions(true);
+        const data = await industriesAPI.getRootIndustries();
+        setJobPositions(data);
+      } catch (error) {
+        console.error("Failed to fetch industries:", error);
+        setJobPositions([]);
+      } finally {
+        setLoadingPositions(false);
+      }
+    };
+    fetchIndustries();
+  }, []);
 
   // Mock data cho các mẫu CV
   const cvTemplates = [
@@ -123,10 +125,11 @@ export default function Header() {
     { id: 5, name: "Mẫu Cover Letter" },
   ];
 
-  // Click handlers (sẽ thay bằng navigation sau)
-  const handleJobPositionClick = (position: (typeof jobPositions)[0]) => {
-    console.log(`Clicked on job position: ${position.name}`);
-    // TODO: Navigate to job search with filter
+  // Click handlers
+  const handleJobPositionClick = (industry: Industry) => {
+    const params = new URLSearchParams();
+    params.set("industry", industry.code);
+    router.push(`/search?${params.toString()}`);
   };
 
   const handleCVTemplateClick = (template: (typeof cvTemplates)[0]) => {
@@ -264,18 +267,28 @@ export default function Header() {
                           VIỆC LÀM THEO VỊ TRÍ
                         </h3>
                         <div className="space-y-2">
-                          {jobPositions.map((position) => (
-                            <div
-                              key={position.id}
-                              className="text-gray-600 hover:text-primary cursor-pointer flex items-center group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
-                              onClick={() => handleJobPositionClick(position)}
-                            >
-                              <span>Việc làm {position.name}</span>
-                              <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
-                                →
-                              </span>
+                          {loadingPositions ? (
+                            <div className="text-sm text-muted-foreground py-2">
+                              Đang tải...
                             </div>
-                          ))}
+                          ) : jobPositions.length > 0 ? (
+                            jobPositions.map((industry) => (
+                              <div
+                                key={industry._id}
+                                className="text-gray-600 hover:text-primary cursor-pointer flex items-center group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
+                                onClick={() => handleJobPositionClick(industry)}
+                              >
+                                <span>Việc làm {industry.name.vi}</span>
+                                <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                                  →
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-sm text-muted-foreground py-2">
+                              Chưa có dữ liệu
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -395,7 +408,7 @@ export default function Header() {
               className="w-10 h-6"
             />
 
-            {loading || status === "loading" ? (
+            {loading ? (
               // UI khi đang loading - hiển thị skeleton hoặc ẩn
               <div className="flex items-center space-x-4">
                 <div className="w-5 h-5 bg-muted animate-pulse rounded"></div>
