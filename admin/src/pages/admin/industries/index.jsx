@@ -7,14 +7,13 @@ import {
   Button,
   Space,
   Tag,
-  Statistic,
   Form,
   Select,
   Input,
   Switch,
-  Tree,
   Modal,
   message,
+  InputNumber,
 } from "antd";
 import {
   PlusOutlined,
@@ -24,14 +23,21 @@ import {
   FileTextOutlined,
   UserOutlined,
   ReloadOutlined,
-  FolderOutlined,
-  FolderOpenOutlined,
+  BarChartOutlined,
 } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
 import industriesAPI from "../../../api/industries";
+
+const { TextArea } = Input;
 
 const Industries = () => {
   const [form] = Form.useForm();
+  const [addForm] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentIndustry, setCurrentIndustry] = useState(null);
   const [industries, setIndustries] = useState([]);
   const [allIndustries, setAllIndustries] = useState([]);
   const [selectedParent, setSelectedParent] = useState("");
@@ -40,6 +46,16 @@ const Industries = () => {
   const [expandedRows, setExpandedRows] = useState([]);
   const [subIndustriesCache, setSubIndustriesCache] = useState(new Map());
   const [loadingSubIndustries, setLoadingSubIndustries] = useState(new Set());
+
+  const navigate = useNavigate();
+
+  const nextSortOrder = useMemo(() => {
+    if (allIndustries.length === 0) return 0;
+    const maxOrder = Math.max(
+      ...allIndustries.map((item) => item.sortOrder ?? 0)
+    );
+    return maxOrder + 1;
+  }, [allIndustries]);
 
   const columns = [
     {
@@ -196,45 +212,6 @@ const Industries = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [includeStats]);
 
-  const stats = useMemo(() => {
-    const totalIndustries = allIndustries.length;
-    const rootIndustries = allIndustries.filter((i) => !i.parentCode).length;
-    const totalJobs = includeStats
-      ? allIndustries.reduce((sum, i) => sum + (i.stats?.totalJobs || 0), 0)
-      : 0;
-    const totalCandidates = includeStats
-      ? allIndustries.reduce(
-          (sum, i) => sum + (i.stats?.totalCandidates || 0),
-          0
-        )
-      : 0;
-
-    return [
-      {
-        title: "Tổng ngành nghề",
-        value: totalIndustries,
-        icon: <FolderOutlined />,
-      },
-      {
-        title: "Ngành nghề gốc",
-        value: rootIndustries,
-        icon: <FolderOpenOutlined />,
-      },
-      {
-        title: "Tổng việc làm",
-        value: totalJobs,
-        icon: <FileTextOutlined />,
-        show: includeStats,
-      },
-      {
-        title: "Tổng ứng viên",
-        value: totalCandidates,
-        icon: <UserOutlined />,
-        show: includeStats,
-      },
-    ].filter((stat) => stat.show !== false);
-  }, [allIndustries, includeStats]);
-
   const handleViewDetail = (record) => {
     Modal.info({
       title: record.name?.vi || record.name,
@@ -280,9 +257,29 @@ const Industries = () => {
     });
   };
 
-  const handleEdit = () => {
-    message.info("Chức năng sửa đang được phát triển");
-    // TODO: Implement edit modal
+  const handleEdit = (record) => {
+    setIsEditing(true);
+    setCurrentIndustry(record);
+    addForm.resetFields();
+    addForm.setFieldsValue({
+      code: record.code,
+      parentCode: record.parentCode ?? "",
+      nameVi: record.name?.vi ?? "",
+      nameEn: record.name?.en ?? "",
+      descriptionVi: record.description?.vi ?? "",
+      descriptionEn: record.description?.en ?? "",
+      color: record.color ?? "#2563eb",
+      icon: record.icon ?? "",
+      keywords: record.keywords?.join(", ") ?? "",
+      suggestedTemplates: record.suggestedTemplates?.join(", ") ?? "",
+      summarySuggestions: record.suggestions?.summary?.join(", ") ?? "",
+      experienceSuggestions: record.suggestions?.experience?.join(", ") ?? "",
+      projectSuggestions: record.suggestions?.projects?.join(", ") ?? "",
+      skillSuggestions: record.suggestions?.skills?.join(", ") ?? "",
+      visible: record.visible ?? true,
+      sortOrder: record.sortOrder ?? nextSortOrder,
+    });
+    setShowAddModal(true);
   };
 
   const handleDelete = (record) => {
@@ -297,10 +294,30 @@ const Industries = () => {
       onOk: async () => {
         try {
           const { success, error } = await industriesAPI.deleteIndustry(
-            record._id
+            record.code
           );
           if (success) {
             message.success("Xóa thành công");
+            // Cập nhật lại danh sách hiện tại
+            setIndustries((prev) =>
+              prev.filter((industry) => industry.code !== record.code)
+            );
+            setAllIndustries((prev) =>
+              prev.filter((industry) => industry.code !== record.code)
+            );
+            setSubIndustriesCache((prev) => {
+              const next = new Map();
+              prev.forEach((value, key) => {
+                if (key !== record.code) {
+                  next.set(
+                    key,
+                    value.filter((industry) => industry.code !== record.code)
+                  );
+                }
+              });
+              return next;
+            });
+            setExpandedRows((prev) => prev.filter((key) => key !== record.key));
             fetchIndustries();
             fetchAllIndustries();
           } else {
@@ -315,8 +332,95 @@ const Industries = () => {
   };
 
   const handleAdd = () => {
-    message.info("Chức năng thêm mới đang được phát triển");
-    // TODO: Implement add modal
+    setIsEditing(false);
+    setCurrentIndustry(null);
+    addForm.resetFields();
+    addForm.setFieldsValue({
+      parentCode: "",
+      visible: true,
+      sortOrder: nextSortOrder,
+      color: "#2563eb",
+    });
+    setShowAddModal(true);
+  };
+
+  const parseListInput = (value) => {
+    if (!value) return [];
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  };
+
+  const handleSubmitIndustry = async () => {
+    try {
+      const values = await addForm.validateFields();
+      const payload = {
+        code: values.code.trim(),
+        parentCode:
+          values.parentCode === "" || values.parentCode === undefined
+            ? null
+            : values.parentCode,
+        name: {
+          vi: values.nameVi?.trim() || "",
+          en: values.nameEn?.trim() || "",
+        },
+        description: {
+          vi: values.descriptionVi?.trim() || "",
+          en: values.descriptionEn?.trim() || "",
+        },
+        color: values.color || "#2563eb",
+        icon: values.icon || "",
+        keywords: parseListInput(values.keywords),
+        suggestedTemplates: parseListInput(values.suggestedTemplates),
+        suggestions: {
+          summary: parseListInput(values.summarySuggestions),
+          experience: parseListInput(values.experienceSuggestions),
+          projects: parseListInput(values.projectSuggestions),
+          skills: parseListInput(values.skillSuggestions),
+        },
+        visible: Boolean(values.visible),
+        sortOrder:
+          typeof values.sortOrder === "number"
+            ? values.sortOrder
+            : Number(values.sortOrder) || 0,
+      };
+
+      setCreating(true);
+      if (isEditing && currentIndustry) {
+        const { success, error } = await industriesAPI.updateIndustry(
+          currentIndustry.code,
+          payload
+        );
+        if (success) {
+          message.success("Cập nhật ngành nghề thành công");
+          setShowAddModal(false);
+          setCurrentIndustry(null);
+          fetchIndustries();
+          fetchAllIndustries();
+        } else {
+          message.error(error || "Không thể cập nhật ngành nghề");
+        }
+      } else {
+        const { success, error } = await industriesAPI.createIndustry(payload);
+        if (success) {
+          message.success("Tạo ngành nghề thành công");
+          setShowAddModal(false);
+          fetchIndustries();
+          fetchAllIndustries();
+        } else {
+          message.error(error || "Không thể tạo ngành nghề");
+        }
+      }
+    } catch (error) {
+      if (error?.errorFields) {
+        return;
+      }
+      console.error("Failed to submit industry:", error);
+      message.error("Có lỗi xảy ra khi xử lý ngành nghề");
+    } finally {
+      setCreating(false);
+    }
   };
 
   // Get parent options for filter
@@ -352,22 +456,13 @@ const Industries = () => {
         >
           Thêm ngành nghề
         </Button>
+        <Button
+          icon={<BarChartOutlined />}
+          onClick={() => navigate("/admin/industries/analytics")}
+        >
+          Xem thống kê
+        </Button>
       </div>
-
-      <Row gutter={[16, 16]} className="mb-6">
-        {stats.map((stat, index) => (
-          <Col xs={24} sm={12} lg={6} key={index}>
-            <Card>
-              <Statistic
-                title={stat.title}
-                value={stat.value}
-                prefix={stat.icon}
-                valueStyle={{ color: "oklch(0.55 0.18 195)" }}
-              />
-            </Card>
-          </Col>
-        ))}
-      </Row>
 
       <Card>
         <Form
@@ -561,6 +656,192 @@ const Industries = () => {
           }}
         />
       </Card>
+
+      <Modal
+        title={isEditing ? "Cập nhật ngành nghề" : "Thêm ngành nghề"}
+        open={showAddModal}
+        onCancel={() => setShowAddModal(false)}
+        confirmLoading={creating}
+        onOk={handleSubmitIndustry}
+        width={720}
+        okText={isEditing ? "Cập nhật" : "Tạo"}
+        cancelText="Hủy"
+      >
+        <Form form={addForm} layout="vertical">
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="code"
+                label="Mã ngành nghề"
+                rules={[
+                  { required: true, message: "Vui lòng nhập mã ngành nghề" },
+                  {
+                    pattern: /^[a-z0-9-]+$/,
+                    message: "Chỉ sử dụng chữ thường, số và dấu gạch ngang",
+                  },
+                ]}
+              >
+                <Input
+                  placeholder="Ví dụ: construction-real-estate"
+                  disabled={isEditing}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="parentCode" label="Ngành nghề cha">
+                <Select placeholder="Không có" allowClear>
+                  <Select.Option value="">Không có</Select.Option>
+                  {allIndustries
+                    .filter(
+                      (item) =>
+                        !item.parentCode && item.code !== currentIndustry?.code
+                    )
+                    .map((item) => (
+                      <Select.Option key={item.code} value={item.code}>
+                        {item.name?.vi || item.name}
+                      </Select.Option>
+                    ))}
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="nameVi"
+                label="Tên (Tiếng Việt)"
+                rules={[
+                  { required: true, message: "Vui lòng nhập tên tiếng Việt" },
+                ]}
+              >
+                <Input placeholder="Tên tiếng Việt" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="nameEn"
+                label="Tên (Tiếng Anh)"
+                rules={[
+                  { required: true, message: "Vui lòng nhập tên tiếng Anh" },
+                ]}
+              >
+                <Input placeholder="Tên tiếng Anh" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="descriptionVi" label="Mô tả (Tiếng Việt)">
+                <TextArea rows={3} placeholder="Mô tả ngành nghề" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="descriptionEn" label="Mô tả (Tiếng Anh)">
+                <TextArea rows={3} placeholder="Description" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item name="color" label="Màu sắc">
+                <Input placeholder="#2563eb" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="icon" label="Icon">
+                <Input placeholder="Ví dụ: building" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="keywords"
+                label="Từ khóa"
+                tooltip="Phân tách bằng dấu phẩy"
+              >
+                <Input placeholder="construction, architecture, property" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="suggestedTemplates"
+                label="Gợi ý template"
+                tooltip="Phân tách bằng dấu phẩy"
+              >
+                <Input placeholder="classic, executive" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="summarySuggestions"
+                label="Gợi ý Summary"
+                tooltip="Phân tách bằng dấu phẩy"
+              >
+                <Input placeholder="Kỹ sư xây dựng..., Kiến trúc sư..." />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="experienceSuggestions"
+                label="Gợi ý Kinh nghiệm"
+                tooltip="Phân tách bằng dấu phẩy"
+              >
+                <Input placeholder="Giám sát thi công..., Thiết kế 20+ dự án" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="projectSuggestions"
+                label="Gợi ý Dự án"
+                tooltip="Phân tách bằng dấu phẩy"
+              >
+                <Input placeholder="Dự án chung cư 30 tầng..., Khu đô thị thông minh..." />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="skillSuggestions"
+                label="Gợi ý Kỹ năng"
+                tooltip="Phân tách bằng dấu phẩy"
+              >
+                <Input placeholder="AutoCAD, Revit, Project Management" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="visible"
+                label="Hiển thị"
+                valuePropName="checked"
+              >
+                <Switch />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="sortOrder"
+                label="Thứ tự hiển thị"
+                rules={[{ required: true, message: "Vui lòng nhập thứ tự" }]}
+              >
+                <InputNumber min={0} style={{ width: "100%" }} />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </Modal>
     </div>
   );
 };

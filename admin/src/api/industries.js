@@ -64,6 +64,46 @@ export const industriesAPI = {
   },
 
   /**
+   * Sync analytics statistics for industries
+   * @returns {Promise<Object>} Sync result
+   */
+  syncAnalytics: async () => {
+    const response = await axiosClient.post("/admin/industries/analytics/sync");
+
+    const syncData =
+      response?.data && !Array.isArray(response.data) ? response.data : {};
+
+    return {
+      success: Boolean(response?.success),
+      data: syncData,
+      message: response?.message,
+      error: response?.error,
+      raw: response,
+    };
+  },
+
+  /**
+   * Get analytics overview for industries
+   * @returns {Promise<Object>} Analytics overview data
+   */
+  getAnalyticsOverview: async () => {
+    const response = await axiosClient.get(
+      "/admin/industries/analytics/overview"
+    );
+
+    const analyticsData =
+      response?.data && !Array.isArray(response.data) ? response.data : {};
+
+    return {
+      success: Boolean(response?.success),
+      data: analyticsData,
+      message: response?.message,
+      error: response?.error,
+      raw: response,
+    };
+  },
+
+  /**
    * Get sub-industries by parent code
    * @param {string} parentCode - Parent industry code
    * @param {boolean} includeStats - Whether to include statistics
@@ -140,7 +180,9 @@ export const industriesAPI = {
    * @returns {Promise<Object>} Delete response
    */
   deleteIndustry: async (industryId) => {
-    const response = await axiosClient.delete(`/admin/industries/${industryId}`);
+    const response = await axiosClient.delete(
+      `/admin/industries/${industryId}`
+    );
 
     return {
       success: Boolean(response?.success),
@@ -152,4 +194,3 @@ export const industriesAPI = {
 };
 
 export default industriesAPI;
-

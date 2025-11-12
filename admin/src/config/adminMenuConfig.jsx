@@ -134,8 +134,8 @@ const adminMenuConfig = [
     element: <Posts />,
   },
   {
-    key: "posts",
-    label: "Quản lý danh mục nghề",
+    key: "industries",
+    label: "Danh mục nghề",
     path: "/admin/industries",
     icon: Icons.CategoryIcon,
     element: <Industries />,
