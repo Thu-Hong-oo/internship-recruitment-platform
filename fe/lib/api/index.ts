@@ -6,12 +6,14 @@ export { authService } from "./services/auth.service";
 export { jobService } from "./services/job.service";
 export { candidateService } from "./services/candidate.service";
 export { profileService } from "./services/profile.service";
+export { industryService } from "./services/industry.service";
 
 // Convenient API object (backward compatible)
 import { authService } from "./services/auth.service";
 import { jobService } from "./services/job.service";
 import { candidateService } from "./services/candidate.service";
 import { profileService } from "./services/profile.service";
+import { industryService } from "./services/industry.service";
 import { apiClient } from "./client";
 
 export const api = {
@@ -19,6 +21,7 @@ export const api = {
   jobs: jobService,
   candidateCV: candidateService,
   profile: profileService,
+  industries: industryService,
   client: apiClient,
 };
 
@@ -27,3 +30,4 @@ export const authAPI = authService;
 export const jobsAPI = jobService;
 export const candidateCVAPI = candidateService;
 export const profileAPI = profileService;
+export const industriesAPI = industryService;

@@ -13,6 +13,7 @@ import NotFoundPage from "../components/NotFoundPage";
 import AccountsDetail from "../pages/accounts/detail";
 import CompanyDetail from "../pages/companies/detail";
 import AdminJobDetail from "../pages/admin/posts/detail";
+import IndustriesAnalytics from "../pages/admin/industries/analytics";
 
 // Component để điều hướng dựa trên role
 const RoleBasedRedirect = () => {
@@ -77,6 +78,10 @@ export default function AppRouter() {
         ))}
         <Route path="/admin/companies/:id" element={<CompanyDetail />} />
         <Route path="/admin/posts/:id" element={<AdminJobDetail />} />
+        <Route
+          path="/admin/industries/analytics"
+          element={<IndustriesAnalytics />}
+        />
       </Route>
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
