@@ -1,0 +1,56 @@
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: url("/images/bg-login.png") no-repeat center center;
+    background-size: cover;
+  }
+  
+  .login-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex: 1;
+  }
+  
+  .login-card {
+    width: 50%;
+    min-width: 500px;
+    max-width: 800px;
+    padding: 50px;
+    border-radius: 16px;
+    background-color: #fff;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 50px;
+  }
+
+  .login-logo {
+    width: 30%;
+  }
+
+  .login-form {
+    width: 100%;
+    padding: 15px;
+    gap: 15px;
+    border-radius: 16px;
+    border: 0.5px solid var(--Stroke-Strong, #000D4D73);
+
+  }
+
+  .login-form .ant-form-item {
+    margin-bottom: 15px;
+  }
+  
+  .login-footer {
+    display: flex;
+    justify-content: space-between;
+    background-color: var(--brand-primary);
+    padding: 15px 50px;
+    font-size: 14px;
+    color: #fff;
+  }
+  

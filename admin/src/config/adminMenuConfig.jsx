@@ -20,6 +20,7 @@ import PostPackages from "../pages/admin/packages/post-packages";
 import ViewPackages from "../pages/admin/packages/view-packages";
 import Posts from "../pages/admin/posts";
 import Employers from "../pages/admin/employers";
+import Industries from "../pages/admin/industries";
 
 const adminMenuConfig = [
   {
@@ -131,6 +132,13 @@ const adminMenuConfig = [
     path: "/admin/posts",
     icon: Icons.PostIcon,
     element: <Posts />,
+  },
+  {
+    key: "posts",
+    label: "Quản lý danh mục nghề",
+    path: "/admin/industries",
+    icon: Icons.CategoryIcon,
+    element: <Industries />,
   },
 ];
 
