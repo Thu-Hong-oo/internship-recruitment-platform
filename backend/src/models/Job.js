@@ -171,4 +171,12 @@ JobSchema.virtual('isHot').get(function () {
   return this.hotScore && this.hotScore > 80;
 });
 
+// Static methods
+JobSchema.statics.findActive = function () {
+  return this.find({
+    status: JOB_STATUS.ACTIVE,
+    $or: [{ deadline: { $gte: new Date() } }, { deadline: null }],
+  });
+};
+
 module.exports = mongoose.model('Job', JobSchema);
