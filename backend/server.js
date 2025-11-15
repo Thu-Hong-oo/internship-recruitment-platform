@@ -37,6 +37,7 @@ const candidateRoutes = require('./src/routes/candidate/candidates');
 
 // AI & Analysis Routes
 const aiRoutes = require('./src/routes/ai');
+const advancedNLPRoutes = require('./src/routes/advancedNLP');
 
 // Safe Additional Routes (confirmed models exist)
 const notificationRoutes = require('./src/routes/notifications');
@@ -266,6 +267,7 @@ app.use('/api/candidates', candidateRoutes);
 
 // AI & Analysis Routes
 app.use('/api/ai', aiRoutes);
+app.use('/api/nlp', advancedNLPRoutes);
 
 // Safe Additional Routes (confirmed models exist)
 app.use('/api/notifications', notificationRoutes);

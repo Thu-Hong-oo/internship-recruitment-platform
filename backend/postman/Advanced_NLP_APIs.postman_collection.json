@@ -1,0 +1,357 @@
+{
+  "info": {
+    "name": "Advanced NLP - Matching Score & Learning Roadmap",
+    "description": "API collection for advanced NLP features: Matching Score calculation and Personalized Learning Roadmap generation",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "📊 Matching Score",
+      "item": [
+        {
+          "name": "Calculate Matching Score",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cvData\": {\n    \"skills\": [\n      { \"name\": \"React\", \"level\": \"intermediate\" },\n      { \"name\": \"Node.js\", \"level\": \"advanced\" },\n      { \"name\": \"JavaScript\", \"level\": \"advanced\" },\n      { \"name\": \"MongoDB\", \"level\": \"intermediate\" }\n    ],\n    \"experience\": [\n      {\n        \"position\": \"Frontend Developer\",\n        \"company\": \"ABC Corp\",\n        \"startDate\": \"2021-01-01\",\n        \"endDate\": \"2023-12-31\",\n        \"description\": \"Built responsive web applications using React and Node.js\"\n      }\n    ],\n    \"education\": [\n      {\n        \"degree\": \"bachelor\",\n        \"major\": \"Computer Science\",\n        \"school\": \"Tech University\"\n      }\n    ]\n  },\n  \"jobId\": \"{{jobId}}\",\n  \"candidateId\": \"{{userId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/nlp/matching-score",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nlp", "matching-score"]
+            },
+            "description": "Calculate advanced matching score between CV and Job with detailed breakdown"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Matching Score",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/nlp/matching-score/{{jobId}}/{{candidateId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nlp", "matching-score", "{{jobId}}", "{{candidateId}}"]
+            },
+            "description": "Get existing matching score for a specific job and candidate"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Top Candidates (Employer)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{employerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/nlp/top-candidates/{{jobId}}?limit=20&minScore=70&tier=top",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nlp", "top-candidates", "{{jobId}}"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "minScore",
+                  "value": "70"
+                },
+                {
+                  "key": "tier",
+                  "value": "top"
+                }
+              ]
+            },
+            "description": "Get top matching candidates for a job. For employers only."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Best Job Matches (Candidate)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/nlp/best-matches?limit=10&minScore=60",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nlp", "best-matches"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "minScore",
+                  "value": "60"
+                }
+              ]
+            },
+            "description": "Get best matching jobs for current candidate"
+          },
+          "response": []
+        },
+        {
+          "name": "Recalculate Scores (Employer)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{employerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/nlp/recalculate-scores/{{jobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nlp", "recalculate-scores", "{{jobId}}"]
+            },
+            "description": "Mark all matching scores as stale and trigger recalculation"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🎓 Learning Roadmap",
+      "item": [
+        {
+          "name": "Generate Learning Roadmap",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetJobId\": \"{{jobId}}\",\n  \"targetRole\": \"Full Stack Developer\",\n  \"timeframe\": 12,\n  \"cvData\": {\n    \"skills\": [\n      { \"name\": \"HTML\", \"level\": \"advanced\" },\n      { \"name\": \"CSS\", \"level\": \"advanced\" },\n      { \"name\": \"JavaScript\", \"level\": \"intermediate\" }\n    ],\n    \"experience\": [\n      {\n        \"position\": \"Junior Developer\",\n        \"startDate\": \"2022-01-01\",\n        \"endDate\": \"2023-12-31\"\n      }\n    ],\n    \"education\": [\n      {\n        \"degree\": \"bachelor\",\n        \"major\": \"Computer Science\"\n      }\n    ],\n    \"currentLevel\": \"beginner\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/nlp/learning-roadmap",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nlp", "learning-roadmap"]
+            },
+            "description": "Generate personalized learning roadmap with detailed resources and milestones"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Learning Roadmap",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/nlp/learning-roadmap/{{roadmapId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nlp", "learning-roadmap", "{{roadmapId}}"]
+            },
+            "description": "Get specific learning roadmap by ID"
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Roadmaps",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/nlp/my-roadmaps?status=active",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nlp", "my-roadmaps"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "active"
+                }
+              ]
+            },
+            "description": "Get all roadmaps for current user"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Roadmap Progress",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weekNumber\": 1,\n  \"resourceId\": \"resource_123\",\n  \"phaseNumber\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/nlp/learning-roadmap/{{roadmapId}}/progress",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nlp", "learning-roadmap", "{{roadmapId}}", "progress"]
+            },
+            "description": "Update progress: mark week or resource as completed"
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Roadmap Feedback",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Very helpful roadmap! The resources are excellent and credible.\",\n  \"isHelpful\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/nlp/learning-roadmap/{{roadmapId}}/feedback",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nlp", "learning-roadmap", "{{roadmapId}}", "feedback"]
+            },
+            "description": "Submit feedback and rating for a roadmap"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Recommended Resources",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/nlp/roadmap/recommended-resources/{{roadmapId}}?phase=1&week=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nlp", "roadmap", "recommended-resources", "{{roadmapId}}"],
+              "query": [
+                {
+                  "key": "phase",
+                  "value": "1"
+                },
+                {
+                  "key": "week",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Get top recommended resources for specific phase and week"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Popular Roadmaps",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/nlp/popular-roadmaps?limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nlp", "popular-roadmaps"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Get popular public roadmaps (no auth required)"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "candidateToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "employerToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "jobId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "candidateId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "roadmapId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

@@ -625,6 +625,12 @@ class AIController {
         }
       }
 
+      logger.info('Analyzing skill gaps', {
+        userId: req.user.id,
+        jobTitle: jobData.title,
+        hasSkills: !!cvData.skills,
+      });
+
       const skillGapAnalysis = await aiService.analyzeSkillGaps(
         cvData,
         jobData
@@ -636,7 +642,11 @@ class AIController {
         'Skill gap analysis completed'
       );
     } catch (error) {
-      console.error('Skill gap analysis error:', error);
+      logger.error('Skill gap analysis error:', {
+        error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
+      });
       next(new AppError('Failed to analyze skill gaps', 500));
     }
   }
