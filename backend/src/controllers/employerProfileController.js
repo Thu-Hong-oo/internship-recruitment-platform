@@ -439,6 +439,8 @@ const uploadBusinessLicense = asyncHandler(async (req, res) => {
       metadata,
       profile
     );
+
+    // ✅ Delete old document from Cloudinary if exists
     if (oldCloudinaryId) {
       try {
         await EmployerServices.deleteDocument(oldCloudinaryId);
@@ -450,6 +452,31 @@ const uploadBusinessLicense = asyncHandler(async (req, res) => {
         });
       }
     }
+
+    // ✅ Remove old document from profile.verification.documents
+    if (existingDoc) {
+      profile.verification.documents = profile.verification.documents.filter(
+        doc => doc.documentType !== documentType
+      );
+    }
+
+    // ✅ Add new document to profile.verification.documents
+    profile.verification.documents.push({
+      documentType: documentType,
+      url: uploadResult.url,
+      cloudinaryId: uploadResult.publicId,
+      uploadedAt: new Date(),
+      status: 'pending',
+      metadata: {
+        originalName: uploadResult.originalName,
+        size: uploadResult.size,
+        mimeType: uploadResult.mimeType,
+        ...metadata,
+      },
+    });
+
+    await profile.save();
+
     logger.info('Business license uploaded successfully', {
       userId: req.user.id,
       employerProfileId: profile._id,
@@ -539,6 +566,30 @@ const uploadTaxCertificate = asyncHandler(async (req, res) => {
       }
     }
 
+    // ✅ Remove old document from profile.verification.documents
+    if (existingDoc) {
+      profile.verification.documents = profile.verification.documents.filter(
+        doc => doc.documentType !== documentType
+      );
+    }
+
+    // ✅ Add new document to profile.verification.documents
+    profile.verification.documents.push({
+      documentType: documentType,
+      url: uploadResult.url,
+      cloudinaryId: uploadResult.publicId,
+      uploadedAt: new Date(),
+      status: 'pending',
+      metadata: {
+        originalName: uploadResult.originalName,
+        size: uploadResult.size,
+        mimeType: uploadResult.mimeType,
+        ...metadata,
+      },
+    });
+
+    await profile.save();
+
     logger.info('Tax certificate uploaded successfully', {
       userId: req.user.id,
       employerProfileId: profile._id,
@@ -557,13 +608,13 @@ const uploadTaxCertificate = asyncHandler(async (req, res) => {
         mimeType: uploadResult.mimeType,
       },
     });
-  } catch (error) {
+  } catch (err) {
     logger.error('Upload tax certificate failed:', {
-      error: error.message,
+      error: err.message,
       userId: req.user?.id,
-      stack: error.stack,
+      stack: err.stack,
     });
-    return error(res, 'Lỗi upload giấy chứng nhận thuế', error);
+    return error(res, 'Lỗi upload giấy chứng nhận thuế', err);
   }
 });
 

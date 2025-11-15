@@ -232,8 +232,8 @@ class EmployerService {
     // Use ensureProfile to auto-create if needed
     const profile = await this.ensureProfile(userId);
 
-    // Allowed fields
-    const allowedFields = ['company', 'businessInfo'];
+    // Allowed fields (including legalRepresentative for verification)
+    const allowedFields = ['company', 'businessInfo', 'legalRepresentative'];
 
     for (const field of allowedFields) {
       if (updates[field]) {
@@ -586,10 +586,10 @@ class EmployerService {
     const documentUploadService = require('../documentUploadService');
 
     return await documentUploadService.uploadDocument(file, {
-      folder: `internbridge/employer-documents/${userId}`,
+      folder: `internbridge/employer-documents/${userId.toString()}`,
       documentType,
       metadata,
-      userId,
+      userId: userId.toString(),
     });
   }
 

@@ -1,0 +1,660 @@
+{
+  "info": {
+    "name": "Skills Admin API",
+    "description": "Complete Skills Admin API - CRUD operations, categories, analytics, bulk operations, and status management",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "skill_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Skills CRUD",
+      "item": [
+        {
+          "name": "1.1 Get All Skills (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills?page=1&limit=50&status=all&sortBy=name&sortOrder=asc",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Items per page"
+                },
+                {
+                  "key": "status",
+                  "value": "all",
+                  "description": "Filter: all | active | inactive"
+                },
+                {
+                  "key": "category",
+                  "value": "frontend",
+                  "description": "Filter by category slug",
+                  "disabled": true
+                },
+                {
+                  "key": "search",
+                  "value": "React",
+                  "description": "Search in name, description, aliases",
+                  "disabled": true
+                },
+                {
+                  "key": "demandLevel",
+                  "value": "high",
+                  "description": "Filter: low | medium | high | critical",
+                  "disabled": true
+                },
+                {
+                  "key": "trend",
+                  "value": "growing",
+                  "description": "Filter: declining | stable | growing | emerging",
+                  "disabled": true
+                },
+                {
+                  "key": "sortBy",
+                  "value": "name",
+                  "description": "Sort field: name | popularity | createdAt"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "asc",
+                  "description": "Sort order: asc | desc"
+                }
+              ]
+            },
+            "description": "Get all skills with admin filters (includes inactive skills)\n\n**Features:**\n- Pagination\n- Status filter (active/inactive/all)\n- Search by name/description/aliases\n- Filter by category, demand level, trend\n- Sort by multiple fields\n- Includes usage statistics (job count, candidate count)"
+          },
+          "response": []
+        },
+        {
+          "name": "1.2 Get Skill by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/{{skill_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "{{skill_id}}"]
+            },
+            "description": "Get skill by ID with detailed analytics:\n- Basic skill info\n- Job count (total and active)\n- Candidate count\n- Recent jobs using this skill (last 10)\n- Total usage statistics"
+          },
+          "response": []
+        },
+        {
+          "name": "1.3 Create Skill",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.data && response.data.skill && response.data.skill._id) {",
+                  "        pm.collectionVariables.set('skill_id', response.data.skill._id);",
+                  "        console.log('Skill ID saved:', response.data.skill._id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"React\",\n  \"category\": \"frontend\",\n  \"description\": \"A JavaScript library for building user interfaces\",\n  \"aliases\": [\"ReactJS\", \"React.js\"],\n  \"demandLevel\": \"high\",\n  \"trend\": \"growing\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills"]
+            },
+            "description": "Create new skill\n\n**Required fields:**\n- name (string, unique)\n- category (string, must exist)\n\n**Optional fields:**\n- description (string, max 500 chars)\n- aliases (array of strings)\n- demandLevel (low | medium | high | critical, default: medium)\n- trend (declining | stable | growing | emerging, default: stable)\n\n**Note:**\n- isActive is NOT allowed on create - always defaults to true\n- Use toggle-status endpoint to deactivate later\n- Checks for duplicate names and aliases"
+          },
+          "response": []
+        },
+        {
+          "name": "1.4 Update Skill",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"React is a JavaScript library for building user interfaces, maintained by Meta\",\n  \"demandLevel\": \"critical\",\n  \"trend\": \"stable\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/{{skill_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "{{skill_id}}"]
+            },
+            "description": "Update skill (partial update supported)\n\n**Can update:**\n- name (checks for duplicates)\n- category\n- description\n- aliases\n- demandLevel\n- trend\n- isActive (but prefer using toggle-status endpoint)\n\n**Validation:**\n- Name uniqueness check\n- Alias uniqueness check"
+          },
+          "response": []
+        },
+        {
+          "name": "1.5 Toggle Skill Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/{{skill_id}}/toggle-status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "{{skill_id}}", "toggle-status"]
+            },
+            "description": "Toggle skill active/inactive status\n\n**Use cases:**\n- Deactivate outdated skills (e.g., Flash, Silverlight)\n- Temporarily hide skills from public API\n- Reactivate skills when needed\n\n**Effect:**\n- Active → Inactive: Skill hidden from public endpoints\n- Inactive → Active: Skill visible again\n- Does NOT delete data\n- Does NOT affect existing job/candidate references"
+          },
+          "response": []
+        },
+        {
+          "name": "1.6 Delete Skill",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/{{skill_id}}?force=false",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "{{skill_id}}"],
+              "query": [
+                {
+                  "key": "force",
+                  "value": "false",
+                  "description": "Set to 'true' to force delete even if skill is in use"
+                }
+              ]
+            },
+            "description": "Delete skill with validation\n\n**Safety checks:**\n- Counts usage in jobs and candidate profiles\n- Blocks deletion if skill is in use (unless force=true)\n- Shows usage count in error message\n\n**Query params:**\n- force=true: Force delete even if skill is in use (dangerous!)\n- force=false (default): Prevent deletion if skill is in use\n\n**Recommendation:**\n- Use toggle-status to deactivate instead of deleting\n- Only delete duplicate/test skills\n- Use force=true only if you understand the impact"
+          },
+          "response": []
+        }
+      ],
+      "description": "Basic CRUD operations for skills management"
+    },
+    {
+      "name": "2. Categories Management",
+      "item": [
+        {
+          "name": "2.1 Get All Categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/categories/list",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "categories", "list"]
+            },
+            "description": "Get all skill categories with statistics\n\n**Returns:**\n- Category details (name, slug, icon, color)\n- Skill count per category\n- Job count per category\n- Hierarchy information (parent/subcategories)\n- Sort order"
+          },
+          "response": []
+        },
+        {
+          "name": "2.2 Get Skills by Category",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/categories/frontend?page=1&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "categories", "frontend"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Get all skills belonging to a specific category\n\n**URL parameter:**\n- :category - Category slug (e.g., frontend, backend, databases)\n\n**Query parameters:**\n- page, limit - Pagination\n- Supports all filters from getAllSkills"
+          },
+          "response": []
+        },
+        {
+          "name": "2.3 Update Skill Category",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category\": \"frameworks\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/categories/{{skill_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "categories", "{{skill_id}}"]
+            },
+            "description": "Move skill to different category\n\n**Body:**\n- category (string, required) - New category slug\n\n**Validation:**\n- Category must exist\n- Updates skill's category field"
+          },
+          "response": []
+        }
+      ],
+      "description": "Manage skill categories and categorization"
+    },
+    {
+      "name": "3. Analytics & Insights",
+      "item": [
+        {
+          "name": "3.1 Get Skills Analytics Overview",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/analytics/overview",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "analytics", "overview"]
+            },
+            "description": "Get comprehensive skill analytics\n\n**Returns:**\n- Total skills count\n- Active vs inactive skills\n- Skills by category distribution\n- Skills by demand level\n- Skills by trend\n- Top skills by usage\n- Skills with no usage\n- Recent skills added"
+          },
+          "response": []
+        },
+        {
+          "name": "3.2 Get Skill Trends",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/analytics/trends?period=30d",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "analytics", "trends"],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "30d",
+                  "description": "Time period: 30d | 90d | 1y"
+                }
+              ]
+            },
+            "description": "Get skill demand trends over time\n\n**Query params:**\n- period: 30d | 90d | 1y (default: 30d)\n\n**Returns:**\n- Skills with growing demand\n- Emerging skills\n- Declining skills\n- Stable skills\n- Trend changes over period"
+          },
+          "response": []
+        },
+        {
+          "name": "3.3 Sync Skill Popularity",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/analytics/sync",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "analytics", "sync"]
+            },
+            "description": "Recalculate skill popularity from actual usage\n\n**What it does:**\n- Counts active jobs requiring each skill\n- Counts candidates with each skill\n- Updates popularity field for all skills\n\n**When to use:**\n- After bulk data imports\n- When popularity seems outdated\n- Periodically (recommended: daily cron job)"
+          },
+          "response": []
+        }
+      ],
+      "description": "Analytics, statistics, and trend analysis for skills"
+    },
+    {
+      "name": "4. Bulk Operations",
+      "item": [
+        {
+          "name": "4.1 Bulk Create Skills",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"skills\": [\n    {\n      \"name\": \"Vue.js\",\n      \"category\": \"frontend\",\n      \"description\": \"Progressive JavaScript framework\",\n      \"aliases\": [\"Vue\", \"VueJS\"],\n      \"demandLevel\": \"high\",\n      \"trend\": \"growing\"\n    },\n    {\n      \"name\": \"Angular\",\n      \"category\": \"frontend\",\n      \"description\": \"TypeScript-based web application framework\",\n      \"aliases\": [\"AngularJS\"],\n      \"demandLevel\": \"medium\",\n      \"trend\": \"stable\"\n    },\n    {\n      \"name\": \"Svelte\",\n      \"category\": \"frontend\",\n      \"description\": \"Cybernetically enhanced web apps\",\n      \"demandLevel\": \"medium\",\n      \"trend\": \"emerging\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/bulk/create",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "bulk", "create"]
+            },
+            "description": "Create multiple skills at once\n\n**Body:**\n- skills (array, required) - Array of skill objects\n\n**Validation:**\n- Each skill validated individually\n- Skips duplicates (by name/alias)\n- Returns success count and error details\n\n**Response:**\n- created: Array of successfully created skills\n- errors: Array of failed skills with reasons\n- summary: { total, successful, failed }"
+          },
+          "response": []
+        },
+        {
+          "name": "4.2 Batch Update Skills",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"updates\": [\n    {\n      \"id\": \"{{skill_id}}\",\n      \"data\": {\n        \"demandLevel\": \"critical\"\n      }\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/bulk/update",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "bulk", "update"]
+            },
+            "description": "Update multiple skills at once\n\n**Body:**\n- updates (array, required) - Array of { id, data } objects\n\n**Use cases:**\n- Bulk update demand levels\n- Batch categorization changes\n- Mass trend updates\n\n**Response:**\n- updated: Array of successfully updated skills\n- errors: Array of failed updates with reasons\n- summary: { total, successful, failed }"
+          },
+          "response": []
+        },
+        {
+          "name": "4.3 Batch Delete Skills",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": [\"skill_id_1\", \"skill_id_2\", \"skill_id_3\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/bulk/delete?force=false",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "bulk", "delete"],
+              "query": [
+                {
+                  "key": "force",
+                  "value": "false",
+                  "description": "Force delete skills even if in use"
+                }
+              ]
+            },
+            "description": "Delete multiple skills at once\n\n**Body:**\n- ids (array, required) - Array of skill IDs to delete\n\n**Query params:**\n- force=true: Force delete even if skills are in use\n\n**Safety:**\n- Checks each skill for usage\n- Skips skills in use (unless force=true)\n- Returns detailed results per skill\n\n**Response:**\n- deleted: Array of successfully deleted skill IDs\n- errors: Array of failed deletions with reasons\n- summary: { total, successful, failed }"
+          },
+          "response": []
+        }
+      ],
+      "description": "Batch operations for efficient bulk management"
+    },
+    {
+      "name": "5. Skill Relationships",
+      "item": [
+        {
+          "name": "5.1 Get Related Skills",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/{{skill_id}}/related",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "{{skill_id}}", "related"]
+            },
+            "description": "Get related skills for a specific skill\n\n**Returns:**\n- relatedSkills: Skills often used together\n- prerequisites: Skills needed before learning this\n- alternatives: Alternative/competing skills\n- skillsThatRequireThis: Skills that list this as prerequisite"
+          },
+          "response": []
+        },
+        {
+          "name": "5.2 Update Skill Relationships",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"relatedSkills\": [\"skill_id_1\", \"skill_id_2\"],\n  \"prerequisites\": [\"skill_id_3\"],\n  \"alternatives\": [\"skill_id_4\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/{{skill_id}}/relationships",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "{{skill_id}}", "relationships"]
+            },
+            "description": "Update skill relationships\n\n**Body:**\n- relatedSkills (array) - Skills commonly used together\n- prerequisites (array) - Skills needed before this\n- alternatives (array) - Alternative/competing skills\n\n**Use cases:**\n- Build skill dependency graphs\n- Power recommendation systems\n- Create learning paths\n- Show \"people who learned X also learned Y\""
+          },
+          "response": []
+        }
+      ],
+      "description": "Manage relationships between skills"
+    },
+    {
+      "name": "6. Import/Export",
+      "item": [
+        {
+          "name": "6.1 Export Skills (CSV)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/export?format=csv",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "export"],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "csv",
+                  "description": "Export format: csv | json"
+                },
+                {
+                  "key": "status",
+                  "value": "all",
+                  "description": "Filter: all | active | inactive",
+                  "disabled": true
+                },
+                {
+                  "key": "category",
+                  "value": "frontend",
+                  "description": "Filter by category",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Export skills to CSV format\n\n**Query params:**\n- format: csv | json (required)\n- All filters from getAllSkills supported\n\n**CSV columns:**\n- ID, Name, Category, Description, Aliases, Demand Level, Trend, Popularity, Status, Created At"
+          },
+          "response": []
+        },
+        {
+          "name": "6.2 Export Skills (JSON)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/export?format=json",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "export"],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "json"
+                }
+              ]
+            },
+            "description": "Export skills to JSON format\n\n**Use cases:**\n- Backup skills data\n- Data migration\n- Analysis in external tools\n- Share skills list with other systems"
+          },
+          "response": []
+        },
+        {
+          "name": "6.3 Import Skills",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "/path/to/skills.csv",
+                  "description": "CSV or JSON file with skills data"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/admin/skills/import",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "skills", "import"]
+            },
+            "description": "Import skills from CSV or JSON file\n\n**Supported formats:**\n- CSV (with headers matching export format)\n- JSON (array of skill objects)\n\n**CSV format:**\n```\nName,Category,Description,Aliases,DemandLevel,Trend\nReact,frontend,\"JavaScript library\",\"ReactJS,React.js\",high,growing\n```\n\n**JSON format:**\n```json\n[\n  {\n    \"name\": \"React\",\n    \"category\": \"frontend\",\n    \"description\": \"JavaScript library\",\n    \"aliases\": [\"ReactJS\", \"React.js\"],\n    \"demandLevel\": \"high\",\n    \"trend\": \"growing\"\n  }\n]\n```\n\n**Behavior:**\n- Skips duplicates\n- Validates each record\n- Returns detailed import report\n- Continues on errors (doesn't rollback)"
+          },
+          "response": []
+        }
+      ],
+      "description": "Import and export skills data for backup, migration, and analysis"
+    }
+  ]
+}
