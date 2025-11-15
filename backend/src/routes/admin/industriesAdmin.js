@@ -35,13 +35,6 @@ router.get('/', getAllIndustries);
 router.get('/hierarchy', getIndustryHierarchy);
 
 /**
- * @route   GET /api/admin/industries/:code
- * @desc    Get industry by code with detailed stats
- * @access  Private/Admin
- */
-router.get('/:code', getIndustryByCode);
-
-/**
  * @route   POST /api/admin/industries
  * @desc    Create new industry
  * @access  Private/Admin
@@ -49,24 +42,10 @@ router.get('/:code', getIndustryByCode);
  */
 router.post('/', createIndustry);
 
-/**
- * @route   PUT /api/admin/industries/:code
- * @desc    Update industry
- * @access  Private/Admin
- * @body    Partial industry data
- */
-router.put('/:code', updateIndustry);
-
-/**
- * @route   DELETE /api/admin/industries/:code
- * @desc    Delete industry (with validation)
- * @access  Private/Admin
- */
-router.delete('/:code', deleteIndustry);
-
 // ========================================
 // ANALYTICS & BULK OPERATIONS
 // ========================================
+// NOTE: These routes MUST come BEFORE /:code routes to avoid conflicts
 
 /**
  * @route   GET /api/admin/industries/analytics/overview
@@ -97,5 +76,31 @@ router.post('/bulk', bulkCreateIndustries);
  * @body    { updates: [{ code, sortOrder }] }
  */
 router.put('/sort-order', updateIndustrySortOrder);
+
+// ========================================
+// DYNAMIC ROUTES (MUST BE LAST)
+// ========================================
+
+/**
+ * @route   GET /api/admin/industries/:code
+ * @desc    Get industry by code with detailed stats
+ * @access  Private/Admin
+ */
+router.get('/:code', getIndustryByCode);
+
+/**
+ * @route   PUT /api/admin/industries/:code
+ * @desc    Update industry
+ * @access  Private/Admin
+ * @body    Partial industry data
+ */
+router.put('/:code', updateIndustry);
+
+/**
+ * @route   DELETE /api/admin/industries/:code
+ * @desc    Delete industry (with validation)
+ * @access  Private/Admin
+ */
+router.delete('/:code', deleteIndustry);
 
 module.exports = router;

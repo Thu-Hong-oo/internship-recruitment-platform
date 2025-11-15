@@ -529,8 +529,14 @@ class ResumeController {
       const filename =
         resumeToView.displayName || resumeToView.filename || 'resume.pdf';
 
+      // Encode filename to handle special characters (Vietnamese, etc.)
+      const encodedFilename = encodeURIComponent(filename);
+
       res.setHeader('Content-Type', contentType);
-      res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+      res.setHeader(
+        'Content-Disposition',
+        `inline; filename="resume.pdf"; filename*=UTF-8''${encodedFilename}`
+      );
       res.send(fileBuffer);
     } catch (error) {
       next(error);
