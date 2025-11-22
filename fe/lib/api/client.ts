@@ -129,7 +129,12 @@ export class ApiClient {
     }
 
     try {
-      const response = await fetch(url, config);
+      // Add cache: 'no-store' to prevent browser/Next.js caching
+      const response = await fetch(url, {
+        ...config,
+        cache: 'no-store',
+        next: { revalidate: 0 }, // Disable Next.js cache
+      });
 
       console.log("API Response:", {
         status: response.status,
@@ -140,8 +145,23 @@ export class ApiClient {
 
       if (!response.ok) {
         //200-299 >< 400, 401, 403, 404, 500, ...
-        const errorData = await response.json().catch(() => ({}));
+        let errorData: any;
+        try {
+          const text = await response.text();
+          errorData = text ? JSON.parse(text) : {};
+        } catch {
+          errorData = {};
+        }
+        
         console.error("API Error Response:", errorData);
+        
+        // If the error response has a structured format with success: false,
+        // return it instead of throwing (this allows callers to handle it gracefully)
+        if (errorData && typeof errorData === 'object' && errorData.success === false) {
+          return errorData;
+        }
+        
+        // Otherwise, throw an error with the message
         throw new Error(
           errorData.error ||
             errorData.message ||

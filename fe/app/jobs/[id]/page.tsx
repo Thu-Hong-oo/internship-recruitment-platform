@@ -14,10 +14,15 @@ import {
 import { PageLayout } from "@/components/layout";
 import { jobsAPI } from "@/lib/api";
 import { notFound } from "next/navigation";
+import { ApplyButton } from "@/components/jobs/ApplyButton";
 
 interface JobDetailPageProps {
   params: Promise<{ id: string }>;
 }
+
+// Disable caching for this page to ensure fresh data
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function JobDetailPage({ params }: JobDetailPageProps) {
   const { id } = await params;
@@ -105,7 +110,11 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button className="font-medium">Ứng tuyển ngay</Button>
+              <ApplyButton
+                jobId={id}
+                jobTitle={job.title}
+                className="font-medium"
+              />
               <Button variant="outline">Lưu việc làm</Button>
             </div>
           </div>
@@ -232,7 +241,11 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                     </div>
                   )}
                   <div className="flex gap-3">
-                    <Button className="font-medium">Ứng tuyển ngay</Button>
+                    <ApplyButton
+                      jobId={id}
+                      jobTitle={job.title}
+                      className="font-medium"
+                    />
                     <Button variant="outline">Lưu việc làm</Button>
                   </div>
                 </CardContent>

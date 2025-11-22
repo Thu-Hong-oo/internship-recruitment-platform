@@ -33,6 +33,7 @@ import {
   CompanyFormData,
 } from "@/lib/companyAPI";
 import { useVerificationContext } from "@/contexts/VerificationContext";
+import { industryService, type Industry } from "@/lib/industryAPI";
 
 export default function CompanyPage() {
   const router = useRouter();
@@ -44,6 +45,8 @@ export default function CompanyPage() {
   const [companyView, setCompanyView] = useState<any>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [industries, setIndustries] = useState<Industry[]>([]);
+  const [loadingIndustries, setLoadingIndustries] = useState(false);
 
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
@@ -343,15 +346,23 @@ export default function CompanyPage() {
     if (cities.length) fetchCompany();
   }, [cities]);
 
-  const industryOptions = [
-    { value: "technology", label: "Công nghệ" },
-    { value: "finance", label: "Tài chính" },
-    { value: "manufacturing", label: "Sản xuất" },
-    { value: "education", label: "Giáo dục" },
-    { value: "healthcare", label: "Y tế" },
-    { value: "retail", label: "Bán lẻ" },
-    { value: "other", label: "Khác" },
-  ];
+  // Fetch industries on mount
+  useEffect(() => {
+    const fetchIndustries = async () => {
+      try {
+        setLoadingIndustries(true);
+        const rootIndustries = await industryService.getRootIndustries();
+        setIndustries(rootIndustries);
+      } catch (error) {
+        console.error("Failed to fetch industries:", error);
+        setError("Không thể tải danh sách ngành nghề");
+      } finally {
+        setLoadingIndustries(false);
+      }
+    };
+
+    fetchIndustries();
+  }, []);
 
   const sizeOptions = [
     { value: "small", label: "Nhỏ" },
@@ -547,7 +558,9 @@ export default function CompanyPage() {
                   </div>
                   <div>
                     <span className="text-slate-500">Ngành:</span>{" "}
-                    {formData.company.industry}
+                    {industries.find((i) => i.code === formData.company.industry)?.name?.vi ||
+                      formData.company.industry ||
+                      "Chưa cập nhật"}
                   </div>
                   <div>
                     <span className="text-slate-500">Quy mô:</span>{" "}
@@ -665,14 +678,15 @@ export default function CompanyPage() {
                     <Select
                       value={formData.company.industry}
                       onValueChange={(v) => setField("company.industry", v)}
+                      disabled={loadingIndustries}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Chọn ngành" />
+                        <SelectValue placeholder={loadingIndustries ? "Đang tải..." : "Chọn ngành"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {industryOptions.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>
-                            {o.label}
+                        {industries.map((industry) => (
+                          <SelectItem key={industry.code} value={industry.code}>
+                            {industry.name.vi || industry.name.en || industry.code}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -734,11 +748,16 @@ export default function CompanyPage() {
                     <Label htmlFor="company.website">Website</Label>
                     <Input
                       id="company.website"
+                      type="url"
+                      placeholder="https://example.com hoặc example.com"
                       value={formData.company.website}
                       onChange={(e) =>
                         setField("company.website", e.target.value)
                       }
                     />
+                    <p className="text-xs text-slate-500 mt-1">
+                      Hệ thống sẽ tự động thêm https:// nếu bạn chưa nhập
+                    </p>
                   </div>
                 </div>
 
@@ -979,7 +998,9 @@ export default function CompanyPage() {
 
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <p className="text-red-800">{error}</p>
+                <div className="text-red-800 whitespace-pre-line">
+                  {typeof error === "string" ? error : JSON.stringify(error)}
+                </div>
               </div>
             )}
 
