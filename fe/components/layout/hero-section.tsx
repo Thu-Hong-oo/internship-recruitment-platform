@@ -10,15 +10,98 @@ import { industriesAPI, Industry } from "@/lib/api";
 
 interface HeroSectionProps {
   onSearch?: (keyword: string) => void;
+  onFiltersChange?: (filters: FilterState) => void;
 }
 
-export default function HeroSection({ onSearch }: HeroSectionProps) {
+export interface FilterState {
+  search?: string;
+  location?: string;
+  employmentType?: string;
+  experienceLevel?: string;
+  industryCode?: string;
+  skills?: string[];
+  minSalary?: number;
+  maxSalary?: number;
+}
+
+export default function HeroSection({
+  onSearch,
+  onFiltersChange,
+}: HeroSectionProps) {
   const router = useRouter();
   const [searchKeyword, setSearchKeyword] = useState("");
   const [selectedLocation, setSelectedLocation] = useState("Tất cả địa điểm");
   const [selectedDistricts, setSelectedDistricts] = useState<string[]>([]);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showJobCategoryModal, setShowJobCategoryModal] = useState(false);
+
+  // Location options
+  const locations = [
+    "Tất cả địa điểm",
+    "Ho Chi Minh",
+    "Ha Noi",
+    "Da Nang",
+    "Can Tho",
+    "Hai Phong",
+    "An Giang",
+    "Ba Ria - Vung Tau",
+    "Bac Lieu",
+    "Bac Giang",
+    "Bac Kan",
+    "Bac Ninh",
+    "Ben Tre",
+    "Binh Dinh",
+    "Binh Duong",
+    "Binh Phuoc",
+    "Binh Thuan",
+    "Ca Mau",
+    "Cao Bang",
+    "Dak Lak",
+    "Dak Nong",
+    "Dien Bien",
+    "Dong Nai",
+    "Dong Thap",
+    "Gia Lai",
+    "Ha Giang",
+    "Ha Nam",
+    "Ha Tinh",
+    "Hai Duong",
+    "Hau Giang",
+    "Hoa Binh",
+    "Hung Yen",
+    "Khanh Hoa",
+    "Kien Giang",
+    "Kon Tum",
+    "Lai Chau",
+    "Lam Dong",
+    "Lang Son",
+    "Lao Cai",
+    "Long An",
+    "Nam Dinh",
+    "Nghe An",
+    "Ninh Binh",
+    "Ninh Thuan",
+    "Phu Tho",
+    "Phu Yen",
+    "Quang Binh",
+    "Quang Nam",
+    "Quang Ngai",
+    "Quang Ninh",
+    "Quang Tri",
+    "Soc Trang",
+    "Son La",
+    "Tay Ninh",
+    "Thai Binh",
+    "Thai Nguyen",
+    "Thanh Hoa",
+    "Thua Thien Hue",
+    "Tien Giang",
+    "Tra Vinh",
+    "Tuyen Quang",
+    "Vinh Long",
+    "Vinh Phuc",
+    "Yen Bai",
+  ];
 
   // Industries state
   const [industries, setIndustries] = useState<Industry[]>([]);
@@ -404,7 +487,10 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
                                         onClick={() => {
                                           setShowJobCategoryModal(false);
                                           const params = new URLSearchParams();
-                                          params.set("industry", industry.code);
+                                          params.set(
+                                            "industryCode",
+                                            industry.code
+                                          );
                                           router.push(
                                             `/search?${params.toString()}`
                                           );
@@ -481,7 +567,7 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
                                         setShowJobCategoryModal(false);
                                         const params = new URLSearchParams();
                                         params.set(
-                                          "industry",
+                                          "industryCode",
                                           subIndustry.code
                                         );
                                         router.push(
@@ -530,7 +616,7 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
                                         setShowJobCategoryModal(false);
                                         const params = new URLSearchParams();
                                         params.set(
-                                          "industry",
+                                          "industryCode",
                                           subIndustry.code
                                         );
                                         router.push(
@@ -676,28 +762,27 @@ export default function HeroSection({ onSearch }: HeroSectionProps) {
               </div>
             </div>
             <div className="flex max-h-96">
-              <div className="w-1/2 border-r border-gray-200">
+              <div className="w-full">
                 <div className="p-4">
-                  <div className="space-y-2">
-                    {[
-                      "Hà Nội",
-                      "Hồ Chí Minh",
-                      "Bình Dương",
-                      "Bắc Ninh",
-                      "Đồng Nai",
-                      "Hưng Yên",
-                      "Hải Dương",
-                    ].map((city) => (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-80 overflow-y-auto">
+                    {locations.map((city) => (
                       <div
                         key={city}
                         className="flex items-center justify-between p-2 hover:bg-gray-50 rounded cursor-pointer"
+                        onClick={() => {
+                          setSelectedLocation(city);
+                          setShowLocationModal(false);
+                        }}
                       >
                         <div className="flex items-center">
                           <Checkbox
                             checked={selectedLocation === city}
-                            onChange={() => setSelectedLocation(city)}
+                            onCheckedChange={() => {
+                              setSelectedLocation(city);
+                              setShowLocationModal(false);
+                            }}
                           />
-                          <span className="ml-3">{city}</span>
+                          <span className="ml-3 text-sm">{city}</span>
                         </div>
                       </div>
                     ))}

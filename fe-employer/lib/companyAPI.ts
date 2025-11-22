@@ -73,8 +73,31 @@ export const updateCompanyInfo = async (
   companyData: CompanyFormData
 ): Promise<CompanyResponse> => {
   try {
+    // Format website: add http:// if missing protocol
+    let formattedWebsite = companyData.company.website;
+    if (formattedWebsite && formattedWebsite.trim() !== "") {
+      formattedWebsite = formattedWebsite.trim();
+      if (!formattedWebsite.startsWith("http://") && !formattedWebsite.startsWith("https://")) {
+        formattedWebsite = `https://${formattedWebsite}`;
+      }
+    }
+
+    // Clean company data: convert empty strings to undefined for optional numeric fields
+    const cleanedCompany = {
+      ...companyData.company,
+      website: formattedWebsite || undefined,
+      foundedYear:
+        companyData.company.foundedYear === "" || companyData.company.foundedYear === undefined
+          ? undefined
+          : companyData.company.foundedYear,
+      employeesCount:
+        companyData.company.employeesCount === "" || companyData.company.employeesCount === undefined
+          ? undefined
+          : companyData.company.employeesCount,
+    };
+
     const body = {
-      company: companyData.company,
+      company: cleanedCompany,
       businessInfo: {
         registrationNumber: companyData.businessInfo.registrationNumber,
         taxId: companyData.businessInfo.taxId,
@@ -97,10 +120,32 @@ export const updateCompanyInfo = async (
     });
 
     const data = await response.json();
+    
+    // Format error message - handle array or object errors
+    let errorMessage = "";
+    if (data?.error) {
+      if (Array.isArray(data.error)) {
+        // Joi validation errors array
+        errorMessage = data.error
+          .map((err: any) => {
+            if (typeof err === "string") return err;
+            if (err?.message) return err.message;
+            return JSON.stringify(err);
+          })
+          .join("\n");
+      } else if (typeof data.error === "string") {
+        errorMessage = data.error;
+      } else if (data.error?.message) {
+        errorMessage = data.error.message;
+      } else {
+        errorMessage = JSON.stringify(data.error);
+      }
+    }
+
     return {
       success: data?.success,
       message: data?.message,
-      error: data?.error,
+      error: errorMessage || undefined,
     };
   } catch (error: any) {
     return {

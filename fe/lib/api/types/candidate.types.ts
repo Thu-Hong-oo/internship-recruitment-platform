@@ -187,3 +187,122 @@ export interface CVTemplatesResponse {
     total: number;
   };
 }
+
+// Application Types
+export interface ApplicationResume {
+  url?: string;
+  uploadedAt?: string;
+}
+
+export interface ApplicationMatchingScore {
+  skills?: Array<{
+    name?: string;
+    score?: number;
+    required?: boolean;
+  }>;
+  experience?: number;
+  education?: number;
+  overall?: number;
+}
+
+export interface ApplicationFeedback {
+  strengths?: string[];
+  improvements?: string[];
+  notes?: string;
+  rating?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ApplicationAIAnalysis {
+  matchAnalysis?: {
+    strengths?: string[];
+    concerns?: string[];
+    recommendations?: string[];
+    overallFit?: number;
+    technicalFit?: number;
+    experienceFit?: number;
+    educationFit?: number;
+    culturalFit?: number;
+  };
+  predictedSuccess?: {
+    probability?: number;
+    factors?: Array<{
+      factor?: string;
+      impact?: number;
+      explanation?: string;
+    }>;
+  };
+  resumeScore?: {
+    overall?: number;
+    sections?: {
+      format?: number;
+      content?: number;
+      keywords?: number;
+      experience?: number;
+    };
+  };
+  analyzedAt?: string;
+}
+
+export interface ApplicationTimelineItem {
+  _id?: string;
+  status: string;
+  note?: string;
+  createdAt: string;
+  createdBy?: string;
+}
+
+export interface ApplicationJob {
+  _id: string;
+  title: string;
+  location?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  status?: string;
+}
+
+export interface Application {
+  _id: string;
+  candidateId: string;
+  jobId: ApplicationJob | null;
+  status: string;
+  resume?: ApplicationResume;
+  coverLetter?: string;
+  attachments?: Array<{
+    name?: string;
+    url?: string;
+    type?: string;
+  }>;
+  matchingScore?: ApplicationMatchingScore;
+  feedback?: ApplicationFeedback;
+  aiAnalysis?: ApplicationAIAnalysis;
+  interviews?: Array<{
+    scheduledAt?: string;
+    duration?: number;
+    type?: string;
+    location?: string;
+    interviewer?: string;
+    feedback?: any;
+  }>;
+  timeline?: ApplicationTimelineItem[];
+  createdAt: string;
+  updatedAt: string;
+  __v?: number;
+}
+
+export interface ApplicationsResponse {
+  success: boolean;
+  message?: string;
+  data: {
+    applications: Application[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      total: number;
+      hasMore: boolean;
+    };
+  };
+  timestamp?: string;
+  requestId?: string | null;
+}

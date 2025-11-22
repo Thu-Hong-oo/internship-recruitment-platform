@@ -1,15 +1,50 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createJob, CreateJobPayload } from "@/lib/jobAPI";
+import { industryService, Industry } from "@/lib/industryAPI";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { X, Plus } from "lucide-react";
+
+const JOB_LEVELS = [
+  { value: "Intern", label: "Thực tập sinh" },
+  { value: "Junior", label: "Junior" },
+  { value: "Middle", label: "Middle" },
+  { value: "Senior", label: "Senior" },
+  { value: "Lead", label: "Lead" },
+  { value: "Manager", label: "Quản lý" },
+];
+
+const JOB_TYPES = [
+  { value: "Fulltime", label: "Toàn thời gian" },
+  { value: "Parttime", label: "Bán thời gian" },
+  { value: "Contract", label: "Hợp đồng" },
+  { value: "Internship", label: "Thực tập" },
+];
+
+const WORKING_MODES = [
+  { value: "Onsite", label: "Tại văn phòng" },
+  { value: "Remote", label: "Làm việc từ xa" },
+  { value: "Hybrid", label: "Kết hợp" },
+];
+
+const CURRENCIES = [
+  { value: "VND", label: "VND (Việt Nam Đồng)" },
+  { value: "USD", label: "USD (Đô la Mỹ)" },
+];
 
 export default function CreateJobPage() {
   const router = useRouter();
@@ -19,22 +54,77 @@ export default function CreateJobPage() {
 
   const [formData, setFormData] = useState<CreateJobPayload>({
     title: "",
+    slug: "",
     description: "",
-    skills: [],
     requirements: "",
-    education: "",
-    experience: "",
-    salary: "",
+    benefits: "",
+    skills: [],
+    skillIds: [],
+    level: "",
+    jobType: "",
+    workingMode: "",
     location: "",
+    address: "",
+    salaryMin: undefined,
+    salaryMax: undefined,
+    currency: "VND",
+    industryCode: "",
+    subIndustryCode: "",
     positions: 1,
     deadline: "",
   });
 
   const [newSkill, setNewSkill] = useState("");
+  const [industries, setIndustries] = useState<Industry[]>([]);
+  const [subIndustries, setSubIndustries] = useState<Industry[]>([]);
+  const [loadingIndustries, setLoadingIndustries] = useState(false);
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+
+  // Load root industries on mount
+  useEffect(() => {
+    const loadIndustries = async () => {
+      setLoadingIndustries(true);
+      try {
+        const data = await industryService.getRootIndustries();
+        setIndustries(data);
+      } catch (err) {
+        console.error("Failed to load industries:", err);
+      } finally {
+        setLoadingIndustries(false);
+      }
+    };
+    loadIndustries();
+  }, []);
+
+  // Load sub-industries when industryCode changes
+  useEffect(() => {
+    const loadSubIndustries = async () => {
+      if (formData.industryCode) {
+        setLoadingIndustries(true);
+        try {
+          const data = await industryService.getSubIndustries(
+            formData.industryCode
+          );
+          setSubIndustries(data);
+          // Reset subIndustryCode when industry changes
+          setFormData((prev) => ({ ...prev, subIndustryCode: "" }));
+        } catch (err) {
+          console.error("Failed to load sub-industries:", err);
+          setSubIndustries([]);
+        } finally {
+          setLoadingIndustries(false);
+        }
+      } else {
+        setSubIndustries([]);
+        setFormData((prev) => ({ ...prev, subIndustryCode: "" }));
+      }
+    };
+    loadSubIndustries();
+  }, [formData.industryCode]);
 
   const handleInputChange = (
     field: keyof CreateJobPayload,
-    value: string | number
+    value: string | number | undefined
   ) => {
     setFormData((prev) => ({
       ...prev,
@@ -59,6 +149,25 @@ export default function CreateJobPage() {
     }));
   };
 
+  // Generate slug from title
+  const generateSlug = (title: string): string => {
+    return title
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "")
+      .substring(0, 100);
+  };
+
+  // Auto-generate slug when title changes (only if not manually edited)
+  useEffect(() => {
+    if (formData.title && !slugManuallyEdited) {
+      const slug = generateSlug(formData.title);
+      setFormData((prev) => ({ ...prev, slug }));
+    }
+  }, [formData.title, slugManuallyEdited]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -69,14 +178,45 @@ export default function CreateJobPage() {
         localStorage.getItem("token") || sessionStorage.getItem("token");
       if (!token) {
         setError("Vui lòng đăng nhập để tạo bài tuyển dụng");
+        setLoading(false);
         return;
       }
 
-      const result = await createJob(formData, token);
+      // Format deadline to ISO string
+      let deadline = formData.deadline;
+      if (deadline) {
+        // datetime-local returns format: "YYYY-MM-DDTHH:mm" (local time)
+        // Convert to ISO string with UTC timezone
+        const date = new Date(deadline);
+        if (!isNaN(date.getTime())) {
+          deadline = date.toISOString();
+        } else {
+          setError("Ngày hết hạn không hợp lệ");
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Prepare payload
+      const payload: CreateJobPayload = {
+        ...formData,
+        deadline,
+        // Remove empty optional fields
+        slug: formData.slug || undefined,
+        benefits: formData.benefits || undefined,
+        address: formData.address || undefined,
+        skillIds: formData.skillIds?.length ? formData.skillIds : undefined,
+        level: formData.level || undefined,
+        jobType: formData.jobType || undefined,
+        workingMode: formData.workingMode || undefined,
+        industryCode: formData.industryCode || undefined,
+        subIndustryCode: formData.subIndustryCode || undefined,
+      };
+
+      const result = await createJob(payload, token);
 
       if (result.success) {
         setSuccess(true);
-        // chuyển về trang quản lý tin
         setTimeout(() => router.push("/jobs"), 1500);
       } else {
         setError(result.error || "Có lỗi xảy ra khi tạo bài tuyển dụng");
@@ -124,9 +264,25 @@ export default function CreateJobPage() {
                 id="title"
                 value={formData.title}
                 onChange={(e) => handleInputChange("title", e.target.value)}
-                placeholder="Ví dụ: Frontend Developer Intern"
+                placeholder="Ví dụ: Senior Full Stack Developer"
                 required
               />
+            </div>
+
+            <div>
+              <Label htmlFor="slug">Slug (URL-friendly)</Label>
+              <Input
+                id="slug"
+                value={formData.slug}
+                onChange={(e) => {
+                  setSlugManuallyEdited(true);
+                  handleInputChange("slug", e.target.value);
+                }}
+                placeholder="Tự động tạo từ tiêu đề hoặc nhập thủ công"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Slug sẽ được tự động tạo từ tiêu đề nếu chưa chỉnh sửa
+              </p>
             </div>
 
             <div>
@@ -143,45 +299,209 @@ export default function CreateJobPage() {
               />
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="level">Cấp độ *</Label>
+                <Select
+                  value={formData.level}
+                  onValueChange={(value) => handleInputChange("level", value)}
+                  required
+                >
+                  <SelectTrigger id="level" className="w-full">
+                    <SelectValue placeholder="Chọn cấp độ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {JOB_LEVELS.map((level) => (
+                      <SelectItem key={level.value} value={level.value}>
+                        {level.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="jobType">Loại công việc *</Label>
+                <Select
+                  value={formData.jobType}
+                  onValueChange={(value) => handleInputChange("jobType", value)}
+                  required
+                >
+                  <SelectTrigger id="jobType" className="w-full">
+                    <SelectValue placeholder="Chọn loại công việc" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {JOB_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="workingMode">Chế độ làm việc *</Label>
+              <Select
+                value={formData.workingMode}
+                onValueChange={(value) => handleInputChange("workingMode", value)}
+                required
+              >
+                <SelectTrigger id="workingMode" className="w-full">
+                  <SelectValue placeholder="Chọn chế độ làm việc" />
+                </SelectTrigger>
+                <SelectContent>
+                  {WORKING_MODES.map((mode) => (
+                    <SelectItem key={mode.value} value={mode.value}>
+                      {mode.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="industryCode">Ngành nghề *</Label>
+                <Select
+                  value={formData.industryCode}
+                  onValueChange={(value) => {
+                    handleInputChange("industryCode", value);
+                  }}
+                  disabled={loadingIndustries}
+                  required
+                >
+                  <SelectTrigger id="industryCode" className="w-full">
+                    <SelectValue placeholder="Chọn ngành nghề" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {industries.map((industry) => (
+                      <SelectItem key={industry.code} value={industry.code}>
+                        {industry.name.vi || industry.name.en}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="subIndustryCode">Lĩnh vực con</Label>
+                <Select
+                  value={formData.subIndustryCode}
+                  onValueChange={(value) =>
+                    handleInputChange("subIndustryCode", value)
+                  }
+                  disabled={loadingIndustries || !formData.industryCode}
+                >
+                  <SelectTrigger id="subIndustryCode" className="w-full">
+                    <SelectValue placeholder="Chọn lĩnh vực con (tùy chọn)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subIndustries.map((subIndustry) => (
+                      <SelectItem key={subIndustry.code} value={subIndustry.code}>
+                        {subIndustry.name.vi || subIndustry.name.en}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
             <div>
               <Label htmlFor="location">Địa điểm làm việc *</Label>
               <Input
                 id="location"
                 value={formData.location}
                 onChange={(e) => handleInputChange("location", e.target.value)}
-                placeholder="Ví dụ: Ho Chi Minh City"
+                placeholder="Ví dụ: Ho Chi Minh City, District 1"
                 required
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="address">Địa chỉ chi tiết</Label>
+              <Input
+                id="address"
+                value={formData.address}
+                onChange={(e) => handleInputChange("address", e.target.value)}
+                placeholder="Ví dụ: 123 Nguyen Hue Street"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="positions">Số lượng vị trí *</Label>
+                <Label htmlFor="salaryMin">Lương tối thiểu *</Label>
                 <Input
-                  id="positions"
+                  id="salaryMin"
                   type="number"
-                  min="1"
-                  value={formData.positions}
+                  min="0"
+                  value={formData.salaryMin || ""}
                   onChange={(e) =>
                     handleInputChange(
-                      "positions",
-                      parseInt(e.target.value) || 1
+                      "salaryMin",
+                      e.target.value ? parseInt(e.target.value) : undefined
                     )
                   }
+                  placeholder="30000000"
                   required
                 />
               </div>
 
               <div>
-                <Label htmlFor="salary">Mức lương *</Label>
+                <Label htmlFor="salaryMax">Lương tối đa *</Label>
                 <Input
-                  id="salary"
-                  value={formData.salary}
-                  onChange={(e) => handleInputChange("salary", e.target.value)}
-                  placeholder="Ví dụ: 8000000 - 12000000 VND"
+                  id="salaryMax"
+                  type="number"
+                  min="0"
+                  value={formData.salaryMax || ""}
+                  onChange={(e) =>
+                    handleInputChange(
+                      "salaryMax",
+                      e.target.value ? parseInt(e.target.value) : undefined
+                    )
+                  }
+                  placeholder="50000000"
                   required
                 />
               </div>
+
+              <div>
+                <Label htmlFor="currency">Đơn vị tiền tệ *</Label>
+                <Select
+                  value={formData.currency}
+                  onValueChange={(value) => handleInputChange("currency", value)}
+                  required
+                >
+                  <SelectTrigger id="currency" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CURRENCIES.map((currency) => (
+                      <SelectItem key={currency.value} value={currency.value}>
+                        {currency.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="positions">Số lượng vị trí *</Label>
+              <Input
+                id="positions"
+                type="number"
+                min="1"
+                value={formData.positions}
+                onChange={(e) =>
+                  handleInputChange(
+                    "positions",
+                    parseInt(e.target.value) || 1
+                  )
+                }
+                required
+              />
             </div>
           </CardContent>
         </Card>
@@ -200,32 +520,19 @@ export default function CreateJobPage() {
                   handleInputChange("requirements", e.target.value)
                 }
                 placeholder="Liệt kê các yêu cầu cụ thể..."
+                rows={4}
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="benefits">Quyền lợi</Label>
+              <Textarea
+                id="benefits"
+                value={formData.benefits}
+                onChange={(e) => handleInputChange("benefits", e.target.value)}
+                placeholder="Liệt kê các quyền lợi (lương tháng 13, bảo hiểm, bonus...)"
                 rows={3}
-                required
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="education">Yêu cầu học vấn *</Label>
-              <Input
-                id="education"
-                value={formData.education}
-                onChange={(e) => handleInputChange("education", e.target.value)}
-                placeholder="Ví dụ: Đang học hoặc tốt nghiệp ngành Công nghệ thông tin"
-                required
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="experience">Kinh nghiệm *</Label>
-              <Input
-                id="experience"
-                value={formData.experience}
-                onChange={(e) =>
-                  handleInputChange("experience", e.target.value)
-                }
-                placeholder="Ví dụ: 0-1 năm kinh nghiệm hoặc sinh viên mới tốt nghiệp"
-                required
               />
             </div>
 

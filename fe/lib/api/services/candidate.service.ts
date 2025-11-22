@@ -11,6 +11,7 @@ import type {
   CandidateProfileResponse,
   CVResponse,
   CVTemplatesResponse,
+  ApplicationsResponse,
 } from "../types";
 
 class CandidateService {
@@ -362,6 +363,31 @@ class CandidateService {
     };
   }): Promise<CandidateProfileResponse> {
     return apiClient.patch<CandidateProfileResponse>("/candidates/me", data);
+  }
+
+  /**
+   * Lấy danh sách các đơn ứng tuyển của candidate
+   * @param params - Query parameters (page, limit, status, etc.)
+   * @returns Danh sách applications với pagination
+   */
+  async getApplications(params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+  }): Promise<ApplicationsResponse> {
+    const query = new URLSearchParams();
+    if (params?.page) {
+      query.set("page", String(params.page));
+    }
+    if (params?.limit) {
+      query.set("limit", String(params.limit));
+    }
+    if (params?.status) {
+      query.set("status", params.status);
+    }
+
+    const endpoint = `/candidates/applications${query.toString() ? `?${query.toString()}` : ""}`;
+    return apiClient.get<ApplicationsResponse>(endpoint);
   }
 }
 
