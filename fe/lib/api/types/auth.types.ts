@@ -15,7 +15,7 @@ export interface LoginRequest {
 export interface AuthResponse {
   success: boolean;
   token?: string; // Optional vì register có thể không trả về token
-  user: User;
+  user?: User; // Optional vì error responses có thể không có user
   message?: string;
   error?: string; // Optional error field
   errorType?: string; // For specific error types
