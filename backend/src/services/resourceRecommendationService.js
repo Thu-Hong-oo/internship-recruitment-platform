@@ -15,6 +15,7 @@
  */
 
 const logger = require('../utils/logger');
+const vectorStoreService = require('./vectorStoreService');
 
 class ResourceRecommendationService {
   constructor() {
@@ -112,19 +113,55 @@ class ResourceRecommendationService {
       });
 
       // 5. Retrieve resources từ knowledge base (RAG)
-      // TODO: Integrate với vector database khi có
-      // const resources = await this._searchResourcesFromRAG(searchQuery, filters);
+      let resources = [];
       
-      // 6. For now, generate intelligent recommendations
-      const resources = await this._generateIntelligentRecommendations({
-        skill,
-        difficulty: appropriateDifficulty,
-        resourceTypes: preferredTypes,
-        learningStage,
-        phaseNumber,
-        currentLevel,
-        targetLevel,
-      });
+      // Try RAG search first (if vector store is available)
+      if (vectorStoreService.isAvailable()) {
+        try {
+          const ragResources = await vectorStoreService.searchResources(
+            {
+              skill,
+              difficulty: appropriateDifficulty,
+              learningStage,
+              objectives: learningObjectives,
+            },
+            {
+              level: appropriateDifficulty,
+              type: preferredTypes.length > 0 ? preferredTypes[0] : undefined,
+              minRating: 4.0, // Only recommend high-quality resources
+            },
+            10 // Get more results for diversification
+          );
+
+          if (ragResources && ragResources.length > 0) {
+            resources = ragResources;
+            logger.info('Using RAG search results', {
+              skill,
+              resultsCount: resources.length,
+            });
+          }
+        } catch (ragError) {
+          logger.warn('RAG search failed, falling back to intelligent recommendations', {
+            error: ragError.message,
+          });
+        }
+      }
+
+      // 6. Fallback to intelligent recommendations if RAG didn't return results
+      if (resources.length === 0) {
+        resources = await this._generateIntelligentRecommendations({
+          skill,
+          difficulty: appropriateDifficulty,
+          resourceTypes: preferredTypes,
+          learningStage,
+          phaseNumber,
+          currentLevel,
+          targetLevel,
+        });
+        logger.info('Using intelligent recommendations (RAG unavailable or no results)', {
+          skill,
+        });
+      }
 
       // 7. Calculate credibility scores
       const resourcesWithCredibility = resources.map((resource) => ({
@@ -145,9 +182,18 @@ class ResourceRecommendationService {
       );
 
       // 9. Health check: Filter out dead links và outdated resources
-      const validResources = await this.healthCheckService.filterValidResources(
-        sortedResources
-      );
+      // Note: healthCheckService might not exist yet, so we'll skip if unavailable
+      let validResources = sortedResources;
+      if (this.healthCheckService && typeof this.healthCheckService.filterValidResources === 'function') {
+        try {
+          validResources = await this.healthCheckService.filterValidResources(sortedResources);
+        } catch (healthCheckError) {
+          logger.warn('Health check failed, using all resources', {
+            error: healthCheckError.message,
+          });
+          validResources = sortedResources;
+        }
+      }
 
       // 10. Limit và diversify với MMR (Maximal Marginal Relevance)
       // Lambda = 0.7: 70% relevance, 30% diversity

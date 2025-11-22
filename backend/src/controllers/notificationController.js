@@ -1,6 +1,7 @@
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const { logger } = require('../utils/logger');
+const { getIO } = require('../socket');
 const asyncHandler = require('express-async-handler');
 
 // @desc    Get user notifications
@@ -98,6 +99,34 @@ const createNotification = asyncHandler(async (req, res) => {
       isRead: false // Notification model dùng 'isRead', không phải 'read'
     });
 
+    // Emit socket event for real-time notification
+    try {
+      const io = getIO();
+      io.to(`user:${recipient}`).emit('new-notification', {
+        _id: notification._id,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        data: notification.data,
+        priority: notification.priority,
+        createdAt: notification.createdAt,
+        isRead: notification.isRead,
+      });
+      
+      // Emit updated unread count
+      const unreadCount = await Notification.countDocuments({
+        recipient,
+        isRead: false
+      });
+      io.to(`user:${recipient}`).emit('notification_unread_count', {
+        count: unreadCount,
+      });
+    } catch (socketError) {
+      logger.warn('Failed to emit new-notification via socket', {
+        error: socketError.message,
+      });
+    }
+
     res.status(201).json({
       success: true,
       data: notification
@@ -137,6 +166,28 @@ const markNotificationAsRead = asyncHandler(async (req, res) => {
     notification.readAt = new Date();
     await notification.save();
 
+    // Emit socket event for real-time update
+    try {
+      const io = getIO();
+      io.to(`user:${req.user.id}`).emit('notification_read', {
+        notificationId: notification._id,
+        readAt: notification.readAt,
+      });
+      
+      // Also emit unread count update
+      const unreadCount = await Notification.countDocuments({
+        recipient: req.user.id,
+        isRead: false
+      });
+      io.to(`user:${req.user.id}`).emit('notification_unread_count', {
+        count: unreadCount,
+      });
+    } catch (socketError) {
+      logger.warn('Failed to emit notification_read via socket', {
+        error: socketError.message,
+      });
+    }
+
     res.status(200).json({
       success: true,
       data: notification
@@ -155,14 +206,33 @@ const markNotificationAsRead = asyncHandler(async (req, res) => {
 // @access  Private
 const markAllNotificationsAsRead = asyncHandler(async (req, res) => {
   try {
-    await Notification.updateMany(
+    const result = await Notification.updateMany(
       { recipient: req.user.id, isRead: false },
       { isRead: true, readAt: new Date() }
     );
 
+    // Emit socket event for real-time update
+    try {
+      const io = getIO();
+      io.to(`user:${req.user.id}`).emit('all_notifications_read', {
+        count: result.modifiedCount,
+        timestamp: new Date(),
+      });
+      
+      // Emit unread count update (should be 0 now)
+      io.to(`user:${req.user.id}`).emit('notification_unread_count', {
+        count: 0,
+      });
+    } catch (socketError) {
+      logger.warn('Failed to emit all_notifications_read via socket', {
+        error: socketError.message,
+      });
+    }
+
     res.status(200).json({
       success: true,
-      message: 'Đã đánh dấu tất cả thông báo là đã đọc'
+      message: 'Đã đánh dấu tất cả thông báo là đã đọc',
+      count: result.modifiedCount
     });
   } catch (error) {
     logger.error('Error marking all notifications as read:', error);
@@ -197,6 +267,28 @@ const deleteNotification = asyncHandler(async (req, res) => {
 
     await notification.deleteOne();
 
+    // Emit socket event for real-time update
+    try {
+      const io = getIO();
+      io.to(`user:${req.user.id}`).emit('notification_deleted', {
+        notificationId: notification._id,
+        timestamp: new Date(),
+      });
+      
+      // Emit updated unread count
+      const unreadCount = await Notification.countDocuments({
+        recipient: req.user.id,
+        isRead: false
+      });
+      io.to(`user:${req.user.id}`).emit('notification_unread_count', {
+        count: unreadCount,
+      });
+    } catch (socketError) {
+      logger.warn('Failed to emit notification_deleted via socket', {
+        error: socketError.message,
+      });
+    }
+
     res.status(200).json({
       success: true,
       message: 'Xóa thông báo thành công'
@@ -215,11 +307,30 @@ const deleteNotification = asyncHandler(async (req, res) => {
 // @access  Private
 const deleteAllNotifications = asyncHandler(async (req, res) => {
   try {
-    await Notification.deleteMany({ recipient: req.user.id });
+    const result = await Notification.deleteMany({ recipient: req.user.id });
+
+    // Emit socket event for real-time update
+    try {
+      const io = getIO();
+      io.to(`user:${req.user.id}`).emit('all_notifications_deleted', {
+        count: result.deletedCount,
+        timestamp: new Date(),
+      });
+      
+      // Emit unread count update (should be 0 now)
+      io.to(`user:${req.user.id}`).emit('notification_unread_count', {
+        count: 0,
+      });
+    } catch (socketError) {
+      logger.warn('Failed to emit all_notifications_deleted via socket', {
+        error: socketError.message,
+      });
+    }
 
     res.status(200).json({
       success: true,
-      message: 'Đã xóa tất cả thông báo'
+      message: 'Đã xóa tất cả thông báo',
+      count: result.deletedCount
     });
   } catch (error) {
     logger.error('Error deleting all notifications:', error);
@@ -310,6 +421,38 @@ const broadcastNotification = asyncHandler(async (req, res) => {
     }));
 
     const createdNotifications = await Notification.insertMany(notifications);
+
+    // Emit socket events for real-time notifications
+    try {
+      const io = getIO();
+      
+      // Emit to each recipient
+      for (const notification of createdNotifications) {
+        io.to(`user:${notification.recipient}`).emit('new-notification', {
+          _id: notification._id,
+          type: notification.type,
+          title: notification.title,
+          message: notification.message,
+          data: notification.data,
+          priority: notification.priority,
+          createdAt: notification.createdAt,
+          isRead: notification.isRead,
+        });
+        
+        // Emit updated unread count for each user
+        const unreadCount = await Notification.countDocuments({
+          recipient: notification.recipient,
+          isRead: false
+        });
+        io.to(`user:${notification.recipient}`).emit('notification_unread_count', {
+          count: unreadCount,
+        });
+      }
+    } catch (socketError) {
+      logger.warn('Failed to emit broadcast notifications via socket', {
+        error: socketError.message,
+      });
+    }
 
     res.status(201).json({
       success: true,
