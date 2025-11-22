@@ -49,9 +49,9 @@ router.post('/export-pdf-direct', cvController.exportPDFDirect);
 // 🔗 NOTE: AI FEATURES MOVED TO /api/ai/*
 // ========================================
 // - AI Suggestions: POST /api/ai/suggestions
-// - Job Match Analysis: POST /api/ai/analyze-job-match
+// - Job Match Analysis: POST /api/nlp/matching-score (⚠️ /api/ai/analyze-job-match is deprecated)
 // - Skill Gap Analysis: POST /api/ai/skill-gap-analysis
-// - Learning Roadmap: POST /api/ai/skill-roadmap
+// - Learning Roadmap: POST /api/nlp/learning-roadmap (⚠️ /api/ai/skill-roadmap is deprecated)
 // - CV Analysis: POST /api/ai/analyze-cv-text
 
 module.exports = router;

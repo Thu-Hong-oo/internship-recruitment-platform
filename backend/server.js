@@ -37,6 +37,7 @@ const candidateRoutes = require('./src/routes/candidate/candidates');
 
 // AI & Analysis Routes
 const aiRoutes = require('./src/routes/ai');
+const advancedNLPRoutes = require('./src/routes/advancedNLP');
 
 // Safe Additional Routes (confirmed models exist)
 const notificationRoutes = require('./src/routes/notifications');
@@ -266,12 +267,18 @@ app.use('/api/candidates', candidateRoutes);
 
 // AI & Analysis Routes
 app.use('/api/ai', aiRoutes);
+app.use('/api/nlp', advancedNLPRoutes);
 
 // Safe Additional Routes (confirmed models exist)
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/skills', skillRoutes);
 app.use('/api/skill-categories', skillCategoryRoutes);
 app.use('/api/industries', industryRoutes);
+app.use('/api/saved-jobs', require('./src/routes/savedJobs'));
+
+// Roadmaps Routes (SkillRoadmap model - legacy/alternative to LearningRoadmap)
+// Note: LearningRoadmap is used in /api/nlp/learning-roadmap
+app.use('/api/roadmaps', require('./src/routes/roadmaps'));
 
 // 404 handler
 app.use('*', (req, res) => {

@@ -16,10 +16,22 @@ const requireVerifiedEmployer = async (req, res, next) => {
       });
     }
 
-    // Tìm employer profile
+    // Tìm employer profile - ensure documents are loaded
     const employerProfile = await EmployerProfile.findOne({
       owner: req.user.id,
     });
+
+    // Log for debugging
+    if (employerProfile) {
+      logger.debug('Employer profile found in requireVerifiedEmployer', {
+        userId: req.user.id,
+        profileId: employerProfile._id,
+        isVerified: employerProfile.verification?.isVerified,
+        status: employerProfile.status,
+        documentsCount: employerProfile.verification?.documents?.length || 0,
+        documentTypes: employerProfile.verification?.documents?.map(doc => doc.documentType) || [],
+      });
+    }
 
     if (!employerProfile) {
       return res.status(400).json({
@@ -111,6 +123,14 @@ const requireEmployerProfile = async (req, res, next) => {
 function getMissingDocuments(employerProfile) {
   const requiredDocs = ['business-license', 'tax-certificate'];
   const uploadedDocs = employerProfile.verification?.documents || [];
+
+  // Log for debugging
+  logger.debug('Checking missing documents', {
+    profileId: employerProfile._id,
+    requiredDocs,
+    uploadedDocsCount: uploadedDocs.length,
+    uploadedDocTypes: uploadedDocs.map(doc => doc.documentType),
+  });
 
   return requiredDocs.filter(
     docType => !uploadedDocs.some(doc => doc.documentType === docType)

@@ -37,7 +37,16 @@ const JobSchema = new mongoose.Schema({
     enum: ['Fulltime', 'Parttime', 'Intern', 'Freelance', 'Remote', 'Hybrid'],
   },
   workingMode: { type: String, enum: ['Onsite', 'Remote', 'Hybrid'] },
-  address: { type: String },
+  // Structured address object (preferred)
+  address: {
+    street: { type: String, trim: true },
+    ward: { type: String, trim: true },
+    district: { type: String, trim: true },
+    city: { type: String, trim: true },
+    country: { type: String, default: 'Vietnam', trim: true },
+    fullAddress: { type: String, trim: true }, // Auto-generated from above fields
+  },
+  // DEPRECATED: Use address object instead. Kept for backward compatibility
   location: { type: String },
   salaryMin: { type: Number },
   salaryMax: { type: Number },
@@ -170,5 +179,13 @@ JobSchema.virtual('applicationRate').get(function () {
 JobSchema.virtual('isHot').get(function () {
   return this.hotScore && this.hotScore > 80;
 });
+
+// Static methods
+JobSchema.statics.findActive = function () {
+  return this.find({
+    status: JOB_STATUS.ACTIVE,
+    $or: [{ deadline: { $gte: new Date() } }, { deadline: null }],
+  });
+};
 
 module.exports = mongoose.model('Job', JobSchema);

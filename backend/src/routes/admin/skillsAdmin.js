@@ -7,6 +7,7 @@ const {
   createSkill,
   updateSkill,
   deleteSkill,
+  toggleSkillStatus,
   bulkCreateSkills,
   
   // Skill Categories
@@ -45,19 +46,34 @@ const {
 router.get('/', getAllSkills);
 
 /**
- * @route   GET /api/admin/skills/:id
- * @desc    Get skill by ID with detailed analytics
- * @access  Private/Admin
- */
-router.get('/:id', getSkillById);
-
-/**
  * @route   POST /api/admin/skills
  * @desc    Create new skill
  * @access  Private/Admin
  * @body    { name, category, description, aliases, demandLevel, trend }
  */
 router.post('/', createSkill);
+
+// ========================================
+// STATIC ROUTES (must come before /:id)
+// ========================================
+
+/**
+ * @route   PATCH /api/admin/skills/:id/toggle-status
+ * @desc    Toggle skill active/inactive status
+ * @access  Private/Admin
+ */
+router.patch('/:id/toggle-status', toggleSkillStatus);
+
+// ========================================
+// DYNAMIC ROUTES
+// ========================================
+
+/**
+ * @route   GET /api/admin/skills/:id
+ * @desc    Get skill by ID with detailed analytics
+ * @access  Private/Admin
+ */
+router.get('/:id', getSkillById);
 
 /**
  * @route   PUT /api/admin/skills/:id

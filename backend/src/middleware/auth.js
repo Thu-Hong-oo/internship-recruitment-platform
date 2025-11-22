@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const { verifyToken } = require('../utils/jwt');
 const User = require('../models/User');
 const asyncHandler = require('express-async-handler');
+const { AppError } = require('../utils/errors');
 
 /**
  * Protect routes - Verify token and attach user to req object
@@ -19,8 +20,7 @@ const protect = asyncHandler(async (req, res, next) => {
 
   // Check if token exists
   if (!token) {
-    res.status(401);
-    throw new Error('Not authorized to access this route');
+    throw new AppError('Not authorized to access this route', 401);
   }
 
   try {
@@ -30,8 +30,7 @@ const protect = asyncHandler(async (req, res, next) => {
     req.user = await User.findById(decoded.id).select('-password');
 
     if (!req.user) {
-      res.status(401);
-      throw new Error('User not found');
+      throw new AppError('User not found', 401);
     }
 
     // Nếu tài khoản bị vô hiệu hóa, chỉ cho phép truy cập /api/users/reactivate
@@ -44,8 +43,12 @@ const protect = asyncHandler(async (req, res, next) => {
 
     next();
   } catch (error) {
-    res.status(401);
-    throw new Error('Not authorized to access this route');
+    // If error is already AppError, throw it
+    if (error.statusCode) {
+      throw error;
+    }
+    // Otherwise, wrap in AppError with 401 status
+    throw new AppError('Not authorized to access this route', 401);
   }
 });
 

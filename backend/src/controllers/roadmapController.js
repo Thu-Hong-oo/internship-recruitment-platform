@@ -1,6 +1,5 @@
 const SkillRoadmap = require('../models/SkillRoadmap');
 const Job = require('../models/Job');
-const Company = require('../models/Company');
 const CandidateProfile = require('../models/CandidateProfile');
 const Skill = require('../models/Skill');
 const aiService = require('../services/aiService');
@@ -20,7 +19,7 @@ const getRoadmaps = async (req, res) => {
     const skip = (page - 1) * limit;
 
     const roadmaps = await SkillRoadmap.find(query)
-      .populate('jobId', 'title companyId')
+      .populate('jobId', 'title')
       .populate('targetSkills.skillId', 'name category')
       .sort({ updatedAt: -1 })
       .skip(skip)
@@ -53,7 +52,7 @@ const getRoadmaps = async (req, res) => {
 const getRoadmap = async (req, res) => {
   try {
     const roadmap = await SkillRoadmap.findById(req.params.id)
-      .populate('jobId', 'title companyId description requirements')
+      .populate('jobId', 'title description requirements')
       .populate('targetSkills.skillId', 'name category description level');
 
     if (!roadmap) {
@@ -94,7 +93,7 @@ const createRoadmap = async (req, res) => {
 
     const roadmap = await SkillRoadmap.create(roadmapData);
 
-    await roadmap.populate('jobId', 'title companyId');
+    await roadmap.populate('jobId', 'title');
     await roadmap.populate('targetSkills.skillId', 'name category');
 
     res.status(201).json({
@@ -137,7 +136,7 @@ const updateRoadmap = async (req, res) => {
       req.body,
       { new: true, runValidators: true }
     )
-      .populate('jobId', 'title companyId')
+      .populate('jobId', 'title')
       .populate('targetSkills.skillId', 'name category');
 
     res.status(200).json({
@@ -338,7 +337,7 @@ const generateRoadmapFromJob = async (req, res) => {
 
     // Get job details
     const job = await Job.findById(jobId)
-      .populate('companyId', 'name')
+      .populate('employer', 'company.name')
       .populate('requirements.skills.skillId', 'name category');
 
     if (!job) {
@@ -377,7 +376,7 @@ const generateRoadmapFromJob = async (req, res) => {
     const roadmapData = {
       userId,
       jobId,
-      title: `Roadmap: ${job.title} tại ${job.companyId.name}`,
+      title: `Roadmap: ${job.title} tại ${job.employer?.company?.name || 'Company'}`,
       description: `Lộ trình phát triển kỹ năng cho vị trí ${job.title}`,
       targetSkills: job.requirements.skills.map(skill => ({
         skillId: skill.skillId._id,
@@ -401,7 +400,7 @@ const generateRoadmapFromJob = async (req, res) => {
         },
         targetJob: {
           title: job.title,
-          company: job.companyId.name,
+          company: job.employer?.company?.name || 'Unknown',
           category: job.aiAnalysis?.category,
         },
       },
@@ -409,7 +408,7 @@ const generateRoadmapFromJob = async (req, res) => {
 
     const roadmap = await SkillRoadmap.create(roadmapData);
 
-    await roadmap.populate('jobId', 'title companyId');
+    await roadmap.populate('jobId', 'title');
     await roadmap.populate('targetSkills.skillId', 'name category');
 
     res.status(201).json({
@@ -453,7 +452,7 @@ const getRecommendedRoadmaps = async (req, res) => {
         }).distinct('_id'),
       },
     })
-      .populate('companyId', 'name')
+      .populate('employer', 'company.name')
       .populate('requirements.skills.skillId', 'name category')
       .limit(parseInt(limit));
 

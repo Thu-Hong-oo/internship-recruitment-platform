@@ -9,7 +9,7 @@ const DOCUMENT_TYPES = {
       required: true,
       description: 'Giấy phép đăng ký kinh doanh do cơ quan có thẩm quyền cấp',
       validation: {
-        metadataRequired: ['documentNumber', 'issueDate', 'issuePlace'],
+        metadataRequired: [], // ✅ Không bắt buộc metadata khi upload
         fileTypes: ['pdf', 'jpg', 'png'],
         maxSize: '10MB',
       },
@@ -21,7 +21,7 @@ const DOCUMENT_TYPES = {
       required: true,
       description: 'Giấy chứng nhận đăng ký thuế do cơ quan thuế cấp',
       validation: {
-        metadataRequired: ['documentNumber', 'issueDate'],
+        metadataRequired: [], // ✅ Không bắt buộc metadata khi upload
         fileTypes: ['pdf', 'jpg', 'png'],
         maxSize: '10MB',
       },
@@ -38,7 +38,7 @@ const DOCUMENT_TYPES = {
       description:
         'CMND/CCCD/Hộ chiếu của người đại diện pháp luật (tùy chọn - chỉ cần khi xác minh nâng cao)',
       validation: {
-        metadataRequired: ['documentNumber', 'issueDate', 'issuePlace'],
+        metadataRequired: [], // ✅ Không bắt buộc metadata
         fileTypes: ['pdf', 'jpg', 'png'],
         maxSize: '5MB',
       },
@@ -50,7 +50,7 @@ const DOCUMENT_TYPES = {
       required: false,
       description: 'Kế hoạch kinh doanh của công ty (nếu có)',
       validation: {
-        metadataRequired: [],
+        metadataRequired: [], // ✅ Already empty
         fileTypes: ['pdf', 'doc', 'docx'],
         maxSize: '20MB',
       },
@@ -62,7 +62,7 @@ const DOCUMENT_TYPES = {
       required: false,
       description: 'Báo cáo tài chính gần nhất (nếu có)',
       validation: {
-        metadataRequired: ['reportYear', 'reportPeriod'],
+        metadataRequired: [], // ✅ Không bắt buộc metadata
         fileTypes: ['pdf', 'xlsx', 'xls'],
         maxSize: '20MB',
       },

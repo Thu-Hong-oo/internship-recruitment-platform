@@ -390,7 +390,7 @@ EmployerProfileSchema.statics.search = function (query) {
 
 EmployerProfileSchema.pre('save', async function (next) {
   try {
-    // Ensure verification object exists
+    // Ensure verification object exists - PRESERVE existing documents
     if (!this.verification) {
       this.verification = {
         isVerified: false,
@@ -399,9 +399,19 @@ EmployerProfileSchema.pre('save', async function (next) {
           businessInfo: false,
           adminApproved: false,
         },
-        documents: [],
-        adminNotes: [],
+        documents: this.verification?.documents || [], // Preserve existing documents
+        adminNotes: this.verification?.adminNotes || [],
       };
+    }
+
+    // Ensure documents array exists - don't overwrite if it already exists
+    if (!this.verification.documents) {
+      this.verification.documents = [];
+    }
+
+    // Ensure adminNotes array exists
+    if (!this.verification.adminNotes) {
+      this.verification.adminNotes = [];
     }
 
     if (!this.verification.steps) {

@@ -4,6 +4,12 @@ const Application = require('../models/Application');
 const CandidateProfile = require('../models/CandidateProfile');
 const { logger } = require('../utils/logger');
 const {
+  formatJobResponse,
+  formatJobsResponse,
+} = require('../utils/jobFormatter');
+const { processJobData } = require('../utils/jobHelpers');
+const { getCacheService } = require('../config/initializeServices');
+const {
   JOB_STATUS,
   EMPLOYER_PROFILE_STATUS,
   APPLICATION_STATUS,
@@ -12,6 +18,9 @@ const {
 // @desc    Get all jobs with filtering and pagination (supports text search)
 // @route   GET /api/jobs
 // @access  Public
+// @query   sortBy - Sort field: 'createdAt' (default), 'updatedAt', 'title', 'salaryMin', 'deadline', etc.
+// @query   sortOrder - Sort order: 'desc' (default, newest first) or 'asc' (oldest first)
+// @note    Jobs are ALWAYS sorted. Default: by createdAt desc (newest jobs first)
 const getAllJobs = async (req, res) => {
   try {
     const {
@@ -35,8 +44,8 @@ const getAllJobs = async (req, res) => {
       deadlineFrom,
       deadlineTo,
       tags,
-      sortBy = 'createdAt',
-      sortOrder = 'desc',
+      sortBy = 'createdAt', // Default: sort by creation date
+      sortOrder = 'desc', // Default: descending (newest first)
     } = req.query;
 
     const query = {};
@@ -113,30 +122,116 @@ const getAllJobs = async (req, res) => {
     });
 
     const skip = (page - 1) * limit;
+
+    // Build sort object - ALWAYS sort (default: createdAt desc = newest first)
+    const validSortFields = [
+      'createdAt',
+      'updatedAt',
+      'title',
+      'salaryMin',
+      'salaryMax',
+      'deadline',
+      'views',
+      'stats.applications',
+    ];
+    const safeSortBy = validSortFields.includes(sortBy) ? sortBy : 'createdAt'; // Fallback to createdAt if invalid
     const sortObj = {};
-    sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    sortObj[safeSortBy] = sortOrder === 'desc' ? -1 : 1;
 
     const jobs = await Job.find(query)
       .populate(
         'employer',
-        'company.name company.logo company.industry company.description company.website company.size company.officeAddress'
+        'company.name company.logo company.industry company.description company.website company.size company.officeAddress contact.phone contact.email'
       )
       .populate('postedBy', 'fullName name email avatar')
-      .sort(sortObj)
+      .populate('skillIds', 'name category')
+      .sort(sortObj) // ALWAYS sorted (default: newest first by createdAt)
       .skip(skip)
       .limit(parseInt(limit));
 
     const total = await Job.countDocuments(query);
 
+    // Try to get from cache first
+    const cacheService = getCacheService();
+    let formattedJobs = null;
+    
+    if (cacheService) {
+      formattedJobs = await cacheService.getCachedJobList(req.query);
+    }
+
+    // If not in cache, fetch and format
+    if (!formattedJobs) {
+      // Process jobs to populate skillIds and industryPath for old jobs
+      const { processJobData } = require('../utils/jobHelpers');
+      const jobsToUpdate = [];
+      
+      // Process jobs that need skillIds or industryPath populated
+      for (const job of jobs) {
+        const jobObj = job.toObject ? job.toObject() : job;
+        const needsProcessing = 
+          (Array.isArray(jobObj.skills) && jobObj.skills.length > 0 && (!jobObj.skillIds || jobObj.skillIds.length === 0)) ||
+          ((jobObj.industryCode || jobObj.subIndustryCode) && (!jobObj.industryPath || jobObj.industryPath.length === 0));
+        
+        if (needsProcessing) {
+          try {
+            const processedData = await processJobData(jobObj);
+            
+            // Update job document in memory for response
+            if (processedData.skillIds && processedData.skillIds.length > 0) {
+              job.skillIds = processedData.skillIds;
+              // Re-populate skillIds for response
+              await job.populate('skillIds', 'name category');
+            }
+            if (processedData.industryPath && processedData.industryPath.length > 0) {
+              job.industryPath = processedData.industryPath;
+            }
+            
+            // Mark for database update (async, don't wait)
+            jobsToUpdate.push({
+              jobId: job._id,
+              updates: {
+                ...(processedData.skillIds && processedData.skillIds.length > 0 ? { skillIds: processedData.skillIds } : {}),
+                ...(processedData.industryPath && processedData.industryPath.length > 0 ? { industryPath: processedData.industryPath } : {}),
+              }
+            });
+          } catch (error) {
+            logger.error(`Error processing job ${job._id}:`, error);
+          }
+        }
+      }
+
+      // Update database in background (don't block response)
+      if (jobsToUpdate.length > 0) {
+        Promise.all(jobsToUpdate.map(async ({ jobId, updates }) => {
+          try {
+            if (Object.keys(updates).length > 0) {
+              await Job.findByIdAndUpdate(jobId, updates, { new: false });
+            }
+          } catch (error) {
+            logger.error(`Error updating job ${jobId} in database:`, error);
+          }
+        })).catch(error => {
+          logger.error('Error updating jobs in background:', error);
+        });
+      }
+
+      formattedJobs = formatJobsResponse(jobs);
+      
+      // Cache the results
+      if (cacheService) {
+        await cacheService.cacheJobList(req.query, formattedJobs);
+      }
+    }
+
     res.status(200).json({
       success: true,
-      data: jobs,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
         pages: Math.ceil(total / limit),
       },
+      data: formattedJobs,
       filters: {
         appliedFilters: Object.keys(query).length,
         searchQuery: q || null,
@@ -172,18 +267,42 @@ const getAllJobs = async (req, res) => {
 // @access  Public
 const getJob = async (req, res) => {
   try {
-    const job = await Job.findById(req.params.id)
-      .populate('employer', 'name logo industry description')
-      .populate('postedBy', 'fullName name email avatar');
-
-    if (!job) {
-      return res.status(404).json({
-        success: false,
-        message: 'Không tìm thấy công việc',
-      });
+    // Try to get from cache first (before querying database)
+    const cacheService = getCacheService();
+    let jobObj = null;
+    
+    if (cacheService) {
+      jobObj = await cacheService.getCachedJobDetail(req.params.id);
     }
 
-    const jobObj = job.toObject();
+    // If not in cache, fetch from database
+    if (!jobObj) {
+      const job = await Job.findById(req.params.id)
+        .populate({
+          path: 'employer',
+          select:
+            'company.name company.logo company.industry company.description company.website company.size company.officeAddress contact.phone contact.email',
+          options: { lean: false },
+        })
+        .populate('postedBy', 'fullName name email avatar')
+        .populate('skillIds', 'name category');
+
+      if (!job) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy công việc',
+        });
+      }
+
+      // Format job using shared formatter
+      jobObj = formatJobResponse(job);
+      
+      // Cache the result
+      if (cacheService) {
+        await cacheService.cacheJobDetail(req.params.id, jobObj);
+      }
+    }
+    
     if (jobObj.postedBy) {
       const pb = jobObj.postedBy;
       const computedFullName =
@@ -238,7 +357,7 @@ const getJob = async (req, res) => {
 // @access  Private (Employer)
 const createJob = async (req, res) => {
   try {
-    const jobData = req.body;
+    let jobData = req.body;
     // Tìm employer profile theo owner là user đang đăng nhập
     const EmployerProfile = require('../models/EmployerProfile');
     const employerProfile = await EmployerProfile.findOne({
@@ -265,9 +384,36 @@ const createJob = async (req, res) => {
     // Luôn tạo job ở trạng thái 'draft' (bản nháp)
     jobData.status = JOB_STATUS.DRAFT;
 
+    // Process address: build fullAddress if address is structured object
+    if (jobData.address && typeof jobData.address === 'object') {
+      const addr = jobData.address;
+      const addressParts = [
+        addr.street,
+        addr.ward,
+        addr.district,
+        addr.city,
+        addr.country || 'Vietnam'
+      ].filter(Boolean);
+      jobData.address.fullAddress = addressParts.join(', ');
+      // Set default country if not provided
+      if (!jobData.address.country) {
+        jobData.address.country = 'Vietnam';
+      }
+    }
+
+    // Process job data: populate skillIds and industryPath
+    jobData = await processJobData(jobData);
+
     const job = await Job.create(jobData);
     await job.populate('employer', 'name logo industry description');
     await job.populate('postedBy', 'fullName name email avatar');
+    await job.populate('skillIds', 'name category');
+
+    // Invalidate job caches when new job is created
+    const cacheService = getCacheService();
+    if (cacheService) {
+      await cacheService.invalidateJobCache();
+    }
 
     res.status(201).json({
       success: true,
@@ -307,7 +453,7 @@ const updateJob = async (req, res) => {
         .status(403)
         .json({ success: false, message: 'Bạn không có quyền sửa job này' });
     }
-    const updateData = req.body;
+    let updateData = req.body;
     // Chỉ admin mới được đổi status
     if (updateData.status && req.user.role !== 'admin') {
       delete updateData.status;
@@ -320,12 +466,42 @@ const updateJob = async (req, res) => {
           .json({ success: false, message: 'Trạng thái job không hợp lệ' });
       }
     }
+
+    // Process address: build fullAddress if address is structured object
+    if (updateData.address && typeof updateData.address === 'object') {
+      const addr = updateData.address;
+      const addressParts = [
+        addr.street,
+        addr.ward,
+        addr.district,
+        addr.city,
+        addr.country || 'Vietnam'
+      ].filter(Boolean);
+      updateData.address.fullAddress = addressParts.join(', ');
+      // Set default country if not provided
+      if (!updateData.address.country) {
+        updateData.address.country = 'Vietnam';
+      }
+    }
+
+    // Merge with existing job data to process skills and industry
+    const mergedData = { ...job.toObject(), ...updateData };
+    updateData = await processJobData(mergedData);
+
     const updatedJob = await Job.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
       runValidators: true,
     })
       .populate('employer', 'name logo industry description')
-      .populate('postedBy', 'fullName name email avatar');
+      .populate('postedBy', 'fullName name email avatar')
+      .populate('skillIds', 'name category');
+    
+    // Invalidate job caches when job is updated
+    const cacheService = getCacheService();
+    if (cacheService) {
+      await cacheService.invalidateJobCache(req.params.id);
+    }
+    
     res.status(200).json({ success: true, data: updatedJob });
   } catch (error) {
     logger.error('Error updating job:', error);
@@ -389,6 +565,13 @@ const deleteJob = async (req, res) => {
     job.deletedAt = new Date();
     job.deletedBy = req.user.id;
     await job.save();
+    
+    // Invalidate job caches when job is deleted
+    const cacheService = getCacheService();
+    if (cacheService) {
+      await cacheService.invalidateJobCache(req.params.id);
+    }
+    
     res
       .status(200)
       .json({ success: true, message: 'Đã xóa công việc thành công' });
@@ -542,8 +725,14 @@ const getJobBySlug = async (req, res) => {
     const { slug } = req.params;
 
     const job = await Job.findOne({ slug, status: JOB_STATUS.OPEN })
-      .populate('employer', 'name logo industry description')
-      .populate('postedBy', 'fullName name email avatar');
+      .populate({
+        path: 'employer',
+        select:
+          'company.name company.logo company.industry company.description company.website company.size company.officeAddress contact.phone contact.email',
+        options: { lean: false },
+      })
+      .populate('postedBy', 'fullName name email avatar')
+      .populate('skillIds', 'name category');
 
     if (!job) {
       return res.status(404).json({
@@ -552,9 +741,12 @@ const getJobBySlug = async (req, res) => {
       });
     }
 
+    // Format job using shared formatter
+    const formattedJob = formatJobResponse(job);
+
     res.status(200).json({
       success: true,
-      data: job,
+      data: formattedJob,
     });
   } catch (error) {
     logger.error('Error getting job by slug:', error);
@@ -601,22 +793,72 @@ const incrementJobViews = async (req, res) => {
 // @desc    Get recent jobs
 // @route   GET /api/jobs/recent
 // @access  Public
+// @query   limit - Number of jobs to return (default: 10)
+// @query   category - Filter by category (optional)
+// @query   sortBy - Sort field: 'createdAt' (default) or 'updatedAt'
+// @note    "Recent" jobs are sorted by createdAt (job creation date) by default
+//          This shows the newest posted jobs first
 const getRecentJobs = async (req, res) => {
   try {
-    const { limit = 10, category } = req.query;
+    const { limit = 10, category, sortBy = 'createdAt' } = req.query;
 
     const query = { status: JOB_STATUS.OPEN };
+
+    // Apply category filter if provided
+    if (category) {
+      query.category = { $regex: category, $options: 'i' };
+    }
+
     const total = await Job.countDocuments(query);
+
+    // Determine sort field (default: createdAt for "recently posted")
+    const sortField = sortBy === 'updatedAt' ? 'updatedAt' : 'createdAt';
+
     const jobs = await Job.find(query)
-      .populate('employer', 'name logo industry description')
-      .sort({ createdAt: -1 })
+      .populate({
+        path: 'employer',
+        select:
+          'company.name company.logo company.industry company.description company.website company.size company.officeAddress contact.phone contact.email',
+        options: { lean: false },
+      })
+      .populate('postedBy', 'fullName name email avatar')
+      .populate('skillIds', 'name category')
+      .sort({ [sortField]: -1 }) // Sort by creation date (newest first) or updatedAt
       .limit(parseInt(limit));
+
+    // Try to get from cache first
+    const cacheService = getCacheService();
+    let formattedJobs = null;
+    
+    if (cacheService) {
+      formattedJobs = await cacheService.getCachedJobList({
+        ...req.query,
+        sortBy: sortField
+      });
+    }
+
+    // If not in cache, fetch and format
+    if (!formattedJobs) {
+      formattedJobs = formatJobsResponse(jobs);
+      
+      // Cache the results
+      if (cacheService) {
+        await cacheService.cacheJobList(
+          { ...req.query, sortBy: sortField },
+          formattedJobs
+        );
+      }
+    }
+
     res.status(200).json({
       success: true,
-      data: jobs,
+      data: formattedJobs,
       total,
       limit: parseInt(limit),
-      message: `Tìm thấy ${total} công việc gần đây`,
+      sortBy: sortField,
+      message: `Tìm thấy ${total} công việc gần đây (sắp xếp theo ${
+        sortField === 'createdAt' ? 'ngày đăng' : 'ngày cập nhật'
+      })`,
     });
   } catch (error) {
     logger.error('Error getting recent jobs:', error);
@@ -634,22 +876,28 @@ const getJobCompany = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const job = await Job.findById(id).populate(
-      'employer',
-      'name logo industry description'
-    );
+    const job = await Job.findById(id).populate({
+      path: 'employer',
+      select:
+        'company.name company.logo company.industry company.description company.website company.size company.officeAddress contact.phone contact.email',
+      options: { lean: false },
+    });
     if (!job) {
       return res.status(404).json({
         success: false,
         message: 'Không tìm thấy công việc',
       });
     }
+
+    // Format job using shared formatter
+    const formattedJob = formatJobResponse(job);
+
     res.status(200).json({
       success: true,
       data: {
-        company: job.employer,
-        jobTitle: job.title,
-        jobId: job._id,
+        company: formattedJob.employer,
+        jobTitle: formattedJob.title,
+        jobId: formattedJob._id,
       },
     });
   } catch (error) {
@@ -735,11 +983,15 @@ const getEmployerJobs = async (req, res) => {
     sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
     const jobs = await Job.find(query)
-      .populate(
-        'employer',
-        'company.name company.logo company.industry company.description'
-      )
+      .populate({
+        path: 'employer',
+        select:
+          'company.name company.logo company.industry company.description company.website company.size company.officeAddress contact.phone contact.email',
+        // Ensure populate works even if some fields are missing
+        options: { lean: false },
+      })
       .populate('postedBy', 'fullName name email avatar')
+      .populate('skillIds', 'name category')
       .sort(sortObj)
       .skip(skip)
       .limit(parseInt(limit));
@@ -763,14 +1015,19 @@ const getEmployerJobs = async (req, res) => {
       statusStats[item._id] = item.count;
     });
 
+    // Format jobs using shared formatter
+    const formattedJobs = formatJobsResponse(jobs);
+
     res.status(200).json({
       success: true,
-      data: jobs,
+      data: formattedJobs,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / limit),
+        hasNextPage: parseInt(page) < Math.ceil(total / limit),
+        hasPrevPage: parseInt(page) > 1,
       },
       statistics: {
         total,
@@ -821,17 +1078,26 @@ const getDraftJobs = async (req, res) => {
     sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
     const jobs = await Job.find(query)
-      .populate('employer', 'company.name company.logo company.industry')
+      .populate({
+        path: 'employer',
+        select:
+          'company.name company.logo company.industry company.description company.website company.size company.officeAddress contact.phone contact.email',
+        options: { lean: false },
+      })
       .populate('postedBy', 'fullName name email avatar')
+      .populate('skillIds', 'name category')
       .sort(sortObj)
       .skip(skip)
       .limit(parseInt(limit));
 
     const total = await Job.countDocuments(query);
 
+    // Format jobs using shared formatter
+    const formattedJobs = formatJobsResponse(jobs);
+
     res.status(200).json({
       success: true,
-      data: jobs,
+      data: formattedJobs,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -845,6 +1111,168 @@ const getDraftJobs = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy danh sách job nháp',
+    });
+  }
+};
+
+// @desc    Bulk create multiple jobs
+// @route   POST /api/jobs/bulk
+// @access  Private (Employer)
+// @body    { jobs: Array<JobData> } - Array of job data objects
+const bulkCreateJobs = async (req, res) => {
+  try {
+    const { jobs } = req.body;
+
+    // Validate input
+    if (!Array.isArray(jobs) || jobs.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mảng jobs là bắt buộc và không được rỗng',
+      });
+    }
+
+    // Limit batch size to prevent abuse
+    const MAX_BATCH_SIZE = 50;
+    if (jobs.length > MAX_BATCH_SIZE) {
+      return res.status(400).json({
+        success: false,
+        message: `Chỉ có thể tạo tối đa ${MAX_BATCH_SIZE} jobs mỗi lần`,
+      });
+    }
+
+    // Find employer profile
+    const EmployerProfile = require('../models/EmployerProfile');
+    const employerProfile = await EmployerProfile.findOne({
+      owner: req.user.id,
+    });
+
+    if (!employerProfile) {
+      return res.status(400).json({
+        success: false,
+        message: 'Không tìm thấy hồ sơ employer',
+      });
+    }
+
+    if (
+      !employerProfile.verification?.isVerified &&
+      employerProfile.status !== EMPLOYER_PROFILE_STATUS.VERIFIED
+    ) {
+      return res.status(403).json({
+        success: false,
+        message:
+          'Tài khoản employer chưa xác thực, không thể tạo job mới. Vui lòng hoàn thành xác thực doanh nghiệp.',
+      });
+    }
+
+    const results = {
+      created: [],
+      failed: [],
+      total: jobs.length,
+    };
+
+    // Process each job
+    for (let i = 0; i < jobs.length; i++) {
+      const jobData = jobs[i];
+      try {
+        // Validate required fields
+        if (!jobData.title || !jobData.description) {
+          results.failed.push({
+            index: i,
+            title: jobData.title || 'N/A',
+            error: 'Title và description là bắt buộc',
+          });
+          continue;
+        }
+
+        // Set common fields
+        const processedJobData = {
+          ...jobData,
+          employer: employerProfile._id,
+          postedBy: req.user.id,
+          status: JOB_STATUS.DRAFT, // Always create as draft
+        };
+
+        // Process deadline: convert string to Date if needed
+        if (processedJobData.deadline && typeof processedJobData.deadline === 'string') {
+          processedJobData.deadline = new Date(processedJobData.deadline);
+        }
+
+        // Process address: build fullAddress if address is structured object
+        if (processedJobData.address && typeof processedJobData.address === 'object') {
+          const addr = processedJobData.address;
+          const addressParts = [
+            addr.street,
+            addr.ward,
+            addr.district,
+            addr.city,
+            addr.country || 'Vietnam',
+          ].filter(Boolean);
+          processedJobData.address.fullAddress = addressParts.join(', ');
+          if (!processedJobData.address.country) {
+            processedJobData.address.country = 'Vietnam';
+          }
+        }
+
+        // Process job data: populate skillIds and industryPath
+        const finalJobData = await processJobData(processedJobData);
+
+        // Create job
+        const job = await Job.create(finalJobData);
+        await job.populate('employer', 'name logo industry description');
+        await job.populate('postedBy', 'fullName name email avatar');
+        await job.populate('skillIds', 'name category');
+
+        results.created.push({
+          index: i,
+          id: job._id,
+          title: job.title,
+          status: job.status,
+        });
+      } catch (error) {
+        logger.error(`Error creating job at index ${i}:`, {
+          error: error.message,
+          jobData: jobData.title || 'N/A',
+        });
+        results.failed.push({
+          index: i,
+          title: jobData.title || 'N/A',
+          error: error.message || 'Lỗi không xác định',
+        });
+      }
+    }
+
+    // Invalidate job caches
+    const cacheService = getCacheService();
+    if (cacheService && results.created.length > 0) {
+      await cacheService.invalidateJobCache();
+    }
+
+    // Log result
+    logger.info(`Bulk create jobs: ${results.created.length} created, ${results.failed.length} failed`, {
+      userId: req.user.id,
+      employerId: employerProfile._id,
+    });
+
+    // Return response
+    const allSucceeded = results.failed.length === 0;
+    const allFailed = results.created.length === 0;
+
+    res.status(allSucceeded ? 201 : allFailed ? 400 : 207).json({
+      success: !allFailed,
+      data: results,
+      message:
+        allSucceeded
+          ? `Đã tạo thành công ${results.created.length} jobs`
+          : allFailed
+            ? `Không thể tạo job nào (${results.failed.length} lỗi)`
+            : `Đã tạo ${results.created.length}/${results.total} jobs thành công`,
+    });
+  } catch (error) {
+    logger.error('Error in bulk create jobs:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi tạo jobs',
+      error: error.message,
     });
   }
 };
@@ -886,6 +1314,7 @@ module.exports = {
   getAllJobs,
   getJob,
   createJob,
+  bulkCreateJobs,
   updateJob,
   deleteJob,
   applyForJob,
