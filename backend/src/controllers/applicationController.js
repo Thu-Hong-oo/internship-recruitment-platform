@@ -258,11 +258,30 @@ const updateApplicationStatus = asyncHandler(async (req, res) => {
       });
     }
 
+    const oldStatus = application.status;
     application.status = status;
     if (feedback) application.feedback = feedback;
     await application.save();
 
-    await application.populate('jobseekerId', 'firstName lastName email');
+    await application.populate('candidateId', 'userId');
+    await application.populate('jobId', 'title');
+
+    // Notify candidate về status change
+    if (oldStatus !== status && application.candidateId && application.candidateId.userId) {
+      try {
+        const NotificationService = require('../services/notificationService');
+        await NotificationService.notifyApplicationStatusChange(
+          application.candidateId.userId.toString(),
+          application._id.toString(),
+          application.jobId._id.toString(),
+          application.jobId.title || 'Công việc',
+          status
+        );
+      } catch (notifyError) {
+        logger.error('Failed to send application status change notification:', notifyError);
+        // Không fail request nếu notification fail
+      }
+    }
 
     res.status(200).json({
       success: true,

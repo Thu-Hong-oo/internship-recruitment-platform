@@ -371,6 +371,20 @@ const verifyEmployer = asyncHandler(async (req, res) => {
       employerId: employerProfile._id,
       notes: !!notes,
     });
+
+    // Notify employer về verification approved
+    try {
+      const NotificationService = require('../../services/notificationService');
+      if (employerProfile.owner) {
+        await NotificationService.notifyVerificationApproved(
+          employerProfile.owner.toString(),
+          employerProfile._id.toString(),
+          employerProfile.company?.name || 'Công ty của bạn'
+        );
+      }
+    } catch (notifyError) {
+      logger.error('Failed to send verification approved notification:', notifyError);
+    }
   } else {
     // Reject the profile
     if (!reason) {
@@ -390,6 +404,21 @@ const verifyEmployer = asyncHandler(async (req, res) => {
       employerId: employerProfile._id,
       reason,
     });
+
+    // Notify employer về verification rejected
+    try {
+      const NotificationService = require('../../services/notificationService');
+      if (employerProfile.owner) {
+        await NotificationService.notifyVerificationRejected(
+          employerProfile.owner.toString(),
+          employerProfile._id.toString(),
+          employerProfile.company?.name || 'Công ty của bạn',
+          reason
+        );
+      }
+    } catch (notifyError) {
+      logger.error('Failed to send verification rejected notification:', notifyError);
+    }
   }
 
   await employerProfile.save();

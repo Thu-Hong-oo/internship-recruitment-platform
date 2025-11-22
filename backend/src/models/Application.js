@@ -182,7 +182,47 @@ ApplicationSchema.methods.updateStatus = async function (status, note, userId) {
 ApplicationSchema.methods.scheduleInterview = async function (interviewData) {
   this.interviews.push(interviewData);
   await this.updateStatus('interview', 'Lịch phỏng vấn đã được đặt');
-  return this.save();
+  await this.save();
+  
+  // Notify candidate và employer về interview scheduled
+  try {
+    const NotificationService = require('../services/notificationService');
+    const CandidateProfile = require('./CandidateProfile');
+    const EmployerProfile = require('./EmployerProfile');
+    const Job = require('./Job');
+    
+    // Get candidate user ID
+    const candidateProfile = await CandidateProfile.findById(this.candidateId);
+    if (candidateProfile && candidateProfile.userId) {
+      await NotificationService.notifyInterviewScheduled(
+        candidateProfile.userId.toString(),
+        this._id.toString(),
+        this.jobId.toString(),
+        interviewData.scheduledAt || new Date(),
+        'candidate'
+      );
+    }
+    
+    // Get employer user ID
+    const job = await Job.findById(this.jobId);
+    if (job && job.employer) {
+      const employerProfile = await EmployerProfile.findById(job.employer);
+      if (employerProfile && employerProfile.owner) {
+        await NotificationService.notifyInterviewScheduled(
+          employerProfile.owner.toString(),
+          this._id.toString(),
+          this.jobId.toString(),
+          interviewData.scheduledAt || new Date(),
+          'employer'
+        );
+      }
+    }
+  } catch (notifyError) {
+    console.error('Failed to send interview scheduled notifications:', notifyError);
+    // Không fail nếu notification fail
+  }
+  
+  return this;
 };
 
 ApplicationSchema.methods.addFeedback = async function (feedbackData) {
