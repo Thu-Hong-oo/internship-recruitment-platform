@@ -5,6 +5,7 @@ const ProfileController = require('./ProfileController'); // Import ProfileContr
 const aiService = require('../../services/aiService');
 const { ApiResponse } = require('../../utils/responseHandler');
 const { AppError } = require('../../utils/errors');
+const { logger } = require('../../utils/logger');
 const Job = require('../../models/Job'); // Import Job model
 
 class ResumeController {
@@ -504,22 +505,154 @@ class ResumeController {
         resumeToView = foundCV;
       }
 
-      if (!resumeToView || !resumeToView.url) {
-        throw new AppError('CV URL not found', 404);
+      if (!resumeToView) {
+        throw new AppError('CV not found', 404);
       }
 
-      let accessibleUrl = resumeToView.url.replace('http://', 'https://');
-      if (
-        accessibleUrl.includes('/image/upload/') &&
-        accessibleUrl.includes('.pdf')
-      ) {
-        accessibleUrl = accessibleUrl.replace('/image/upload/', '/raw/upload/');
+      // Ưu tiên dùng URL gốc từ database (có version chính xác)
+      // Nếu URL gốc không hợp lệ, mới generate từ publicId
+      let accessibleUrl = null;
+      
+      if (resumeToView.url) {
+        // Dùng URL gốc từ database (đảm bảo version chính xác)
+        accessibleUrl = resumeToView.url.replace('http://', 'https://');
+        // Fix URL format cho PDF files nếu cần
+        if (
+          accessibleUrl.includes('/image/upload/') &&
+          (accessibleUrl.includes('.pdf') || resumeToView.mimeType === 'application/pdf')
+        ) {
+          accessibleUrl = accessibleUrl.replace('/image/upload/', '/raw/upload/');
+        }
+        logger.info('Using original URL from database', {
+          url: accessibleUrl,
+          hasPublicId: !!resumeToView.publicId,
+        });
+      } else if (resumeToView.publicId) {
+        // Fallback: generate URL từ publicId nếu không có URL gốc
+        try {
+          const { cloudinary } = require('../../utils/cloudinary');
+          // Generate URL không có version (Cloudinary sẽ tự động dùng latest)
+          accessibleUrl = cloudinary.url(resumeToView.publicId, {
+            resource_type: 'raw', // PDF files nên dùng raw
+            secure: true,
+            // Không thêm version để Cloudinary tự động dùng latest
+          });
+          logger.info('Generated Cloudinary URL from publicId (no version)', {
+            publicId: resumeToView.publicId,
+            generatedUrl: accessibleUrl,
+          });
+        } catch (cloudinaryError) {
+          logger.error('Failed to generate Cloudinary URL from publicId', {
+            error: cloudinaryError.message,
+            publicId: resumeToView.publicId,
+          });
+        }
       }
 
-      const response = await fetch(accessibleUrl);
-      if (!response.ok) {
+      if (!accessibleUrl) {
+        throw new AppError('CV URL not found or invalid', 404);
+      }
+
+      logger.info('Fetching CV from URL', {
+        url: accessibleUrl,
+        cvId: id || 'current',
+        hasPublicId: !!resumeToView.publicId,
+      });
+
+      // Fetch CV với timeout và fallback
+      let response;
+      let finalUrl = accessibleUrl;
+      
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
+
+        response = await fetch(finalUrl, {
+          method: 'GET',
+          headers: {
+            'User-Agent': 'Mozilla/5.0',
+          },
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        // Nếu URL gốc trả về 404 và có publicId, thử generate URL mới (không version)
+        if (!response.ok && response.status === 404 && resumeToView.publicId) {
+          logger.warn('Original URL returned 404, trying to generate from publicId', {
+            originalUrl: finalUrl,
+            publicId: resumeToView.publicId,
+          });
+
+          try {
+            const { cloudinary } = require('../../utils/cloudinary');
+            // Generate URL không có version để Cloudinary tự động dùng latest
+            const fallbackUrl = cloudinary.url(resumeToView.publicId, {
+              resource_type: 'raw',
+              secure: true,
+              // Không thêm version - Cloudinary sẽ tự động dùng latest
+            });
+
+            logger.info('Trying fallback URL from publicId', {
+              fallbackUrl,
+              publicId: resumeToView.publicId,
+            });
+
+            // Thử lại với fallback URL
+            const fallbackController = new AbortController();
+            const fallbackTimeoutId = setTimeout(() => fallbackController.abort(), 10000);
+            
+            response = await fetch(fallbackUrl, {
+              method: 'GET',
+              headers: {
+                'User-Agent': 'Mozilla/5.0',
+              },
+              signal: fallbackController.signal,
+            });
+
+            clearTimeout(fallbackTimeoutId);
+            finalUrl = fallbackUrl;
+
+            if (response.ok) {
+              logger.info('Fallback URL succeeded', {
+                fallbackUrl,
+              });
+            }
+          } catch (fallbackError) {
+            logger.error('Fallback URL also failed', {
+              error: fallbackError.message,
+              publicId: resumeToView.publicId,
+            });
+          }
+        }
+      } catch (fetchError) {
+        if (fetchError.name === 'AbortError') {
+          logger.error('CV fetch timeout', {
+            url: finalUrl,
+            timeout: '10s',
+          });
+          throw new AppError('CV fetch timeout. The file may be too large or the server is slow.', 504);
+        }
+        logger.error('Failed to fetch CV from URL', {
+          error: fetchError.message,
+          url: finalUrl,
+        });
         throw new AppError(
-          `Failed to fetch CV: ${response.status} ${response.statusText}`,
+          `Failed to fetch CV: ${fetchError.message}`,
+          502
+        );
+      }
+
+      if (!response.ok) {
+        logger.error('CV URL returned error (both original and fallback failed)', {
+          status: response.status,
+          statusText: response.statusText,
+          originalUrl: accessibleUrl,
+          finalUrl,
+          publicId: resumeToView.publicId,
+        });
+        throw new AppError(
+          `Failed to fetch CV: ${response.status} ${response.statusText}. The file may have been deleted or moved.`,
           502
         );
       }

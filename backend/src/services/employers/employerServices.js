@@ -232,12 +232,67 @@ class EmployerService {
     // Use ensureProfile to auto-create if needed
     const profile = await this.ensureProfile(userId);
 
-    // Allowed fields (including legalRepresentative for verification)
-    const allowedFields = ['company', 'businessInfo', 'legalRepresentative'];
+    // Deep merge helper for nested objects
+    const deepMerge = (target, source) => {
+      if (!source) return target;
+      const result = { ...target };
+      for (const key in source) {
+        if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key]) && !(source[key] instanceof Date)) {
+          result[key] = deepMerge(target[key] || {}, source[key]);
+        } else if (source[key] !== undefined) {
+          result[key] = source[key];
+        }
+      }
+      return result;
+    };
 
-    for (const field of allowedFields) {
-      if (updates[field]) {
-        profile[field] = { ...profile[field], ...updates[field] };
+    // Update company with deep merge to preserve nested objects
+    if (updates.company) {
+      profile.company = deepMerge(profile.company || {}, updates.company);
+    }
+
+    // Update businessInfo with deep merge
+    if (updates.businessInfo) {
+      profile.businessInfo = deepMerge(profile.businessInfo || {}, updates.businessInfo);
+    }
+
+    // Update legalRepresentative with deep merge
+    if (updates.legalRepresentative) {
+      profile.legalRepresentative = deepMerge(profile.legalRepresentative || {}, updates.legalRepresentative);
+    }
+
+    // ĐỒNG BỘ ĐỊA CHỈ: Chỉ dùng 1 địa chỉ duy nhất
+    // Ưu tiên: company.officeAddress là nguồn chính, tự động sync sang businessInfo.address
+    
+    // Nếu cập nhật company.officeAddress, tự động sync sang businessInfo.address
+    if (updates.company?.officeAddress) {
+      const officeAddress = updates.company.officeAddress;
+      // Chỉ sync nếu có ít nhất street hoặc city
+      if (officeAddress.street || officeAddress.city) {
+        profile.businessInfo.address = {
+          ...profile.businessInfo?.address,
+          ...officeAddress,
+        };
+        logger.info('Synced company.officeAddress to businessInfo.address', {
+          userId,
+          profileId: profile._id,
+        });
+      }
+    }
+    
+    // Nếu chỉ cập nhật businessInfo.address (không có company.officeAddress), sync ngược lại
+    if (updates.businessInfo?.address && !updates.company?.officeAddress) {
+      const businessAddress = updates.businessInfo.address;
+      // Chỉ sync nếu có ít nhất street hoặc city
+      if (businessAddress.street || businessAddress.city) {
+        profile.company.officeAddress = {
+          ...profile.company?.officeAddress,
+          ...businessAddress,
+        };
+        logger.info('Synced businessInfo.address to company.officeAddress', {
+          userId,
+          profileId: profile._id,
+        });
       }
     }
 
@@ -246,9 +301,11 @@ class EmployerService {
     logger.info('Company info updated', {
       userId,
       profileId: profile._id,
+      hasOfficeAddress: !!profile.company?.officeAddress,
+      officeAddress: profile.company?.officeAddress,
     });
 
-    return { profile, updatedFields: { profile: allowedFields } };
+    return { profile, updatedFields: { profile: ['company', 'businessInfo', 'legalRepresentative'] } };
   }
 
   /**

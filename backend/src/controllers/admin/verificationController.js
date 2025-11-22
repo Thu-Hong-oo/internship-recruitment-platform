@@ -324,7 +324,8 @@ const verifyEmployer = asyncHandler(async (req, res) => {
     const steps = employerProfile.verification.steps || {};
     const documents = employerProfile.verification.documents || [];
 
-    // Required: businessInfo, business-license, tax-certificate
+    // Required: business-license và tax-certificate (verified)
+    // businessInfo có thể được thay thế bằng documents verified
     const hasBusinessInfo = steps.businessInfo;
     const hasBusinessLicense = documents.find(
       d => d.documentType === 'business-license' && d.verified
@@ -333,8 +334,14 @@ const verifyEmployer = asyncHandler(async (req, res) => {
       d => d.documentType === 'tax-certificate' && d.verified
     );
 
+    // Nếu có cả 2 documents verified, coi như đã có businessInfo
+    const hasVerifiedDocuments = hasBusinessLicense && hasTaxCertificate;
+
     const missingRequirements = [];
-    if (!hasBusinessInfo) missingRequirements.push('Thông tin doanh nghiệp');
+    // Chỉ yêu cầu businessInfo nếu chưa có documents verified
+    if (!hasBusinessInfo && !hasVerifiedDocuments) {
+      missingRequirements.push('Thông tin doanh nghiệp hoặc documents đã xác thực');
+    }
     if (!hasBusinessLicense)
       missingRequirements.push('Giấy phép kinh doanh đã xác thực');
     if (!hasTaxCertificate)

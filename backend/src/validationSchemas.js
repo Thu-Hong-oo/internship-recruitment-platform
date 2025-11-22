@@ -1,23 +1,50 @@
 const Joi = require('joi');
 
-// Company info validation
+// Company info validation for creation (all required fields)
 const companySchema = Joi.object({
   name: Joi.string().min(2).max(100).required(), 
   industry: Joi.string().min(2).max(50).required(),
-  size: Joi.string().valid('small', 'medium', 'large').required(),
+  size: Joi.string().valid('startup', 'small', 'medium', 'large', 'enterprise').required(),
   email: Joi.string().email().required(),
   website: Joi.string().uri().optional(), 
-  description: Joi.string().max(500).optional(), 
+  description: Joi.string().max(2000).optional(), 
   employeesCount: Joi.number().integer().min(1).optional(), 
-  foundedYear: Joi.number().integer().min(1900).max(new Date().getFullYear()).optional(), 
-});
+  foundedYear: Joi.number().integer().min(1900).max(new Date().getFullYear()).optional(),
+  officeAddress: Joi.object({
+    street: Joi.string().optional(),
+    ward: Joi.string().optional(),
+    district: Joi.string().optional(),
+    city: Joi.string().optional(),
+    country: Joi.string().default('Vietnam').optional(),
+  }).optional(),
+}).unknown(false); // Reject unknown fields explicitly
+
+// Company info validation for update (all fields optional for partial updates)
+const companyUpdateSchema = Joi.object({
+  name: Joi.string().min(2).max(100).optional(), 
+  industry: Joi.string().min(2).max(50).optional(),
+  size: Joi.string().valid('startup', 'small', 'medium', 'large', 'enterprise').optional(),
+  email: Joi.string().email().optional(),
+  website: Joi.string().uri().optional(), 
+  description: Joi.string().max(2000).optional(), 
+  employeesCount: Joi.number().integer().min(1).optional(), 
+  foundedYear: Joi.number().integer().min(1900).max(new Date().getFullYear()).optional(),
+  officeAddress: Joi.object({
+    street: Joi.string().optional(),
+    ward: Joi.string().optional(),
+    district: Joi.string().optional(),
+    city: Joi.string().optional(),
+    country: Joi.string().default('Vietnam').optional(),
+  }).optional(),
+}).unknown(false); // Reject unknown fields explicitly
 
 
 
+// Business info schema for full validation (when creating new)
 const businessInfoSchema = Joi.object({
   registrationNumber: Joi.string().required(),
   taxId: Joi.string().required(),
-  issueDate: Joi.date().iso().required(), // Thêm dòng này!
+  issueDate: Joi.date().iso().required(),
   issuePlace: Joi.string().required(),
   address: Joi.object({
     street: Joi.string().required(),
@@ -26,6 +53,21 @@ const businessInfoSchema = Joi.object({
     city: Joi.string().required(),
     country: Joi.string().default('Vietnam'),
   }).required(),
+});
+
+// Business info schema for partial update (all fields optional)
+const businessInfoUpdateSchema = Joi.object({
+  registrationNumber: Joi.string().optional(),
+  taxId: Joi.string().optional(),
+  issueDate: Joi.date().iso().optional(),
+  issuePlace: Joi.string().optional(),
+  address: Joi.object({
+    street: Joi.string().optional(),
+    ward: Joi.string().optional(),
+    district: Joi.string().optional(),
+    city: Joi.string().optional(),
+    country: Joi.string().default('Vietnam').optional(),
+  }).optional(),
 });
 
 // Legal representative validation
@@ -54,7 +96,9 @@ const contactSchema = Joi.object({
 
 module.exports = {
   companySchema,
+  companyUpdateSchema,
   businessInfoSchema,
+  businessInfoUpdateSchema,
   legalRepresentativeSchema,
   positionSchema,
   contactSchema,
