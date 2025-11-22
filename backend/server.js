@@ -135,8 +135,40 @@ initializeRedis().then(async () => {
   }
 });
 
-// Security middleware
-app.use(helmet());
+// Security middleware with CSP configuration
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'", // Allow inline scripts for test pages
+          "'unsafe-hashes'", // Allow inline event handlers
+          "https://cdn.socket.io", // Allow Socket.io CDN
+          "https://cdn.jsdelivr.net", // Allow other CDNs if needed
+        ],
+        scriptSrcAttr: [
+          "'unsafe-inline'", // Allow inline event handlers (onclick, etc.)
+        ],
+        styleSrc: [
+          "'self'",
+          "'unsafe-inline'", // Allow inline styles
+        ],
+        connectSrc: [
+          "'self'",
+          "ws://localhost:*", // Allow WebSocket connections
+          "wss://localhost:*",
+          "http://localhost:*",
+          "https://localhost:*",
+          "https://cdn.socket.io", // Allow Socket.io CDN connections
+        ],
+        imgSrc: ["'self'", "data:", "https:"],
+        fontSrc: ["'self'", "data:"],
+      },
+    },
+  })
+);
 app.use(compression());
 
 // Global rate limiting - áp dụng cho tất cả requests
@@ -167,6 +199,15 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Static file serving for CV template previews
 app.use('/templates', express.static(path.join(__dirname, 'public/templates')));
+
+// Disable CSP for test pages (test-notifications.html)
+app.use('/test-notifications.html', (req, res, next) => {
+  res.setHeader('Content-Security-Policy', "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.socket.io https://cdn.jsdelivr.net; connect-src 'self' ws://localhost:* wss://localhost:* http://localhost:* https://localhost:*;");
+  next();
+});
+
+// Static file serving for test pages
+app.use(express.static(path.join(__dirname, 'public')));
 
 // 🔧 FIX: Add timeout handling for file upload routes
 app.use('/api/candidates/me/resume', (req, res, next) => {
