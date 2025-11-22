@@ -126,10 +126,10 @@ class ResumeController {
     profile,
     newResumeData,
     shouldUpdateHistory = true,
-    shouldDeleteOldFile = true
+    shouldDeleteOldFile = false // Đổi mặc định thành false - KHÔNG xóa file khi thêm vào history
   ) {
     try {
-      // 1. Add old current resume to history
+      // 1. Add old current resume to history (GIỮ LẠI FILE trên Cloudinary)
       if (
         shouldUpdateHistory &&
         profile.resume.current &&
@@ -141,17 +141,31 @@ class ResumeController {
           _id: new mongoose.Types.ObjectId(), // Ensure new history item has a unique ID
           uploadedAt: profile.resume.current.updatedAt || new Date(),
         });
+        logger.info('Added old resume to history (file preserved on Cloudinary)', {
+          publicId: profile.resume.current.publicId,
+        });
       }
 
-      // 2. Delete old file from Cloudinary
+      // 2. Delete old file from Cloudinary (CHỈ khi explicitly requested)
+      // LƯU Ý: Không xóa file khi thêm vào history để user có thể xem lại
+      // Chỉ xóa khi user xóa CV khỏi history hoặc khi thực sự cần thiết
       if (shouldDeleteOldFile && profile.resume.current.publicId) {
         try {
-          console.log('🗑️ Deleting old resume from Cloudinary...');
+          logger.info('Deleting old resume from Cloudinary (explicitly requested)', {
+            publicId: profile.resume.current.publicId,
+          });
           await uploadService.deleteFile(profile.resume.current.publicId);
-          console.log('✅ Old resume deleted');
+          logger.info('Old resume deleted from Cloudinary');
         } catch (deleteError) {
-          console.warn('⚠️ Failed to delete old resume:', deleteError.message);
+          logger.warn('Failed to delete old resume from Cloudinary', {
+            error: deleteError.message,
+            publicId: profile.resume.current.publicId,
+          });
         }
+      } else if (profile.resume.current.publicId) {
+        logger.info('Old resume file preserved on Cloudinary (available in history)', {
+          publicId: profile.resume.current.publicId,
+        });
       }
 
       // 3. Fix address field if it's a string but code expects object
@@ -847,7 +861,8 @@ class ResumeController {
       displayName: req.file.originalname,
     });
 
-    await this._updateResumeInProfile(profile, newResumeEntry, true, true);
+    // KHÔNG xóa file cũ khi upload CV mới - giữ lại trong history để user có thể xem
+    await this._updateResumeInProfile(profile, newResumeEntry, true, false);
 
     return ApiResponse.success(
       res,
@@ -898,7 +913,8 @@ class ResumeController {
         : { error: 'Parsing failed during upload', analyzedAt: new Date() },
     });
 
-    await this._updateResumeInProfile(profile, newResumeEntry, true, true);
+    // KHÔNG xóa file cũ khi upload CV mới - giữ lại trong history để user có thể xem
+    await this._updateResumeInProfile(profile, newResumeEntry, true, false);
 
     // *** FIX: Auto-fill profile after parsing ***
     if (parseResult && parseResult.extractedData) {
