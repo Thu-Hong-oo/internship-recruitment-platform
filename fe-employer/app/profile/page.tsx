@@ -13,12 +13,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Save, User, Building, Edit3 } from "lucide-react";
+import {
+  ArrowLeft,
+  Save,
+  User,
+  Building,
+  Edit3,
+  AlertCircle,
+} from "lucide-react";
 import { User as UserType, getUserData, getToken } from "@/lib/userStorage";
 import { EMPLOYER_LEVEL_LABEL } from "@/lib/labels";
 import { getEmployerProfile } from "@/lib/api";
 import { updateEmployerProfile } from "@/lib/profileAPI";
 import { useVerificationContext } from "@/contexts/VerificationContext";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  isPlaceholderProfileData,
+  isPlaceholderText,
+  isPlaceholderEmail,
+  isPlaceholderPhone,
+} from "@/lib/placeholderUtils";
 
 interface ProfileData {
   contact: {
@@ -41,6 +55,8 @@ export default function ProfilePage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isEditing, setIsEditing] = useState(false);
+  const [profileData, setProfileData] = useState<any>(null);
+  const [isPlaceholder, setIsPlaceholder] = useState(false);
   const levelLabel = EMPLOYER_LEVEL_LABEL;
 
   // Form data
@@ -87,6 +103,11 @@ export default function ProfilePage() {
 
         const profile = json?.data || json?.profile || null;
         if (!profile) return;
+
+        // Store profile data and check if it's placeholder
+        setProfileData(profile);
+        const isPlaceholderData = isPlaceholderProfileData(profile);
+        setIsPlaceholder(isPlaceholderData);
 
         const apiContact = profile.contact || {};
         const apiPosition = profile.position || {};
@@ -151,6 +172,13 @@ export default function ProfilePage() {
         setSuccess("Cập nhật thông tin thành công!");
         // Refresh verification status
         refreshVerification();
+        // Refresh profile data to update placeholder status
+        const json = await getEmployerProfile(token);
+        const profile = json?.data || json?.profile || null;
+        if (profile) {
+          setProfileData(profile);
+          setIsPlaceholder(isPlaceholderProfileData(profile));
+        }
         // Update user data in localStorage if needed
         if (data.user) {
           // You might want to update the user data here
@@ -214,6 +242,20 @@ export default function ProfilePage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-6 py-10">
+        {/* Placeholder Data Alert */}
+        {isPlaceholder && !isEditing && (
+          <Alert className="mb-6 border-amber-200 bg-amber-50">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertTitle className="text-amber-800">
+              Dữ liệu mẫu được hiển thị
+            </AlertTitle>
+            <AlertDescription className="text-amber-700">
+              Thông tin hiện tại là dữ liệu mẫu. Vui lòng cập nhật thông tin
+              thực tế của bạn để sử dụng đầy đủ các tính năng của hệ thống.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid gap-8 md:grid-cols-2">
             {/* Contact Information */}
@@ -243,7 +285,9 @@ export default function ProfilePage() {
                       />
                     ) : (
                       <div className="mt-1 text-base font-medium text-slate-900">
-                        {formData.contact.name || "Chưa cập nhật"}
+                        {isPlaceholderText(formData.contact.name)
+                          ? "Chưa cập nhật"
+                          : formData.contact.name || "Chưa cập nhật"}
                       </div>
                     )}
                   </div>
@@ -261,7 +305,9 @@ export default function ProfilePage() {
                       />
                     ) : (
                       <div className="mt-1 text-base font-medium text-slate-900">
-                        {formData.contact.phone || "Chưa cập nhật"}
+                        {isPlaceholderPhone(formData.contact.phone)
+                          ? "Chưa cập nhật"
+                          : formData.contact.phone || "Chưa cập nhật"}
                       </div>
                     )}
                   </div>
@@ -281,7 +327,9 @@ export default function ProfilePage() {
                     />
                   ) : (
                     <div className="mt-1 text-base font-medium text-slate-900">
-                      {formData.contact.email || "Chưa cập nhật"}
+                      {isPlaceholderEmail(formData.contact.email)
+                        ? "Chưa cập nhật"
+                        : formData.contact.email || "Chưa cập nhật"}
                     </div>
                   )}
                 </div>

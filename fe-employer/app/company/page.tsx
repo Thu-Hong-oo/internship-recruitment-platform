@@ -21,6 +21,7 @@ import {
   ArrowLeft,
   Edit3,
   FileText,
+  AlertCircle,
 } from "lucide-react";
 import { getToken } from "@/lib/userStorage";
 import { useVietnamAddress } from "@/hooks/useVietnamAddress";
@@ -34,6 +35,15 @@ import {
 } from "@/lib/companyAPI";
 import { useVerificationContext } from "@/contexts/VerificationContext";
 import { industryService, type Industry } from "@/lib/industryAPI";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  isPlaceholderCompanyData,
+  isPlaceholderText,
+  isPlaceholderEmail,
+  isPlaceholderPhone,
+  isPlaceholderRegistrationNumber,
+  isPlaceholderTaxId,
+} from "@/lib/placeholderUtils";
 
 export default function CompanyPage() {
   const router = useRouter();
@@ -47,6 +57,7 @@ export default function CompanyPage() {
   const [uploadingCover, setUploadingCover] = useState(false);
   const [industries, setIndustries] = useState<Industry[]>([]);
   const [loadingIndustries, setLoadingIndustries] = useState(false);
+  const [isPlaceholder, setIsPlaceholder] = useState(false);
 
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
@@ -233,6 +244,11 @@ export default function CompanyPage() {
         const result = await getCompanyInfo(token);
         if (!result.success || !result.data) return;
         const data = result.data;
+        
+        // Check if data is placeholder
+        const isPlaceholderData = isPlaceholderCompanyData(data);
+        setIsPlaceholder(isPlaceholderData);
+        
         setCompanyView({
           ...data,
           logo: data?.logo || data?.company?.logo?.url || data?.company?.logo,
@@ -390,6 +406,20 @@ export default function CompanyPage() {
         setSuccess(result.message || "Cập nhật thông tin công ty thành công");
         // Refresh verification status after successful update
         refreshVerification();
+        // Refresh company data to update placeholder status
+        const refreshResult = await getCompanyInfo(token);
+        if (refreshResult.success && refreshResult.data) {
+          const data = refreshResult.data;
+          setIsPlaceholder(isPlaceholderCompanyData(data));
+          setCompanyView({
+            ...data,
+            logo: data?.logo || data?.company?.logo?.url || data?.company?.logo,
+            coverImage:
+              data?.coverImage ||
+              data?.company?.coverImage?.url ||
+              data?.company?.coverImage,
+          });
+        }
       } else {
         setError(result.error || "Cập nhật thất bại");
       }
@@ -447,6 +477,21 @@ export default function CompanyPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-6 py-8">
+        {/* Placeholder Data Alert */}
+        {isPlaceholder && !isEditing && (
+          <Alert className="mb-6 border-amber-200 bg-amber-50">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertTitle className="text-amber-800">
+              Dữ liệu mẫu được hiển thị
+            </AlertTitle>
+            <AlertDescription className="text-amber-700">
+              Thông tin công ty hiện tại là dữ liệu mẫu. Vui lòng cập nhật
+              thông tin thực tế của công ty để sử dụng đầy đủ các tính năng của
+              hệ thống.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {!isEditing && (
           <div className="space-y-6">
             {/* View Mode - Company visuals */}
@@ -554,7 +599,9 @@ export default function CompanyPage() {
                 <CardContent className="space-y-2 text-slate-900">
                   <div>
                     <span className="text-slate-500">Tên:</span>{" "}
-                    {formData.company.name || "Chưa cập nhật"}
+                    {isPlaceholderText(formData.company.name)
+                      ? "Chưa cập nhật"
+                      : formData.company.name || "Chưa cập nhật"}
                   </div>
                   <div>
                     <span className="text-slate-500">Ngành:</span>{" "}
@@ -568,7 +615,9 @@ export default function CompanyPage() {
                   </div>
                   <div>
                     <span className="text-slate-500">Email:</span>{" "}
-                    {formData.company.email || "Chưa cập nhật"}
+                    {isPlaceholderEmail(formData.company.email)
+                      ? "Chưa cập nhật"
+                      : formData.company.email || "Chưa cập nhật"}
                   </div>
                   <div>
                     <span className="text-slate-500">Website:</span>{" "}
@@ -597,19 +646,27 @@ export default function CompanyPage() {
                 <CardContent className="space-y-2 text-slate-900">
                   <div>
                     <span className="text-slate-500">Địa chỉ:</span>{" "}
-                    {formData.businessInfo.address.street || "Chưa cập nhật"}
+                    {isPlaceholderText(formData.businessInfo.address.street)
+                      ? "Chưa cập nhật"
+                      : formData.businessInfo.address.street || "Chưa cập nhật"}
                   </div>
                   <div>
                     <span className="text-slate-500">Phường/Xã:</span>{" "}
-                    {formData.businessInfo.address.ward || "Chưa cập nhật"}
+                    {isPlaceholderText(formData.businessInfo.address.ward)
+                      ? "Chưa cập nhật"
+                      : formData.businessInfo.address.ward || "Chưa cập nhật"}
                   </div>
                   <div>
                     <span className="text-slate-500">Quận/Huyện:</span>{" "}
-                    {formData.businessInfo.address.district || "Chưa cập nhật"}
+                    {isPlaceholderText(formData.businessInfo.address.district)
+                      ? "Chưa cập nhật"
+                      : formData.businessInfo.address.district || "Chưa cập nhật"}
                   </div>
                   <div>
                     <span className="text-slate-500">Tỉnh/Thành phố:</span>{" "}
-                    {formData.businessInfo.address.city || "Chưa cập nhật"}
+                    {isPlaceholderText(formData.businessInfo.address.city)
+                      ? "Chưa cập nhật"
+                      : formData.businessInfo.address.city || "Chưa cập nhật"}
                   </div>
                   <div>
                     <span className="text-slate-500">Quốc gia:</span>{" "}
@@ -1040,14 +1097,20 @@ export default function CompanyPage() {
                   <div>
                     <Label>Số ĐKKD</Label>
                     <div className="mt-1 text-slate-900">
-                      {formData.businessInfo.registrationNumber ||
-                        "Chưa cập nhật"}
+                      {isPlaceholderRegistrationNumber(
+                        formData.businessInfo.registrationNumber
+                      )
+                        ? "Chưa cập nhật"
+                        : formData.businessInfo.registrationNumber ||
+                          "Chưa cập nhật"}
                     </div>
                   </div>
                   <div>
                     <Label>Mã số thuế</Label>
                     <div className="mt-1 text-slate-900">
-                      {formData.businessInfo.taxId || "Chưa cập nhật"}
+                      {isPlaceholderTaxId(formData.businessInfo.taxId)
+                        ? "Chưa cập nhật"
+                        : formData.businessInfo.taxId || "Chưa cập nhật"}
                     </div>
                   </div>
                 </div>
@@ -1061,22 +1124,29 @@ export default function CompanyPage() {
                   <div>
                     <Label>Nơi cấp</Label>
                     <div className="mt-1 text-slate-900">
-                      {formData.businessInfo.issuePlace || "Chưa cập nhật"}
+                      {isPlaceholderText(formData.businessInfo.issuePlace)
+                        ? "Chưa cập nhật"
+                        : formData.businessInfo.issuePlace || "Chưa cập nhật"}
                     </div>
                   </div>
                 </div>
                 <div>
                   <Label>Địa chỉ</Label>
                   <div className="mt-1 text-slate-900">
-                    {[
-                      formData.businessInfo.address.street,
-                      formData.businessInfo.address.ward,
-                      formData.businessInfo.address.district,
-                      formData.businessInfo.address.city,
-                      formData.businessInfo.address.country,
-                    ]
-                      .filter(Boolean)
-                      .join(", ") || "Chưa cập nhật"}
+                    {(() => {
+                      const addressParts = [
+                        formData.businessInfo.address.street,
+                        formData.businessInfo.address.ward,
+                        formData.businessInfo.address.district,
+                        formData.businessInfo.address.city,
+                        formData.businessInfo.address.country,
+                      ];
+                      const hasPlaceholder = addressParts.some(
+                        (part) => part && isPlaceholderText(part)
+                      );
+                      if (hasPlaceholder) return "Chưa cập nhật";
+                      return addressParts.filter(Boolean).join(", ") || "Chưa cập nhật";
+                    })()}
                   </div>
                 </div>
               </CardContent>
@@ -1095,13 +1165,23 @@ export default function CompanyPage() {
                   <div>
                     <Label>Họ và tên</Label>
                     <div className="mt-1 text-slate-900">
-                      {formData.legalRepresentative.fullName || "Chưa cập nhật"}
+                      {isPlaceholderText(
+                        formData.legalRepresentative.fullName
+                      )
+                        ? "Chưa cập nhật"
+                        : formData.legalRepresentative.fullName ||
+                          "Chưa cập nhật"}
                     </div>
                   </div>
                   <div>
                     <Label>Chức vụ</Label>
                     <div className="mt-1 text-slate-900">
-                      {formData.legalRepresentative.position || "Chưa cập nhật"}
+                      {isPlaceholderText(
+                        formData.legalRepresentative.position
+                      )
+                        ? "Chưa cập nhật"
+                        : formData.legalRepresentative.position ||
+                          "Chưa cập nhật"}
                     </div>
                   </div>
                 </div>
@@ -1109,13 +1189,21 @@ export default function CompanyPage() {
                   <div>
                     <Label>Số điện thoại</Label>
                     <div className="mt-1 text-slate-900">
-                      {formData.legalRepresentative.phone || "Chưa cập nhật"}
+                      {isPlaceholderPhone(
+                        formData.legalRepresentative.phone
+                      )
+                        ? "Chưa cập nhật"
+                        : formData.legalRepresentative.phone || "Chưa cập nhật"}
                     </div>
                   </div>
                   <div>
                     <Label>Email</Label>
                     <div className="mt-1 text-slate-900">
-                      {formData.legalRepresentative.email || "Chưa cập nhật"}
+                      {isPlaceholderEmail(
+                        formData.legalRepresentative.email
+                      )
+                        ? "Chưa cập nhật"
+                        : formData.legalRepresentative.email || "Chưa cập nhật"}
                     </div>
                   </div>
                 </div>
