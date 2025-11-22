@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Notification System</title>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #dc3545;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.connected {
+            background: #28a745;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .badge {
+            background: #dc3545;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+
+        .badge.zero {
+            background: #6c757d;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            padding: 30px;
+        }
+
+        .section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 25px;
+        }
+
+        .section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .notifications-list {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .notification-item {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .notification-item:hover {
+            border-color: #667eea;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+        }
+
+        .notification-item.unread {
+            border-left: 4px solid #667eea;
+            background: #f0f4ff;
+        }
+
+        .notification-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 10px;
+        }
+
+        .notification-title {
+            font-weight: 600;
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        .notification-type {
+            background: #667eea;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: 600;
+        }
+
+        .notification-message {
+            color: #666;
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+        .notification-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85em;
+            color: #999;
+            margin-top: 10px;
+        }
+
+        .notification-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 0.85em;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .socket-log {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 15px;
+        }
+
+        .socket-log-entry {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-left: 3px solid #00ff00;
+            padding-left: 10px;
+        }
+
+        .socket-log-entry.error {
+            color: #ff6b6b;
+            border-color: #ff6b6b;
+        }
+
+        .socket-log-entry.info {
+            color: #4ecdc4;
+            border-color: #4ecdc4;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .empty-state-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔔 Test Notification System</h1>
+            <p>Real-time Notification Testing Tool</p>
+            <p style="font-size: 0.9em; margin-top: 10px; opacity: 0.9;">
+                ⚠️ Lưu ý: Form này để TEST THỦ CÔNG. Thông báo TỰ ĐỘNG đã được tích hợp vào hệ thống khi apply job.
+            </p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-indicator" id="socketStatus"></div>
+                <span id="socketStatusText">Disconnected</span>
+            </div>
+            <div class="status-item">
+                <span>Unread Count:</span>
+                <span class="badge" id="unreadCount">0</span>
+            </div>
+            <div class="status-item">
+                <span>Total Notifications:</span>
+                <span class="badge" id="totalCount">0</span>
+            </div>
+        </div>
+
+        <div class="content">
+            <!-- Create Notification Form -->
+            <div class="section">
+                <h2>📝 Create Notification (Manual Test)</h2>
+                <p style="font-size: 0.85em; color: #666; margin-bottom: 15px; padding: 10px; background: #fff3cd; border-radius: 5px; border-left: 4px solid #ffc107;">
+                    <strong>ℹ️ Thông tin:</strong><br>
+                    • Thông báo TỰ ĐỘNG được tạo khi: Apply job, Status change, Verification, etc.<br>
+                    • Form này để TEST THỦ CÔNG và kiểm tra Socket.io real-time<br>
+                    • Nhập User ID của người nhận để test
+                </p>
+                
+                <div id="alertContainer"></div>
+
+                <form id="createNotificationForm">
+                    <div class="form-group">
+                        <label for="recipientId">Recipient ID (User ID nhận thông báo) *</label>
+                        <input type="text" id="recipientId" required placeholder="Nhập User ID (có thể dùng User ID của bạn để test)">
+                        <small style="color: #666; font-size: 0.85em;">💡 Tip: Dùng User ID của chính bạn để xem thông báo real-time</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="notificationType">Type *</label>
+                        <select id="notificationType" required>
+                            <option value="">Select type...</option>
+                            <option value="NEW_APPLICATION">New Application</option>
+                            <option value="APPLICATION_STATUS_CHANGE">Application Status Change</option>
+                            <option value="INTERVIEW_SCHEDULED">Interview Scheduled</option>
+                            <option value="JOB_MATCH">Job Match</option>
+                            <option value="VERIFICATION_APPROVED">Verification Approved</option>
+                            <option value="VERIFICATION_REJECTED">Verification Rejected</option>
+                            <option value="SKILL_RECOMMENDATION">Skill Recommendation</option>
+                            <option value="NEW_MESSAGE">New Message</option>
+                            <option value="SYSTEM">System</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="notificationTitle">Title *</label>
+                        <input type="text" id="notificationTitle" required placeholder="Notification title">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="notificationMessage">Message *</label>
+                        <textarea id="notificationMessage" required placeholder="Notification message"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="notificationData">Data (JSON, optional)</label>
+                        <textarea id="notificationData" placeholder='{"jobId": "123", "applicationId": "456"}'></textarea>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Create Notification (Test)</button>
+                    <button type="button" class="btn btn-secondary" onclick="loadNotifications()">Refresh List</button>
+                    <button type="button" class="btn btn-success" onclick="fillTestData()">Fill Test Data</button>
+                </form>
+
+                <div class="socket-log" id="socketLog">
+                    <div class="socket-log-entry">Socket events will appear here...</div>
+                </div>
+            </div>
+
+            <!-- Notifications List -->
+            <div class="section">
+                <h2>📋 Notifications</h2>
+                
+                <div style="margin-bottom: 15px;">
+                    <button class="btn btn-success btn-small" onclick="markAllAsRead()">Mark All as Read</button>
+                    <button class="btn btn-danger btn-small" onclick="deleteAllNotifications()">Delete All</button>
+                </div>
+
+                <div class="notifications-list" id="notificationsList">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <p>No notifications yet</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration - Auto-detect port from current URL
+        const API_BASE_URL = window.location.origin; // Use same port as current page
+        const SOCKET_URL = API_BASE_URL;
+        
+        console.log('🔧 API Base URL:', API_BASE_URL);
+        console.log('🔧 Socket URL:', SOCKET_URL);
+        
+        let socket = null;
+        let authToken = null;
+        let currentUserId = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            // Get token from localStorage or prompt
+            authToken = localStorage.getItem('authToken');
+            currentUserId = localStorage.getItem('userId');
+
+            if (!authToken) {
+                promptForAuth();
+            } else {
+                // Auto-fill recipient ID with current user ID
+                if (currentUserId) {
+                    document.getElementById('recipientId').value = currentUserId;
+                }
+                initializeSocket();
+                loadNotifications();
+            }
+
+            // Setup form
+            document.getElementById('createNotificationForm').addEventListener('submit', handleCreateNotification);
+        });
+
+        function fillTestData() {
+            if (!currentUserId) {
+                showAlert('Please set your User ID first', 'error');
+                return;
+            }
+            
+            document.getElementById('recipientId').value = currentUserId;
+            document.getElementById('notificationType').value = 'NEW_APPLICATION';
+            document.getElementById('notificationTitle').value = 'Test: Có ứng viên mới ứng tuyển';
+            document.getElementById('notificationMessage').value = 'Ứng viên Test User vừa gửi đơn ứng tuyển cho vị trí "Test Job". Vui lòng xem xét hồ sơ trong thời gian sớm nhất.';
+            document.getElementById('notificationData').value = JSON.stringify({
+                jobId: 'test-job-id',
+                applicationId: 'test-application-id',
+                candidateId: currentUserId
+            }, null, 2);
+            
+            showAlert('Test data filled! Click "Create Notification" to test', 'info');
+        }
+
+        function promptForAuth() {
+            const token = prompt('Enter your JWT token:');
+            const userId = prompt('Enter your User ID:');
+            
+            if (token && userId) {
+                localStorage.setItem('authToken', token);
+                localStorage.setItem('userId', userId);
+                authToken = token;
+                currentUserId = userId;
+                initializeSocket();
+                loadNotifications();
+            } else {
+                showAlert('Please provide both token and user ID', 'error');
+            }
+        }
+
+        function initializeSocket() {
+            try {
+                console.log('🔌 Initializing Socket.io connection to:', SOCKET_URL);
+                console.log('🔌 Auth token present:', !!authToken);
+                
+                socket = io(SOCKET_URL, {
+                    auth: {
+                        token: authToken
+                    },
+                    transports: ['websocket', 'polling'],
+                    reconnection: true,
+                    reconnectionDelay: 1000,
+                    reconnectionAttempts: 5,
+                    timeout: 20000
+                });
+
+                socket.on('connect', () => {
+                    console.log('✅ Socket connected successfully!');
+                    updateSocketStatus(true);
+                    addSocketLog('✅ Connected to server', 'info');
+                    showAlert('Socket.io connected successfully!', 'success');
+                });
+
+                socket.on('disconnect', (reason) => {
+                    console.log('❌ Socket disconnected:', reason);
+                    updateSocketStatus(false);
+                    addSocketLog(`Disconnected from server: ${reason}`, 'error');
+                });
+                
+                socket.on('reconnect', (attemptNumber) => {
+                    console.log('🔄 Socket reconnected after', attemptNumber, 'attempts');
+                    addSocketLog(`Reconnected after ${attemptNumber} attempts`, 'info');
+                });
+                
+                socket.on('reconnect_attempt', (attemptNumber) => {
+                    console.log('🔄 Reconnection attempt:', attemptNumber);
+                    addSocketLog(`Reconnection attempt ${attemptNumber}...`, 'info');
+                });
+                
+                socket.on('reconnect_error', (error) => {
+                    console.error('❌ Reconnection error:', error);
+                    addSocketLog(`Reconnection error: ${error.message}`, 'error');
+                });
+                
+                socket.on('reconnect_failed', () => {
+                    console.error('❌ Reconnection failed');
+                    addSocketLog('Reconnection failed - please refresh page', 'error');
+                    showAlert('Socket connection failed. Please refresh the page.', 'error');
+                });
+
+                socket.on('connect_error', (error) => {
+                    updateSocketStatus(false);
+                    addSocketLog(`Connection error: ${error.message}`, 'error');
+                    console.error('🔌 Socket connection error:', error);
+                    
+                    // Show helpful error message
+                    if (error.message.includes('websocket')) {
+                        showAlert('WebSocket connection failed. Check if server is running and CORS is configured correctly.', 'error');
+                    } else if (error.message.includes('Authentication')) {
+                        showAlert('Authentication failed. Please check your JWT token.', 'error');
+                    }
+                });
+
+                // Listen for new notifications
+                socket.on('new-notification', (notification) => {
+                    addSocketLog(`New notification received: ${notification.title}`, 'info');
+                    showAlert(`New notification: ${notification.title}`, 'success');
+                    loadNotifications();
+                });
+
+                // Listen for notification read
+                socket.on('notification_read', (data) => {
+                    addSocketLog(`Notification marked as read: ${data.notificationId}`, 'info');
+                    loadNotifications();
+                });
+
+                // Listen for all notifications read
+                socket.on('all_notifications_read', (data) => {
+                    addSocketLog(`All notifications marked as read (${data.count} notifications)`, 'info');
+                    showAlert(`All notifications marked as read`, 'success');
+                    loadNotifications();
+                });
+
+                // Listen for notification deleted
+                socket.on('notification_deleted', (data) => {
+                    addSocketLog(`Notification deleted: ${data.notificationId}`, 'info');
+                    loadNotifications();
+                });
+
+                // Listen for all notifications deleted
+                socket.on('all_notifications_deleted', (data) => {
+                    addSocketLog(`All notifications deleted (${data.count} notifications)`, 'info');
+                    showAlert(`All notifications deleted`, 'success');
+                    loadNotifications();
+                });
+
+                // Listen for unread count updates
+                socket.on('notification_unread_count', (data) => {
+                    document.getElementById('unreadCount').textContent = data.count;
+                    document.getElementById('unreadCount').className = data.count > 0 ? 'badge' : 'badge zero';
+                    addSocketLog(`Unread count updated: ${data.count}`, 'info');
+                });
+
+            } catch (error) {
+                addSocketLog(`Socket initialization error: ${error.message}`, 'error');
+            }
+        }
+
+        function updateSocketStatus(connected) {
+            const indicator = document.getElementById('socketStatus');
+            const text = document.getElementById('socketStatusText');
+            
+            if (connected) {
+                indicator.classList.add('connected');
+                text.textContent = 'Connected';
+            } else {
+                indicator.classList.remove('connected');
+                text.textContent = 'Disconnected';
+            }
+        }
+
+        function addSocketLog(message, type = 'info') {
+            const log = document.getElementById('socketLog');
+            const entry = document.createElement('div');
+            entry.className = `socket-log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.insertBefore(entry, log.firstChild);
+            
+            // Keep only last 20 entries
+            while (log.children.length > 20) {
+                log.removeChild(log.lastChild);
+            }
+        }
+
+        function showAlert(message, type = 'info') {
+            const container = document.getElementById('alertContainer');
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type} show`;
+            alert.textContent = message;
+            container.innerHTML = '';
+            container.appendChild(alert);
+            
+            setTimeout(() => {
+                alert.classList.remove('show');
+            }, 3000);
+        }
+
+        async function loadNotifications() {
+            try {
+                console.log('📡 Loading notifications from:', `${API_BASE_URL}/api/notifications`);
+                
+                const response = await fetch(`${API_BASE_URL}/api/notifications`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                console.log('📡 Response status:', response.status, response.statusText);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('📡 Error response:', errorText);
+                    throw new Error(`Failed to load notifications: ${response.status} ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayNotifications(result.data);
+                    document.getElementById('unreadCount').textContent = result.unreadCount || 0;
+                    document.getElementById('unreadCount').className = (result.unreadCount || 0) > 0 ? 'badge' : 'badge zero';
+                    document.getElementById('totalCount').textContent = result.pagination?.total || result.data.length;
+                }
+            } catch (error) {
+                showAlert(`Error loading notifications: ${error.message}`, 'error');
+                addSocketLog(`Error loading notifications: ${error.message}`, 'error');
+            }
+        }
+
+        function displayNotifications(notifications) {
+            const list = document.getElementById('notificationsList');
+            
+            if (!notifications || notifications.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <p>No notifications yet</p>
+                    </div>
+                `;
+                return;
+            }
+
+            list.innerHTML = notifications.map(notif => `
+                <div class="notification-item ${notif.isRead ? '' : 'unread'}">
+                    <div class="notification-header">
+                        <div class="notification-title">${notif.title || 'No title'}</div>
+                        <div class="notification-type">${notif.type || 'SYSTEM'}</div>
+                    </div>
+                    <div class="notification-message">${notif.message || 'No message'}</div>
+                    <div class="notification-meta">
+                        <span>${new Date(notif.createdAt).toLocaleString()}</span>
+                        <span>${notif.isRead ? '✅ Read' : '🔴 Unread'}</span>
+                    </div>
+                    ${notif.data ? `<div style="font-size: 0.8em; color: #999; margin-top: 5px;">Data: ${JSON.stringify(notif.data)}</div>` : ''}
+                    <div class="notification-actions">
+                        ${!notif.isRead ? `<button class="btn btn-success btn-small" onclick="markAsRead('${notif._id}')">Mark as Read</button>` : ''}
+                        <button class="btn btn-danger btn-small" onclick="deleteNotification('${notif._id}')">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function handleCreateNotification(e) {
+            e.preventDefault();
+            
+            const recipientId = document.getElementById('recipientId').value;
+            const type = document.getElementById('notificationType').value;
+            const title = document.getElementById('notificationTitle').value;
+            const message = document.getElementById('notificationMessage').value;
+            let data = {};
+
+            try {
+                const dataText = document.getElementById('notificationData').value;
+                if (dataText) {
+                    data = JSON.parse(dataText);
+                }
+            } catch (error) {
+                showAlert('Invalid JSON in data field', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/notifications`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        recipient: recipientId,
+                        type,
+                        title,
+                        message,
+                        data
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert('Notification created successfully!', 'success');
+                    addSocketLog(`Notification created: ${title}`, 'info');
+                    document.getElementById('createNotificationForm').reset();
+                    
+                    // If created for current user, reload notifications
+                    if (recipientId === currentUserId) {
+                        setTimeout(() => loadNotifications(), 500);
+                    }
+                } else {
+                    showAlert(`Error: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showAlert(`Error creating notification: ${error.message}`, 'error');
+                addSocketLog(`Error creating notification: ${error.message}`, 'error');
+            }
+        }
+
+        async function markAsRead(notificationId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/notifications/${notificationId}/read`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert('Notification marked as read', 'success');
+                    loadNotifications();
+                } else {
+                    showAlert(`Error: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showAlert(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function markAllAsRead() {
+            if (!confirm('Mark all notifications as read?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/notifications/read-all`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert('All notifications marked as read', 'success');
+                    loadNotifications();
+                } else {
+                    showAlert(`Error: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showAlert(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function deleteNotification(notificationId) {
+            if (!confirm('Delete this notification?')) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/notifications/${notificationId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert('Notification deleted', 'success');
+                    loadNotifications();
+                } else {
+                    showAlert(`Error: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showAlert(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function deleteAllNotifications() {
+            if (!confirm('Delete ALL notifications? This cannot be undone!')) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/notifications`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showAlert('All notifications deleted', 'success');
+                    loadNotifications();
+                } else {
+                    showAlert(`Error: ${result.message}`, 'error');
+                }
+            } catch (error) {
+                showAlert(`Error: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
+
