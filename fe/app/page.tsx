@@ -27,7 +27,7 @@ export default function HomePage({ onSearch }: HomePageProps) {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(9);
   const [totalJobs, setTotalJobs] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const searchParams = useSearchParams();
@@ -386,123 +386,8 @@ export default function HomePage({ onSearch }: HomePageProps) {
           </div>
         </div>
 
-        {/* Companies Section */}
-        <div className="mt-12">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-foreground">
-              Gợi ý việc làm phù hợp
-            </h2>
-            <div className="flex items-center space-x-2 text-primary hover:text-primary/80 cursor-pointer transition-colors duration-200">
-              <span className="text-sm font-medium">Xem tất cả</span>
-              <ChevronRight className="w-4 h-4" />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {[
-              {
-                company: "VINFAST",
-                jobs: "317",
-                description: "Tập đoàn Vingroup - Thành viên VINFAST",
-              },
-              {
-                company: "VNPAY",
-                jobs: "48",
-                description: "Công ty Cổ phần Giải pháp Thanh toán Việt Nam",
-              },
-            ].map((company, index) => (
-              <Card key={index} className="card-hover border-border">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 bg-muted rounded flex items-center justify-center">
-                        <Building2 className="w-6 h-6 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-foreground">
-                          {company.company}
-                        </h3>
-                        <p className="text-sm text-muted-foreground font-medium">
-                          {company.description}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-3xl font-bold text-primary">
-                        {company.jobs}
-                      </div>
-                      <div className="text-sm text-muted-foreground font-medium">
-                        việc làm
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-
-        {/* Top Industries */}
-        <div className="mt-12">
-          <h2 className="text-2xl font-bold mb-6 text-foreground">
-            Top ngành nghề nổi bật
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {[
-              {
-                name: "Kinh doanh - Bán hàng",
-                jobs: "14,235 việc làm",
-                icon: "💼",
-              },
-              {
-                name: "Marketing - PR - Quảng cáo",
-                jobs: "5,478 việc làm",
-                icon: "📢",
-              },
-              {
-                name: "Chăm sóc khách hàng",
-                jobs: "3,823 việc làm",
-                icon: "🎧",
-              },
-              {
-                name: "Nhân sự - Hành chính",
-                jobs: "2,945 việc làm",
-                icon: "👥",
-              },
-              {
-                name: "Công nghệ thông tin",
-                jobs: "8,156 việc làm",
-                icon: "💻",
-              },
-              {
-                name: "Tài chính - Ngân hàng - Bảo hiểm",
-                jobs: "4,267 việc làm",
-                icon: "🏦",
-              },
-              { name: "Bất động sản", jobs: "3,891 việc làm", icon: "🏢" },
-              {
-                name: "Kế toán - Kiểm toán - Thuế",
-                jobs: "5,634 việc làm",
-                icon: "📊",
-              },
-            ].map((industry, index) => (
-              <Card
-                key={index}
-                className="card-hover cursor-pointer border-border"
-              >
-                <CardContent className="p-6 text-center">
-                  <div className="text-4xl mb-3">{industry.icon}</div>
-                  <h3 className="font-semibold text-sm mb-2 text-foreground">
-                    {industry.name}
-                  </h3>
-                  <p className="text-xs text-muted-foreground font-medium">
-                    {industry.jobs}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
+  
       </div>
     </PageLayout>
   );
