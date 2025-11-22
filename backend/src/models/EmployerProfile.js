@@ -436,12 +436,22 @@ EmployerProfileSchema.pre('save', async function (next) {
     }
 
     // Update business info step
-    if (
+    // Có thể set từ businessInfo hoặc từ documents verified
+    const hasBusinessInfo = 
       this.businessInfo?.registrationNumber &&
       this.businessInfo?.taxId &&
       this.businessInfo?.issueDate &&
-      this.businessInfo?.issuePlace
-    ) {
+      this.businessInfo?.issuePlace;
+    
+    // Nếu có documents verified (business-license và tax-certificate), tự động set businessInfo step
+    const documents = this.verification?.documents || [];
+    const hasVerifiedDocuments = documents.some(
+      doc => doc.documentType === 'business-license' && doc.verified
+    ) && documents.some(
+      doc => doc.documentType === 'tax-certificate' && doc.verified
+    );
+    
+    if (hasBusinessInfo || hasVerifiedDocuments) {
       steps.businessInfo = true;
     }
 

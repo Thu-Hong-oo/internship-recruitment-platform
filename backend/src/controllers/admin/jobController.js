@@ -85,14 +85,13 @@ const getJobsAdmin = asyncHandler(async (req, res) => {
   const jobs = await Job.find(filter)
     .populate({
       path: 'employer',
-      select: 'company owner',
       populate: {
         path: 'owner',
         select: 'email fullName',
       },
     })
     .select(
-      'title location salaryMin salaryMax currency status level jobType skills createdAt updatedAt views stats deadline positions'
+      'title location salaryMin salaryMax currency status level jobType skills createdAt updatedAt views stats deadline positions employer'
     )
     .sort({ createdAt: -1 })
     .skip(startIndex)
@@ -107,10 +106,28 @@ const getJobsAdmin = asyncHandler(async (req, res) => {
         status: { $in: ['pending', 'reviewing'] },
       });
 
+      // Debug logging
+      if (!job.employer) {
+        logger.warn('Job missing employer', {
+          jobId: job._id,
+          jobTitle: job.title,
+          employerField: job.employer,
+        });
+      }
+
       return {
         _id: job._id,
         title: job.title,
-        company: job.employer?.company || null,
+        company: job.employer?.company ? {
+          name: job.employer.company.name,
+          logo: job.employer.company.logo,
+          industry: job.employer.company.industry,
+          website: job.employer.company.website,
+          email: job.employer.company.email,
+          size: job.employer.company.size,
+          description: job.employer.company.description,
+          officeAddress: job.employer.company.officeAddress,
+        } : null,
         employer: job.employer ? {
           _id: job.employer._id,
           name: job.employer.company?.name || 'Unknown Company',
@@ -463,11 +480,14 @@ const getJobApplicationsAdmin = asyncHandler(async (req, res) => {
   const total = await Application.countDocuments(filter);
 
   const applications = await Application.find(filter)
-    .populate('candidateId', 'fullName email phone')
-    .populate(
-      'candidateProfile',
-      'personalInfo education workExperience skills'
-    )
+    .populate({
+      path: 'candidateId',
+      select: 'personalInfo education workExperience skills userId',
+      populate: {
+        path: 'userId',
+        select: 'fullName email phone',
+      },
+    })
     .populate('jobId', 'title company')
     .sort({ createdAt: -1 })
     .skip(startIndex)
@@ -498,19 +518,38 @@ const getJobApplicationsAdmin = asyncHandler(async (req, res) => {
     data: applications.map(app => ({
       _id: app._id,
       candidate: {
-        _id: app.candidateId._id,
-        fullName: app.candidateId.fullName,
-        email: app.candidateId.email,
-        phone: app.candidateId.phone,
+        _id: app.candidateId?._id,
+        fullName: app.candidateId?.userId?.fullName,
+        email: app.candidateId?.userId?.email,
+        phone: app.candidateId?.userId?.phone,
       },
       profile: {
-        personalInfo: app.candidateProfile?.personalInfo,
-        education: app.candidateProfile?.education?.slice(0, 2), // Latest 2
-        experience: app.candidateProfile?.workExperience?.slice(0, 2), // Latest 2
-        skills: app.candidateProfile?.skills?.slice(0, 10), // Top 10
+        personalInfo: app.candidateId?.personalInfo,
+        education: app.candidateId?.education ? {
+          university: app.candidateId.education.university,
+          certifications: Array.isArray(app.candidateId.education.certifications) 
+            ? app.candidateId.education.certifications.slice(0, 2) 
+            : [],
+        } : null,
+        experience: app.candidateId?.experience ? {
+          internships: Array.isArray(app.candidateId.experience.internships)
+            ? app.candidateId.experience.internships.slice(0, 2)
+            : [],
+          projects: Array.isArray(app.candidateId.experience.projects)
+            ? app.candidateId.experience.projects.slice(0, 2)
+            : [],
+        } : null,
+        skills: app.candidateId?.skills ? {
+          technical: Array.isArray(app.candidateId.skills.technical)
+            ? app.candidateId.skills.technical.slice(0, 10)
+            : [],
+          soft: Array.isArray(app.candidateId.skills.soft)
+            ? app.candidateId.skills.soft.slice(0, 10)
+            : [],
+        } : null,
       },
       status: app.status,
-      score: app.score,
+      score: app.matchingScore?.overall || app.score,
       coverLetter: app.coverLetter,
       appliedAt: app.createdAt,
       updatedAt: app.updatedAt,
