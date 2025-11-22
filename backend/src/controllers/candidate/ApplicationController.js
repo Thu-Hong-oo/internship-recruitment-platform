@@ -146,6 +146,164 @@ class ApplicationController {
       candidateProfile.analytics.applicationStats.pending += 1;
       await candidateProfile.save();
 
+      // Log before notification
+      const { logger } = require('../../utils/logger');
+      logger.info('Application saved successfully, starting notification process', {
+        applicationId: application._id.toString(),
+        jobId: job._id.toString(),
+      });
+      
+      // IMPORTANT: Log để đảm bảo code được chạy
+      console.log('🔔 [NOTIFICATION] Starting notification process for application:', application._id.toString());
+
+      // Notify employer về application mới
+      try {
+        console.log('🔔 [NOTIFICATION] Entering try block for employer notification');
+        const NotificationService = require('../../services/notificationService');
+        const User = require('../../models/User');
+        const EmployerProfile = require('../../models/EmployerProfile');
+        const { logger } = require('../../utils/logger');
+        
+        logger.info('=== START NOTIFICATION PROCESS ===', {
+          jobId: job._id.toString(),
+          applicationId: application._id.toString(),
+          jobEmployer: job.employer,
+          jobEmployerType: typeof job.employer,
+        });
+        
+        // Lấy employer ID (có thể là ObjectId hoặc đã populate)
+        const employerId = job.employer?._id || job.employer;
+        
+        logger.info('Extracted employerId', {
+          employerId: employerId?.toString(),
+          employerIdType: typeof employerId,
+        });
+        
+        if (!employerId) {
+          logger.warn('❌ Job has no employer, cannot send notification', {
+            jobId: job._id.toString(),
+            applicationId: application._id.toString(),
+            jobData: {
+              _id: job._id,
+              title: job.title,
+              employer: job.employer,
+            },
+          });
+        } else {
+          logger.info('✅ Found employerId, fetching employer profile...', {
+            employerId: employerId.toString(),
+            jobId: job._id.toString(),
+            applicationId: application._id.toString(),
+          });
+          
+          // Lấy employer profile
+          const employerProfile = await EmployerProfile.findById(employerId);
+          logger.info('EmployerProfile query result', {
+            found: !!employerProfile,
+            profileId: employerProfile?._id?.toString(),
+            hasOwner: !!employerProfile?.owner,
+            ownerId: employerProfile?.owner?.toString(),
+          });
+          
+          if (!employerProfile) {
+            logger.warn('❌ Employer profile not found', {
+              employerId: employerId.toString(),
+              jobId: job._id.toString(),
+            });
+          } else if (!employerProfile.owner) {
+            logger.warn('❌ Employer profile has no owner', {
+              employerProfileId: employerProfile._id.toString(),
+              jobId: job._id.toString(),
+            });
+          } else {
+            logger.info('✅ Found employer profile with owner, fetching user...', {
+              ownerId: employerProfile.owner.toString(),
+              employerProfileId: employerProfile._id.toString(),
+            });
+            
+            // Lấy employer user
+            const employerUser = await User.findById(employerProfile.owner);
+            logger.info('User query result', {
+              found: !!employerUser,
+              userId: employerUser?._id?.toString(),
+              email: employerUser?.email,
+            });
+            
+            if (!employerUser) {
+              logger.warn('❌ Employer user not found', {
+                ownerId: employerProfile.owner.toString(),
+                employerProfileId: employerProfile._id.toString(),
+              });
+            } else {
+              logger.info('✅ Found employer user, sending notification...', {
+                employerUserId: employerUser._id.toString(),
+                employerEmail: employerUser.email,
+                candidateName: req.user.fullName || req.user.email || 'Ứng viên',
+              });
+              
+              // Gửi notification (lưu candidateId để có thể cập nhật sau)
+              const notification = await NotificationService.notifyNewApplication(
+                employerUser._id.toString(),
+                application._id.toString(),
+                job._id.toString(),
+                req.user.fullName || req.user.email || 'Ứng viên',
+                req.user.id.toString() // Lưu candidateId
+              );
+              
+              logger.info('✅ Notification sent successfully to employer', {
+                notificationId: notification?._id?.toString(),
+                employerUserId: employerUser._id.toString(),
+                applicationId: application._id.toString(),
+              });
+            }
+          }
+        }
+        
+        logger.info('=== END NOTIFICATION PROCESS ===');
+        console.log('🔔 [NOTIFICATION] Employer notification process completed');
+      } catch (notifyError) {
+        // Log error nhưng không fail request
+        const { logger } = require('../../utils/logger');
+        console.error('🔔 [NOTIFICATION] ERROR in employer notification:', notifyError.message);
+        logger.error('❌ Failed to send notification to employer', {
+          error: notifyError.message,
+          stack: notifyError.stack,
+          jobId: job._id?.toString(),
+          applicationId: application._id?.toString(),
+        });
+      }
+
+      // Notify candidate về application thành công (optional)
+      try {
+        console.log('🔔 [NOTIFICATION] Starting candidate notification');
+        const NotificationService = require('../../services/notificationService');
+        const { logger } = require('../../utils/logger');
+        
+        await NotificationService.notifyApplicationStatusChange(
+          req.user.id.toString(),
+          application._id.toString(),
+          job._id.toString(),
+          job.title,
+          'pending' // Status mới là pending
+        );
+        
+        logger.info('Notification sent to candidate for successful application', {
+          candidateId: req.user.id,
+          applicationId: application._id.toString(),
+        });
+        console.log('🔔 [NOTIFICATION] Candidate notification sent successfully');
+      } catch (candidateNotifyError) {
+        // Log error nhưng không fail request
+        const { logger } = require('../../utils/logger');
+        console.error('🔔 [NOTIFICATION] ERROR in candidate notification:', candidateNotifyError.message);
+        logger.error('Failed to send notification to candidate', {
+          error: candidateNotifyError.message,
+          candidateId: req.user.id,
+        });
+      }
+      
+      console.log('🔔 [NOTIFICATION] All notification processes completed');
+
       return ApiResponse.success(
         res,
         application,
@@ -194,6 +352,27 @@ class ApplicationController {
       });
 
       await application.save();
+
+      // Notify employer về application withdrawn
+      try {
+        const NotificationService = require('../../services/notificationService');
+        const EmployerProfile = require('../../models/EmployerProfile');
+        
+        await application.populate('jobId', 'employer title');
+        if (application.jobId && application.jobId.employer) {
+          const employerProfile = await EmployerProfile.findById(application.jobId.employer);
+          if (employerProfile && employerProfile.owner) {
+            await NotificationService.notifyApplicationWithdrawn(
+              employerProfile.owner.toString(),
+              application._id.toString(),
+              application.jobId.title || 'Công việc',
+              req.user.fullName || req.user.email
+            );
+          }
+        }
+      } catch (notifyError) {
+        console.error('Failed to send withdrawal notification to employer:', notifyError);
+      }
 
       return ApiResponse.success(
         res,

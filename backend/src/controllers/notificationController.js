@@ -11,8 +11,9 @@ const getUserNotifications = asyncHandler(async (req, res) => {
     const { page = 1, limit = 20, read, type } = req.query;
     const skip = (page - 1) * limit;
 
-    const query = { userId: req.user.id };
-    if (read !== undefined) query.read = read === 'true';
+    // Notification model dùng field 'recipient', không phải 'userId'
+    const query = { recipient: req.user.id };
+    if (read !== undefined) query.isRead = read === 'true';
     if (type) query.type = type;
 
     const notifications = await Notification.find(query)
@@ -22,8 +23,8 @@ const getUserNotifications = asyncHandler(async (req, res) => {
 
     const total = await Notification.countDocuments(query);
     const unreadCount = await Notification.countDocuments({
-      userId: req.user.id,
-      read: false
+      recipient: req.user.id,
+      isRead: false
     });
 
     res.status(200).json({
@@ -61,7 +62,7 @@ const getNotification = asyncHandler(async (req, res) => {
     }
 
     // Check ownership
-    if (notification.userId.toString() !== req.user.id) {
+    if (notification.recipient.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: 'Không có quyền xem thông báo này'
@@ -86,15 +87,15 @@ const getNotification = asyncHandler(async (req, res) => {
 // @access  Private (Admin/System)
 const createNotification = asyncHandler(async (req, res) => {
   try {
-    const { userId, title, message, type, data } = req.body;
+    const { recipient, title, message, type, data } = req.body;
 
     const notification = await Notification.create({
-      userId,
+      recipient, // Notification model dùng 'recipient', không phải 'userId'
       title,
       message,
       type,
       data,
-      read: false
+      isRead: false // Notification model dùng 'isRead', không phải 'read'
     });
 
     res.status(201).json({
@@ -125,14 +126,14 @@ const markNotificationAsRead = asyncHandler(async (req, res) => {
     }
 
     // Check ownership
-    if (notification.userId.toString() !== req.user.id) {
+    if (notification.recipient.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: 'Không có quyền cập nhật thông báo này'
       });
     }
 
-    notification.read = true;
+    notification.isRead = true;
     notification.readAt = new Date();
     await notification.save();
 
@@ -155,8 +156,8 @@ const markNotificationAsRead = asyncHandler(async (req, res) => {
 const markAllNotificationsAsRead = asyncHandler(async (req, res) => {
   try {
     await Notification.updateMany(
-      { userId: req.user.id, read: false },
-      { read: true, readAt: new Date() }
+      { recipient: req.user.id, isRead: false },
+      { isRead: true, readAt: new Date() }
     );
 
     res.status(200).json({
@@ -187,7 +188,7 @@ const deleteNotification = asyncHandler(async (req, res) => {
     }
 
     // Check ownership
-    if (notification.userId.toString() !== req.user.id) {
+    if (notification.recipient.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: 'Không có quyền xóa thông báo này'
@@ -214,7 +215,7 @@ const deleteNotification = asyncHandler(async (req, res) => {
 // @access  Private
 const deleteAllNotifications = asyncHandler(async (req, res) => {
   try {
-    await Notification.deleteMany({ userId: req.user.id });
+    await Notification.deleteMany({ recipient: req.user.id });
 
     res.status(200).json({
       success: true,
@@ -300,12 +301,12 @@ const broadcastNotification = asyncHandler(async (req, res) => {
     }
 
     const notifications = userIds.map(userId => ({
-      userId,
+      recipient: userId, // Notification model dùng 'recipient'
       title,
       message,
       type,
       data,
-      read: false
+      isRead: false // Notification model dùng 'isRead'
     }));
 
     const createdNotifications = await Notification.insertMany(notifications);

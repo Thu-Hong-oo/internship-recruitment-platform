@@ -444,6 +444,24 @@ class ProfileController {
         this._calculateProfileCompletion(profile);
       await profile.save();
 
+      // Cập nhật notification nếu candidate thay đổi tên
+      if (section === 'profile' && data.personalInfo?.fullName) {
+        try {
+          const NotificationService = require('../../services/notificationService');
+          await NotificationService.updateCandidateNameInNotifications(
+            req.user.id.toString(),
+            data.personalInfo.fullName
+          );
+        } catch (notifyError) {
+          // Log error nhưng không fail request
+          const { logger } = require('../../utils/logger');
+          logger.error('Failed to update candidate name in notifications', {
+            error: notifyError.message,
+            candidateId: req.user.id,
+          });
+        }
+      }
+
       return ApiResponse.success(
         res,
         { section, updated: data },

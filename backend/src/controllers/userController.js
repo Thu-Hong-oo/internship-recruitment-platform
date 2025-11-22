@@ -540,7 +540,8 @@ const getUserNotifications = asyncHandler(async (req, res) => {
   const { page = 1, limit = 20, unreadOnly = false } = req.query;
 
   // Đảm bảo chỉ dùng req.user.id, không dùng req.params.id
-  const query = { user: req.user.id };
+  // Notification model dùng field 'recipient', không phải 'user'
+  const query = { recipient: req.user.id };
 
   if (unreadOnly === 'true') {
     query.isRead = false;
