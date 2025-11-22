@@ -37,7 +37,16 @@ const JobSchema = new mongoose.Schema({
     enum: ['Fulltime', 'Parttime', 'Intern', 'Freelance', 'Remote', 'Hybrid'],
   },
   workingMode: { type: String, enum: ['Onsite', 'Remote', 'Hybrid'] },
-  address: { type: String },
+  // Structured address object (preferred)
+  address: {
+    street: { type: String, trim: true },
+    ward: { type: String, trim: true },
+    district: { type: String, trim: true },
+    city: { type: String, trim: true },
+    country: { type: String, default: 'Vietnam', trim: true },
+    fullAddress: { type: String, trim: true }, // Auto-generated from above fields
+  },
+  // DEPRECATED: Use address object instead. Kept for backward compatibility
   location: { type: String },
   salaryMin: { type: Number },
   salaryMax: { type: Number },

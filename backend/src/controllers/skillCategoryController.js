@@ -1,6 +1,7 @@
 const SkillCategory = require('../models/SkillCategory');
 const asyncHandler = require('express-async-handler');
 const logger = require('../utils/logger');
+const { getCacheService } = require('../config/initializeServices');
 
 // @desc    Get all skill categories
 // @route   GET /api/skill-categories
@@ -24,18 +25,43 @@ const getAllSkillCategories = asyncHandler(async (req, res) => {
     query.isActive = active === 'true';
   }
 
-  // Build sort
-  const sortOrder = order === 'desc' ? -1 : 1;
-  const sortObj = { [sort]: sortOrder };
+  // Try to get from cache first (only for simple queries)
+  const cacheService = getCacheService();
+  let categories = null;
+  let total = 0;
+  
+  const cacheKey = parent === null && active === 'true'
+    ? `skill-categories:list:page:${page}:limit:${limit}:sort:${sort}:${order}`
+    : null;
+  
+  if (cacheService && cacheKey) {
+    const cached = await cacheService.get(cacheKey);
+    if (cached) {
+      categories = cached.data;
+      total = cached.total;
+    }
+  }
 
-  // Execute query with pagination
-  const categories = await SkillCategory.find(query)
-    .populate('parentCategory', 'name slug')
-    .sort(sortObj)
-    .limit(limit * 1)
-    .skip((page - 1) * limit);
+  // If not in cache, fetch from database
+  if (!categories) {
+    // Build sort
+    const sortOrder = order === 'desc' ? -1 : 1;
+    const sortObj = { [sort]: sortOrder };
 
-  const total = await SkillCategory.countDocuments(query);
+    // Execute query with pagination
+    categories = await SkillCategory.find(query)
+      .populate('parentCategory', 'name slug')
+      .sort(sortObj)
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    total = await SkillCategory.countDocuments(query);
+
+    // Cache the results (only for simple queries)
+    if (cacheService && cacheKey) {
+      await cacheService.set(cacheKey, { data: categories, total }, 3600); // 1 hour
+    }
+  }
 
   res.json({
     success: true,
@@ -54,7 +80,23 @@ const getAllSkillCategories = asyncHandler(async (req, res) => {
 // @route   GET /api/skill-categories/tree
 // @access  Public
 const getSkillCategoryTree = asyncHandler(async (req, res) => {
-  const tree = await SkillCategory.getCategoryTree();
+  // Try to get from cache first
+  const cacheService = getCacheService();
+  let tree = null;
+  
+  if (cacheService) {
+    tree = await cacheService.get('skill-categories:tree');
+  }
+
+  // If not in cache, fetch from database
+  if (!tree) {
+    tree = await SkillCategory.getCategoryTree();
+    
+    // Cache the results
+    if (cacheService) {
+      await cacheService.set('skill-categories:tree', tree, 3600); // 1 hour
+    }
+  }
   
   res.json({
     success: true,
@@ -113,6 +155,12 @@ const createSkillCategory = asyncHandler(async (req, res) => {
     sortOrder: sortOrder || 0,
   });
 
+  // Invalidate skill category caches
+  const cacheService = getCacheService();
+  if (cacheService) {
+    await cacheService.deleteByPattern('skill-categories:*');
+  }
+
   logger.info(`Skill category created: ${category.name}`, {
     service: 'internship-ai-platform',
     categoryId: category._id,
@@ -166,6 +214,12 @@ const updateSkillCategory = asyncHandler(async (req, res) => {
 
   await category.save();
 
+  // Invalidate skill category caches
+  const cacheService = getCacheService();
+  if (cacheService) {
+    await cacheService.deleteByPattern('skill-categories:*');
+  }
+
   logger.info(`Skill category updated: ${category.name}`, {
     service: 'internship-ai-platform',
     categoryId: category._id,
@@ -216,6 +270,12 @@ const deleteSkillCategory = asyncHandler(async (req, res) => {
   }
 
   await SkillCategory.findByIdAndDelete(req.params.id);
+
+  // Invalidate skill category caches
+  const cacheService = getCacheService();
+  if (cacheService) {
+    await cacheService.deleteByPattern('skill-categories:*');
+  }
 
   logger.info(`Skill category deleted: ${category.name}`, {
     service: 'internship-ai-platform',

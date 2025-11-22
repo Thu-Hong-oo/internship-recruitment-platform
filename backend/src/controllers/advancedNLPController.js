@@ -5,6 +5,7 @@ const Job = require('../models/Job');
 const User = require('../models/User');
 const CandidateProfile = require('../models/CandidateProfile');
 const { logger } = require('../utils/logger');
+const { getCacheService } = require('../config/initializeServices');
 
 /**
  * Advanced NLP Controller
@@ -38,16 +39,33 @@ class AdvancedNLPController {
         });
       }
 
-      // Calculate matching score
-      const matchingResult = await aiService.calculateAdvancedMatchScore(
-        cvData,
-        job,
-        {
-          candidateId: candidateId || userId,
-          jobId,
-          saveToDatabase: true,
+      const finalCandidateId = candidateId || userId;
+
+      // Try to get from cache first
+      const cacheService = getCacheService();
+      let matchingResult = null;
+      
+      if (cacheService) {
+        matchingResult = await cacheService.getCachedMatchingScore(finalCandidateId, jobId);
+      }
+
+      // If not in cache, calculate matching score
+      if (!matchingResult) {
+        matchingResult = await aiService.calculateAdvancedMatchScore(
+          cvData,
+          job,
+          {
+            candidateId: finalCandidateId,
+            jobId,
+            saveToDatabase: true,
+          }
+        );
+
+        // Cache the result
+        if (cacheService) {
+          await cacheService.cacheMatchingScore(finalCandidateId, jobId, matchingResult);
         }
-      );
+      }
 
       res.status(200).json({
         success: true,
@@ -73,7 +91,23 @@ class AdvancedNLPController {
     try {
       const { jobId, candidateId } = req.params;
 
-      const matchingScore = await CVMatchingScore.findOne({
+      // Try to get from cache first
+      const cacheService = getCacheService();
+      let matchingScore = null;
+      
+      if (cacheService) {
+        const cached = await cacheService.getCachedMatchingScore(candidateId, jobId);
+        if (cached) {
+          // If cached result exists, return it
+          return res.status(200).json({
+            success: true,
+            data: cached,
+          });
+        }
+      }
+
+      // If not in cache, fetch from database
+      matchingScore = await CVMatchingScore.findOne({
         jobId,
         candidateId,
       }).populate('jobId candidateId', 'title fullName email');

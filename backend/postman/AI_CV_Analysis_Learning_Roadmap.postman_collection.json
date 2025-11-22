@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "AI - CV Analysis & Learning Roadmap (NLP)",
-    "description": "NLP-based CV analysis, skill gap identification, and personalized learning roadmap generation using Skills and Industries data",
+    "name": "AI - CV Analysis & Job Matching",
+    "description": "CV analysis, job recommendations, skill gap analysis, AI suggestions, and candidate insights. For Learning Roadmap (full CRUD), use Advanced_NLP_APIs collection.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "internship-platform-ai"
   },
@@ -93,31 +93,6 @@
           }
         },
         {
-          "name": "Analyze Job Match",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{auth_token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"jobId\": \"{{job_id}}\",\n  \"targetJobDescription\": \"We are looking for a Full Stack Developer with 3+ years of experience in React, Node.js, and cloud technologies.\",\n  \"targetJobTitle\": \"Full Stack Developer\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/ai/analyze-job-match",
-              "host": ["{{base_url}}"],
-              "path": ["api", "ai", "analyze-job-match"]
-            }
-          }
-        },
-        {
           "name": "Analyze Job Description",
           "request": {
             "method": "POST",
@@ -194,86 +169,6 @@
               "raw": "{{base_url}}/api/ai/skill-gap-analysis",
               "host": ["{{base_url}}"],
               "path": ["api", "ai", "skill-gap-analysis"]
-            }
-          }
-        }
-      ]
-    },
-    {
-      "name": "Learning Roadmap Generation",
-      "item": [
-        {
-          "name": "Generate Skill Roadmap (Basic)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{auth_token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"targetRole\": \"Full Stack Developer\",\n  \"targetSkills\": [\n    \"React\",\n    \"Node.js\",\n    \"TypeScript\",\n    \"MongoDB\",\n    \"Docker\"\n  ],\n  \"timeframe\": 12,\n  \"currentLevel\": \"intermediate\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/ai/skill-roadmap",
-              "host": ["{{base_url}}"],
-              "path": ["api", "ai", "skill-roadmap"]
-            }
-          }
-        },
-        {
-          "name": "Generate Skill Roadmap (Advanced with Job)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{auth_token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"targetJobTitle\": \"Senior Full Stack Developer\",\n  \"targetJobDescription\": \"We need a developer with strong skills in React, Node.js, cloud technologies (AWS), database management, and DevOps practices. Experience with microservices architecture and CI/CD is essential.\",\n  \"skillGaps\": [\n    {\n      \"skill\": \"TypeScript\",\n      \"currentLevel\": \"beginner\",\n      \"targetLevel\": \"advanced\",\n      \"priority\": \"high\"\n    },\n    {\n      \"skill\": \"AWS\",\n      \"currentLevel\": \"none\",\n      \"targetLevel\": \"intermediate\",\n      \"priority\": \"critical\"\n    },\n    {\n      \"skill\": \"Kubernetes\",\n      \"currentLevel\": \"none\",\n      \"targetLevel\": \"intermediate\",\n      \"priority\": \"high\"\n    },\n    {\n      \"skill\": \"GraphQL\",\n      \"currentLevel\": \"beginner\",\n      \"targetLevel\": \"intermediate\",\n      \"priority\": \"medium\"\n    }\n  ],\n  \"timeframe\": 16,\n  \"learningPreferences\": {\n    \"focus\": \"practical\",\n    \"pace\": \"intensive\",\n    \"learningStyle\": \"project-based\",\n    \"budget\": \"moderate\"\n  }\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/ai/skill-roadmap",
-              "host": ["{{base_url}}"],
-              "path": ["api", "ai", "skill-roadmap"]
-            }
-          }
-        },
-        {
-          "name": "Generate Career Change Roadmap",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "Authorization",
-                "value": "Bearer {{auth_token}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"targetJobTitle\": \"DevOps Engineer\",\n  \"targetJobDescription\": \"Seeking a DevOps Engineer to manage our cloud infrastructure, implement CI/CD pipelines, and ensure system reliability. Must have experience with AWS, Docker, Kubernetes, and infrastructure as code.\",\n  \"timeframe\": 24,\n  \"currentLevel\": \"beginner\",\n  \"learningPreferences\": {\n    \"focus\": \"comprehensive\",\n    \"pace\": \"moderate\",\n    \"learningStyle\": \"structured\",\n    \"certifications\": true\n  }\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/ai/skill-roadmap",
-              "host": ["{{base_url}}"],
-              "path": ["api", "ai", "skill-roadmap"]
             }
           }
         }

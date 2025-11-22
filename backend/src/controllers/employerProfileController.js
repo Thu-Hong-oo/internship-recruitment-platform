@@ -625,6 +625,8 @@ const uploadTaxCertificate = asyncHandler(async (req, res) => {
 // GET /api/employers/jobs
 const getPostedJobs = asyncHandler(async (req, res) => {
   const Job = require('../models/Job');
+  const { formatJobsResponse } = require('../utils/jobFormatter');
+  
   // Sử dụng ensureProfile thay vì getProfile
   const profile = await EmployerServices.ensureProfile(req.user.id);
   const page = parseInt(req.query.page) || 1;
@@ -636,9 +638,18 @@ const getPostedJobs = asyncHandler(async (req, res) => {
 
   const total = await Job.countDocuments(filter);
   const jobs = await Job.find(filter)
+    .populate({
+      path: 'employer',
+      select: 'company.name company.logo company.industry company.description company.website company.size company.officeAddress contact.phone contact.email',
+      options: { lean: false }
+    })
+    .populate('postedBy', 'fullName name email avatar')
     .sort({ createdAt: -1 })
     .skip(startIndex)
     .limit(limit);
+
+  // Format jobs using shared formatter
+  const formattedJobs = formatJobsResponse(jobs);
 
   res.status(200).json({
     success: true,
@@ -649,7 +660,7 @@ const getPostedJobs = asyncHandler(async (req, res) => {
       hasNextPage: startIndex + limit < total,
       hasPrevPage: startIndex > 0,
     },
-    data: jobs,
+    data: formattedJobs,
   });
 });
 
@@ -945,6 +956,17 @@ const uploadCoverImage = asyncHandler(async (req, res) => {
 const removeCoverImage = asyncHandler(async (req, res) => {
   try {
     const result = await EmployerServices.removeCoverImage(req.user.id);
+    
+    if (result.alreadyRemoved) {
+      logger.info('Cover image removal: no cover image to remove', {
+        userId: req.user.id,
+      });
+      return res.status(200).json({
+        success: true,
+        message: 'Không có ảnh bìa để xóa',
+      });
+    }
+
     logger.info('Company cover image removed', {
       userId: req.user.id,
       employerProfileId: result.employerProfileId,
@@ -969,6 +991,17 @@ const removeCoverImage = asyncHandler(async (req, res) => {
 const removeLogo = asyncHandler(async (req, res) => {
   try {
     const result = await EmployerServices.removeLogo(req.user.id);
+    
+    if (result.alreadyRemoved) {
+      logger.info('Logo removal: no logo to remove', {
+        userId: req.user.id,
+      });
+      return res.status(200).json({
+        success: true,
+        message: 'Không có logo để xóa',
+      });
+    }
+
     logger.info('Company logo removed', {
       userId: req.user.id,
       employerProfileId: result.employerProfileId,
