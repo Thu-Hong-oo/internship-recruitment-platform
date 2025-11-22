@@ -650,6 +650,58 @@ const applyForJob = async (req, res) => {
     });
     // Update job stats
     await Job.findByIdAndUpdate(id, { $inc: { 'stats.applications': 1 } });
+    
+    // Notify employer về application mới
+    try {
+      const NotificationService = require('../services/notificationService');
+      const EmployerProfile = require('../models/EmployerProfile');
+      const User = require('../models/User');
+      
+      const employerProfile = await EmployerProfile.findById(job.employer);
+      if (employerProfile && employerProfile.owner) {
+        const employerUser = await User.findById(employerProfile.owner);
+        if (employerUser) {
+          await NotificationService.notifyNewApplication(
+            employerUser._id.toString(),
+            application._id.toString(),
+            job._id.toString(),
+            req.user.fullName || req.user.email || 'Ứng viên',
+            req.user.id.toString() // Lưu candidateId
+          );
+          logger.info('Notification sent to employer for new application', {
+            employerId: employerUser._id,
+            applicationId: application._id,
+          });
+        }
+      }
+    } catch (notifyError) {
+      logger.error('Failed to send notification to employer:', {
+        error: notifyError.message,
+        applicationId: application._id,
+      });
+    }
+    
+    // Notify candidate về application thành công
+    try {
+      const NotificationService = require('../services/notificationService');
+      await NotificationService.notifyApplicationStatusChange(
+        req.user.id.toString(),
+        application._id.toString(),
+        job._id.toString(),
+        job.title,
+        'pending'
+      );
+      logger.info('Notification sent to candidate for successful application', {
+        candidateId: req.user.id,
+        applicationId: application._id,
+      });
+    } catch (candidateNotifyError) {
+      logger.error('Failed to send notification to candidate:', {
+        error: candidateNotifyError.message,
+        candidateId: req.user.id,
+      });
+    }
+    
     res.status(201).json({ success: true, data: application });
   } catch (error) {
     logger.error('Error applying for job:', error);
