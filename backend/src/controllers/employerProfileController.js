@@ -5,7 +5,9 @@ const documentUploadService = require('../services/documentUploadService');
 const asyncHandler = require('express-async-handler');
 const {
   companySchema,
+  companyUpdateSchema,
   businessInfoSchema,
+  businessInfoUpdateSchema,
   legalRepresentativeSchema,
 } = require('../validationSchemas');
 const validateProfileFields = require('../middleware/validateProfileFields');
@@ -766,9 +768,9 @@ const getAnalytics = asyncHandler(async (req, res) => {
  */
 const updateCompanyInfo = asyncHandler(async (req, res) => {
   try {
-    // Validate input bằng Joi
+    // Validate input bằng Joi - sử dụng update schema (all fields optional)
     if (req.body.company) {
-      const { error } = companySchema.validate(req.body.company);
+      const { error } = companyUpdateSchema.validate(req.body.company);
       if (error) {
         return res.status(400).json({
           success: false,
@@ -778,7 +780,8 @@ const updateCompanyInfo = asyncHandler(async (req, res) => {
       }
     }
     if (req.body.businessInfo) {
-      const { error } = businessInfoSchema.validate(req.body.businessInfo);
+      // Use update schema (all fields optional) for partial updates
+      const { error } = businessInfoUpdateSchema.validate(req.body.businessInfo);
       if (error) {
         return res.status(400).json({
           success: false,

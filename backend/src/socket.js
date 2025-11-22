@@ -4,10 +4,12 @@ const jwt = require('jsonwebtoken');
 const User = require('./models/User');
 const { logger } = require('./utils/logger');
 
+let io = null;
+
 const setupSocket = (server) => {
   const { Server } = require('socket.io');
   //khởi tạo socket io dựa trên http server
-  const io = new Server(server, {
+  io = new Server(server, {
     cors: {//bật cor để client có thể kết nối từ domain khác
       origin: process.env.FRONTEND_URL || '*',
       methods: ['GET', 'POST'],
@@ -322,7 +324,14 @@ const setupSocket = (server) => {
   return io;
 };
 
-module.exports = { setupSocket };
+const getIO = () => {
+  if (!io) {
+    throw new Error('Socket.io not initialized. Call setupSocket first.');
+  }
+  return io;
+};
+
+module.exports = { setupSocket, getIO };
 
 
 
