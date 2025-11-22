@@ -8,6 +8,7 @@ const {
   getAllJobs,
   getJob,
   createJob,
+  bulkCreateJobs,
   updateJob,
   deleteJob,
   applyForJob,
@@ -50,12 +51,19 @@ router.get('/:id', getJob); // GET /api/jobs/:id
 router.get('/:id/company', getJobCompany); // GET /api/jobs/:id/company
 router.get('/:id/stats', getJobStats); // GET /api/jobs/:id/stats
 router.post(
+  '/bulk',
+  protect,
+  authorize('employer'),
+  requireEmployerProfile,
+  bulkCreateJobs
+); // POST /api/jobs/bulk - Bulk create multiple jobs
+router.post(
   '/',
   protect,
   authorize('employer'),
   requireEmployerProfile,
   createJob
-); // POST /api/jobs
+); // POST /api/jobs - Create single job
 
 // Protected routes - Employer only (require verification for publishing)
 router.put(

@@ -1,10 +1,12 @@
 const { createClient } = require('redis');
 const OTPService = require('../services/otpService');
 const OTPCooldownService = require('../services/otpCooldownService');
+const { initializeCacheService } = require('../services/cacheService');
 const { logger } = require('../utils/logger');
 require('dotenv').config();
 let otpService = null;
 let otpCooldownService = null;
+let cacheService = null;
 
 const initializeRedisServices = async () => {
   try {
@@ -24,6 +26,9 @@ const initializeRedisServices = async () => {
     otpCooldownService = new OTPCooldownService(redisClient);
     await otpService.initialize();
 
+    // Initialize cache service
+    cacheService = await initializeCacheService(redisClient);
+
     logger.info('Redis services initialized successfully');
   } catch (error) {
     logger.error('Failed to initialize Redis services', {
@@ -42,8 +47,13 @@ const getOTPCooldownService = () => {
   return otpCooldownService;
 };
 
+const getCacheService = () => {
+  return cacheService;
+};
+
 module.exports = {
   initializeRedisServices,
   getOTPService,
   getOTPCooldownService,
+  getCacheService,
 };

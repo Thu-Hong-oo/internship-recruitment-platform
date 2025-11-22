@@ -4,6 +4,7 @@ const CandidateProfile = require('../../models/CandidateProfile');
 const { logger } = require('../../utils/logger');
 const { ApiResponse } = require('../../utils/responseHandler');
 const { AppError } = require('../../utils/errors');
+const { getCacheService } = require('../../config/initializeServices');
 const asyncHandler = require('express-async-handler');
 
 // ============================================
@@ -18,13 +19,26 @@ const asyncHandler = require('express-async-handler');
 exports.getAllIndustries = asyncHandler(async (req, res) => {
   const { q, parent, includeStats = 'false' } = req.query;
 
-  const filter = {};
-  if (parent) filter.parentCode = parent === 'root' ? null : parent;
-  if (q) filter.$text = { $search: q };
+  // Try to get from cache first (only for simple queries without search/stats)
+  const cacheService = getCacheService();
+  let industries = null;
+  const cacheKey = !q && !parent && includeStats === 'false'
+    ? 'industries:list:all'
+    : null;
+  
+  if (cacheService && cacheKey) {
+    industries = await cacheService.getCachedIndustriesList();
+  }
 
-  let industries = await Industry.find(filter)
-    .sort({ sortOrder: 1, 'name.vi': 1 })
-    .lean();
+  // If not in cache, fetch from database
+  if (!industries) {
+    const filter = {};
+    if (parent) filter.parentCode = parent === 'root' ? null : parent;
+    if (q) filter.$text = { $search: q };
+
+    industries = await Industry.find(filter)
+      .sort({ sortOrder: 1, 'name.vi': 1 })
+      .lean();
 
   // Optionally include real-time stats
   if (includeStats === 'true') {
@@ -46,6 +60,12 @@ exports.getAllIndustries = asyncHandler(async (req, res) => {
     );
   }
 
+    // Cache the results (only for simple queries)
+    if (cacheService && cacheKey) {
+      await cacheService.cacheIndustriesList(industries);
+    }
+  }
+
   return ApiResponse.success(res, { industries });
 });
 
@@ -55,11 +75,21 @@ exports.getAllIndustries = asyncHandler(async (req, res) => {
  * @access  Private/Admin
  */
 exports.getIndustryHierarchy = asyncHandler(async (req, res) => {
-  const industries = await Industry.find().sort({ sortOrder: 1 }).lean();
+  // Try to get from cache first
+  const cacheService = getCacheService();
+  let hierarchy = null;
+  
+  if (cacheService) {
+    hierarchy = await cacheService.get('industries:hierarchy:tree');
+  }
 
-  // Build tree structure
-  const industryMap = new Map();
-  const rootIndustries = [];
+  // If not in cache, fetch from database
+  if (!hierarchy) {
+    const industries = await Industry.find().sort({ sortOrder: 1 }).lean();
+
+    // Build tree structure
+    const industryMap = new Map();
+    const rootIndustries = [];
 
   // First pass: create map
   industries.forEach(industry => {
@@ -81,10 +111,18 @@ exports.getIndustryHierarchy = asyncHandler(async (req, res) => {
     }
   });
 
-  return ApiResponse.success(res, {
-    hierarchy: rootIndustries,
-    totalIndustries: industries.length,
-  });
+    hierarchy = {
+      hierarchy: rootIndustries,
+      totalIndustries: industries.length,
+    };
+
+    // Cache the results
+    if (cacheService) {
+      await cacheService.set('industries:hierarchy:tree', hierarchy, 86400); // 24 hours
+    }
+  }
+
+  return ApiResponse.success(res, hierarchy);
 });
 
 /**
@@ -153,6 +191,13 @@ exports.createIndustry = asyncHandler(async (req, res) => {
 
   const industry = await Industry.create(req.body);
 
+  // Invalidate industries cache
+  const cacheService = getCacheService();
+  if (cacheService) {
+    await cacheService.invalidateStaticData('industries');
+    await cacheService.delete('industries:hierarchy:tree');
+  }
+
   logger.info(`Industry created: ${industry.code} by admin ${req.user.id}`);
 
   return ApiResponse.success(res, { industry }, 'Industry created successfully', 201);
@@ -197,6 +242,13 @@ exports.updateIndustry = asyncHandler(async (req, res) => {
     { new: true, runValidators: true }
   );
 
+  // Invalidate industries cache
+  const cacheService = getCacheService();
+  if (cacheService) {
+    await cacheService.invalidateStaticData('industries');
+    await cacheService.delete('industries:hierarchy:tree');
+  }
+
   logger.info(`Industry updated: ${updatedIndustry.code} by admin ${req.user.id}`);
 
   return ApiResponse.success(res, { industry: updatedIndustry }, 'Industry updated successfully');
@@ -240,6 +292,13 @@ exports.deleteIndustry = asyncHandler(async (req, res) => {
   }
 
   await industry.deleteOne();
+
+  // Invalidate industries cache
+  const cacheService = getCacheService();
+  if (cacheService) {
+    await cacheService.invalidateStaticData('industries');
+    await cacheService.delete('industries:hierarchy:tree');
+  }
 
   logger.warn(
     `Industry deleted: ${industry.code} by admin ${req.user.id}. Usage: ${totalUsage}`

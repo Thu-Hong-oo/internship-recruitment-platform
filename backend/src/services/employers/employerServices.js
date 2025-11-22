@@ -319,12 +319,15 @@ class EmployerService {
 
   /**
    * Remove company logo
+   * Idempotent: returns success if no logo exists
    */
   static async removeLogo(userId) {
     const profile = await this.ensureProfile(userId);
 
+    // Idempotent: if no logo exists, consider it already removed
     if (!profile.company?.logo?.cloudinaryId) {
-      throw new AppError('No logo to remove', 404);
+      logger.info('No logo to remove (idempotent)', { userId, profileId: profile._id });
+      return { message: 'No logo to remove', alreadyRemoved: true };
     }
 
     // Delete from Cloudinary
@@ -336,7 +339,7 @@ class EmployerService {
 
     logger.info('Logo removed', { userId, profileId: profile._id });
 
-    return { message: 'Logo removed successfully' };
+    return { message: 'Logo removed successfully', alreadyRemoved: false, employerProfileId: profile._id };
   }
 
   /**
@@ -405,12 +408,15 @@ class EmployerService {
 
   /**
    * Remove cover image
+   * Idempotent: returns success if no cover image exists
    */
   static async removeCoverImage(userId) {
     const profile = await this.ensureProfile(userId);
 
+    // Idempotent: if no cover image exists, consider it already removed
     if (!profile.company?.coverImage?.cloudinaryId) {
-      throw new AppError('No cover image to remove', 404);
+      logger.info('No cover image to remove (idempotent)', { userId, profileId: profile._id });
+      return { message: 'No cover image to remove', alreadyRemoved: true };
     }
 
     await deleteImage(profile.company.coverImage.cloudinaryId);
@@ -420,7 +426,7 @@ class EmployerService {
 
     logger.info('Cover image removed', { userId, profileId: profile._id });
 
-    return { message: 'Cover image removed successfully' };
+    return { message: 'Cover image removed successfully', alreadyRemoved: false, employerProfileId: profile._id };
   }
 
   /**

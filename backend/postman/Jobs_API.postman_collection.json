@@ -279,6 +279,39 @@
 					"response": []
 				},
 				{
+					"name": "Bulk Create Jobs",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{employer_token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"jobs\": [\n    {\n      \"title\": \"Test No skill  Full Stack Developer\",\n      \"slug\": \"senior-full-stack-developer-2025\",\n      \"description\": \"We are looking for an experienced Full Stack Developer to join our growing team.\",\n      \"requirements\": \"• 5+ years of experience with React and Node.js\\n• Strong understanding of TypeScript\\n• Experience with MongoDB and PostgreSQL\",\n      \"benefits\": \"• Competitive salary\\n• Health insurance\\n• Flexible working hours\",\n      \"skills\": [\n        \"React\",\n        \"Node.js\",\n        \"TypeScript\",\n        \"MongoDB\",\n        \"no skill\"\n      ],\n      \"tags\": [\"fullstack\", \"react\", \"nodejs\"],\n      \"industryCode\": \"technology\",\n      \"subIndustryCode\": \"software-development\",\n      \"level\": \"Senior\",\n      \"jobType\": \"Fulltime\",\n      \"workingMode\": \"Hybrid\",\n      \"address\": {\n        \"street\": \"123 Nguyen Hue Street\",\n        \"ward\": \"Ben Nghe Ward\",\n        \"district\": \"District 1\",\n        \"city\": \"Ho Chi Minh City\",\n        \"country\": \"Vietnam\"\n      },\n      \"salaryMin\": 30000000,\n      \"salaryMax\": 50000000,\n      \"currency\": \"VND\",\n      \"experience\": \"5+ years of full stack development experience\",\n      \"education\": \"Bachelor's degree in Computer Science\",\n      \"deadline\": \"2025-12-31\",\n      \"positions\": 2\n    },\n    {\n      \"title\": \"Junior Frontend Developer\",\n      \"slug\": \"junior-frontend-developer-2025\",\n      \"description\": \"Looking for a junior frontend developer to join our team.\",\n      \"requirements\": \"• 1+ years of experience with React\\n• Basic understanding of JavaScript\\n• Willingness to learn\",\n      \"benefits\": \"• Competitive salary\\n• Health insurance\\n• Training opportunities\",\n      \"skills\": [\"React\", \"JavaScript\", \"CSS\"],\n      \"tags\": [\"frontend\", \"react\", \"junior\"],\n      \"industryCode\": \"technology\",\n      \"subIndustryCode\": \"software-development\",\n      \"level\": \"Junior\",\n      \"jobType\": \"Fulltime\",\n      \"workingMode\": \"Remote\",\n      \"address\": {\n        \"street\": \"456 Le Loi Street\",\n        \"ward\": \"Ben Thanh Ward\",\n        \"district\": \"District 1\",\n        \"city\": \"Ho Chi Minh City\",\n        \"country\": \"Vietnam\"\n      },\n      \"salaryMin\": 15000000,\n      \"salaryMax\": 25000000,\n      \"currency\": \"VND\",\n      \"experience\": \"1+ years of frontend development experience\",\n      \"education\": \"Bachelor's degree in Computer Science or related field\",\n      \"deadline\": \"2025-11-30\",\n      \"positions\": 3\n    }\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/jobs/bulk",
+							"host": ["{{base_url}}"],
+							"path": ["jobs", "bulk"]
+						},
+						"description": "Create multiple jobs at once (employer only, requires profile). Returns detailed results for each job (created/failed). Maximum 50 jobs per request."
+					},
+					"response": []
+				},
+				{
 					"name": "Update Job",
 					"request": {
 						"auth": {

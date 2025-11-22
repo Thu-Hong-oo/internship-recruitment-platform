@@ -31,8 +31,21 @@ class ApplicationController {
         return this._getApplicationDetail(id, req, res, next);
       }
 
-      // Build filter
-      let filter = { candidateId: req.user.candidateProfile };
+      // Get candidate profile first (similar to applyForJob)
+      const candidateProfile = await CandidateProfile.findOne({
+        userId: req.user.id,
+      });
+
+      if (!candidateProfile) {
+        return ApiResponse.error(
+          res,
+          'Candidate profile not found. Please complete your profile first.',
+          404
+        );
+      }
+
+      // Build filter using candidateProfile._id
+      let filter = { candidateId: candidateProfile._id };
       if (status) filter.status = status;
       if (job_id) filter.jobId = job_id;
 
@@ -78,17 +91,7 @@ class ApplicationController {
         throw new AppError('Job not found or not available', 404);
       }
 
-      // Check if already applied
-      const existingApplication = await Application.findOne({
-        candidateId: req.user.candidateProfile,
-        jobId: job_id,
-      });
-
-      if (existingApplication) {
-        throw new AppError('You have already applied for this job', 400);
-      }
-
-      // Get candidate profile
+      // Get candidate profile first
       const candidateProfile = await CandidateProfile.findOne({
         userId: req.user.id,
       });
@@ -97,9 +100,19 @@ class ApplicationController {
         throw new AppError('Candidate profile not found', 404);
       }
 
+      // Check if already applied
+      const existingApplication = await Application.findOne({
+        candidateId: candidateProfile._id,
+        jobId: job_id,
+      });
+
+      if (existingApplication) {
+        throw new AppError('You have already applied for this job', 400);
+      }
+
       // Create application
       const application = new Application({
-        candidateId: req.user.candidateProfile,
+        candidateId: candidateProfile._id,
         jobId: job_id,
         coverLetter: cover_letter,
         resume: {

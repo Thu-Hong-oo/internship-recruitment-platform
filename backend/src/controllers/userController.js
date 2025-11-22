@@ -14,7 +14,6 @@ const { uploadImage } = require('../services/imageUploadService');
 const { getAvatarUrl } = require('../utils/avatarUtils');
 const { getIO } = require('../config/socket');
 const googleAuthService = require('../services/googleAuth');
-const UnifiedProfileService = require('../services/unifiedProfileService');
 
 // Resolve display name consistently
 const resolveFullName = user => {
@@ -142,26 +141,6 @@ const uploadAvatar = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Update user profile (Universal - works for both candidate & employer)
-// @route   PUT /api/users/profile
-// @access  Private
-const updateProfile = asyncHandler(async (req, res) => {
-  try {
-    const result = await UnifiedProfileService.updateProfile(
-      req.user.id,
-      req.body,
-      { role: req.user.role }
-    );
-
-    UnifiedProfileService.successResponse(res, 'Cập nhật hồ sơ thành công', {
-      user: result.user || UnifiedProfileService.formatUserResponse(req.user),
-      profile: result.profile,
-      updated: result.updatedFields,
-    });
-  } catch (error) {
-    UnifiedProfileService.handleError(error, res, 'Cập nhật hồ sơ');
-  }
-});
 // @desc    Change user password
 // @route   PUT /api/users/password
 // @access  Private
@@ -327,22 +306,6 @@ const unlinkGoogleAccount = asyncHandler(async (req, res) => {
       success: false,
       error: error.message || 'Không thể hủy liên kết tài khoản Google',
     });
-  }
-});
-
-// @desc    Get user profile
-// @route   GET /api/users/profile
-// @access  Private
-const getUserProfile = asyncHandler(async (req, res) => {
-  try {
-    const result = await UnifiedProfileService.getCompleteProfile(
-      req.user.id,
-      req.user.role
-    );
-    UnifiedProfileService.successResponse(res, null, result);
-  } catch (error) {
-    console.error('getUserProfile Error:', error);
-    UnifiedProfileService.handleError(error, res, 'Lấy thông tin hồ sơ');
   }
 });
 
@@ -728,151 +691,19 @@ const reactivateAccount = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Debug token information
-// @route   GET /api/users/debug-token
-// @access  Private
-const debugToken = asyncHandler(async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.split(' ')[1];
-
-    // Decode token without verification to see payload
-    const jwt = require('jsonwebtoken');
-    const decoded = jwt.decode(token);
-
-    const dbUser = await User.findById(req.user.id).select(
-      'role email fullName isActive'
-    );
-
-    res.json({
-      success: true,
-      debug: {
-        rawToken: token?.substring(0, 50) + '...',
-        tokenPayload: decoded,
-        requestUser: {
-          id: req.user.id,
-          role: req.user.role,
-          email: req.user.email,
-          isActive: req.user.isActive,
-        },
-        databaseUser: dbUser,
-        timestamp: new Date().toISOString(),
-        matches: {
-          id: req.user.id === dbUser._id.toString(),
-          role: req.user.role === dbUser.role,
-          email: req.user.email === dbUser.email,
-        },
-        tokenAge: decoded
-          ? {
-              issuedAt: new Date(decoded.iat * 1000),
-              expiresAt: new Date(decoded.exp * 1000),
-              ageInMinutes: Math.floor(
-                (Date.now() - decoded.iat * 1000) / (1000 * 60)
-              ),
-            }
-          : null,
-      },
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Debug failed',
-      details: error.message,
-    });
-  }
-});
-
-// @desc    Compare different profile methods
-// @route   GET /api/users/compare-profiles
-// @access  Private
-const compareProfiles = asyncHandler(async (req, res) => {
-  try {
-    console.log('=== PROFILE COMPARISON ===');
-    console.log('User from token:', {
-      id: req.user.id,
-      role: req.user.role,
-      email: req.user.email,
-    });
-
-    // Method 1: UnifiedProfileService
-    const unifiedResult = await UnifiedProfileService.getCompleteProfile(
-      req.user.id,
-      req.user.role
-    );
-
-    // Method 2: Direct queries
-    const directUser = await User.findById(req.user.id).select('-password');
-    let directProfile = {};
-
-    if (req.user.role === 'candidate') {
-      const candidateProfile = await CandidateProfile.findOne({
-        userId: req.user.id,
-      });
-      directProfile = candidateProfile;
-    } else if (req.user.role === 'employer') {
-      const employerProfile = await EmployerProfile.findOne({
-        owner: req.user.id,
-      });
-      directProfile = employerProfile;
-    }
-
-    res.json({
-      success: true,
-      comparison: {
-        tokenUser: {
-          id: req.user.id,
-          role: req.user.role,
-          email: req.user.email,
-        },
-        unifiedService: {
-          user: unifiedResult.user,
-          profile: unifiedResult.profile,
-          profileKeys: Object.keys(unifiedResult.profile || {}),
-        },
-        directQuery: {
-          user: directUser
-            ? {
-                id: directUser._id,
-                role: directUser.role,
-                email: directUser.email,
-              }
-            : null,
-          profile: directProfile,
-          profileKeys: Object.keys(directProfile || {}),
-        },
-        matches: {
-          userIdMatch: req.user.id === directUser?._id?.toString(),
-          roleMatch: req.user.role === directUser?.role,
-          emailMatch: req.user.email === directUser?.email,
-        },
-      },
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Comparison failed',
-      details: error.message,
-    });
-  }
-});
-
 module.exports = {
-  getUser, //get nhanh thông tin cơ bản của user
-  uploadAvatar, //upload avatar của user
-  updateProfile,
-  changePassword, //thay đổi mật khẩu của user
-  linkGoogleAccount,
-  unlinkGoogleAccount,
-  getUserProfile, // get đầy đủ thông tin
-  getPublicUserProfile, // dành cho admin/ nhà tuyển dụng
-  getUserStats,
-  updateUserPreferences,
-  getUserNotifications,
-  markNotificationAsRead,
-  markAllNotificationsAsRead,
-  deleteNotification,
-  deactivateAccount,
-  reactivateAccount,
-  debugToken, // Debug endpoint
-  compareProfiles, // Compare endpoint
+  getUser, // Get basic user information by ID
+  uploadAvatar, // Upload user avatar
+  changePassword, // Change user password
+  linkGoogleAccount, // Link Google account
+  unlinkGoogleAccount, // Unlink Google account
+  getPublicUserProfile, // Get public user profile (employer/admin only)
+  getUserStats, // Get user statistics
+  updateUserPreferences, // Update user preferences
+  getUserNotifications, // Get user notifications
+  markNotificationAsRead, // Mark notification as read
+  markAllNotificationsAsRead, // Mark all notifications as read
+  deleteNotification, // Delete notification
+  deactivateAccount, // Deactivate user account
+  reactivateAccount, // Reactivate user account
 };

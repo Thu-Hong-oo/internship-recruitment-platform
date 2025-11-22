@@ -274,6 +274,11 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/skills', skillRoutes);
 app.use('/api/skill-categories', skillCategoryRoutes);
 app.use('/api/industries', industryRoutes);
+app.use('/api/saved-jobs', require('./src/routes/savedJobs'));
+
+// Roadmaps Routes (SkillRoadmap model - legacy/alternative to LearningRoadmap)
+// Note: LearningRoadmap is used in /api/nlp/learning-roadmap
+app.use('/api/roadmaps', require('./src/routes/roadmaps'));
 
 // 404 handler
 app.use('*', (req, res) => {
