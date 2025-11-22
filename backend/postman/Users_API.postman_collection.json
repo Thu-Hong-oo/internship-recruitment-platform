@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "users-api-001",
 		"name": "Users API",
-		"description": "Complete user management API including profile, preferences, account management, and notifications.",
+		"description": "User management API for account settings, preferences, notifications, and utilities. For role-specific profile operations:\n- Employers: Use Employer_Profile_API.postman_collection.json (/api/employers/profile)\n- Candidates: Use Candidates_API.postman_collection.json (/api/candidates/me)",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"auth": {
@@ -18,7 +18,7 @@
 	"variable": [
 		{
 			"key": "base_url",
-			"value": "http://localhost:5000/api",
+			"value": "http://localhost:3000/api",
 			"type": "string"
 		},
 		{
@@ -44,45 +44,8 @@
 	],
 	"item": [
 		{
-			"name": "Profile Management",
+			"name": "Avatar & User Info",
 			"item": [
-				{
-					"name": "Get User Profile",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/users/profile",
-							"host": ["{{base_url}}"],
-							"path": ["users", "profile"]
-						},
-						"description": "Get authenticated user's profile"
-					},
-					"response": []
-				},
-				{
-					"name": "Update Profile",
-					"request": {
-						"method": "PUT",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"phone\": \"+84901234567\",\n  \"dateOfBirth\": \"1995-05-15\",\n  \"address\": \"123 Nguyen Hue, District 1, Ho Chi Minh City\"\n}"
-						},
-						"url": {
-							"raw": "{{base_url}}/users/profile",
-							"host": ["{{base_url}}"],
-							"path": ["users", "profile"]
-						},
-						"description": "Update user profile information"
-					},
-					"response": []
-				},
 				{
 					"name": "Upload Avatar",
 					"request": {
@@ -117,12 +80,12 @@
 							"host": ["{{base_url}}"],
 							"path": ["users", "{{user_id}}"]
 						},
-						"description": "Get user information by ID"
+						"description": "Get basic user information by ID"
 					},
 					"response": []
 				},
 				{
-					"name": "Get Public User Profile (Employer)",
+					"name": "Get Public User Profile (Employer Only)",
 					"request": {
 						"auth": {
 							"type": "bearer",
@@ -141,12 +104,12 @@
 							"host": ["{{base_url}}"],
 							"path": ["users", "{{user_id}}", "public-profile"]
 						},
-						"description": "Get public profile of a candidate (employer only)"
+						"description": "Get public profile of a candidate (employer/admin only). For detailed profile operations, use role-specific endpoints."
 					},
 					"response": []
 				}
 			],
-			"description": "User profile operations"
+			"description": "Avatar upload and basic user information. For profile management, use role-specific endpoints."
 		},
 		{
 			"name": "Account Management",
@@ -339,22 +302,13 @@
 					"name": "Mark Notification as Read",
 					"request": {
 						"method": "PUT",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"notificationId\": \"{{notification_id}}\"\n}"
-						},
+						"header": [],
 						"url": {
-							"raw": "{{base_url}}/users/notifications/read",
+							"raw": "{{base_url}}/users/notifications/{{notification_id}}/read",
 							"host": ["{{base_url}}"],
-							"path": ["users", "notifications", "read"]
+							"path": ["users", "notifications", "{{notification_id}}", "read"]
 						},
-						"description": "Mark notification as read"
+						"description": "Mark notification as read by notification ID"
 					},
 					"response": []
 				},
@@ -376,61 +330,18 @@
 					"name": "Delete Notification",
 					"request": {
 						"method": "DELETE",
-						"header": [
-							{
-								"key": "Content-Type",
-								"value": "application/json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n  \"notificationId\": \"{{notification_id}}\"\n}"
-						},
+						"header": [],
 						"url": {
-							"raw": "{{base_url}}/users/notifications",
+							"raw": "{{base_url}}/users/notifications/{{notification_id}}",
 							"host": ["{{base_url}}"],
-							"path": ["users", "notifications"]
+							"path": ["users", "notifications", "{{notification_id}}"]
 						},
-						"description": "Delete notification"
+						"description": "Delete notification by notification ID"
 					},
 					"response": []
 				}
 			],
 			"description": "User notification operations"
-		},
-		{
-			"name": "Debug & Utilities",
-			"item": [
-				{
-					"name": "Debug Token",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/users/debug-token",
-							"host": ["{{base_url}}"],
-							"path": ["users", "debug-token"]
-						},
-						"description": "Debug endpoint to verify token information"
-					},
-					"response": []
-				},
-				{
-					"name": "Compare Profiles",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "{{base_url}}/users/compare-profiles",
-							"host": ["{{base_url}}"],
-							"path": ["users", "compare-profiles"]
-						},
-						"description": "Compare user profiles endpoint"
-					},
-					"response": []
-				}
-			],
-			"description": "Debug and utility endpoints"
 		}
 	]
 }

@@ -221,6 +221,10 @@ router.post('/analyze-job-description', aiController.analyzeJobDescription);
  *   post:
  *     summary: Analyze compatibility between candidate CV and job
  *     tags: [AI - Matching]
+ *     deprecated: true
+ *     description: |
+ *       ⚠️ **DEPRECATED**: This endpoint is deprecated. 
+ *       Please use `/api/nlp/matching-score` instead for advanced matching with detailed breakdown, caching, and recalculation.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -242,6 +246,8 @@ router.post('/analyze-job-description', aiController.analyzeJobDescription);
  *     responses:
  *       200:
  *         description: Detailed job match analysis with compatibility scores
+ *       410:
+ *         description: This endpoint is deprecated. Use /api/nlp/matching-score instead.
  */
 router.post('/analyze-job-match', aiController.analyzeJobMatch);
 
@@ -358,6 +364,10 @@ router.post('/skill-gap-analysis', aiController.getSkillGapAnalysis);
  *   post:
  *     summary: Generate personalized skill learning roadmap
  *     tags: [AI - Skills]
+ *     deprecated: true
+ *     description: |
+ *       ⚠️ **DEPRECATED**: This endpoint is deprecated. 
+ *       Please use `/api/nlp/learning-roadmap` instead for full CRUD operations, progress tracking, feedback, and resource recommendations.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -398,6 +408,8 @@ router.post('/skill-gap-analysis', aiController.getSkillGapAnalysis);
  *     responses:
  *       200:
  *         description: Personalized learning roadmap with milestones and resources
+ *       410:
+ *         description: This endpoint is deprecated. Use /api/nlp/learning-roadmap instead.
  */
 router.post('/skill-roadmap', aiController.generateSkillRoadmap);
 

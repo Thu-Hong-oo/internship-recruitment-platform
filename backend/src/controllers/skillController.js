@@ -1,6 +1,7 @@
 const Skill = require('../models/Skill');
 const Job = require('../models/Job');
 const { logger } = require('../utils/logger');
+const { getCacheService } = require('../config/initializeServices');
 const asyncHandler = require('express-async-handler');
 
 // @desc    Get all skills
@@ -30,16 +31,42 @@ const getAllSkills = asyncHandler(async (req, res) => {
     // Category filter
     if (category) query.category = category;
 
-    const skip = (page - 1) * limit;
-    const sortObj = {};
-    sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    // Try to get from cache first (only for simple queries without search/filters)
+    const cacheService = getCacheService();
+    let skills = null;
+    let total = 0;
+    
+    // Only cache if no search and no category filter (most common case)
+    const cacheKey = !search && !category 
+      ? `skills:list:page:${page}:limit:${limit}:sort:${sortBy}:${sortOrder}`
+      : null;
+    
+    if (cacheService && cacheKey) {
+      const cached = await cacheService.get(cacheKey);
+      if (cached) {
+        skills = cached.data;
+        total = cached.total;
+      }
+    }
 
-    const skills = await Skill.find(query)
-      .sort(sortObj)
-      .skip(skip)
-      .limit(parseInt(limit));
+    // If not in cache, fetch from database
+    if (!skills) {
+      const skip = (page - 1) * limit;
+      const sortObj = {};
+      sortObj[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
-    const total = await Skill.countDocuments(query);
+      skills = await Skill.find(query)
+        .sort(sortObj)
+        .skip(skip)
+        .limit(parseInt(limit));
+
+      total = await Skill.countDocuments(query);
+
+      // Cache the results (only for simple queries)
+      if (cacheService && cacheKey) {
+        await cacheService.set(cacheKey, { data: skills, total }, 3600); // 1 hour
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -103,6 +130,13 @@ const createSkill = asyncHandler(async (req, res) => {
   try {
     const skill = await Skill.create(req.body);
 
+    // Invalidate skills cache when new skill is created
+    const cacheService = getCacheService();
+    if (cacheService) {
+      await cacheService.invalidateStaticData('skills');
+      await cacheService.delete('skills:categories:list');
+    }
+
     res.status(201).json({
       success: true,
       data: skill
@@ -135,6 +169,13 @@ const updateSkill = asyncHandler(async (req, res) => {
       req.body,
       { new: true, runValidators: true }
     );
+
+    // Invalidate skills cache when skill is updated
+    const cacheService = getCacheService();
+    if (cacheService) {
+      await cacheService.invalidateStaticData('skills');
+      await cacheService.delete('skills:categories:list');
+    }
 
     res.status(200).json({
       success: true,
@@ -177,6 +218,13 @@ const deleteSkill = asyncHandler(async (req, res) => {
 
     await skill.deleteOne();
 
+    // Invalidate skills cache when skill is deleted
+    const cacheService = getCacheService();
+    if (cacheService) {
+      await cacheService.invalidateStaticData('skills');
+      await cacheService.delete('skills:categories:list');
+    }
+
     res.status(200).json({
       success: true,
       message: 'Xóa kỹ năng thành công'
@@ -195,7 +243,23 @@ const deleteSkill = asyncHandler(async (req, res) => {
 // @access  Public
 const getSkillCategories = asyncHandler(async (req, res) => {
   try {
-    const categories = await Skill.distinct('category');
+    // Try to get from cache first
+    const cacheService = getCacheService();
+    let categories = null;
+    
+    if (cacheService) {
+      categories = await cacheService.get('skills:categories:list');
+    }
+
+    // If not in cache, fetch from database
+    if (!categories) {
+      categories = await Skill.distinct('category');
+      
+      // Cache the results
+      if (cacheService) {
+        await cacheService.set('skills:categories:list', categories, 3600); // 1 hour
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -252,8 +316,19 @@ const getPopularSkills = asyncHandler(async (req, res) => {
   try {
     const { limit = 20 } = req.query;
 
-    // Get skills with job count
-    const skills = await Skill.aggregate([
+    // Try to get from cache first
+    const cacheService = getCacheService();
+    let skills = null;
+    const cacheKey = `skills:popular:limit:${limit}`;
+    
+    if (cacheService) {
+      skills = await cacheService.get(cacheKey);
+    }
+
+    // If not in cache, fetch from database
+    if (!skills) {
+      // Get skills with job count
+      skills = await Skill.aggregate([
       {
         $lookup: {
           from: 'jobs',
@@ -287,6 +362,12 @@ const getPopularSkills = asyncHandler(async (req, res) => {
         }
       }
     ]);
+
+      // Cache the results
+      if (cacheService) {
+        await cacheService.set(cacheKey, skills, 1800); // 30 minutes (popular skills change more frequently)
+      }
+    }
 
     res.status(200).json({
       success: true,

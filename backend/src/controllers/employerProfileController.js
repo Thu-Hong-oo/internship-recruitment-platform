@@ -439,6 +439,8 @@ const uploadBusinessLicense = asyncHandler(async (req, res) => {
       metadata,
       profile
     );
+
+    // ✅ Delete old document from Cloudinary if exists
     if (oldCloudinaryId) {
       try {
         await EmployerServices.deleteDocument(oldCloudinaryId);
@@ -450,6 +452,31 @@ const uploadBusinessLicense = asyncHandler(async (req, res) => {
         });
       }
     }
+
+    // ✅ Remove old document from profile.verification.documents
+    if (existingDoc) {
+      profile.verification.documents = profile.verification.documents.filter(
+        doc => doc.documentType !== documentType
+      );
+    }
+
+    // ✅ Add new document to profile.verification.documents
+    profile.verification.documents.push({
+      documentType: documentType,
+      url: uploadResult.url,
+      cloudinaryId: uploadResult.publicId,
+      uploadedAt: new Date(),
+      status: 'pending',
+      metadata: {
+        originalName: uploadResult.originalName,
+        size: uploadResult.size,
+        mimeType: uploadResult.mimeType,
+        ...metadata,
+      },
+    });
+
+    await profile.save();
+
     logger.info('Business license uploaded successfully', {
       userId: req.user.id,
       employerProfileId: profile._id,
@@ -539,6 +566,30 @@ const uploadTaxCertificate = asyncHandler(async (req, res) => {
       }
     }
 
+    // ✅ Remove old document from profile.verification.documents
+    if (existingDoc) {
+      profile.verification.documents = profile.verification.documents.filter(
+        doc => doc.documentType !== documentType
+      );
+    }
+
+    // ✅ Add new document to profile.verification.documents
+    profile.verification.documents.push({
+      documentType: documentType,
+      url: uploadResult.url,
+      cloudinaryId: uploadResult.publicId,
+      uploadedAt: new Date(),
+      status: 'pending',
+      metadata: {
+        originalName: uploadResult.originalName,
+        size: uploadResult.size,
+        mimeType: uploadResult.mimeType,
+        ...metadata,
+      },
+    });
+
+    await profile.save();
+
     logger.info('Tax certificate uploaded successfully', {
       userId: req.user.id,
       employerProfileId: profile._id,
@@ -557,13 +608,13 @@ const uploadTaxCertificate = asyncHandler(async (req, res) => {
         mimeType: uploadResult.mimeType,
       },
     });
-  } catch (error) {
+  } catch (err) {
     logger.error('Upload tax certificate failed:', {
-      error: error.message,
+      error: err.message,
       userId: req.user?.id,
-      stack: error.stack,
+      stack: err.stack,
     });
-    return error(res, 'Lỗi upload giấy chứng nhận thuế', error);
+    return error(res, 'Lỗi upload giấy chứng nhận thuế', err);
   }
 });
 
@@ -574,6 +625,8 @@ const uploadTaxCertificate = asyncHandler(async (req, res) => {
 // GET /api/employers/jobs
 const getPostedJobs = asyncHandler(async (req, res) => {
   const Job = require('../models/Job');
+  const { formatJobsResponse } = require('../utils/jobFormatter');
+  
   // Sử dụng ensureProfile thay vì getProfile
   const profile = await EmployerServices.ensureProfile(req.user.id);
   const page = parseInt(req.query.page) || 1;
@@ -585,9 +638,18 @@ const getPostedJobs = asyncHandler(async (req, res) => {
 
   const total = await Job.countDocuments(filter);
   const jobs = await Job.find(filter)
+    .populate({
+      path: 'employer',
+      select: 'company.name company.logo company.industry company.description company.website company.size company.officeAddress contact.phone contact.email',
+      options: { lean: false }
+    })
+    .populate('postedBy', 'fullName name email avatar')
     .sort({ createdAt: -1 })
     .skip(startIndex)
     .limit(limit);
+
+  // Format jobs using shared formatter
+  const formattedJobs = formatJobsResponse(jobs);
 
   res.status(200).json({
     success: true,
@@ -598,7 +660,7 @@ const getPostedJobs = asyncHandler(async (req, res) => {
       hasNextPage: startIndex + limit < total,
       hasPrevPage: startIndex > 0,
     },
-    data: jobs,
+    data: formattedJobs,
   });
 });
 
@@ -894,6 +956,17 @@ const uploadCoverImage = asyncHandler(async (req, res) => {
 const removeCoverImage = asyncHandler(async (req, res) => {
   try {
     const result = await EmployerServices.removeCoverImage(req.user.id);
+    
+    if (result.alreadyRemoved) {
+      logger.info('Cover image removal: no cover image to remove', {
+        userId: req.user.id,
+      });
+      return res.status(200).json({
+        success: true,
+        message: 'Không có ảnh bìa để xóa',
+      });
+    }
+
     logger.info('Company cover image removed', {
       userId: req.user.id,
       employerProfileId: result.employerProfileId,
@@ -918,6 +991,17 @@ const removeCoverImage = asyncHandler(async (req, res) => {
 const removeLogo = asyncHandler(async (req, res) => {
   try {
     const result = await EmployerServices.removeLogo(req.user.id);
+    
+    if (result.alreadyRemoved) {
+      logger.info('Logo removal: no logo to remove', {
+        userId: req.user.id,
+      });
+      return res.status(200).json({
+        success: true,
+        message: 'Không có logo để xóa',
+      });
+    }
+
     logger.info('Company logo removed', {
       userId: req.user.id,
       employerProfileId: result.employerProfileId,

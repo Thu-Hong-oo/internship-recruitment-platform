@@ -170,7 +170,7 @@ exports.createSkill = asyncHandler(async (req, res) => {
     aliases = [],
     demandLevel = 'medium',
     trend = 'stable',
-    isActive = true,
+    // isActive is NOT allowed on create - always defaults to true
   } = req.body;
 
   // Validation
@@ -197,7 +197,7 @@ exports.createSkill = asyncHandler(async (req, res) => {
     aliases: aliases.map(a => a.trim()),
     demandLevel,
     trend,
-    isActive,
+    // isActive defaults to true in model
   });
 
   logger.info(`Skill created: ${skill.name} by admin ${req.user.id}`);
@@ -285,6 +285,33 @@ exports.deleteSkill = asyncHandler(async (req, res) => {
   );
 
   return ApiResponse.success(res, null, 'Skill deleted successfully');
+});
+
+/**
+ * @desc    Toggle skill active status
+ * @route   PATCH /api/admin/skills/:id/toggle-status
+ * @access  Private/Admin
+ */
+exports.toggleSkillStatus = asyncHandler(async (req, res) => {
+  const skill = await Skill.findById(req.params.id);
+
+  if (!skill) {
+    throw new AppError('Skill not found', 404);
+  }
+
+  // Toggle the status
+  skill.isActive = !skill.isActive;
+  await skill.save();
+
+  logger.info(
+    `Skill status toggled: ${skill.name} -> ${skill.isActive ? 'active' : 'inactive'} by admin ${req.user.id}`
+  );
+
+  return ApiResponse.success(
+    res,
+    { skill },
+    `Skill ${skill.isActive ? 'activated' : 'deactivated'} successfully`
+  );
 });
 
 // ============================================

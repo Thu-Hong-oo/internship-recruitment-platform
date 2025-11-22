@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
 const User = require('../models/User');
@@ -16,9 +17,16 @@ const { AppError } = require('../utils/errors');
 // ============================================
 // MULTER CONFIGURATION FOR CV UPLOAD
 // ============================================
+// Ensure upload directory exists
+const uploadPath = path.join(__dirname, '../../uploads/cv');
+if (!fsSync.existsSync(uploadPath)) {
+  fsSync.mkdirSync(uploadPath, { recursive: true });
+  logger.info(`Created upload directory: ${uploadPath}`);
+}
+
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadPath = path.join(__dirname, '../../uploads/cv');
+    // Directory is already created above
     cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
@@ -394,9 +402,17 @@ class AIController {
   /**
    * POST /api/ai/analyze-job-match
    * Phân tích độ khớp giữa candidate và job
+   * 
+   * @deprecated This endpoint is deprecated. Use /api/nlp/matching-score instead for advanced matching with detailed breakdown, caching, and recalculation.
    */
   async analyzeJobMatch(req, res, next) {
     try {
+      // Deprecation warning
+      logger.warn('Deprecated endpoint /api/ai/analyze-job-match called. Consider using /api/nlp/matching-score instead.', {
+        userId: req.user.id,
+        endpoint: '/api/ai/analyze-job-match'
+      });
+
       const { targetJobDescription, targetJobTitle, jobId } = req.body;
 
       const profile = await CandidateProfile.findOne({ userId: req.user.id });
@@ -426,7 +442,18 @@ class AIController {
 
       const analysis = await aiService.analyzeJobMatch(cvData, jobData);
 
-      return ApiResponse.success(res, analysis, 'Job match analysis completed');
+      return ApiResponse.success(
+        res, 
+        {
+          ...analysis,
+          _deprecationWarning: {
+            message: 'This endpoint is deprecated. Use /api/nlp/matching-score instead for advanced features.',
+            alternativeEndpoint: '/api/nlp/matching-score',
+            reason: 'Advanced matching with detailed breakdown, caching, and recalculation'
+          }
+        }, 
+        'Job match analysis completed'
+      );
     } catch (error) {
       console.error('Job match analysis error:', error);
       next(new AppError('Failed to analyze job match', 500));
@@ -625,6 +652,12 @@ class AIController {
         }
       }
 
+      logger.info('Analyzing skill gaps', {
+        userId: req.user.id,
+        jobTitle: jobData.title,
+        hasSkills: !!cvData.skills,
+      });
+
       const skillGapAnalysis = await aiService.analyzeSkillGaps(
         cvData,
         jobData
@@ -636,7 +669,11 @@ class AIController {
         'Skill gap analysis completed'
       );
     } catch (error) {
-      console.error('Skill gap analysis error:', error);
+      logger.error('Skill gap analysis error:', {
+        error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
+      });
       next(new AppError('Failed to analyze skill gaps', 500));
     }
   }
@@ -644,6 +681,8 @@ class AIController {
   /**
    * POST /api/ai/skill-roadmap
    * Tạo lộ trình học tập/phát triển kỹ năng
+   * 
+   * @deprecated This endpoint is deprecated. Use /api/nlp/learning-roadmap instead for full CRUD operations, progress tracking, feedback, and resource recommendations.
    */
   async generateSkillRoadmap(req, res) {
     const userId = req.user.id;
@@ -659,6 +698,11 @@ class AIController {
     } = req.body;
 
     try {
+      // Deprecation warning
+      logger.warn('Deprecated endpoint /api/ai/skill-roadmap called. Consider using /api/nlp/learning-roadmap instead.', {
+        userId: req.user.id,
+        endpoint: '/api/ai/skill-roadmap'
+      });
       if (
         !targetRole &&
         (!targetSkills || targetSkills.length === 0) &&
@@ -723,11 +767,19 @@ class AIController {
         targetRole: targetRole || targetJobTitle,
         timeframe,
         skillsCount: roadmap.skills?.length || 0,
+        deprecated: true,
       });
 
       return ApiResponse.success(
         res,
-        roadmap,
+        {
+          ...roadmap,
+          _deprecationWarning: {
+            message: 'This endpoint is deprecated. Use /api/nlp/learning-roadmap instead for full CRUD operations, progress tracking, feedback, and resource recommendations.',
+            alternativeEndpoint: '/api/nlp/learning-roadmap',
+            reason: 'Full CRUD operations, progress tracking, feedback, and resource recommendations'
+          }
+        },
         'Skill roadmap generated successfully'
       );
     } catch (error) {

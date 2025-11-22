@@ -99,14 +99,14 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n  \"companyName\": \"Tech Innovations Vietnam Co., Ltd.\",\n  \"businessName\": \"Tech Innovations Vietnam\",\n  \"taxCode\": \"0123456789\",\n  \"companySize\": \"100-500\",\n  \"industryCode\": \"technology\",\n  \"website\": \"https://techinnovations.vn\",\n  \"description\": \"Leading technology company specializing in innovative software solutions.\",\n  \"foundedYear\": 2015,\n  \"address\": {\n    \"street\": \"123 Le Duan Street\",\n    \"city\": \"Ho Chi Minh City\",\n    \"district\": \"District 1\",\n    \"country\": \"Vietnam\",\n    \"zipCode\": \"70000\"\n  },\n  \"socialMedia\": {\n    \"facebook\": \"https://facebook.com/techinnovations\",\n    \"linkedin\": \"https://linkedin.com/company/techinnovations\",\n    \"twitter\": \"https://twitter.com/techinnovations\"\n  },\n  \"benefits\": [\n    \"Competitive salary\",\n    \"Health insurance\",\n    \"Annual bonus\",\n    \"Team building activities\",\n    \"Professional development opportunities\"\n  ]\n}"
+							"raw": "{\n  \"company\": {\n    \"name\": \"Tech Innovations Vietnam Co., Ltd.\",\n    \"industry\": \"technology\",\n    \"size\": \"medium\",\n    \"email\": \"contact@techinnovations.vn\",\n    \"website\": \"https://techinnovations.vn\",\n    \"description\": \"Leading technology company specializing in innovative software solutions.\",\n    \"employeesCount\": 250,\n    \"foundedYear\": 2015\n  },\n  \"businessInfo\": {\n    \"registrationNumber\": \"0123456789\",\n    \"taxId\": \"0123456789-001\",\n    \"issueDate\": \"2015-06-15T00:00:00.000Z\",\n    \"issuePlace\": \"Department of Planning and Investment - Ho Chi Minh City\",\n    \"address\": {\n      \"street\": \"123 Le Duan Street\",\n      \"ward\": \"Ben Nghe Ward\",\n      \"district\": \"District 1\",\n      \"city\": \"Ho Chi Minh City\",\n      \"country\": \"Vietnam\"\n    }\n  },\n  \"legalRepresentative\": {\n    \"fullName\": \"Nguyen Van A\",\n    \"position\": \"CEO\",\n    \"phone\": \"+84901234567\",\n    \"email\": \"ceo@techinnovations.vn\",\n    \"identityCard\": \"079087001234\",\n    \"address\": \"123 Le Duan Street, District 1, Ho Chi Minh City\"\n  }\n}"
 						},
 						"url": {
 							"raw": "{{base_url}}/employer-profiles/company",
 							"host": ["{{base_url}}"],
 							"path": ["employer-profiles", "company"]
 						},
-						"description": "Update company information"
+						"description": "Update complete company information including business registration and legal representative. All three objects (company, businessInfo, legalRepresentative) are required."
 					},
 					"response": []
 				}

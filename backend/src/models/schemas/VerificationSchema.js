@@ -20,11 +20,13 @@ const VerificationSchema = new mongoose.Schema(
           type: String,
           required: true,
           enum: [
-            'business_registration',
-            'tax_certificate',
-            'legal_rep_id',
-            'office_proof',
-            'bank_statement',
+            'business-license',
+            'tax-certificate',
+            'legal-representative-id',
+            'business-plan',
+            'financial-statement',
+            'medical-license',
+            'education-license',
             'other'
           ]
         },

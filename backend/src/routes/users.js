@@ -4,9 +4,7 @@ const router = express.Router();
 const { protect, authorize } = require('../middleware/auth');
 const {
   getUser,
-  getUserProfile,
   getPublicUserProfile,
-  updateProfile,
   uploadAvatar,
   changePassword,
   linkGoogleAccount,
@@ -19,8 +17,6 @@ const {
   deleteNotification,
   deactivateAccount,
   reactivateAccount,
-  debugToken, // Add debug function
-  compareProfiles, // Add compare function
 } = require('../controllers/userController');
 
 // Configure multer for avatar uploads
@@ -38,11 +34,7 @@ const upload = multer({
   },
 });
 
-// Profile routes
-router.get('/profile', protect, getUserProfile);
-router.get('/debug-token', protect, debugToken); // Debug endpoint
-router.get('/compare-profiles', protect, compareProfiles); // Compare endpoint
-router.put('/profile', protect, updateProfile);
+// Avatar & Password
 router.post('/avatar', protect, upload.single('avatar'), uploadAvatar);
 router.put('/password', protect, changePassword);
 
@@ -53,22 +45,22 @@ router.put('/preferences', protect, updateUserPreferences);
 router.put('/deactivate', protect, deactivateAccount);
 router.put('/reactivate', protect, reactivateAccount);
 
-// User info
+// User info & stats
 router.get('/stats', protect, getUserStats);
-router.get('/notifications', protect, getUserNotifications); // Đúng cho notifications
-router.get('/:id', protect, getUser); // Đặt sau /notifications để không bị Express nhầm lẫn
+
+// Notifications (must be before /:id routes to avoid conflicts)
+router.get('/notifications', protect, getUserNotifications);
+router.put('/notifications/read-all', protect, markAllNotificationsAsRead);
+router.put('/notifications/:id/read', protect, markNotificationAsRead);
+router.delete('/notifications/:id', protect, deleteNotification);
+
+// User by ID (must be last to avoid route conflicts)
+router.get('/:id', protect, getUser);
 router.get(
   '/:id/public-profile',
   protect,
   authorize('employer'),
   getPublicUserProfile
 );
-
-// Notifications
-router.get('/notifications', protect, getUserNotifications);
-// Removed the :id from notifications
-router.put('/notifications/read-all', protect, markAllNotificationsAsRead);
-router.put('/notifications/read', protect, markNotificationAsRead); // Changed to not use :id
-router.delete('/notifications', protect, deleteNotification); // Changed to not use :id
 
 module.exports = router;

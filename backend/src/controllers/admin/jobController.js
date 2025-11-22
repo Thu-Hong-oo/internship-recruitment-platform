@@ -83,16 +83,16 @@ const getJobsAdmin = asyncHandler(async (req, res) => {
   const total = await Job.countDocuments(filter);
 
   const jobs = await Job.find(filter)
-    .populate('employer', 'company.name owner')
     .populate({
       path: 'employer',
+      select: 'company owner',
       populate: {
         path: 'owner',
         select: 'email fullName',
       },
     })
     .select(
-      'title location salary status level jobType skills createdAt updatedAt views stats'
+      'title location salaryMin salaryMax currency status level jobType skills createdAt updatedAt views stats deadline positions'
     )
     .sort({ createdAt: -1 })
     .skip(startIndex)
@@ -110,18 +110,24 @@ const getJobsAdmin = asyncHandler(async (req, res) => {
       return {
         _id: job._id,
         title: job.title,
-        company: job.company,
-        employer: {
+        company: job.employer?.company || null,
+        employer: job.employer ? {
           _id: job.employer._id,
-          name: job.employer?.company?.name || 'Unknown Company',
-          email: job.employer?.owner?.email,
-        },
+          name: job.employer.company?.name || 'Unknown Company',
+          email: job.employer.owner?.email || null,
+        } : null,
         location: job.location,
-        salary: job.salary,
+        salary: {
+          min: job.salaryMin,
+          max: job.salaryMax,
+          currency: job.currency || 'VND'
+        },
         level: job.level,
         jobType: job.jobType,
         status: job.status,
-        skills: job.skills,
+        skills: job.skills || [],
+        deadline: job.deadline,
+        positions: job.positions,
         createdAt: job.createdAt,
         updatedAt: job.updatedAt,
 
