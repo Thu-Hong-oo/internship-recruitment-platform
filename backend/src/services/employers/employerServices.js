@@ -226,6 +226,30 @@ class EmployerService {
   }
 
   /**
+   * Update user fullName (from User model)
+   * Called when employer updates their name
+   */
+  static async updateUserFullName(userId, fullName) {
+    const User = require('../../models/User');
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { fullName },
+      { new: true }
+    );
+    
+    if (!user) {
+      throw new AppError('User not found', 404);
+    }
+    
+    logger.info('Employer fullName updated', {
+      userId,
+      fullName,
+    });
+    
+    return user;
+  }
+
+  /**
    * Update company info
    */
   static async updateCompanyInfo(userId, updates) {

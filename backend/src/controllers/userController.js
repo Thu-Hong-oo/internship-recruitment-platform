@@ -114,6 +114,17 @@ const uploadAvatar = asyncHandler(async (req, res) => {
       url: result.url,
     });
 
+    // Emit socket event để update real-time (nếu có listeners)
+    try {
+      const io = getIO();
+      io.to(`user:${user._id}`).emit('user_avatar_updated', {
+        userId: user._id,
+        avatar: result.url,
+      });
+    } catch (socketError) {
+      // Ignore socket errors
+    }
+
     res.status(200).json({
       success: true,
       message: 'Upload avatar thành công',
