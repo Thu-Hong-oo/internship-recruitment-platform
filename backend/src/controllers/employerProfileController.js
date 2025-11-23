@@ -77,10 +77,27 @@ const getApplications = asyncHandler(async (req, res) => {
  */
 const getProfile = asyncHandler(async (req, res) => {
   try {
+    const User = require('../models/User');
+    const { calculateEmployerProfileCompletion } = require('../utils/employerProfileCompletion');
+    
     // Sử dụng ensureProfile thay vì getProfile để auto-create
     const profile = await EmployerServices.ensureProfile(req.user.id);
+    
+    // Lấy user info để check fullName, avatar
+    const user = await User.findById(req.user.id).select('fullName avatar email');
+    const { getAvatarUrl } = require('../utils/avatarUtils');
+    
+    // Tính toán profile completion
+    const completion = calculateEmployerProfileCompletion(profile, user);
+    
     return success(res, 'Lấy profile thành công', {
       _id: profile._id,
+      // ✅ Thêm user info để FE biết avatar/name đã thay đổi
+      user: {
+        fullName: user?.fullName || null,
+        avatar: getAvatarUrl(user),
+        email: user?.email || null,
+      },
       company: profile.company,
       businessInfo: profile.businessInfo,
       legalRepresentative: profile.legalRepresentative,
@@ -93,6 +110,8 @@ const getProfile = asyncHandler(async (req, res) => {
       documents: profile.documents || [],
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt,
+      // Thêm completion info cho FE - biết được phần nào đã cập nhật
+      completion,
     });
   } catch (err) {
     return error(res, 'Lỗi lấy profile', err);
@@ -148,13 +167,48 @@ const updateProfile = [
   validateProfileFields,
   asyncHandler(async (req, res) => {
     try {
+      const User = require('../models/User');
+      const NotificationService = require('../services/notificationService');
+      
+      // Check if fullName is being updated (from User model, not profile)
+      let updatedUser = null;
+      if (req.body.fullName) {
+        updatedUser = await User.findByIdAndUpdate(
+          req.user.id,
+          { fullName: req.body.fullName },
+          { new: true }
+        );
+        
+        // Cập nhật notifications nếu employer thay đổi tên
+        // (Notifications có thể chứa employer name trong messages)
+        try {
+          // Tìm notifications có liên quan đến employer này
+          // Ví dụ: notifications gửi cho candidates về jobs của employer này
+          // Note: Hiện tại chưa có notification type nào chứa employer name trong message
+          // Nhưng có thể cần update trong tương lai
+          logger.info('Employer fullName updated, notifications may need update', {
+            employerId: req.user.id,
+            newName: req.body.fullName,
+          });
+        } catch (notifyError) {
+          logger.warn('Failed to update notifications for employer name change', {
+            error: notifyError.message,
+          });
+        }
+      }
+      
       const result = await EmployerServices.updateProfile(
         req.user.id,
         req.body
       );
+      
       return success(res, 'Cập nhật thông tin cá nhân thành công', {
         profile: result.profile,
         updatedFields: result.updatedFields.profile,
+        user: updatedUser ? {
+          fullName: updatedUser.fullName,
+          avatar: updatedUser.avatar,
+        } : undefined,
       });
     } catch (err) {
       return error(res, 'Lỗi cập nhật thông tin cá nhân', err);
@@ -716,6 +770,39 @@ const removeDocument = asyncHandler(async (req, res) => {
   }
 });
 
+// GET /api/employers/profile-completion
+// Trả về tiến độ hoàn thiện profile để FE hiển thị form yêu cầu
+const getProfileCompletion = asyncHandler(async (req, res) => {
+  try {
+    const User = require('../models/User');
+    const { calculateEmployerProfileCompletion } = require('../utils/employerProfileCompletion');
+    
+    // Lấy profile và user info
+    const profile = await EmployerServices.ensureProfile(req.user.id);
+    const user = await User.findById(req.user.id).select('fullName avatar email');
+    
+    // Tính toán completion
+    const completion = calculateEmployerProfileCompletion(profile, user);
+    
+    return success(res, 'Lấy tiến độ hoàn thiện profile thành công', {
+      completion,
+      user: {
+        fullName: user?.fullName,
+        avatar: user?.avatar,
+        email: user?.email,
+      },
+      profile: {
+        companyName: profile?.company?.name,
+        hasBusinessInfo: !!(profile?.businessInfo?.registrationNumber && profile?.businessInfo?.taxId),
+        hasLegalRepresentative: !!(profile?.legalRepresentative?.fullName),
+        hasDocuments: (profile?.verification?.documents || []).length > 0,
+      },
+    });
+  } catch (err) {
+    return error(res, 'Lỗi lấy tiến độ hoàn thiện profile', err);
+  }
+});
+
 // GET /api/employers/analytics (combined dashboard stats)
 const getAnalytics = asyncHandler(async (req, res) => {
   const Job = require('../models/Job');
@@ -818,11 +905,52 @@ const updateCompanyInfo = asyncHandler(async (req, res) => {
         }
       }
     }
+    // Lấy company name cũ trước khi update
+    const profileBefore = await EmployerServices.getProfile(req.user.id);
+    const oldCompanyName = profileBefore?.company?.name;
+    const newCompanyName = req.body.company?.name;
+    
     // Gọi service để cập nhật
     const result = await EmployerServices.updateCompanyInfo(
       req.user.id,
       req.body
     );
+    
+    // Cập nhật notifications nếu company name thay đổi
+    if (newCompanyName && oldCompanyName && oldCompanyName !== newCompanyName) {
+      try {
+        const Notification = require('../models/Notification');
+        // Update notifications có chứa company name trong message
+        // Tìm tất cả notifications có message chứa oldCompanyName
+        const notifications = await Notification.find({
+          message: { $regex: oldCompanyName, $options: 'i' },
+          type: { $in: ['JOB_MATCH', 'NEW_JOB_MATCH'] },
+        });
+        
+        // Update từng notification
+        for (const notif of notifications) {
+          notif.message = notif.message.replace(
+            new RegExp(oldCompanyName, 'gi'),
+            newCompanyName
+          );
+          await notif.save();
+        }
+        
+        logger.info('Updated company name in notifications', {
+          employerId: req.user.id,
+          oldName: oldCompanyName,
+          newName: newCompanyName,
+          updatedCount: notifications.length,
+        });
+      } catch (notifyError) {
+        logger.warn('Error updating company name in notifications', {
+          error: notifyError.message,
+          employerId: req.user.id,
+        });
+        // Không fail request nếu notification update fail
+      }
+    }
+    
     return res.status(200).json({
       success: true,
       message: 'Cập nhật thông tin công ty thành công',
@@ -1026,20 +1154,22 @@ const removeLogo = asyncHandler(async (req, res) => {
 });
 
 // GET /api/employers/company
-// GET /api/employers/company
-// Trả về đầy đủ thông tin công ty cho employer (nội bộ)
+// Chỉ trả về thông tin công ty (company, businessInfo, legalRepresentative)
+// Không bao gồm thông tin cá nhân, completion, stats, etc.
+// Cấu trúc phẳng để dễ sử dụng cho form cập nhật thông tin công ty
 const getCompanyInfo = asyncHandler(async (req, res) => {
   try {
-    // Sử dụng ensureProfile thay vì getProfile
     const profile = await EmployerServices.ensureProfile(req.user.id);
     const c = profile.company || {};
+    
     res.status(200).json({
       success: true,
       data: {
         _id: profile._id,
+        // Thông tin công ty (cấu trúc phẳng)
         name: c.name,
-        logo: c.logo?.url,
-        coverImage: c.coverImage?.url,
+        logo: c.logo?.url || null,
+        coverImage: c.coverImage?.url || null,
         industry: c.industry,
         size: c.size,
         description: c.description,
@@ -1048,15 +1178,16 @@ const getCompanyInfo = asyncHandler(async (req, res) => {
         foundedYear: c.foundedYear,
         employeesCount: c.employeesCount,
         officeAddress: c.officeAddress,
+        // Thông tin đăng ký kinh doanh
         businessInfo: profile.businessInfo,
+        // Người đại diện pháp luật
         legalRepresentative: profile.legalRepresentative,
-        stats: profile.stats,
-        hiring: profile.hiring,
-        preferences: profile.preferences,
+        // Verification status (để biết đã verify chưa)
         status: profile.status,
-        verification: profile.verification,
-        companyMembers: profile.companyMembers,
-        documents: profile.documents || [],
+        verification: {
+          isVerified: profile.verification?.isVerified || false,
+          documents: profile.verification?.documents || [],
+        },
         createdAt: profile.createdAt,
         updatedAt: profile.updatedAt,
       },
@@ -1098,6 +1229,9 @@ module.exports = {
   getAnalytics, // GET /employers/analytics - Thống kê tổng hợp (jobs, applications, dashboard)
 
   getRecommendedCandidates, // GET /employers/recommended-candidates - Gợi ý ứng viên (STUB)
+
+  // === PROFILE COMPLETION ===
+  getProfileCompletion, // GET /employers/profile-completion - Lấy tiến độ hoàn thiện profile
 
   // === MEDIA UPLOAD ===
   uploadCompanyLogo, // POST /employers/upload-logo - Upload logo công ty

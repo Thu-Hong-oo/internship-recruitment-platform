@@ -29,6 +29,7 @@ const {
   uploadCoverImage,
   removeLogo,
   removeCoverImage,
+  getProfileCompletion,
 } = require('../controllers/employerProfileController');
 
 const router = express.Router();
@@ -79,6 +80,13 @@ router.get(
   authorize('employer'),
   ensureEmployerProfile,
   getProfile
+);
+router.get(
+  '/profile-completion',
+  protect,
+  authorize('employer'),
+  ensureEmployerProfile,
+  getProfileCompletion
 );
 router.get(
   '/company',
