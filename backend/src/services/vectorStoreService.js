@@ -8,8 +8,21 @@
 
 const { ChromaClient } = require('chromadb');
 const { logger } = require('../utils/logger');
-const embeddingService = require('./embeddingService');
 require('dotenv').config();
+
+// Lazy load embeddingService to avoid initialization errors
+let embeddingService = null;
+function getEmbeddingService() {
+  if (!embeddingService) {
+    try {
+      embeddingService = require('./embeddingService');
+    } catch (error) {
+      logger.warn('Embedding service not available', { error: error.message });
+      return null;
+    }
+  }
+  return embeddingService;
+}
 
 class VectorStoreService {
   constructor() {
@@ -117,7 +130,12 @@ class VectorStoreService {
       }
 
       // Generate embedding
-      const embedding = await embeddingService.embedResource(resource);
+      const embeddingServiceInstance = getEmbeddingService();
+      if (!embeddingServiceInstance || !embeddingServiceInstance.isAvailable()) {
+        throw new Error('Embedding service not available. OPENAI_API_KEY is required for vector search.');
+      }
+
+      const embedding = await embeddingServiceInstance.embedResource(resource);
 
       if (!embedding) {
         throw new Error('Failed to generate embedding for resource');
@@ -177,7 +195,12 @@ class VectorStoreService {
       }
 
       // Generate embeddings for all resources
-      const embeddings = await embeddingService.generateEmbeddings(
+      const embeddingServiceInstance = getEmbeddingService();
+      if (!embeddingServiceInstance || !embeddingServiceInstance.isAvailable()) {
+        throw new Error('Embedding service not available. OPENAI_API_KEY is required for vector search.');
+      }
+
+      const embeddings = await embeddingServiceInstance.generateEmbeddings(
         resources.map((r) =>
           `${r.title} ${r.description || ''} Skills: ${Array.isArray(r.skills) ? r.skills.join(', ') : r.skills || ''} Level: ${r.level || ''} Provider: ${r.provider || ''}`
         )
@@ -246,7 +269,12 @@ class VectorStoreService {
       }
 
       // Generate query embedding
-      const queryEmbedding = await embeddingService.embedSearchQuery(queryParams);
+      const embeddingServiceInstance = getEmbeddingService();
+      if (!embeddingServiceInstance || !embeddingServiceInstance.isAvailable()) {
+        throw new Error('Embedding service not available. OPENAI_API_KEY is required for vector search.');
+      }
+
+      const queryEmbedding = await embeddingServiceInstance.embedSearchQuery(queryParams);
 
       if (!queryEmbedding) {
         throw new Error('Failed to generate query embedding');
@@ -293,6 +321,10 @@ class VectorStoreService {
           // Convert distance to similarity score (1 - distance)
           const similarity = 1 - distance;
 
+          // Normalize URL trước khi trả về
+          const resourceHealthCheckService = require('./resourceHealthCheckService');
+          const normalizedUrl = resourceHealthCheckService.normalizeUrl(metadata.url) || metadata.url;
+          
           resources.push({
             id: results.ids[0][i],
             title: metadata.title,
@@ -301,13 +333,14 @@ class VectorStoreService {
             level: metadata.level,
             provider: metadata.provider,
             type: metadata.type,
-            url: metadata.url,
+            url: normalizedUrl, // ✅ Normalized URL
             rating: metadata.rating ? Number(metadata.rating) : 0,
             isFree: metadata.isFree === 'true',
             estimatedCost: metadata.estimatedCost ? Number(metadata.estimatedCost) : 0,
             duration: metadata.duration,
             certificateOffered: metadata.certificateOffered === 'true',
             similarity, // Semantic similarity score (0-1)
+            indexedAt: metadata.indexedAt, // For freshness validation
           });
         }
       }
@@ -389,7 +422,11 @@ class VectorStoreService {
    * @returns {boolean}
    */
   isAvailable() {
-    return this.client !== null;
+    // Check both ChromaDB client and embedding service
+    const embeddingServiceInstance = getEmbeddingService();
+    return this.client !== null && 
+           embeddingServiceInstance !== null && 
+           embeddingServiceInstance.isAvailable();
   }
 }
 
