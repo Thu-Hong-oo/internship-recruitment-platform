@@ -152,20 +152,34 @@ class JobService {
     data: {
       id: string;
       title: string;
+      slug?: string;
       description?: string;
       requirements?: string;
+      benefits?: string;
       education?: string;
       experience?: string;
       skills?: string[];
+      skillIds?: any[];
+      tags?: string[];
       salary?: string;
+      salaryMin?: number;
+      salaryMax?: number;
+      currency?: string;
       location?: string;
+      address?: any;
       deadline?: string;
       status?: string;
+      level?: string;
+      jobType?: string;
+      workingMode?: string;
+      industryCode?: string;
+      subIndustryCode?: string;
       views?: number;
       positions?: number;
       stats?: { applications?: number; interviews?: number; offers?: number };
       createdAt?: string;
       updatedAt?: string;
+      hasApplied?: boolean;
       employer?: BackendJob["employer"]; // keep original nested employer for detail page
       postedBy?: {
         id?: string;
@@ -181,25 +195,78 @@ class JobService {
       `/jobs/${id}?t=${timestamp}`
     );
     const j = res.data;
+    
+    // Format salary from salaryMin, salaryMax, currency
+    let salaryString = (j as any).salary;
+    if (!salaryString && ((j as any).salaryMin || (j as any).salaryMax)) {
+      const min = (j as any).salaryMin;
+      const max = (j as any).salaryMax;
+      const currency = (j as any).currency || "VND";
+      
+      if (min && max) {
+        if (currency === "VND") {
+          salaryString = `${(min / 1000000).toFixed(0)}M - ${(max / 1000000).toFixed(0)}M VND`;
+        } else {
+          salaryString = `${min.toLocaleString()} - ${max.toLocaleString()} ${currency}`;
+        }
+      } else if (min) {
+        if (currency === "VND") {
+          salaryString = `Từ ${(min / 1000000).toFixed(0)}M VND`;
+        } else {
+          salaryString = `Từ ${min.toLocaleString()} ${currency}`;
+        }
+      } else if (max) {
+        if (currency === "VND") {
+          salaryString = `Đến ${(max / 1000000).toFixed(0)}M VND`;
+        } else {
+          salaryString = `Đến ${max.toLocaleString()} ${currency}`;
+        }
+      }
+    }
+    
+    // Format location from address object or location string
+    let locationString = (j as any).location;
+    if (!locationString && (j as any).address) {
+      const addr = (j as any).address;
+      locationString = addr.fullAddress || 
+        [addr.street, addr.ward, addr.district, addr.city, addr.country]
+          .filter(Boolean)
+          .join(", ");
+    }
+    
     return {
       success: res.success,
       data: {
         id: j._id,
         title: j.title,
+        slug: (j as any).slug,
         description: j.description,
         requirements: j.requirements,
+        benefits: (j as any).benefits,
         education: j.education,
         experience: j.experience,
         skills: j.skills,
-        salary: (j as any).salary,
-        location: (j as any).location,
+        skillIds: (j as any).skillIds,
+        tags: (j as any).tags,
+        salary: salaryString,
+        salaryMin: (j as any).salaryMin,
+        salaryMax: (j as any).salaryMax,
+        currency: (j as any).currency,
+        location: locationString,
+        address: (j as any).address,
         deadline: (j as any).deadline,
         status: (j as any).status,
+        level: (j as any).level,
+        jobType: (j as any).jobType,
+        workingMode: (j as any).workingMode,
+        industryCode: (j as any).industryCode,
+        subIndustryCode: (j as any).subIndustryCode,
         views: (j as any).views,
         positions: (j as any).positions,
-        stats: (j as any).stats,
+        stats: (j as any).stats, // Keep for internal use but don't display
         createdAt: j.createdAt,
         updatedAt: (j as any).updatedAt,
+        hasApplied: (j as any).hasApplied,
         employer: j.employer,
         postedBy: j.postedBy
           ? {

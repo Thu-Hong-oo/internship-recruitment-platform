@@ -96,3 +96,8 @@ class IndustryService {
 export const industryService = new IndustryService();
 
 
+
+
+
+
+

@@ -342,7 +342,7 @@ export default function JobsPage() {
               </h3>
               <p className="text-sm">Hãy tạo tin tuyển dụng đầu tiên của bạn</p>
             </div>
-            <Button onClick={() => router.push("/create-job")}>
+            <Button onClick={() => router.push("/jobs/create-job")}>
               <Plus className="h-4 w-4 mr-2" />
               Tạo tin đầu tiên
             </Button>
@@ -430,24 +430,48 @@ export default function JobsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => router.push(`/jobs/${job._id}`)}
+                          title="Xem chi tiết"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
                         {job.status === "draft" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSubmitJobId(job._id)}
-                            disabled={actionLoading === job._id}
-                          >
-                            {actionLoading === job._id ? (
-                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current mr-1"></div>
-                            ) : (
-                              <Send className="h-3 w-3 mr-1" />
-                            )}
-                            Gửi duyệt
-                          </Button>
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                router.push(`/jobs/${job._id}/edit`)
+                              }
+                              title="Chỉnh sửa"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSubmitJobId(job._id)}
+                              disabled={actionLoading === job._id}
+                              title="Gửi duyệt"
+                            >
+                              {actionLoading === job._id ? (
+                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current"></div>
+                              ) : (
+                                <Send className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </>
                         )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Thêm tùy chọn"
+                            >
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>

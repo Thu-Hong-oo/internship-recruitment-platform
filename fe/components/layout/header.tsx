@@ -8,6 +8,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useTheme } from "next-themes";
 import {
   Bell,
+  BellRing,
   User,
   ChevronDown,
   Search,
@@ -17,6 +18,10 @@ import {
   Building2,
   LogOut,
   ChevronRight,
+  Circle,
+  Clock,
+  ExternalLink,
+  CheckCircle2,
 } from "lucide-react"; //icon
 import { Badge } from "@/components/ui/badge"; // bo tròn như badge
 import { Switch } from "@/components/ui/switch";
@@ -27,6 +32,13 @@ import {
   HoverCardContent,
 } from "@/components/ui/hover-card";
 import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+} from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import {
   Accordion,
   AccordionItem,
   AccordionTrigger,
@@ -36,6 +48,12 @@ import Link from "next/link"; // link to other page
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { getUserAvatar, industriesAPI, Industry } from "@/lib/api";
+import {
+  getNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  type Notification,
+} from "@/lib/notificationAPI";
 
 // Custom hook để quản lý dropdown
 const useDropdown = (delay = 150) => {
@@ -82,6 +100,11 @@ export default function Header() {
   // State cho industries
   const [jobPositions, setJobPositions] = useState<Industry[]>([]);
   const [loadingPositions, setLoadingPositions] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationDropdownOpen, setNotificationDropdownOpen] =
+    useState(false);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
 
   // Fetch industries on mount
   useEffect(() => {
@@ -99,6 +122,132 @@ export default function Header() {
     };
     fetchIndustries();
   }, []);
+
+  const getAuthToken = () => {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem("token");
+  };
+
+  const fetchNotifications = useCallback(
+    async (options?: { silent?: boolean }) => {
+      const token = getAuthToken();
+      if (!token) {
+        setNotifications([]);
+        setUnreadCount(0);
+        return;
+      }
+
+      if (!options?.silent) {
+        setLoadingNotifications(true);
+      }
+
+      try {
+        const response = await getNotifications(token, { limit: 10 });
+        if (response.success) {
+          setNotifications(response.data || []);
+          if (typeof response.unreadCount === "number") {
+            setUnreadCount(response.unreadCount);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch notifications:", err);
+      } finally {
+        if (!options?.silent) {
+          setLoadingNotifications(false);
+        }
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    fetchNotifications({ silent: true });
+  }, [fetchNotifications]);
+
+  useEffect(() => {
+    if (notificationDropdownOpen) {
+      fetchNotifications();
+    }
+  }, [notificationDropdownOpen, fetchNotifications]);
+
+  const handleMarkAsRead = async (notificationId: string) => {
+    try {
+      const token = getAuthToken();
+      if (!token) return;
+
+      const response = await markNotificationAsRead(token, notificationId);
+      if (response.success) {
+        setNotifications((prev) =>
+          prev.map((notif) =>
+            notif._id === notificationId
+              ? { ...notif, isRead: true, readAt: new Date().toISOString() }
+              : notif
+          )
+        );
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      }
+    } catch (err) {
+      console.error("Failed to mark notification as read:", err);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      const token = getAuthToken();
+      if (!token) return;
+
+      const response = await markAllNotificationsAsRead(token);
+      if (response.success) {
+        setNotifications((prev) =>
+          prev.map((notif) => ({
+            ...notif,
+            isRead: true,
+            readAt: notif.readAt || new Date().toISOString(),
+          }))
+        );
+        setUnreadCount(0);
+      }
+    } catch (err) {
+      console.error("Failed to mark all notifications as read:", err);
+    }
+  };
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return "Vừa xong";
+    if (diffInSeconds < 3600)
+      return `${Math.floor(diffInSeconds / 60)} phút trước`;
+    if (diffInSeconds < 86400)
+      return `${Math.floor(diffInSeconds / 3600)} giờ trước`;
+    if (diffInSeconds < 604800)
+      return `${Math.floor(diffInSeconds / 86400)} ngày trước`;
+    return date.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+    });
+  };
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case "NEW_APPLICATION":
+        return <BellRing className="w-4 h-4" />;
+      default:
+        return <Bell className="w-4 h-4" />;
+    }
+  };
+
+  const handleNotificationClick = async (notification: Notification) => {
+    if (!notification.isRead) {
+      await handleMarkAsRead(notification._id);
+    }
+    if (notification.data?.jobId) {
+      router.push(`/jobs/${notification.data.jobId}`);
+      setNotificationDropdownOpen(false);
+    }
+  };
 
   // Mock data cho các mẫu CV
   const cvTemplates = [
@@ -417,7 +566,150 @@ export default function Header() {
             ) : user ? (
               // UI khi đã đăng nhập
               <>
-                <Bell className="w-5 h-5 text-muted-foreground hover:text-primary cursor-pointer transition-colors duration-200" />
+                <DropdownMenu
+                  open={notificationDropdownOpen}
+                  onOpenChange={setNotificationDropdownOpen}
+                >
+                  <DropdownMenuTrigger asChild>
+                    <button className="relative p-2 rounded-lg hover:bg-muted transition-colors">
+                      <Bell className="w-5 h-5 text-muted-foreground" />
+                      {unreadCount > 0 && (
+                        <Badge className="absolute -top-1 -right-1 bg-red-500 text-white text-xs min-w-[20px] h-5 rounded-full flex items-center justify-center px-1.5 font-bold">
+                          {unreadCount > 99 ? "99+" : unreadCount}
+                        </Badge>
+                      )}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    className="w-[380px] p-0 rounded-2xl border border-border bg-card shadow-xl"
+                  >
+                    <div className="p-4 border-b border-border">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-semibold text-foreground">
+                          Thông báo
+                        </h3>
+                        <div className="flex items-center gap-2">
+                          {unreadCount > 0 && (
+                            <Badge className="bg-red-500 text-white text-xs px-2 py-0.5">
+                              {unreadCount} chưa đọc
+                            </Badge>
+                          )}
+                          {unreadCount > 0 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 text-xs text-primary hover:text-primary/80"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarkAllAsRead();
+                              }}
+                            >
+                              Đánh dấu tất cả
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {notifications.length > 0
+                          ? `${notifications.length} thông báo gần nhất`
+                          : "Chưa có thông báo"}
+                      </p>
+                    </div>
+                    <ScrollArea className="h-[360px]">
+                      {loadingNotifications ? (
+                        <div className="flex items-center justify-center py-12">
+                          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
+                        </div>
+                      ) : notifications.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                          <Bell className="w-10 h-10 mb-3" />
+                          <p>Chưa có thông báo nào</p>
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-border">
+                          {notifications.map((notification) => (
+                            <div
+                              key={notification._id}
+                              className={`p-4 hover:bg-muted/60 transition-colors cursor-pointer ${
+                                !notification.isRead ? "bg-muted/40" : ""
+                              }`}
+                              onClick={() =>
+                                handleNotificationClick(notification)
+                              }
+                            >
+                              <div className="flex items-start gap-3">
+                                <div
+                                  className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${
+                                    !notification.isRead
+                                      ? "bg-primary/10 text-primary"
+                                      : "bg-muted text-muted-foreground"
+                                  }`}
+                                >
+                                  {getTypeIcon(notification.type)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between gap-2 mb-1">
+                                    <h4
+                                      className={`text-sm font-semibold line-clamp-1 ${
+                                        !notification.isRead
+                                          ? "text-foreground"
+                                          : "text-muted-foreground"
+                                      }`}
+                                    >
+                                      {notification.title}
+                                    </h4>
+                                    {!notification.isRead && (
+                                      <Circle className="w-2 h-2 fill-primary text-primary flex-shrink-0 mt-1" />
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
+                                    {notification.message}
+                                  </p>
+                                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                    <div className="flex items-center gap-1">
+                                      <Clock className="w-3 h-3" />
+                                      {formatTimeAgo(notification.createdAt)}
+                                    </div>
+                                    {notification.data?.jobId && (
+                                      <div className="flex items-center gap-1 text-primary">
+                                        <ExternalLink className="w-3 h-3" />
+                                        <span>Xem công việc</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                {!notification.isRead && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleMarkAsRead(notification._id);
+                                    }}
+                                    className="flex-shrink-0 p-1.5 rounded-lg hover:bg-primary/10 transition-colors"
+                                  >
+                                    <CheckCircle2 className="w-4 h-4 text-primary" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </ScrollArea>
+                    <div className="p-3 border-t border-border">
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-center text-primary hover:text-primary/80"
+                        onClick={() => {
+                          setNotificationDropdownOpen(false);
+                          router.push("/notifications");
+                        }}
+                      >
+                        Xem tất cả thông báo
+                      </Button>
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <div className="flex items-center">
                   <HoverCard openDelay={100} closeDelay={150}>
                     <HoverCardTrigger asChild>
