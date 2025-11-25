@@ -14,8 +14,11 @@
  * - Source Credibility Theory (Hovland & Weiss, 1951): Đánh giá độ tin cậy
  */
 
-const logger = require('../utils/logger');
+const { logger } = require('../utils/logger');
 const vectorStoreService = require('./vectorStoreService');
+const resourceHealthCheckService = require('./resourceHealthCheckService');
+const realResourceUrlService = require('./realResourceUrlService');
+const curatedResourcesDatabase = require('./curatedResourcesDatabase');
 
 class ResourceRecommendationService {
   constructor() {
@@ -90,6 +93,12 @@ class ResourceRecommendationService {
     totalWeeks = 12,
   }) {
     try {
+      // Validate input
+      if (!skill || typeof skill !== 'string' || skill.trim().length === 0) {
+        logger.warn('Invalid skill provided to recommendResources', { skill });
+        return this._getDefaultResources('General Programming');
+      }
+      
       // 1. Xác định độ khó phù hợp
       const appropriateDifficulty = this._determineAppropriateDifficulty(
         currentLevel,
@@ -149,18 +158,29 @@ class ResourceRecommendationService {
 
       // 6. Fallback to intelligent recommendations if RAG didn't return results
       if (resources.length === 0) {
-        resources = await this._generateIntelligentRecommendations({
-          skill,
-          difficulty: appropriateDifficulty,
-          resourceTypes: preferredTypes,
-          learningStage,
-          phaseNumber,
-          currentLevel,
-          targetLevel,
-        });
-        logger.info('Using intelligent recommendations (RAG unavailable or no results)', {
-          skill,
-        });
+        try {
+          resources = await this._generateIntelligentRecommendations({
+            skill,
+            difficulty: appropriateDifficulty,
+            resourceTypes: preferredTypes,
+            learningStage,
+            phaseNumber,
+            currentLevel,
+            targetLevel,
+          });
+          logger.info('Using intelligent recommendations (RAG unavailable or no results)', {
+            skill,
+            resourcesCount: resources.length,
+          });
+        } catch (intelligentError) {
+          logger.error('Error generating intelligent recommendations', {
+            error: intelligentError.message,
+            skill,
+            stack: intelligentError.stack,
+          });
+          // Fallback to default resources
+          resources = this._getDefaultResources(skill);
+        }
       }
 
       // 7. Calculate credibility scores
@@ -182,17 +202,47 @@ class ResourceRecommendationService {
       );
 
       // 9. Health check: Filter out dead links và outdated resources
-      // Note: healthCheckService might not exist yet, so we'll skip if unavailable
+      // Skip health check for curated resources (already verified)
+      // Only check for generated/fallback resources
       let validResources = sortedResources;
-      if (this.healthCheckService && typeof this.healthCheckService.filterValidResources === 'function') {
-        try {
-          validResources = await this.healthCheckService.filterValidResources(sortedResources);
-        } catch (healthCheckError) {
-          logger.warn('Health check failed, using all resources', {
-            error: healthCheckError.message,
-          });
-          validResources = sortedResources;
+      
+      // Separate curated vs generated resources
+      const curatedResources = sortedResources.filter(r => r.isCurated === true);
+      const generatedResources = sortedResources.filter(r => r.isCurated !== true);
+      
+      try {
+        // Only health check generated resources
+        if (generatedResources.length > 0) {
+          const checkedGenerated = await resourceHealthCheckService.filterValidResources(generatedResources);
+          
+          // Combine curated (always valid) + checked generated
+          validResources = [...curatedResources, ...checkedGenerated];
+        } else {
+          // All are curated, skip health check
+          validResources = curatedResources;
         }
+        
+        // Nếu sau health check không còn resources, fallback to original (có thể là network issue)
+        if (validResources.length === 0 && sortedResources.length > 0) {
+          logger.warn('All resources failed health check, using original list', {
+            originalCount: sortedResources.length,
+            curatedCount: curatedResources.length,
+          });
+          // Normalize URLs ít nhất và keep all
+          validResources = sortedResources.map(r => ({
+            ...r,
+            url: resourceHealthCheckService.normalizeUrl(r.url) || r.url,
+          }));
+        }
+      } catch (healthCheckError) {
+        logger.warn('Health check failed, using all resources', {
+          error: healthCheckError.message,
+        });
+        // Normalize URLs ít nhất và keep all
+        validResources = sortedResources.map(r => ({
+          ...r,
+          url: resourceHealthCheckService.normalizeUrl(r.url) || r.url,
+        }));
       }
 
       // 10. Limit và diversify với MMR (Maximal Marginal Relevance)
@@ -322,7 +372,8 @@ class ResourceRecommendationService {
   }
 
   /**
-   * Generate intelligent recommendations (temporary until RAG is integrated)
+   * Generate intelligent recommendations
+   * Priority: Curated database → Real URLs → Fallback
    */
   async _generateIntelligentRecommendations({
     skill,
@@ -335,70 +386,144 @@ class ResourceRecommendationService {
   }) {
     const resources = [];
 
+    // Try curated database first (highest quality)
+    const hasCurated = curatedResourcesDatabase.hasResources(skill);
+
     // Course recommendations
     if (resourceTypes.includes('course')) {
-      resources.push({
-        type: 'course',
-        title: `${skill} ${this._getPhaseTitle(phaseNumber)} Course`,
-        provider: this._getRecommendedProvider(phaseNumber, 'course'),
-        difficulty,
-        duration: this._calculateDuration(phaseNumber, difficulty),
-        rating: 4.5 + Math.random() * 0.5, // 4.5-5.0
-        isFree: phaseNumber === 1 ? Math.random() > 0.5 : false, // More free in Phase 1
-        estimatedCost: phaseNumber === 1 ? 0 : 19.99 + Math.random() * 30,
-        certificateOffered: phaseNumber >= 2,
-        url: `https://example.com/${skill}-course`,
-        relevanceScore: this._calculateRelevance(skill, difficulty, learningStage),
-      });
+      if (hasCurated) {
+        // Use curated courses
+        const curatedCourses = curatedResourcesDatabase.getResources(skill, 'course', difficulty, 2);
+        curatedCourses.forEach(course => {
+          resources.push({
+            type: 'course',
+            title: course.title,
+            provider: course.provider,
+            instructor: course.instructor,
+            difficulty: course.difficulty || difficulty,
+            duration: course.duration,
+            rating: course.rating,
+            isFree: course.isFree || false,
+            estimatedCost: course.estimatedCost || 0,
+            certificateOffered: course.certificateOffered || false,
+            url: course.url,
+            relevanceScore: this._calculateRelevance(skill, course.difficulty || difficulty, learningStage),
+            isCurated: true, // Mark as curated to skip health check
+          });
+        });
+      } else {
+        // Fallback to generated recommendations
+        const provider = this._getRecommendedProvider(phaseNumber, 'course');
+        resources.push({
+          type: 'course',
+          title: `${skill} ${this._getPhaseTitle(phaseNumber)} Course`,
+          provider,
+          difficulty,
+          duration: this._calculateDuration(phaseNumber, difficulty),
+          rating: 4.5 + Math.random() * 0.5,
+          isFree: phaseNumber === 1 ? Math.random() > 0.5 : false,
+          estimatedCost: phaseNumber === 1 ? 0 : 19.99 + Math.random() * 30,
+          certificateOffered: phaseNumber >= 2,
+          url: realResourceUrlService.getRealUrl({
+            skill,
+            type: 'course',
+            difficulty,
+            provider,
+          }),
+          relevanceScore: this._calculateRelevance(skill, difficulty, learningStage),
+        });
+      }
     }
 
-    // Video recommendations (especially for beginners)
+    // Video recommendations
     if (resourceTypes.includes('video') && (phaseNumber === 1 || difficulty === 'beginner')) {
-      resources.push({
-        type: 'video',
-        title: `${skill} Tutorial for ${difficulty === 'beginner' ? 'Beginners' : 'Intermediate'}`,
-        provider: 'YouTube - Recommended Channel',
-        difficulty: 'beginner',
-        duration: this._calculateDuration(phaseNumber, 'beginner', 'video'),
-        rating: 4.6 + Math.random() * 0.4,
-        isFree: true,
-        estimatedCost: 0,
-        url: `https://youtube.com/${skill}-tutorial`,
-        relevanceScore: this._calculateRelevance(skill, 'beginner', 'remember'),
-      });
+      if (hasCurated) {
+        // Use curated videos
+        const curatedVideos = curatedResourcesDatabase.getResources(skill, 'video', 'beginner', 2);
+        curatedVideos.forEach(video => {
+          resources.push({
+            type: 'video',
+            title: video.title,
+            provider: video.provider,
+            channel: video.channel,
+            difficulty: video.difficulty || 'beginner',
+            duration: video.duration,
+            rating: video.rating,
+            isFree: true,
+            estimatedCost: 0,
+            url: video.url,
+            relevanceScore: this._calculateRelevance(skill, 'beginner', 'remember'),
+            isCurated: true, // Mark as curated to skip health check
+          });
+        });
+      } else {
+        // Fallback to generated recommendations
+        resources.push({
+          type: 'video',
+          title: `${skill} Tutorial for ${difficulty === 'beginner' ? 'Beginners' : 'Intermediate'}`,
+          provider: 'YouTube',
+          difficulty: 'beginner',
+          duration: this._calculateDuration(phaseNumber, 'beginner', 'video'),
+          rating: 4.6 + Math.random() * 0.4,
+          isFree: true,
+          estimatedCost: 0,
+          url: realResourceUrlService.getRealUrl({
+            skill,
+            type: 'video',
+            difficulty: 'beginner',
+            provider: 'YouTube',
+          }),
+          relevanceScore: this._calculateRelevance(skill, 'beginner', 'remember'),
+        });
+      }
     }
 
     // Documentation (always include for fundamentals)
     if (resourceTypes.includes('documentation')) {
-      resources.push({
-        type: 'documentation',
-        title: `Official ${skill} Documentation`,
-        provider: 'Official Docs',
-        difficulty: 'intermediate', // Docs are usually intermediate+
-        duration: 'Reference',
-        rating: 5.0,
-        isFree: true,
-        estimatedCost: 0,
-        url: `https://docs.example.com/${skill}`,
-        relevanceScore: 0.9, // Docs are always relevant
-      });
+      if (hasCurated) {
+        // Use curated documentation
+        const curatedDocs = curatedResourcesDatabase.getResources(skill, 'documentation', null, 1);
+        curatedDocs.forEach(doc => {
+          resources.push({
+            type: 'documentation',
+            title: doc.title,
+            provider: doc.provider,
+            difficulty: doc.difficulty || 'intermediate',
+            duration: 'Reference',
+            rating: doc.rating || 5.0,
+            isFree: true,
+            estimatedCost: 0,
+            url: doc.url,
+            relevanceScore: 0.9,
+            isCurated: true, // Mark as curated to skip health check
+          });
+        });
+      } else {
+        // Fallback to official docs
+        resources.push({
+          type: 'documentation',
+          title: `Official ${skill} Documentation`,
+          provider: 'Official Docs',
+          difficulty: 'intermediate',
+          duration: 'Reference',
+          rating: 5.0,
+          isFree: true,
+          estimatedCost: 0,
+          url: realResourceUrlService.getRealUrl({
+            skill,
+            type: 'documentation',
+          }),
+          relevanceScore: 0.9,
+        });
+      }
     }
 
-    // Articles for advanced stages
-    if (resourceTypes.includes('article') && phaseNumber >= 3) {
-      resources.push({
-        type: 'article',
-        title: `Advanced ${skill}: ${this._getAdvancedTopic(learningStage)}`,
-        provider: 'Tech Blog - Authoritative Source',
-        difficulty: 'advanced',
-        duration: '30 minutes',
-        rating: 4.3 + Math.random() * 0.4,
-        isFree: true,
-        estimatedCost: 0,
-        url: `https://blog.example.com/${skill}-advanced`,
-        relevanceScore: this._calculateRelevance(skill, 'advanced', learningStage),
-      });
-    }
+    // Articles for advanced stages - only if we have curated articles or skip
+    // Skip articles if we don't have curated ones (avoid search URLs)
+    // if (resourceTypes.includes('article') && phaseNumber >= 3) {
+    //   // Only add articles if we have curated ones
+    //   // For now, skip to avoid search URLs
+    // }
 
     return resources;
   }

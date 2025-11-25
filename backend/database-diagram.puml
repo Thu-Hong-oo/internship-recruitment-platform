@@ -1,0 +1,432 @@
+@startuml Internship Recruitment Platform - MongoDB Database Schema
+
+' Định nghĩa style cho diagram
+skinparam class {
+    BackgroundColor<<Collection>> LightBlue
+    BackgroundColor<<Embedded>> LightYellow
+    BackgroundColor<<Reference>> LightGreen
+    BorderColor Black
+    ArrowColor Black
+}
+
+skinparam linetype ortho
+
+' ================================
+' MAIN COLLECTIONS
+' ================================
+
+class Users <<Collection>> {
+    + _id : ObjectId
+    --
+    + email : String
+    + passwordHash : String
+    + role : Enum
+    --
+    + name : String
+    + phone : String
+    + avatar : String
+    + isActive : Boolean
+    + emailVerified : Boolean
+    + lastLogin : DateTime
+    --
+    + candidateProfile : ObjectId
+    + employerProfile : ObjectId
+    --
+    + createdAt : DateTime
+    + updatedAt : DateTime
+}
+
+class Candidate <<Collection>> {
+    + _id : ObjectId
+    --
+    + userId : ObjectId
+    --
+    + fullName : String
+    + dateOfBirth : Date
+    + gender : Enum
+    + phoneNumber : String
+    + email : String
+    --
+    + headline : String
+    + summary : Text
+    + yearsOfExperience : Number
+    + currentJobTitle : String
+    + expectedSalary : Number
+    + jobSearchStatus : Enum
+    --
+    + profileCompleteness : Number
+    + isProfilePublic : Boolean
+    + createdAt : DateTime
+    + updatedAt : DateTime
+}
+
+class Employer <<Collection>> {
+    + _id : ObjectId
+    --
+    + userId : ObjectId
+    + companyId : ObjectId
+    --
+    + position : String
+    + department : String
+    + isVerified : Boolean
+    + verificationDocument : String
+    --
+    + memberStatus : Enum
+    + joinedAt : DateTime
+    + createdAt : DateTime
+    + updatedAt : DateTime
+}
+
+class Company <<Collection>> {
+    + _id : ObjectId
+    --
+    + name : String
+    + slug : String
+    + logo : String
+    + coverImage : String
+    + website : String
+    + email : String
+    + phone : String
+    --
+    + industry : ObjectId
+    + companySize : Enum
+    + foundedYear : Number
+    + taxCode : String
+    --
+    + description : Text
+    + mission : Text
+    + vision : Text
+    + workingEnvironment : Text
+    --
+    + isVerified : Boolean
+    + isActive : Boolean
+    --
+    + createdAt : DateTime
+    + updatedAt : DateTime
+}
+
+class Industry <<Collection>> {
+    + _id : ObjectId
+    --
+    + name : String
+    + code : String
+    + description : Text
+    + icon : String
+    + isActive : Boolean
+    + order : Number
+    --
+    + createdAt : DateTime
+    + updatedAt : DateTime
+}
+
+class Skill <<Collection>> {
+    + _id : ObjectId
+    --
+    + name : String
+    + category : Enum
+    + description : Text
+    + isActive : Boolean
+    + popularityScore : Number
+    --
+    + createdAt : DateTime
+    + updatedAt : DateTime
+}
+
+class Job <<Collection>> {
+    + _id : ObjectId
+    --
+    + companyId : ObjectId
+    + employerId : ObjectId
+    + industry : ObjectId
+    --
+    + title : String
+    + slug : String
+    + description : Text
+    --
+    + jobType : Enum
+    + jobLevel : Enum
+    + experienceRequired : Number
+    --
+    + status : Enum
+    + publishedAt : DateTime
+    + expiryDate : DateTime
+    + vacancies : Number
+    --
+    + createdAt : DateTime
+    + updatedAt : DateTime
+}
+
+class JobApplication <<Collection>> {
+    + _id : ObjectId
+    --
+    + jobId : ObjectId
+    + candidateId : ObjectId
+    + reviewedBy : ObjectId
+    --
+    + coverLetter : Text
+    --
+    + status : Enum
+    + appliedAt : DateTime
+    --
+    + recruiterNotes : Text
+    + reviewedAt : DateTime
+    --
+    + createdAt : DateTime
+    + updatedAt : DateTime
+}
+
+class SavedJob <<Collection>> {
+    + _id : ObjectId
+    --
+    + candidateId : ObjectId
+    + jobId : ObjectId
+    --
+    + savedAt : DateTime
+    + notes : Text
+    --
+    + createdAt : DateTime
+    + updatedAt : DateTime
+}
+
+class Notification <<Collection>> {
+    + _id : ObjectId
+    --
+    + userId : ObjectId
+    + relatedJob : ObjectId
+    + relatedApplication : ObjectId
+    + relatedUser : ObjectId
+    --
+    + type : Enum
+    + title : String
+    + content : Text
+    + actionUrl : String
+    --
+    + isRead : Boolean
+    + readAt : DateTime
+    + sentAt : DateTime
+    --
+    + createdAt : DateTime
+    + updatedAt : DateTime
+}
+
+class RoleSkipAnalysis <<Collection>> {
+    + _id : ObjectId
+    --
+    + candidateId : ObjectId
+    --
+    + analysisType : Enum
+    --
+    + overallScore : Number
+    --
+    + aiModel : String
+    + confidence : Number
+    + analyzedAt : DateTime
+    --
+    + createdAt : DateTime
+    + updatedAt : DateTime
+}
+
+class LearningResource <<Collection>> {
+    + _id : ObjectId
+    --
+    + title : String
+    + description : Text
+    + type : Enum
+    + url : String
+    + thumbnailUrl : String
+    --
+    + provider : String
+    + author : String
+    + duration : Number
+    + level : Enum
+    + language : String
+    --
+    + isFree : Boolean
+    + price : Number
+    + currency : String
+    --
+    + rating : Number
+    + totalReviews : Number
+    + qualityScore : Number
+    --
+    + isActive : Boolean
+    + isVerified : Boolean
+    --
+    + createdAt : DateTime
+    + updatedAt : DateTime
+}
+
+class LearningRoadmap <<Collection>> {
+    + _id : ObjectId
+    --
+    + candidateId : ObjectId
+    + targetJobId : ObjectId
+    --
+    + title : String
+    + description : Text
+    + totalDuration : Number
+    + difficultyLevel : Enum
+    --
+    + generatedBy : String
+    + generatedAt : DateTime
+    + isCustomized : Boolean
+    --
+    + status : Enum
+    --
+    + createdAt : DateTime
+    + updatedAt : DateTime
+}
+
+class CompanyReview <<Collection>> {
+    + _id : ObjectId
+    --
+    + companyId : ObjectId
+    + userId : ObjectId
+    --
+    + rating : Number
+    + title : String
+    + pros : Text
+    + cons : Text
+    + advice : Text
+    --
+    + jobTitle : String
+    + employmentStatus : Enum
+    + yearsWorked : Number
+    --
+    + isVerified : Boolean
+    + isApproved : Boolean
+    + isAnonymous : Boolean
+    --
+    + createdAt : DateTime
+    + updatedAt : DateTime
+}
+
+' ================================
+' EMBEDDED SUBDOCUMENTS
+' ================================
+
+class CandidateSkill <<Embedded>> {
+    + skillId : ObjectId
+    + skillName : String
+    + proficiencyLevel : Enum
+    + yearsOfExperience : Number
+    + lastUsed : Date
+}
+
+class WorkExperience <<Embedded>> {
+    + jobTitle : String
+    + companyName : String
+    + location : String
+    + startDate : Date
+    + endDate : Date
+    + isCurrent : Boolean
+    + description : Text
+}
+
+class Education <<Embedded>> {
+    + degree : String
+    + major : String
+    + institution : String
+    + startDate : Date
+    + endDate : Date
+    + gpa : Number
+    + description : String
+}
+
+class Certification <<Embedded>> {
+    + name : String
+    + issuingOrganization : String
+    + issueDate : Date
+    + expiryDate : Date
+    + credentialId : String
+    + credentialUrl : String
+}
+
+class Project <<Embedded>> {
+    + title : String
+    + description : Text
+    + role : String
+    + startDate : Date
+    + endDate : Date
+    + projectUrl : String
+}
+
+class JobSkill <<Embedded>> {
+    + skillId : ObjectId
+    + skillName : String
+    + proficiencyLevel : Enum
+    + isRequired : Boolean
+}
+
+class LearningPhase <<Embedded>> {
+    + phaseNumber : Number
+    + title : String
+    + description : Text
+    + duration : Number
+}
+
+class LearningStep <<Embedded>> {
+    + stepNumber : Number
+    + title : String
+    + description : Text
+    + estimatedTime : Number
+    + isCompleted : Boolean
+    + completedAt : DateTime
+}
+
+' ================================
+' RELATIONSHIPS
+' ================================
+
+Users "1" -- "0..1" Candidate
+Users "1" -- "0..1" Employer
+
+Company "1" -- "*" Employer
+Company "1" -- "*" Job
+Company "1" -- "*" CompanyReview
+Industry "1" -- "*" Company
+Industry "1" -- "*" Job
+
+Job "1" -- "*" JobApplication
+Job "1" -- "*" SavedJob
+Employer "1" -- "*" Job
+
+Candidate "1" -- "*" JobApplication
+Candidate "1" -- "*" SavedJob
+Candidate "1" -- "*" LearningRoadmap
+Candidate "1" -- "*" RoleSkipAnalysis
+
+Users "1" -- "*" Notification
+Job "1" -- "*" Notification
+JobApplication "1" -- "*" Notification
+
+Candidate "*" -- "*" Skill
+Job "*" -- "*" Skill
+LearningResource "*" -- "*" Skill
+LearningRoadmap "*" -- "*" Skill
+
+LearningRoadmap "1" *-- "*" LearningPhase
+LearningPhase "1" *-- "*" LearningStep
+LearningStep "*" -- "*" LearningResource
+
+Candidate "1" *-- "*" CandidateSkill
+Candidate "1" *-- "*" WorkExperience
+Candidate "1" *-- "*" Education
+Candidate "1" *-- "*" Certification
+Candidate "1" *-- "*" Project
+Job "1" *-- "*" JobSkill
+
+Employer "1" -- "*" JobApplication
+
+legend right
+  |= Color |= Type |
+  |<#LightBlue> | MongoDB Collection |
+  |<#LightYellow> | Embedded Document |
+  |<#LightGreen> | Reference Field |
+  
+  **Relationship Types:**
+  -- : Reference (ObjectId)
+  *-- : Embedded (Nested)
+endlegend
+
+@enduml
