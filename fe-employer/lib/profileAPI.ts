@@ -149,3 +149,56 @@ export const updateEmployerProfile = async (
     };
   }
 };
+
+// Upload avatar
+export const uploadAvatar = async (
+  token: string,
+  file: File
+): Promise<{
+  success: boolean;
+  data?: {
+    avatar?: string;
+    user?: any;
+  };
+  error?: string;
+  message?: string;
+}> => {
+  try {
+    if (!token) {
+      return { success: false, error: "Token không hợp lệ" };
+    }
+
+    // Create FormData
+    const formData = new FormData();
+    formData.append("avatar", file);
+
+    const response = await fetch(`${API_BASE_URL}/users/avatar`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        // Don't set Content-Type header, let browser set it with boundary
+      },
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: data?.error || data?.message || "Upload avatar thất bại",
+      };
+    }
+
+    return {
+      success: true,
+      data: data?.data,
+      message: data?.message,
+    };
+  } catch (error: any) {
+    return {
+      success: false,
+      error: error?.message || "Không thể kết nối máy chủ",
+    };
+  }
+};

@@ -34,7 +34,7 @@ import {
   Circle,
 } from "lucide-react";
 import { User, getUserData, getToken, clearUserData } from "@/lib/userStorage";
-import { logoutEmployer } from "@/lib/api";
+import { logoutEmployer, getEmployerProfile } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import VerificationProgress from "@/components/VerificationProgress";
 import { useVerificationContext } from "@/contexts/VerificationContext";
@@ -50,7 +50,7 @@ export default function DashboardPage() {
   });
 
   useEffect(() => {
-    // Load user data from localStorage
+    // Load user data from localStorage first (for immediate display)
     const loadUserData = () => {
       const userData = getUserData();
       if (userData) {
@@ -59,6 +59,34 @@ export default function DashboardPage() {
     };
 
     loadUserData();
+
+    // Fetch profile data from API to get latest avatar and name
+    const fetchProfile = async () => {
+      try {
+        const token = getToken();
+        if (!token) return;
+
+        const json = await getEmployerProfile(token);
+        const profile = json?.data || json?.profile || null;
+
+        if (profile && profile.user) {
+          // Update user state with latest avatar from API
+          setUser((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              fullName: profile.user.fullName || prev.fullName,
+              avatar: profile.user.avatar || prev.avatar,
+            };
+          });
+        }
+      } catch (err) {
+        // Silent fail - fallback to localStorage data
+        console.error("Failed to fetch profile:", err);
+      }
+    };
+
+    fetchProfile();
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
@@ -92,7 +120,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="flex">
         {/* Left Sidebar */}
-        <aside className="w-64 bg-white shadow-sm min-h-screen">
+        <aside className="w-74 bg-white shadow-sm min-h-screen">
           {/* User Info */}
           <div className="p-4 border-b">
             <div className="flex items-center gap-3">
@@ -143,58 +171,14 @@ export default function DashboardPage() {
                   Bảng tin
                 </Button>
               </li>
-              <li>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-slate-700 hover:bg-primary/10 hover:text-primary"
-                >
-                  <TrendingUp className="w-4 h-4 mr-3" />
-                  InternBridge Insights
-                </Button>
-              </li>
-              <li>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-slate-700 hover:bg-primary/10 hover:text-primary"
-                >
-                  <Star className="w-4 h-4 mr-3" />
-                  InternBridge Rewards
-                </Button>
-              </li>
-              <li>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-slate-700 hover:bg-primary/10 hover:text-primary"
-                >
-                  <Gift className="w-4 h-4 mr-3" />
-                  Đối qua
-                </Button>
-              </li>
-              <li>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-slate-700 hover:bg-primary/10 hover:text-primary"
-                >
-                  <Bot className="w-4 h-4 mr-3" />
-                  Toppy AI - Đề xuất
-                </Button>
-              </li>
+
               <li>
                 <Button
                   variant="ghost"
                   className="w-full justify-start text-slate-700 hover:bg-primary/10 hover:text-primary"
                 >
                   <FileText className="w-4 h-4 mr-3" />
-                  CV đề xuất
-                </Button>
-              </li>
-              <li>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-slate-700 hover:bg-primary/10 hover:text-primary"
-                >
-                  <Briefcase className="w-4 h-4 mr-3" />
-                  Chiến dịch tuyển dụng
+                  Đề xuất CV
                 </Button>
               </li>
               <li>
@@ -214,7 +198,7 @@ export default function DashboardPage() {
                     className="w-full justify-start text-slate-700 hover:bg-primary/10 hover:text-primary"
                   >
                     <FolderOpen className="w-4 h-4 mr-3" />
-                    Quản lý CV
+                    Quản lý ứng viên
                     <ChevronDown className="w-4 h-4 ml-auto" />
                   </Button>
                   <div className="ml-6 space-y-1">
@@ -222,18 +206,16 @@ export default function DashboardPage() {
                       variant="ghost"
                       size="sm"
                       className="w-full justify-start text-slate-600 hover:bg-primary/10 hover:text-primary"
+                      onClick={() => router.push("/applications")}
                     >
-                      Quản lý nhân CV
-                      <Badge className="ml-auto bg-blue-500 text-white text-xs">
-                        Beta
-                      </Badge>
+                      Quản lý ứng viên đã ứng tuyển
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
                       className="w-full justify-start text-slate-600 hover:bg-primary/10 hover:text-primary"
                     >
-                      Quản lý yêu cầu kết nối CV
+                      Khám phá ứng viên tiềm năng
                     </Button>
                   </div>
                 </div>
@@ -244,7 +226,7 @@ export default function DashboardPage() {
                   className="w-full justify-start text-slate-700 hover:bg-primary/10 hover:text-primary"
                 >
                   <BarChart3 className="w-4 h-4 mr-3" />
-                  Báo cáo tuyển dụng
+                  Thống kê
                 </Button>
               </li>
               <li>
@@ -263,18 +245,6 @@ export default function DashboardPage() {
         {/* Main Content */}
         <main className="flex-1 p-6">
           <div className="max-w-6xl mx-auto">
-            {/* Debug: Manual refresh button */}
-            <div className="mb-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={refreshVerification}
-                className="text-xs"
-              >
-                🔄 Refresh Verification Status
-              </Button>
-            </div>
-
             {/* Verification Progress */}
             <VerificationProgress />
 
@@ -327,17 +297,16 @@ export default function DashboardPage() {
               {/* Recent Activity */}
               <Card className="md:col-span-2 lg:col-span-3">
                 <CardHeader>
-                  <CardTitle>Hoạt động gần đây</CardTitle>
+                  <CardTitle>Cần tìm kiếm ứng viên?</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-center py-8 text-gray-500">
                     <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>Chưa có hoạt động nào</p>
                     <Button
                       className="mt-4"
                       onClick={() => router.push("/jobs/create-job")}
                     >
-                      Tạo tin tuyển dụng đầu tiên
+                      Đăng bài tuyển dụng ngay
                     </Button>
                   </div>
                 </CardContent>

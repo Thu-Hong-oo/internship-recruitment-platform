@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { createJob, CreateJobPayload } from "@/lib/jobAPI";
+import { useRouter, useParams } from "next/navigation";
+import { CreateJobPayload } from "@/lib/jobAPI";
 import { industryService, Industry } from "@/lib/industryAPI";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,8 +17,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X, Plus } from "lucide-react";
+import { X, Plus, ArrowLeft } from "lucide-react";
 import { getCities, getDistricts, getWards } from "@/lib/vietnamAddress";
+import { findOptionByLabelLoose } from "@/lib/addressUtils";
+import { getJobById } from "@/lib/jobAPI";
+import { getToken } from "@/lib/userStorage";
 
 const JOB_LEVELS = [
   { value: "Intern", label: "Thực tập sinh" },
@@ -47,11 +50,14 @@ const CURRENCIES = [
   { value: "USD", label: "USD (Đô la Mỹ)" },
 ];
 
-export default function CreateJobPage() {
+export default function EditJobPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const params = useParams();
+  const jobId = params?.id as string;
+
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState<CreateJobPayload>({
     title: "",
@@ -75,9 +81,6 @@ export default function CreateJobPage() {
     deadline: "",
   });
 
-  // Separate state for street address (detailed address)
-  const [streetAddress, setStreetAddress] = useState<string>("");
-
   const [newSkill, setNewSkill] = useState("");
   const [industries, setIndustries] = useState<Industry[]>([]);
   const [subIndustries, setSubIndustries] = useState<Industry[]>([]);
@@ -95,6 +98,149 @@ export default function CreateJobPage() {
   const [selectedWard, setSelectedWard] = useState<string>("");
   const [loadingAddress, setLoadingAddress] = useState(false);
 
+  // Load job data on mount
+  useEffect(() => {
+    const loadJobData = async () => {
+      try {
+        setLoading(true);
+        const token = getToken();
+        if (!token) {
+          setError("Vui lòng đăng nhập");
+          return;
+        }
+
+        const result = await getJobById(jobId, token);
+        if (!result.success || !result.data) {
+          setError(result.error || "Không tìm thấy bài tuyển dụng");
+          return;
+        }
+
+        const job = result.data;
+
+        // Map address object to location string and address field
+        let locationString = "";
+        let addressString = "";
+
+        if (job.address) {
+          // Use fullAddress if available, otherwise construct from parts
+          if (job.address.fullAddress) {
+            locationString = job.address.fullAddress;
+          } else if (
+            job.address.ward &&
+            job.address.district &&
+            job.address.city
+          ) {
+            locationString = `${job.address.ward}, ${job.address.district}, ${job.address.city}`;
+          }
+          addressString = job.address.street || "";
+        } else if (job.location) {
+          // Fallback to location field if address object doesn't exist
+          locationString = job.location;
+        }
+
+        // Map skills - use skills array (string[]) or extract from skillIds
+        const skillsArray =
+          job.skills ||
+          (job.skillIds ? job.skillIds.map((s: any) => s.name || s) : []);
+
+        const formDataPayload: CreateJobPayload = {
+          title: job.title || "",
+          slug: job.slug || "",
+          description: job.description || "",
+          requirements: job.requirements || "",
+          benefits: job.benefits || "",
+          skills: skillsArray,
+          skillIds: job.skillIds
+            ? job.skillIds.map((s: any) => s._id || s.id || s)
+            : [],
+          level: job.level || "",
+          jobType: job.jobType || "",
+          workingMode: job.workingMode || "",
+          location: locationString,
+          address: addressString,
+          salaryMin: job.salaryMin,
+          salaryMax: job.salaryMax,
+          currency: job.currency || "VND",
+          industryCode: job.industryCode || "",
+          subIndustryCode: job.subIndustryCode || "",
+          positions: job.positions || 1,
+          deadline: job.deadline
+            ? new Date(job.deadline).toISOString().slice(0, 16)
+            : "",
+        };
+
+        // Load cities first
+        const citiesData = await getCities();
+        setCities(citiesData);
+
+        // Set form data
+        setFormData(formDataPayload);
+
+        // Parse location string to set address dropdowns
+        if (locationString) {
+          await parseAndSetLocation(locationString, citiesData);
+        }
+      } catch (err) {
+        setError("Không thể tải dữ liệu bài tuyển dụng");
+        console.error("Failed to load job:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (jobId) {
+      loadJobData();
+    }
+  }, [jobId]);
+
+  // Parse location string and set address dropdowns
+  const parseAndSetLocation = async (
+    locationString: string,
+    citiesData: { value: string; label: string }[]
+  ) => {
+    try {
+      // Location format: "Phường/Xã, Quận/Huyện, Tỉnh/Thành phố"
+      const parts = locationString.split(",").map((p) => p.trim());
+
+      if (parts.length >= 3) {
+        const wardName = parts[0];
+        const districtName = parts[1];
+        const cityName = parts[2];
+
+        // Find and set city
+        const cityOption = findOptionByLabelLoose(citiesData, cityName);
+        if (cityOption) {
+          setSelectedCity(cityOption.value);
+
+          // Load districts for selected city
+          const districtsData = await getDistricts(cityOption.value);
+          setDistricts(districtsData);
+
+          // Find and set district
+          const districtOption = findOptionByLabelLoose(
+            districtsData,
+            districtName
+          );
+          if (districtOption) {
+            setSelectedDistrict(districtOption.value);
+
+            // Load wards for selected district
+            const wardsData = await getWards(districtOption.value);
+            setWards(wardsData);
+
+            // Find and set ward
+            const wardOption = findOptionByLabelLoose(wardsData, wardName);
+            if (wardOption) {
+              setSelectedWard(wardOption.value);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to parse location:", err);
+    }
+  };
+
   // Load root industries on mount
   useEffect(() => {
     const loadIndustries = async () => {
@@ -111,21 +257,23 @@ export default function CreateJobPage() {
     loadIndustries();
   }, []);
 
-  // Load cities on mount
+  // Load cities on mount (only if not already loaded)
   useEffect(() => {
     const loadCities = async () => {
-      setLoadingAddress(true);
-      try {
-        const data = await getCities();
-        setCities(data);
-      } catch (err) {
-        console.error("Failed to load cities:", err);
-      } finally {
-        setLoadingAddress(false);
+      if (cities.length === 0) {
+        setLoadingAddress(true);
+        try {
+          const data = await getCities();
+          setCities(data);
+        } catch (err) {
+          console.error("Failed to load cities:", err);
+        } finally {
+          setLoadingAddress(false);
+        }
       }
     };
     loadCities();
-  }, []);
+  }, [cities.length]);
 
   // Load districts when city changes
   useEffect(() => {
@@ -135,10 +283,12 @@ export default function CreateJobPage() {
         try {
           const data = await getDistricts(selectedCity);
           setDistricts(data);
-          // Reset district and ward when city changes
-          setSelectedDistrict("");
-          setSelectedWard("");
-          setWards([]);
+          // Reset district and ward when city changes (unless initializing)
+          if (!formData.location) {
+            setSelectedDistrict("");
+            setSelectedWard("");
+            setWards([]);
+          }
         } catch (err) {
           console.error("Failed to load districts:", err);
           setDistricts([]);
@@ -147,9 +297,11 @@ export default function CreateJobPage() {
         }
       } else {
         setDistricts([]);
-        setSelectedDistrict("");
-        setSelectedWard("");
-        setWards([]);
+        if (!formData.location) {
+          setSelectedDistrict("");
+          setSelectedWard("");
+          setWards([]);
+        }
       }
     };
     loadDistricts();
@@ -163,8 +315,10 @@ export default function CreateJobPage() {
         try {
           const data = await getWards(selectedDistrict);
           setWards(data);
-          // Reset ward when district changes
-          setSelectedWard("");
+          // Reset ward when district changes (unless initializing)
+          if (!formData.location) {
+            setSelectedWard("");
+          }
         } catch (err) {
           console.error("Failed to load wards:", err);
           setWards([]);
@@ -173,7 +327,9 @@ export default function CreateJobPage() {
         }
       } else {
         setWards([]);
-        setSelectedWard("");
+        if (!formData.location) {
+          setSelectedWard("");
+        }
       }
     };
     loadWards();
@@ -213,8 +369,6 @@ export default function CreateJobPage() {
             formData.industryCode
           );
           setSubIndustries(data);
-          // Reset subIndustryCode when industry changes
-          setFormData((prev) => ({ ...prev, subIndustryCode: "" }));
         } catch (err) {
           console.error("Failed to load sub-industries:", err);
           setSubIndustries([]);
@@ -223,7 +377,6 @@ export default function CreateJobPage() {
         }
       } else {
         setSubIndustries([]);
-        setFormData((prev) => ({ ...prev, subIndustryCode: "" }));
       }
     };
     loadSubIndustries();
@@ -277,46 +430,22 @@ export default function CreateJobPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setSaving(true);
     setError(null);
 
     try {
-      const token =
-        localStorage.getItem("token") || sessionStorage.getItem("token");
-      if (!token) {
-        setError("Vui lòng đăng nhập để tạo bài tuyển dụng");
-        setLoading(false);
-        return;
-      }
-
       // Format deadline to ISO string
       let deadline = formData.deadline;
       if (deadline) {
-        // datetime-local returns format: "YYYY-MM-DDTHH:mm" (local time)
-        // Convert to ISO string with UTC timezone
         const date = new Date(deadline);
         if (!isNaN(date.getTime())) {
           deadline = date.toISOString();
         } else {
           setError("Ngày hết hạn không hợp lệ");
-          setLoading(false);
+          setSaving(false);
           return;
         }
       }
-
-      // Build address object from selected values
-      const wardObj = wards.find((w) => w.value === selectedWard);
-      const districtObj = districts.find((d) => d.value === selectedDistrict);
-      const cityObj = cities.find((c) => c.value === selectedCity);
-
-      const addressObject = {
-        street: streetAddress || undefined,
-        ward: wardObj?.label || undefined,
-        district: districtObj?.label || undefined,
-        city: cityObj?.label || undefined,
-        country: "Vietnam",
-        fullAddress: formData.location || undefined,
-      };
 
       // Prepare payload
       const payload: CreateJobPayload = {
@@ -325,8 +454,7 @@ export default function CreateJobPage() {
         // Remove empty optional fields
         slug: formData.slug || undefined,
         benefits: formData.benefits || undefined,
-        address: addressObject,
-        location: formData.location || undefined,
+        address: formData.address || undefined,
         skillIds: formData.skillIds?.length ? formData.skillIds : undefined,
         level: formData.level || undefined,
         jobType: formData.jobType || undefined,
@@ -335,30 +463,61 @@ export default function CreateJobPage() {
         subIndustryCode: formData.subIndustryCode || undefined,
       };
 
-      const result = await createJob(payload, token);
+      // TODO: Replace with actual API call
+      // const token = localStorage.getItem("token") || sessionStorage.getItem("token");
+      // if (!token) {
+      //   setError("Vui lòng đăng nhập để cập nhật bài tuyển dụng");
+      //   setSaving(false);
+      //   return;
+      // }
+      // const result = await updateJob(jobId, payload, token);
 
-      if (result.success) {
-        setSuccess(true);
-        setTimeout(() => router.push("/jobs"), 1500);
-      } else {
-        setError(result.error || "Có lỗi xảy ra khi tạo bài tuyển dụng");
-      }
+      // For now, just log the payload
+      console.log("Update Job Payload:", {
+        jobId,
+        payload,
+      });
+
+      // Simulate success
+      alert(
+        "Chức năng cập nhật chưa được kết nối với endpoint. Payload đã được log ra console."
+      );
+
+      // Uncomment when endpoint is ready:
+      // if (result.success) {
+      //   router.push("/jobs");
+      // } else {
+      //   setError(result.error || "Có lỗi xảy ra khi cập nhật bài tuyển dụng");
+      // }
     } catch (err) {
-      setError("Có lỗi xảy ra khi tạo bài tuyển dụng");
+      setError("Có lỗi xảy ra khi cập nhật bài tuyển dụng");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  if (success) {
+  if (loading) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <Card>
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-gray-600">Đang tải dữ liệu bài tuyển dụng...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !formData.title) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <Card className="border-red-200 bg-red-50">
           <CardContent className="p-6 text-center">
-            <div className="text-green-600 text-lg font-semibold mb-2">
-              ✅ Tin của bạn đã được lưu nháp!
-            </div>
-            <p className="text-gray-600">Đang chuyển về trang quản lý tin...</p>
+            <p className="text-red-600 mb-4">{error}</p>
+            <Button onClick={() => router.push("/jobs")} variant="outline">
+              Quay lại danh sách
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -368,10 +527,21 @@ export default function CreateJobPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold mb-2">Tạo bài tuyển dụng mới</h1>
-        <p className="text-gray-600">
-          Điền thông tin chi tiết về vị trí tuyển dụng
-        </p>
+        <div className="flex items-center gap-4 mb-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.back()}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Quay lại
+          </Button>
+        </div>
+        <h1 className="text-2xl font-semibold mb-2">
+          Chỉnh sửa bài tuyển dụng
+        </h1>
+        <p className="text-gray-600">Cập nhật thông tin về vị trí tuyển dụng</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -620,8 +790,8 @@ export default function CreateJobPage() {
               </Label>
               <Input
                 id="address"
-                value={streetAddress}
-                onChange={(e) => setStreetAddress(e.target.value)}
+                value={formData.address}
+                onChange={(e) => handleInputChange("address", e.target.value)}
                 placeholder="Ví dụ: 123 Nguyễn Huệ, Tòa nhà ABC"
               />
             </div>
@@ -805,12 +975,12 @@ export default function CreateJobPage() {
             type="button"
             variant="outline"
             onClick={() => router.back()}
-            disabled={loading}
+            disabled={saving}
           >
             Hủy
           </Button>
-          <Button type="submit" disabled={loading}>
-            {loading ? "Đang tạo..." : "Tạo bài tuyển dụng"}
+          <Button type="submit" disabled={saving}>
+            {saving ? "Đang lưu..." : "Lưu thay đổi"}
           </Button>
         </div>
       </form>

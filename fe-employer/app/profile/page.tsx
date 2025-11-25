@@ -20,11 +20,20 @@ import {
   Building,
   Edit3,
   AlertCircle,
+  Upload,
+  Camera,
+  X,
 } from "lucide-react";
-import { User as UserType, getUserData, getToken } from "@/lib/userStorage";
+import {
+  User as UserType,
+  getUserData,
+  getToken,
+  saveUserData,
+} from "@/lib/userStorage";
 import { EMPLOYER_LEVEL_LABEL } from "@/lib/labels";
 import { getEmployerProfile } from "@/lib/api";
-import { updateEmployerProfile } from "@/lib/profileAPI";
+import { updateEmployerProfile, uploadAvatar } from "@/lib/profileAPI";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useVerificationContext } from "@/contexts/VerificationContext";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -57,6 +66,10 @@ export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState<any>(null);
   const [isPlaceholder, setIsPlaceholder] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
   const levelLabel = EMPLOYER_LEVEL_LABEL;
 
   // Form data
@@ -124,6 +137,13 @@ export default function ProfilePage() {
             department: apiPosition.department ?? prev.position.department,
           },
         }));
+
+        // Set avatar URL from profile
+        if (profile.user?.avatar) {
+          setAvatarUrl(profile.user.avatar);
+        } else if (user?.avatar) {
+          setAvatarUrl(user.avatar);
+        }
       } catch (err) {
         // Silent fail for initial prefill; detailed errors shown on submit flow.
       }
@@ -148,6 +168,132 @@ export default function ProfilePage() {
       }
       return prev;
     });
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      setAvatarError("Vui lòng chọn file ảnh");
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError("Kích thước file không được vượt quá 5MB");
+      return;
+    }
+
+    setAvatarError("");
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatarPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAvatarUpload = async () => {
+    if (!avatarPreview) return;
+
+    setUploadingAvatar(true);
+    setAvatarError("");
+
+    try {
+      const token = getToken();
+      if (!token) {
+        setAvatarError("Vui lòng đăng nhập lại");
+        return;
+      }
+
+      // Get the file from the input
+      const fileInput = document.getElementById(
+        "avatar-input"
+      ) as HTMLInputElement;
+      const file = fileInput?.files?.[0];
+      if (!file) {
+        setAvatarError("Không tìm thấy file");
+        return;
+      }
+
+      const result = await uploadAvatar(token, file);
+
+      if (result.success) {
+        // Update avatar URL
+        if (result.data?.avatar) {
+          setAvatarUrl(result.data.avatar);
+        } else if (result.data?.user?.avatar) {
+          setAvatarUrl(result.data.user.avatar);
+        }
+
+        // Clear preview
+        setAvatarPreview(null);
+
+        // Refresh profile data
+        const json = await getEmployerProfile(token);
+        const profile = json?.data || json?.profile || null;
+        if (profile) {
+          setProfileData(profile);
+          if (profile.user?.avatar) {
+            setAvatarUrl(profile.user.avatar);
+            // Update user state
+            setUser((prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                avatar: profile.user.avatar,
+              };
+            });
+
+            // Update localStorage with new avatar
+            const userData = getUserData();
+            if (userData) {
+              const updatedUser = {
+                ...userData,
+                avatar: profile.user.avatar,
+              };
+              // Save to both localStorage and sessionStorage to ensure consistency
+              saveUserData(updatedUser, true); // Save to localStorage
+              if (typeof window !== "undefined") {
+                sessionStorage.setItem("user", JSON.stringify(updatedUser));
+              }
+            }
+          }
+        }
+
+        // Refresh verification status to update header
+        refreshVerification();
+
+        setSuccess("Cập nhật avatar thành công!");
+        setTimeout(() => setSuccess(""), 3000);
+
+        // Reload page after 1.5 seconds to update header and sidebar avatar
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else {
+        setAvatarError(result.error || "Upload avatar thất bại");
+      }
+    } catch (error: any) {
+      setAvatarError(error.message || "Không thể kết nối máy chủ");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleCancelAvatarUpload = () => {
+    setAvatarPreview(null);
+    setAvatarError("");
+    // Reset file input
+    const fileInput = document.getElementById(
+      "avatar-input"
+    ) as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = "";
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -255,6 +401,90 @@ export default function ProfilePage() {
             </AlertDescription>
           </Alert>
         )}
+
+        {/* Avatar Upload Section */}
+        <Card className="mb-6 border border-slate-200 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Camera className="w-5 h-5 text-primary" />
+              Ảnh đại diện
+            </CardTitle>
+            <p className="text-sm text-slate-500">
+              Cập nhật ảnh đại diện của bạn (JPG, PNG, tối đa 5MB)
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-6">
+              {/* Avatar Display */}
+              <div className="relative">
+                <Avatar className="w-24 h-24 border-2 border-slate-200">
+                  {avatarPreview || avatarUrl ? (
+                    <AvatarImage
+                      src={avatarPreview || avatarUrl || ""}
+                      alt={user?.fullName || "Avatar"}
+                      className="object-cover"
+                    />
+                  ) : null}
+                  <AvatarFallback className="bg-primary/10 text-primary text-2xl">
+                    {user?.fullName
+                      ? user.fullName.charAt(0).toUpperCase()
+                      : "U"}
+                  </AvatarFallback>
+                </Avatar>
+                {avatarPreview && (
+                  <div className="absolute -top-2 -right-2 bg-green-500 rounded-full p-1">
+                    <Camera className="w-3 h-3 text-white" />
+                  </div>
+                )}
+              </div>
+
+              {/* Upload Controls */}
+              <div className="flex-1 space-y-3">
+                <div className="flex items-center gap-3">
+                  <label
+                    htmlFor="avatar-input"
+                    className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                  >
+                    <Upload className="w-4 h-4" />
+                    {avatarPreview ? "Chọn ảnh khác" : "Chọn ảnh"}
+                  </label>
+                  <input
+                    id="avatar-input"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    className="hidden"
+                  />
+                  {avatarPreview && (
+                    <>
+                      <Button
+                        type="button"
+                        onClick={handleAvatarUpload}
+                        disabled={uploadingAvatar}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        {uploadingAvatar ? "Đang tải lên..." : "Lưu ảnh"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleCancelAvatarUpload}
+                        disabled={uploadingAvatar}
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Hủy
+                      </Button>
+                    </>
+                  )}
+                </div>
+                {avatarError && (
+                  <p className="text-sm text-red-600">{avatarError}</p>
+                )}
+                {success && <p className="text-sm text-green-600">{success}</p>}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid gap-8 md:grid-cols-2">
