@@ -1,11 +1,14 @@
 const cloudinary = require('cloudinary').v2;
 const multer = require('multer');
 
-// Configure Cloudinary
+// Configure Cloudinary với timeout settings
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
+  // CẢI TIẾN: Tăng timeout cho upload requests
+  timeout: 60000, // 60 seconds (default thường là 30s)
+  secure: true, // Use HTTPS
 });
 
 // Test connection
