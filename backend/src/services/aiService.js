@@ -4,8 +4,22 @@ const { logger } = require('../utils/logger');
 const aiCVEnhancementService = require('./aiCVEnhancementService');
 require('dotenv').config();
 
-// Initialize Gemini with proper model
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Initialize Gemini with proper model (top-level, but will be recreated in getModel() if needed)
+// Note: This is kept for backward compatibility, but getModel() creates its own instance
+const geminiApiKey = process.env.GEMINI_API_KEY?.trim();
+if (!geminiApiKey) {
+  console.error('❌ GEMINI_API_KEY is not set in .env file!');
+  console.error('   Hệ thống sẽ sử dụng fallback parsing (rule-based)');
+} else {
+  if (!geminiApiKey.startsWith('AIzaSy')) {
+    console.error(`❌ GEMINI_API_KEY format is INVALID - must start with "AIzaSy"`);
+    console.error(`   Current key starts with: "${geminiApiKey.substring(0, 6)}"`);
+  } else {
+    console.log(`✅ GEMINI_API_KEY loaded: ${geminiApiKey.substring(0, 10)}...${geminiApiKey.substring(geminiApiKey.length - 4)} (length: ${geminiApiKey.length})`);
+  }
+}
+// Note: genAI instance here is not used, getModel() creates its own
+const genAI = geminiApiKey ? new GoogleGenerativeAI(geminiApiKey) : null;
 
 // Skill Synonyms Dictionary - Xử lý các từ viết tắt và biến thể
 // Giúp matching tốt hơn: JS ↔ JavaScript, Node.js ↔ Nodejs, etc.
@@ -215,21 +229,66 @@ class AIService {
     this.tokenizer = new natural.WordTokenizer();
     this.tfidf = new natural.TfIdf();
     this.lastExtractedText = null;
+    this._cachedModel = null;
+    this._cachedModelName = null;
+  }
 
-    // ✅ Try different Gemini models with fallback
-    const modelName = process.env.GEMINI_MODEL || 'gemini-pro';
-    try {
-      this.model = genAI.getGenerativeModel({ 
-        model: modelName,
-        generationConfig: {
-          maxOutputTokens: 2048,
-        }
-      });
-      logger.info('Gemini model initialized:', modelName);
-    } catch (error) {
-      logger.warn('Failed to initialize Gemini model, using fallback methods', error.message);
-      this.model = null;
+  /**
+   * Get Gemini model instance - reads from env each time to support hot-reload
+   * @returns {Object|null} Gemini model instance or null if unavailable
+   */
+  getModel() {
+    // Get API key and model name from env
+    let apiKey = process.env.GEMINI_API_KEY;
+    const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash';
+    
+    // Check if API key is available
+    if (!apiKey) {
+      console.error('❌ GEMINI_API_KEY is not set. Cannot initialize Gemini model.');
+      return null;
     }
+    
+    // Trim API key to remove any whitespace
+    apiKey = apiKey.trim();
+    
+    // Debug: Log API key info (only first and last few chars for security)
+    console.log(`🔑 API Key Info: ${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)} (length: ${apiKey.length})`);
+    
+    // Validate API key format (basic check)
+    if (!apiKey.startsWith('AIzaSy')) {
+      console.error('❌ GEMINI_API_KEY format is INVALID - must start with "AIzaSy"');
+      console.error(`   Current key starts with: "${apiKey.substring(0, 6)}"`);
+      return null;
+    }
+    
+    if (apiKey.length < 30 || apiKey.length > 50) {
+      console.warn(`⚠️ GEMINI_API_KEY length is unusual: ${apiKey.length} (expected ~39 chars)`);
+    }
+    
+    // If model name changed or model not cached, create new instance
+    // ✅ Code chuẩn theo hướng dẫn: Khởi tạo genAI và model đúng cách
+    if (!this._cachedModel || this._cachedModelName !== modelName) {
+      try {
+        // ✅ Bước 1: Khởi tạo GoogleGenerativeAI với API key (đã trim)
+        const genAI = new GoogleGenerativeAI(apiKey);
+        
+        // ✅ Bước 2: Lấy model với tên model
+        this._cachedModel = genAI.getGenerativeModel({
+          model: modelName
+        });
+        
+        this._cachedModelName = modelName;
+        console.log(`✅ Gemini model initialized: ${modelName}`);
+        logger.info(`Gemini model initialized: ${modelName}`);
+      } catch (error) {
+        console.error(`❌ Failed to initialize Gemini model: ${error.message}`);
+        logger.warn('Failed to initialize Gemini model, using fallback methods', error.message);
+        this._cachedModel = null;
+        this._cachedModelName = null;
+      }
+    }
+    
+    return this._cachedModel;
   }
 
   /**
@@ -264,12 +323,32 @@ class AIService {
 
   /**
    * Clean extracted text - fix Vietnamese encoding and formatting
+   * CẢI TIẾN: Xử lý text không có khoảng trắng từ PDF
    */
   cleanExtractedText(text) {
-    // Remove excessive whitespace between characters
+    // FIX: Loại bỏ các ký tự lạ "Đỗ", "Ngô" đứng đơn lẻ (PDF encoding issue)
+    // Pattern: "Đỗ" hoặc "Ngô" đứng giữa các từ (không phải là từ hợp lệ)
+    // Ví dụ: "NguyễnĐỗThị" → "Nguyễn Thị", "PhườNgôCát" → "Phường Cát"
+    text = text.replace(/Đỗ(?=[A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐa-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])/g, ' ');
+    text = text.replace(/Ngô(?=[A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐa-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])/g, ' ');
+    text = text.replace(/([a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])Đỗ/g, '$1 ');
+    text = text.replace(/([a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])Ngô/g, '$1 ');
+    
+    // FIX: Insert spaces between Vietnamese words when text is concatenated
+    // Pattern: Uppercase letter followed by lowercase letters (word boundary)
+    text = text.replace(
+      /([a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])([A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g,
+      '$1 $2'
+    );
+    
+    // FIX: Insert spaces before numbers/dates
+    text = text.replace(/([a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])(\d)/gi, '$1 $2');
+    text = text.replace(/(\d)([a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])/gi, '$1 $2');
+    
+    // Remove excessive whitespace between characters (keep this for normal text)
     text = text.replace(
       /([a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])\s+(?=[a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])/gi,
-      '$1'
+      '$1 '
     );
 
     // Fix common Vietnamese name patterns
@@ -334,6 +413,15 @@ class AIService {
     // Remove non-printable characters
     text = text.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
 
+    // FIX: Loại bỏ các ký tự đặc biệt không hợp lệ (PDF encoding artifacts)
+    // Loại bỏ các ký tự Unicode lạ có thể xuất hiện từ PDF
+    text = text.replace(/[\u200B-\u200D\uFEFF]/g, ''); // Zero-width characters
+    
+    // FIX: Loại bỏ các từ đơn lẻ "Đỗ", "Ngô" không phải là tên hợp lệ
+    // Chỉ giữ lại nếu là tên riêng (đứng đầu câu hoặc sau dấu chấm)
+    text = text.replace(/\bĐỗ\b(?![A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '');
+    text = text.replace(/\bNgô\b(?![A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '');
+    
     // Normalize whitespace
     text = text.replace(/\s+/g, ' ').trim();
 
@@ -482,7 +570,26 @@ LƯU Ý QUAN TRỌNG:
 
       console.log('🤖 Calling Gemini API...');
 
-      const result = await this.model.generateContent(prompt);
+      const model = this.getModel();
+      if (!model) {
+        throw new Error('Gemini model not available');
+      }
+
+      // Double-check API key before calling API
+      const apiKey = process.env.GEMINI_API_KEY?.trim();
+      if (!apiKey) {
+        throw new Error('GEMINI_API_KEY is not set');
+      }
+      
+      if (!apiKey.startsWith('AIzaSy')) {
+        throw new Error('GEMINI_API_KEY format is invalid');
+      }
+      
+      console.log(`🔑 Using API Key: ${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}`);
+
+      // ✅ Bước 3: Code chuẩn - Gọi API đúng cách
+      // KHÔNG dùng fetch, axios, hay custom request
+      const result = await model.generateContent(prompt);
       const response = await result.response;
       let responseText = response.text();
 
@@ -553,14 +660,27 @@ LƯU Ý QUAN TRỌNG:
     } catch (error) {
       console.error('❌ Gemini parsing error:', error.message);
 
-      // If it's a 404 model error, log helpful message
-      if (
-        error.message.includes('404') ||
-        error.message.includes('not found')
-      ) {
+      // Better error handling - distinguish between different error types
+      if (error.message.includes('API Key') || error.message.includes('API_KEY_INVALID')) {
+        console.error('⚠️ Gemini API Key error. Please check GEMINI_API_KEY in .env file');
+        console.error('   Error:', error.message.includes('API Key not found') 
+          ? 'API Key not found or invalid' 
+          : 'API Key error');
+        console.error('   📝 Hướng dẫn:');
+        console.error('      1. Kiểm tra file backend/.env có GEMINI_API_KEY không');
+        console.error('      2. API key phải bắt đầu bằng "AIzaSy" và có độ dài ~39 ký tự');
+        console.error('      3. Lấy API key mới tại: https://aistudio.google.com/app/apikey');
+        console.error('      4. Sau khi cập nhật, restart server để áp dụng thay đổi');
+        console.error('   💡 Hệ thống sẽ sử dụng fallback parsing (rule-based)');
+      } else if (error.message.includes('404') || 
+                 (error.message.includes('not found') && error.message.includes('model'))) {
         console.error(
-          '⚠️ Model not found. Please update to: gemini-1.5-flash or gemini-1.5-pro'
+          '⚠️ Model not found. Please update GEMINI_MODEL to: gemini-1.5-flash or gemini-1.5-pro'
         );
+      } else if (error.message.includes('429') || error.message.includes('quota')) {
+        console.error('⚠️ Gemini API quota exceeded. Using fallback parsing.');
+      } else {
+        console.error('⚠️ Gemini API error:', error.message.substring(0, 200));
       }
 
       return this.fallbackParseResume();
@@ -607,7 +727,11 @@ QUY TẮC:
 - JSON thuần túy, không markdown
 `;
 
-      const result = await this.model.generateContent(prompt);
+      const model = this.getModel();
+      if (!model) {
+        throw new Error('Gemini model not available');
+      }
+      const result = await model.generateContent(prompt);
       const response = await result.response;
       let responseText = response
         .text()
@@ -837,6 +961,7 @@ QUY TẮC:
 
   /**
    * Extract education information
+   * CẢI TIẾN: Xử lý text không có khoảng trắng
    */
   extractEducationInfo(text) {
     const education = {
@@ -849,11 +974,24 @@ QUY TẮC:
       gradeText: null, // NEW: Store original grade text
     };
 
-    // University name
-    const uniMatch = text.match(
+    // University name - CẢI TIẾN: Xử lý cả text có và không có khoảng trắng
+    let uniMatch = text.match(
       /(?:Đại học|University|College|Trường)\s+([^\n]{5,50})/i
     );
-    if (uniMatch) education.institution = uniMatch[0].trim();
+    
+    // Nếu không tìm được với khoảng trắng, thử tìm text dính liền
+    if (!uniMatch) {
+      uniMatch = text.match(
+        /(?:Đạihọc|University|College|Trường)([A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ][^\n]{5,50})/i
+      );
+      if (uniMatch) {
+        // Thêm khoảng trắng vào tên trường
+        const uniName = uniMatch[0].replace(/([a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])([A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '$1 $2');
+        education.institution = uniName.trim();
+      }
+    } else {
+      education.institution = uniMatch[0].trim();
+    }
 
     // Degree
     const degreeMatch = text.match(
@@ -1270,7 +1408,11 @@ LƯU Ý:
 - Trả về JSON thuần túy, không có markdown
 `;
 
-      const result = await this.model.generateContent(prompt);
+      const model = this.getModel();
+      if (!model) {
+        throw new Error('Gemini model not available');
+      }
+      const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
 
@@ -2090,7 +2232,11 @@ Trả về JSON (no markdown):
 }
 `;
 
-      const result = await this.model.generateContent(prompt);
+      const model = this.getModel();
+      if (!model) {
+        throw new Error('Gemini model not available');
+      }
+      const result = await model.generateContent(prompt);
       const response = await result.response;
       let responseText = response
         .text()
@@ -2234,7 +2380,11 @@ Trả về JSON:
 }
 `;
 
-      const result = await this.model.generateContent(prompt);
+      const model = this.getModel();
+      if (!model) {
+        throw new Error('Gemini model not available');
+      }
+      const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response
         .text()
@@ -6603,40 +6753,102 @@ Return JSON:
         saveToDatabase = true,
       } = options;
 
-      // Identify skill gaps
+      // Identify skill gaps (self-built algorithm)
       const skillGaps = await this._identifySkillGapsDetailed(cvData, jobData);
+      
+      if (!skillGaps || skillGaps.length === 0) {
+        logger.warn('No skill gaps identified, returning empty roadmap', {
+          candidateId,
+          targetJobId,
+          hasCvData: !!cvData,
+          hasJobData: !!jobData,
+        });
+      }
 
-      // Generate roadmap using AI
-      const roadmapData = await this._generateRoadmapWithAI(
-        skillGaps,
-        targetRole,
-        timeframe,
-        cvData.currentLevel || 'beginner'
-      );
-
-      // Enhance with intelligent resource recommendations
-      const enhancedPhases = await this._enhanceWithRealResources(
-        roadmapData.phases,
-        {
+      // Generate roadmap structure using Rule-Based Generator (deterministic)
+      const ruleBasedRoadmapGenerator = require('./ruleBasedRoadmapGenerator');
+      let roadmapData;
+      
+      try {
+        roadmapData = ruleBasedRoadmapGenerator.generateStructure(
           skillGaps,
-          currentLevel: cvData.currentLevel || 'beginner',
+          targetRole || jobData?.title || 'Developer',
           timeframe,
+          cvData?.currentLevel || 'beginner'
+        );
+      } catch (ruleBasedError) {
+        logger.error('Error generating rule-based roadmap structure', {
+          error: ruleBasedError.message,
+          stack: ruleBasedError.stack,
+        });
+        // Fallback to default structure
+        roadmapData = {
+          phases: [],
+          milestones: [],
+          successMetrics: [],
+          difficulty: 'intermediate',
+        };
+      }
+
+      // Optional: Enhance roadmap structure with AI if API key is available
+      if (process.env.GEMINI_API_KEY && skillGaps.length > 0) {
+        try {
+          const aiEnhancedRoadmapData = await this._generateRoadmapWithAI(
+            skillGaps,
+            targetRole || jobData?.title || 'Developer',
+            timeframe,
+            cvData?.currentLevel || 'beginner'
+          );
+          // Merge AI enhancements if available (optional, prioritize rule-based)
+          if (aiEnhancedRoadmapData && aiEnhancedRoadmapData.phases) {
+            // For now, we prioritize rule-based structure and use AI for resource enhancement only
+            logger.info('AI enhancement available but using rule-based structure as primary');
+          }
+        } catch (aiError) {
+          logger.warn('AI enhancement for roadmap structure failed, proceeding with rule-based structure', {
+            error: aiError.message,
+          });
         }
-      );
+      }
+
+      // Enhance with intelligent resource recommendations (self-built algorithm + RAG)
+      let enhancedPhases = roadmapData.phases || [];
+      if (skillGaps.length > 0) {
+        try {
+          enhancedPhases = await this._enhanceWithRealResources(
+            roadmapData.phases || [],
+            {
+              skillGaps,
+              currentLevel: cvData?.currentLevel || 'beginner',
+              timeframe,
+            }
+          );
+        } catch (resourceError) {
+          logger.warn('Error enhancing with real resources, using base phases', {
+            error: resourceError.message,
+          });
+        }
+      }
+
+      // Determine generatedBy value (must be one of: 'ai', 'manual', 'hybrid')
+      let generatedBy = 'manual'; // Default to manual (rule-based, no external AI APIs)
+      if (process.env.GEMINI_API_KEY) {
+        generatedBy = 'hybrid'; // Rule-based + Gemini AI enhancement
+      }
 
       const roadmap = {
         candidateId,
         targetJobId,
         targetRole: targetRole || jobData?.title || 'Developer',
-        currentLevel: cvData.currentLevel || 'beginner',
+        currentLevel: cvData?.currentLevel || 'beginner',
         skillGaps,
         phases: enhancedPhases,
-        milestones: roadmapData.milestones,
-        successMetrics: roadmapData.successMetrics,
+        milestones: roadmapData.milestones || [],
+        successMetrics: roadmapData.successMetrics || [],
         totalDuration: `${timeframe} weeks`,
         estimatedTotalHours: timeframe * 15,
         difficulty: roadmapData.difficulty || 'intermediate',
-        generatedBy: 'ai',
+        generatedBy, // Use valid enum value
         aiModelVersion: '2.0',
         status: 'active',
         isPersonalized: true,
@@ -6658,60 +6870,488 @@ Return JSON:
   /**
    * Identify skill gaps with detailed analysis
    */
-  async _identifySkillGapsDetailed(cvData, jobData) {
-    const cvSkills = cvData.skills || [];
-    const jobSkills = jobData.skills || [];
-
-    const skillGaps = [];
-
-    const cvSkillNames = cvSkills.map((s) =>
-      (typeof s === 'string' ? s : s.name).toLowerCase()
-    );
-
-    jobSkills.forEach((jobSkill) => {
-      const skillName = jobSkill.name.toLowerCase();
-      const hasSkill = cvSkillNames.some(
-        (cvSkill) => cvSkill.includes(skillName) || skillName.includes(cvSkill)
-      );
-
-      if (!hasSkill) {
-        skillGaps.push({
-          skill: jobSkill.name,
-          currentLevel: 'none',
-          targetLevel: jobSkill.level || 'intermediate',
-          priority: jobSkill.required ? 'critical' : 'medium',
-          importance: jobSkill.required ? 0.9 : 0.6,
-        });
-      } else {
-        // Check if level needs improvement
-        const cvSkill = cvSkills.find((s) => {
-          const name = (typeof s === 'string' ? s : s.name).toLowerCase();
-          return name.includes(skillName) || skillName.includes(name);
-        });
-
-        const currentLevel =
-          typeof cvSkill === 'object' ? cvSkill.level : 'beginner';
-        const targetLevel = jobSkill.level || 'intermediate';
-
-        if (this._needsLevelImprovement(currentLevel, targetLevel)) {
-          skillGaps.push({
-            skill: jobSkill.name,
-            currentLevel,
-            targetLevel,
-            priority: 'high',
-            importance: 0.7,
+  /**
+   * Normalize job skills from multiple sources into a consistent format
+   * @param {Object} jobData - Job data object
+   * @returns {Array} Normalized skills array with { name, level, required, importance }
+   */
+  _normalizeJobSkills(jobData) {
+    if (!jobData) return [];
+    
+    const normalizedSkills = [];
+    const skillMap = new Map(); // To deduplicate by name
+    
+    // 1. Extract from jobData.skills (array of strings or objects)
+    if (jobData.skills && Array.isArray(jobData.skills)) {
+      jobData.skills.forEach((skill) => {
+        if (typeof skill === 'string' && skill.trim()) {
+          const normalized = skill.trim().toLowerCase();
+          if (!skillMap.has(normalized)) {
+            skillMap.set(normalized, {
+              name: skill.trim(),
+              level: 'intermediate',
+              required: true,
+              importance: 0.8,
+            });
+          }
+        } else if (skill && typeof skill === 'object') {
+          const name = skill.name || skill.skill || skill.title;
+          if (name && typeof name === 'string' && name.trim()) {
+            const normalized = name.trim().toLowerCase();
+            if (!skillMap.has(normalized)) {
+              skillMap.set(normalized, {
+                name: name.trim(),
+                level: skill.level || skill.targetLevel || 'intermediate',
+                required: skill.required !== false && (skill.required === true || skill.importance === 'required'),
+                importance: skill.importance === 'required' ? 0.9 : 
+                           skill.importance === 'preferred' ? 0.7 : 
+                           skill.required === false ? 0.5 : 0.8,
+              });
+            }
+          }
+        }
+      });
+    }
+    
+    // 2. Extract from jobData.ai.extractedSkills (structured format)
+    if (jobData.ai?.extractedSkills && Array.isArray(jobData.ai.extractedSkills)) {
+      jobData.ai.extractedSkills.forEach((skill) => {
+        if (skill && skill.name && typeof skill.name === 'string') {
+          const normalized = skill.name.trim().toLowerCase();
+          const existing = skillMap.get(normalized);
+          
+          if (!existing || (skill.confidence && skill.confidence > 0.7)) {
+            skillMap.set(normalized, {
+              name: skill.name.trim(),
+              level: skill.level || existing?.level || 'intermediate',
+              required: skill.importance === 'required' || existing?.required || false,
+              importance: skill.importance === 'required' ? 0.9 :
+                         skill.importance === 'preferred' ? 0.7 :
+                         skill.importance === 'nice-to-have' ? 0.5 :
+                         existing?.importance || 0.7,
+            });
+          }
+        }
+      });
+    }
+    
+    // 3. Extract from jobData.requirements (text parsing - basic)
+    if (jobData.requirements && typeof jobData.requirements === 'string') {
+      // Simple keyword extraction for common skills
+      const commonTechSkills = [
+        'javascript', 'typescript', 'python', 'java', 'c++', 'c#', 'php', 'ruby', 'go', 'rust',
+        'react', 'vue', 'angular', 'node', 'express', 'django', 'flask', 'spring',
+        'mongodb', 'mysql', 'postgresql', 'redis', 'elasticsearch',
+        'aws', 'docker', 'kubernetes', 'git', 'ci/cd', 'agile', 'scrum'
+      ];
+      
+      const lowerRequirements = jobData.requirements.toLowerCase();
+      commonTechSkills.forEach((techSkill) => {
+        if (lowerRequirements.includes(techSkill) && !skillMap.has(techSkill)) {
+          skillMap.set(techSkill, {
+            name: techSkill.charAt(0).toUpperCase() + techSkill.slice(1),
+            level: 'intermediate',
+            required: false,
+            importance: 0.6,
           });
         }
-      }
-    });
-
-    return skillGaps.sort((a, b) => b.importance - a.importance);
+      });
+    }
+    
+    return Array.from(skillMap.values());
   }
 
   /**
-   * Generate roadmap using Gemini AI
+   * Normalize CV skills from various formats into a consistent format
+   * @param {*} cvSkills - CV skills (can be array, object, or mixed)
+   * @returns {Array} Normalized skills array with { name, level }
+   */
+  _normalizeCVSkills(cvSkills) {
+    if (!cvSkills) return [];
+    
+    const normalized = [];
+    
+    // Handle array format
+    if (Array.isArray(cvSkills)) {
+      cvSkills.forEach((skill) => {
+        if (typeof skill === 'string' && skill.trim()) {
+          normalized.push({
+            name: skill.trim(),
+            level: 'beginner',
+          });
+        } else if (skill && typeof skill === 'object') {
+          const name = skill.name || skill.skill || skill.title || skill;
+          if (name && typeof name === 'string' && name.trim()) {
+            normalized.push({
+              name: name.trim(),
+              level: skill.level || skill.currentLevel || 'beginner',
+            });
+          }
+        }
+      });
+      return normalized;
+    }
+    
+    // Handle object format { technical: [...], soft: [...] }
+    if (typeof cvSkills === 'object' && !Array.isArray(cvSkills)) {
+      const allSkills = [];
+      
+      if (cvSkills.technical && Array.isArray(cvSkills.technical)) {
+        allSkills.push(...cvSkills.technical);
+      }
+      if (cvSkills.soft && Array.isArray(cvSkills.soft)) {
+        allSkills.push(...cvSkills.soft);
+      }
+      if (cvSkills.languages && Array.isArray(cvSkills.languages)) {
+        allSkills.push(...cvSkills.languages);
+      }
+      
+      return this._normalizeCVSkills(allSkills);
+    }
+    
+    return normalized;
+  }
+
+  /**
+   * Calculate skill similarity score between two skill names
+   * @param {string} skill1 - First skill name
+   * @param {string} skill2 - Second skill name
+   * @returns {number} Similarity score (0-1)
+   */
+  _calculateSkillSimilarity(skill1, skill2) {
+    if (!skill1 || !skill2) return 0;
+    
+    const s1 = skill1.toLowerCase().trim();
+    const s2 = skill2.toLowerCase().trim();
+    
+    // Exact match
+    if (s1 === s2) return 1.0;
+    
+    // One contains the other
+    if (s1.includes(s2) || s2.includes(s1)) return 0.8;
+    
+    // Common aliases mapping
+    const aliases = {
+      'js': 'javascript',
+      'ts': 'typescript',
+      'reactjs': 'react',
+      'vuejs': 'vue',
+      'nodejs': 'node',
+      'node.js': 'node',
+      'postgres': 'postgresql',
+      'mongo': 'mongodb',
+      'aws cloud': 'aws',
+    };
+    
+    let normalized1 = s1;
+    let normalized2 = s2;
+    
+    Object.keys(aliases).forEach((alias) => {
+      if (s1 === alias) normalized1 = aliases[alias];
+      if (s2 === alias) normalized2 = aliases[alias];
+    });
+    
+    if (normalized1 === normalized2) return 0.9;
+    if (normalized1.includes(normalized2) || normalized2.includes(normalized1)) return 0.7;
+    
+    // Word-level similarity (simple)
+    const words1 = normalized1.split(/[\s\-_]+/);
+    const words2 = normalized2.split(/[\s\-_]+/);
+    const commonWords = words1.filter((w) => words2.includes(w));
+    
+    if (commonWords.length > 0) {
+      return Math.min(0.6, commonWords.length / Math.max(words1.length, words2.length));
+    }
+    
+    return 0;
+  }
+
+  async _identifySkillGapsDetailed(cvData, jobData) {
+    try {
+      // Normalize CV skills
+      const cvSkills = this._normalizeCVSkills(cvData?.skills);
+      
+      // Normalize job skills
+      const jobSkills = this._normalizeJobSkills(jobData);
+      
+      if (jobSkills.length === 0) {
+        logger.warn('No job skills found for skill gap analysis', {
+          jobId: jobData?._id || jobData?.id,
+          hasSkills: !!jobData?.skills,
+          hasExtractedSkills: !!jobData?.ai?.extractedSkills,
+        });
+        return [];
+      }
+      
+      const skillGaps = [];
+      const cvSkillNames = cvSkills.map((s) => s.name.toLowerCase().trim());
+      
+      jobSkills.forEach((jobSkill) => {
+        if (!jobSkill || !jobSkill.name) {
+          logger.warn('Invalid job skill found, skipping', { jobSkill });
+          return;
+        }
+        
+        const jobSkillName = jobSkill.name.toLowerCase().trim();
+        if (!jobSkillName) return;
+        
+        // Find matching CV skill using similarity
+        let bestMatch = null;
+        let bestSimilarity = 0;
+        
+        cvSkills.forEach((cvSkill) => {
+          const similarity = this._calculateSkillSimilarity(cvSkill.name, jobSkill.name);
+          if (similarity > bestSimilarity && similarity >= 0.6) {
+            bestSimilarity = similarity;
+            bestMatch = cvSkill;
+          }
+        });
+        
+        // Check if skill exists (exact or similar match)
+        const hasSkill = bestMatch !== null;
+        
+        if (!hasSkill) {
+          // Skill gap: candidate doesn't have this skill
+          skillGaps.push({
+            skill: jobSkill.name,
+            currentLevel: 'none',
+            targetLevel: jobSkill.level || 'intermediate',
+            priority: jobSkill.required ? 'critical' : 'medium',
+            importance: jobSkill.importance || (jobSkill.required ? 0.9 : 0.6),
+            gapType: 'missing',
+          });
+        } else {
+          // Check if level needs improvement
+          const currentLevel = bestMatch.level || 'beginner';
+          const targetLevel = jobSkill.level || 'intermediate';
+          
+          if (this._needsLevelImprovement(currentLevel, targetLevel)) {
+            skillGaps.push({
+              skill: jobSkill.name,
+              currentLevel,
+              targetLevel,
+              priority: 'high',
+              importance: jobSkill.importance || 0.7,
+              gapType: 'level_improvement',
+              similarity: bestSimilarity,
+            });
+          }
+        }
+      });
+      
+      // Sort by importance (required skills first, then by importance score)
+      return skillGaps.sort((a, b) => {
+        // Critical priority first
+        if (a.priority === 'critical' && b.priority !== 'critical') return -1;
+        if (b.priority === 'critical' && a.priority !== 'critical') return 1;
+        
+        // Then by importance score
+        return (b.importance || 0) - (a.importance || 0);
+      });
+    } catch (error) {
+      logger.error('Error in _identifySkillGapsDetailed', {
+        error: error.message,
+        stack: error.stack,
+        cvData: cvData ? { hasSkills: !!cvData.skills } : null,
+        jobData: jobData ? { 
+          hasSkills: !!jobData.skills,
+          hasExtractedSkills: !!jobData.ai?.extractedSkills,
+          jobId: jobData._id || jobData.id,
+        } : null,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Generate roadmap using Rule-Based Algorithm (Primary) hoặc AI (Optional Enhancement)
+   * 
+   * Priority:
+   * 1. Rule-Based Generator (deterministic, reproducible, có căn cứ)
+   * 2. AI Enhancement (optional, nếu có GEMINI_API_KEY)
+   * 3. Default Template (fallback)
    */
   async _generateRoadmapWithAI(skillGaps, targetRole, timeframe, currentLevel) {
+    try {
+      // PRIMARY: Use Rule-Based Generator (deterministic, có căn cứ)
+      const ruleBasedGenerator = require('./ruleBasedRoadmapGenerator');
+      const ruleBasedStructure = ruleBasedGenerator.generateStructure(
+        skillGaps,
+        targetRole,
+        timeframe,
+        currentLevel
+      );
+      
+      // OPTIONAL: Enhance with AI nếu có GEMINI_API_KEY
+      if (this.model && process.env.GEMINI_API_KEY) {
+        try {
+          const aiEnhancements = await this._getAIEnhancements(
+            skillGaps,
+            targetRole,
+            timeframe,
+            currentLevel,
+            ruleBasedStructure
+          );
+          
+          // Merge AI enhancements với rule-based structure
+          return this._mergeAIEnhancements(ruleBasedStructure, aiEnhancements);
+        } catch (aiError) {
+          logger.warn('AI enhancement failed, using rule-based structure only', {
+            error: aiError.message,
+          });
+          // Fallback to rule-based only
+          return ruleBasedStructure;
+        }
+      }
+      
+      // Return rule-based structure (no AI)
+      return ruleBasedStructure;
+    } catch (error) {
+      logger.error('Error generating roadmap, falling back to default structure:', error);
+      return this._getDefaultRoadmapStructure(skillGaps, timeframe);
+    }
+  }
+  
+  /**
+   * Get AI enhancements (optional) - chỉ enhance, không thay thế
+   */
+  async _getAIEnhancements(skillGaps, targetRole, timeframe, currentLevel, baseStructure) {
+    if (!this.model) return null;
+    
+    const prompt = `
+Enhance this learning roadmap structure with additional details:
+
+Base Structure:
+${JSON.stringify(baseStructure, null, 2)}
+
+Target Role: ${targetRole}
+Timeframe: ${timeframe} weeks
+Current Level: ${currentLevel}
+
+Please provide ONLY enhancements (no structure changes):
+1. More specific learning objectives for each week
+2. Additional project ideas
+3. Assessment suggestions
+4. Better milestone descriptions
+
+Return JSON format:
+{
+  "enhancements": {
+    "phases": [
+      {
+        "phaseNumber": 1,
+        "weeks": [
+          {
+            "weekNumber": 1,
+            "enhancedObjectives": ["more specific objective 1", "objective 2"],
+            "projectIdeas": ["project idea 1"],
+            "assessmentSuggestions": ["assessment 1"]
+          }
+        ]
+      }
+    ],
+    "milestones": [
+      {
+        "weekNumber": 4,
+        "enhancedDescription": "more detailed description"
+      }
+    ]
+  }
+}
+`;
+
+    try {
+      const model = this.getModel();
+      if (!model) {
+        throw new Error('Gemini model not available');
+      }
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      let text = response.text();
+      
+      // Clean markdown
+      text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
+      }
+      
+      return null;
+    } catch (error) {
+      logger.warn('AI enhancement generation failed:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Merge AI enhancements với rule-based structure
+   */
+  _mergeAIEnhancements(baseStructure, aiEnhancements) {
+    if (!aiEnhancements || !aiEnhancements.enhancements) {
+      return baseStructure;
+    }
+    
+    const enhanced = JSON.parse(JSON.stringify(baseStructure)); // Deep clone
+    
+    // Enhance weeks
+    if (aiEnhancements.enhancements.phases) {
+      aiEnhancements.enhancements.phases.forEach(aiPhase => {
+        const basePhase = enhanced.phases.find(p => p.phaseNumber === aiPhase.phaseNumber);
+        if (basePhase && aiPhase.weeks) {
+          aiPhase.weeks.forEach(aiWeek => {
+            const baseWeek = basePhase.weeks.find(w => w.weekNumber === aiWeek.weekNumber);
+            if (baseWeek) {
+              // Merge enhanced objectives
+              if (aiWeek.enhancedObjectives && aiWeek.enhancedObjectives.length > 0) {
+                baseWeek.learningObjectives = [
+                  ...baseWeek.learningObjectives,
+                  ...aiWeek.enhancedObjectives,
+                ].slice(0, 7); // Limit to 7 objectives
+              }
+              
+              // Add project ideas
+              if (aiWeek.projectIdeas && aiWeek.projectIdeas.length > 0) {
+                baseWeek.projects = aiWeek.projectIdeas.map(idea => ({
+                  title: idea,
+                  description: `Project: ${idea}`,
+                  difficulty: basePhase.focus === 'fundamentals' ? 'beginner' : 'intermediate',
+                  estimatedTime: '10-15 hours',
+                }));
+              }
+              
+              // Add assessment suggestions
+              if (aiWeek.assessmentSuggestions && aiWeek.assessmentSuggestions.length > 0) {
+                baseWeek.assessments = aiWeek.assessmentSuggestions.map(suggestion => ({
+                  type: 'project',
+                  description: suggestion,
+                  passingCriteria: 'Complete successfully',
+                }));
+              }
+            }
+          });
+        }
+      });
+    }
+    
+    // Enhance milestones
+    if (aiEnhancements.enhancements.milestones) {
+      aiEnhancements.enhancements.milestones.forEach(aiMilestone => {
+        const baseMilestone = enhanced.milestones.find(m => m.weekNumber === aiMilestone.weekNumber);
+        if (baseMilestone && aiMilestone.enhancedDescription) {
+          baseMilestone.description = aiMilestone.enhancedDescription;
+        }
+      });
+    }
+    
+    return enhanced;
+  }
+  
+  /**
+   * OLD METHOD - Keep for backward compatibility
+   * Generate roadmap using Gemini AI (DEPRECATED - Use Rule-Based instead)
+   */
+  async _generateRoadmapWithAIOld(skillGaps, targetRole, timeframe, currentLevel) {
     try {
       if (!this.model || !process.env.GEMINI_API_KEY) {
         return this._getDefaultRoadmapStructure(skillGaps, timeframe);
@@ -6820,7 +7460,11 @@ Return ONLY valid JSON (no markdown):
 }
 `;
 
-      const result = await this.model.generateContent(prompt);
+      const model = this.getModel();
+      if (!model) {
+        throw new Error('Gemini model not available');
+      }
+      const result = await model.generateContent(prompt);
       const response = await result.response;
       let text = response.text();
 
@@ -6974,29 +7618,79 @@ Return ONLY valid JSON (no markdown):
 
         for (const week of phase.weeks) {
           // Extract skill và level info từ week
-          const focusSkill = week.focus || '';
+          let focusSkill = week.focus || '';
           const learningObjectives = week.learningObjectives || [];
           
-          // Determine current level và target level từ skill gaps
-          const skillGap = context.skillGaps?.find(
-            (gap) => gap.skill.toLowerCase().includes(focusSkill.toLowerCase())
-          ) || {};
+          // Handle multiple skills in focus (e.g., "Node.js, Python" -> take first)
+          if (focusSkill.includes(',')) {
+            focusSkill = focusSkill.split(',')[0].trim();
+          }
           
+          // Determine current level và target level từ skill gaps
+          // Try exact match first, then partial match
+          let skillGap = context.skillGaps?.find(
+            (gap) => gap.skill.toLowerCase() === focusSkill.toLowerCase()
+          );
+          
+          if (!skillGap) {
+            // Try reverse match (focusSkill contains gap.skill or vice versa)
+            skillGap = context.skillGaps?.find(
+              (gap) => {
+                const gapSkillLower = gap.skill.toLowerCase();
+                const focusLower = focusSkill.toLowerCase();
+                return gapSkillLower.includes(focusLower) || focusLower.includes(gapSkillLower);
+              }
+            );
+          }
+          
+          // If still no match, try to find by removing common suffixes/prefixes
+          if (!skillGap && focusSkill) {
+            const normalizedFocus = focusSkill.toLowerCase().replace(/\.js$|\.py$|^node$/i, '');
+            skillGap = context.skillGaps?.find(
+              (gap) => {
+                const normalizedGap = gap.skill.toLowerCase().replace(/\.js$|\.py$|^node$/i, '');
+                return normalizedGap === normalizedFocus || normalizedGap.includes(normalizedFocus) || normalizedFocus.includes(normalizedGap);
+              }
+            );
+          }
+          
+          skillGap = skillGap || {};
           const currentLevel = skillGap.currentLevel || context.currentLevel || 'beginner';
           const targetLevel = skillGap.targetLevel || 'intermediate';
 
           // Recommend resources thông minh
-          const recommendedResources = await resourceRecommendationService.recommendResources({
-            skill: focusSkill,
-            currentLevel,
-            targetLevel,
-            phaseNumber: phase.phaseNumber || 1,
-            learningObjectives,
-            weekNumber: week.weekNumber || 1,
-            totalWeeks: context.timeframe || 12,
-          });
+          let recommendedResources = [];
+          try {
+            recommendedResources = await resourceRecommendationService.recommendResources({
+              skill: focusSkill,
+              currentLevel,
+              targetLevel,
+              phaseNumber: phase.phaseNumber || 1,
+              learningObjectives,
+              weekNumber: week.weekNumber || 1,
+              totalWeeks: context.timeframe || 12,
+            });
+            
+            if (!recommendedResources || recommendedResources.length === 0) {
+              logger.warn('No resources recommended for skill', {
+                skill: focusSkill,
+                phaseNumber: phase.phaseNumber,
+                weekNumber: week.weekNumber,
+              });
+            }
+          } catch (resourceError) {
+            logger.error('Error recommending resources for week', {
+              error: resourceError.message,
+              skill: focusSkill,
+              phaseNumber: phase.phaseNumber,
+              weekNumber: week.weekNumber,
+            });
+            // Continue with empty resources rather than failing
+            recommendedResources = [];
+          }
 
           // Replace hoặc merge với existing resources
+          // Keep existing projects and assessments from rule-based generator
           const enhancedWeek = {
             ...week,
             resources: recommendedResources.map((resource) => ({
@@ -7014,6 +7708,9 @@ Return ONLY valid JSON (no markdown):
               certificateOffered: resource.certificateOffered || false,
               recommendationScore: resource.recommendationScore, // Score cho ranking
             })),
+            // Keep projects and assessments from rule-based generator
+            projects: week.projects || [],
+            assessments: week.assessments || [],
           };
 
           enhancedWeeks.push(enhancedWeek);
@@ -7212,11 +7909,42 @@ Return ONLY valid JSON (no markdown):
     return words1.filter((w) => words2.includes(w)).slice(0, 10);
   }
 
+  /**
+   * Check if current skill level needs improvement to reach target level
+   * @param {string} currentLevel - Current skill level
+   * @param {string} targetLevel - Target skill level
+   * @returns {boolean} True if improvement is needed
+   */
   _needsLevelImprovement(currentLevel, targetLevel) {
+    if (!currentLevel || !targetLevel) return false;
+    
+    // Normalize level names
+    const normalizeLevel = (level) => {
+      if (!level || typeof level !== 'string') return 'beginner';
+      const normalized = level.toLowerCase().trim();
+      
+      // Handle variations
+      if (normalized === 'none' || normalized === 'novice' || normalized === 'entry') return 'beginner';
+      if (normalized === 'junior' || normalized === 'basic') return 'beginner';
+      if (normalized === 'mid' || normalized === 'medium') return 'intermediate';
+      if (normalized === 'senior' || normalized === 'pro') return 'advanced';
+      if (normalized === 'expert' || normalized === 'master') return 'expert';
+      
+      return normalized;
+    };
+    
     const levels = ['beginner', 'intermediate', 'advanced', 'expert'];
-    const currentIndex = levels.indexOf(currentLevel);
-    const targetIndex = levels.indexOf(targetLevel);
-    return targetIndex > currentIndex;
+    const normalizedCurrent = normalizeLevel(currentLevel);
+    const normalizedTarget = normalizeLevel(targetLevel);
+    
+    const currentIndex = levels.indexOf(normalizedCurrent);
+    const targetIndex = levels.indexOf(normalizedTarget);
+    
+    // If levels are not recognized, default to beginner
+    const safeCurrentIndex = currentIndex >= 0 ? currentIndex : 0;
+    const safeTargetIndex = targetIndex >= 0 ? targetIndex : 0;
+    
+    return safeTargetIndex > safeCurrentIndex;
   }
 }
 
