@@ -276,11 +276,108 @@ class AdvancedNLPController {
           userId: candidateId,
         });
         if (profile) {
+          // Convert skills from object format { technical: [...], soft: [...] } to array format
+          const skillsArray = [];
+          
+          // Add technical skills
+          if (profile.skills?.technical && Array.isArray(profile.skills.technical)) {
+            skillsArray.push(...profile.skills.technical.map(skill => ({
+              name: skill.name || skill,
+              level: skill.level || 'beginner',
+            })));
+          }
+          
+          // Add soft skills (optional, but include for completeness)
+          if (profile.skills?.soft && Array.isArray(profile.skills.soft)) {
+            skillsArray.push(...profile.skills.soft.map(skill => ({
+              name: skill.name || skill,
+              level: skill.level || 'beginner',
+            })));
+          }
+          
+          // Convert experience from object format { internships: [...], projects: [...] } to array format
+          const experienceArray = [];
+          if (profile.experience?.internships && Array.isArray(profile.experience.internships)) {
+            experienceArray.push(...profile.experience.internships.map(exp => ({
+              position: exp.position || '',
+              company: exp.company || '',
+              startDate: exp.startDate || null,
+              endDate: exp.endDate || null,
+              description: exp.description || '',
+            })));
+          }
+          
+          // Also check workExperience (if exists as separate field)
+          if (profile.workExperience && Array.isArray(profile.workExperience)) {
+            experienceArray.push(...profile.workExperience.map(exp => ({
+              position: exp.position || exp.role || '',
+              company: exp.company || '',
+              startDate: exp.startDate || null,
+              endDate: exp.endDate || null,
+              description: exp.description || '',
+            })));
+          }
+          
+          // Convert education from object format { university: {...}, certifications: [...] } to array format
+          const educationArray = [];
+          if (profile.education?.university && profile.education.university.name) {
+            educationArray.push({
+              degree: profile.education.university.degree,
+              major: profile.education.university.major || profile.education.university.field,
+              school: profile.education.university.name || profile.education.university.institution,
+              graduationYear: profile.education.university.graduationYear,
+            });
+          }
+          if (profile.education?.certifications && Array.isArray(profile.education.certifications)) {
+            educationArray.push(...profile.education.certifications.map(cert => ({
+              degree: cert.degree || cert.name,
+              major: cert.field,
+              school: cert.issuer || cert.institution,
+            })));
+          }
+          
+          // Calculate currentLevel from experience (if available)
+          let currentLevel = 'beginner';
+          if (experienceArray.length > 0) {
+            // Calculate total years of experience
+            const totalYears = experienceArray.reduce((total, exp) => {
+              if (exp.startDate && exp.endDate) {
+                const start = new Date(exp.startDate);
+                const end = new Date(exp.endDate);
+                const years = (end - start) / (1000 * 60 * 60 * 24 * 365);
+                return total + Math.max(0, years);
+              }
+              return total;
+            }, 0);
+            
+            // Determine level based on experience
+            if (totalYears >= 5) {
+              currentLevel = 'expert';
+            } else if (totalYears >= 3) {
+              currentLevel = 'advanced';
+            } else if (totalYears >= 1) {
+              currentLevel = 'intermediate';
+            } else {
+              currentLevel = 'beginner';
+            }
+          }
+          
+          // Also check if targetJob.level exists
+          if (profile.targetJob?.level) {
+            const levelMap = {
+              'entry': 'beginner',
+              'mid': 'intermediate',
+              'senior': 'advanced',
+              'executive': 'expert',
+            };
+            currentLevel = levelMap[profile.targetJob.level] || currentLevel;
+          }
+          
           candidateData = {
-            skills: profile.skills,
-            experience: profile.workExperience,
-            education: profile.education,
-            currentLevel: profile.experienceLevel || 'beginner',
+            skills: skillsArray,
+            experience: experienceArray,
+            education: educationArray,
+            currentLevel: currentLevel,
           };
         }
       }

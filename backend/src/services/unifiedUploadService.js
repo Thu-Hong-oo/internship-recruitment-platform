@@ -193,57 +193,80 @@ class UnifiedUploadService {
    * @returns {Promise<Object>} Cloudinary result
    */
   async performUpload(file, config) {
-    // Add timeout to config
-    const configWithTimeout = {
-      ...config,
-      timeout: 240000, // 4 minutes timeout
+    // CẢI TIẾN: Tăng timeout và thêm retry mechanism
+    const UPLOAD_TIMEOUT = 60000; // 60 seconds (tăng từ default)
+    const MAX_RETRIES = 2; // Retry 2 lần nếu fail
+
+    const attemptUpload = (retryCount = 0) => {
+      return new Promise((resolve, reject) => {
+        // Set timeout cho upload
+        const timeoutId = setTimeout(() => {
+          reject(new Error(`Cloudinary upload timeout after ${UPLOAD_TIMEOUT / 1000} seconds`));
+        }, UPLOAD_TIMEOUT);
+
+        const handleError = (error) => {
+          clearTimeout(timeoutId);
+          logger.error('Cloudinary upload error', {
+            error: error.message,
+            file: file.originalname,
+            size: file.size,
+            retryCount,
+          });
+          
+          // Retry nếu chưa đạt max retries và lỗi là timeout hoặc network error
+          if (retryCount < MAX_RETRIES && 
+              (error.message.includes('timeout') || 
+               error.message.includes('ECONNRESET') ||
+               error.message.includes('ETIMEDOUT'))) {
+            logger.info(`Retrying Cloudinary upload (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+            setTimeout(() => {
+              attemptUpload(retryCount + 1).then(resolve).catch(reject);
+            }, 1000 * (retryCount + 1)); // Exponential backoff
+          } else {
+            reject(error);
+          }
+        };
+
+        const handleSuccess = (result) => {
+          clearTimeout(timeoutId);
+          logger.info('Cloudinary upload success', {
+            publicId: result.public_id,
+            file: file.originalname,
+            size: result.bytes,
+            retryCount,
+          });
+          resolve(result);
+        };
+
+        if (file.buffer) {
+          // Upload from buffer (memory storage) with timeout
+          const uploadStream = cloudinary.uploader.upload_stream(
+            config,
+            (error, result) => {
+              if (error) {
+                handleError(error);
+              } else {
+                handleSuccess(result);
+              }
+            }
+          );
+          
+          // Handle stream errors
+          uploadStream.on('error', handleError);
+          uploadStream.end(file.buffer);
+        } else if (file.path) {
+          // Upload from file path (disk storage) with timeout
+          cloudinary.uploader.upload(file.path, config)
+            .then(handleSuccess)
+            .catch(handleError);
+        } else {
+          clearTimeout(timeoutId);
+          reject(new Error('File must have either buffer or path property'));
+        }
+      });
     };
 
-    if (file.buffer) {
-      // Upload from buffer (memory storage) with timeout
-      return new Promise((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-          reject(new Error('Cloudinary upload timeout after 4 minutes'));
-        }, 240000);
-
-        const uploadStream = cloudinary.uploader.upload_stream(
-          configWithTimeout,
-          (error, result) => {
-            clearTimeout(timeoutId);
-            if (error) {
-              logger.error('Cloudinary upload error', {
-                error: error.message,
-                file: file.originalname,
-                size: file.size,
-              });
-              reject(error);
-            } else {
-              logger.info('Cloudinary upload success', {
-                publicId: result.public_id,
-                file: file.originalname,
-                size: result.bytes,
-              });
-              resolve(result);
-            }
-          }
-        );
-        uploadStream.end(file.buffer);
-      });
-    } else if (file.path) {
-      // Upload from file path (disk storage) with timeout
-      return Promise.race([
-        cloudinary.uploader.upload(file.path, configWithTimeout),
-        new Promise((_, reject) =>
-          setTimeout(
-            () =>
-              reject(new Error('Cloudinary upload timeout after 4 minutes')),
-            240000
-          )
-        ),
-      ]);
-    } else {
-      throw new Error('File must have either buffer or path property');
-    }
+    return attemptUpload();
   }
 
   /**
