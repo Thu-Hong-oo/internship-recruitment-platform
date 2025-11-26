@@ -156,14 +156,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"targetJobId\": \"{{jobId}}\",\n  \"targetRole\": \"Full Stack Developer\",\n  \"timeframe\": 12,\n  \"cvData\": {\n    \"skills\": [\n      { \"name\": \"HTML\", \"level\": \"advanced\" },\n      { \"name\": \"CSS\", \"level\": \"advanced\" },\n      { \"name\": \"JavaScript\", \"level\": \"intermediate\" }\n    ],\n    \"experience\": [\n      {\n        \"position\": \"Junior Developer\",\n        \"startDate\": \"2022-01-01\",\n        \"endDate\": \"2023-12-31\"\n      }\n    ],\n    \"education\": [\n      {\n        \"degree\": \"bachelor\",\n        \"major\": \"Computer Science\"\n      }\n    ],\n    \"currentLevel\": \"beginner\"\n  }\n}"
+              "raw": "{\n  \"targetJobId\": \"{{jobId}}\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/nlp/learning-roadmap",
               "host": ["{{baseUrl}}"],
               "path": ["api", "nlp", "learning-roadmap"]
             },
-            "description": "Generate personalized learning roadmap with detailed resources and milestones"
+            "description": "Generate personalized learning roadmap with detailed resources and milestones.\n\n**Request Body - TỐI THIỂU:**\n```json\n{\n  \"targetJobId\": \"job_id_here\"\n}\n```\nHoặc:\n```json\n{\n  \"targetRole\": \"Frontend Developer\"\n}\n```\n\n**Request Body - ĐẦY ĐỦ (Optional):**\n```json\n{\n  \"targetJobId\": \"job_id_here\",\n  \"targetRole\": \"Full Stack Developer\", // Optional if targetJobId provided\n  \"timeframe\": 12, // Optional, default: 12 weeks\n  \"cvData\": { // Optional - sẽ TỰ ĐỘNG lấy từ profile\n    \"skills\": [...],\n    \"experience\": [...],\n    \"education\": [...],\n    \"currentLevel\": \"beginner\"\n  }\n}\n```\n\n**Lưu ý:**\n- ✅ Chỉ cần `targetJobId` HOẶC `targetRole` (bắt buộc một trong hai)\n- ✅ `cvData` là optional - Hệ thống tự động lấy từ CandidateProfile\n- ✅ `timeframe` là optional - Default: 12 weeks"
           },
           "response": []
         },
@@ -320,8 +320,9 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:5000",
-      "type": "string"
+      "value": "http://localhost:3000",
+      "type": "string",
+      "description": "Base URL - Change to http://localhost:5000 if server runs on port 5000"
     },
     {
       "key": "candidateToken",
