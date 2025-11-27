@@ -32,6 +32,8 @@ jobs:
           npm run build:export
       
       - name: Install and build Admin
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL || secrets.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api' }}
         run: |
           cd admin
           npm install
