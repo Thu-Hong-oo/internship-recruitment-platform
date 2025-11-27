@@ -16,12 +16,16 @@ jobs:
           node-version: 18
       
       - name: Install and build FE
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api' }}
         run: |
           cd fe
           npm install
           npm run build:export
       
       - name: Install and build FE-Employer
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api' }}
         run: |
           cd fe-employer
           npm install
