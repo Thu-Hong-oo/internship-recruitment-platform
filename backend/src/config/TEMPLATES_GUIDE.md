@@ -276,4 +276,3 @@ Frontend sẽ tự động lấy templates từ API:
 }
 ```
 
-
