@@ -1,16 +1,19 @@
 FROM node:18-alpine
 
+ARG APP_PATH=backend
+
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy package files (default path backend, override by setting APP_PATH build-arg)
+COPY ${APP_PATH}/package*.json ./
 
 # Install dependencies
 # Use npm install if package-lock.json doesn't exist
 RUN if [ -f package-lock.json ]; then npm ci --only=production; else npm install --only=production; fi
 
 # Copy application files
-COPY . .
+# Copy application files
+COPY ${APP_PATH}/. .
 
 # Expose port
 EXPOSE 3000
