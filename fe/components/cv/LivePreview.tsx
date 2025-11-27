@@ -4,8 +4,22 @@ import type { CVData } from "../../lib/mocks/cvSamples";
 import Template1Renderer from "./renderers/Template1";
 import Template2Renderer from "./renderers/Template2";
 
+type LayoutType = {
+  page: { width: number; height: number; padding: number; backgroundColor?: string };
+  sections: Array<{
+    type: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }>;
+  colors: { primary: string; secondary: string; accent?: string };
+  fonts: { heading: string; body: string };
+};
+
 type Props = {
   data: CVData;
+  layout?: LayoutType; // Layout từ templateConfig, nếu không có thì dùng templateLayouts
   containerRef?: (el: HTMLDivElement | null) => void;
   editable?: boolean;
   onChangeText?: (path: Array<string | number>, value: string) => void;
@@ -14,45 +28,39 @@ type Props = {
   editingField?: string | null;
 };
 
-export default function LivePreview({ data, containerRef, editable = false, onChangeText, onFocusField, onBlurField, editingField }: Props) {
-  const layout = useMemo(() => templateLayouts[data.templateId], [data.templateId]);
+export default function LivePreview({ 
+  data, 
+  layout: layoutProp, 
+  containerRef, 
+  editable = false, 
+  onChangeText, 
+  onFocusField, 
+  onBlurField, 
+  editingField 
+}: Props) {
+  // Ưu tiên dùng layout từ props, fallback về templateLayouts
+  const layout = useMemo(() => {
+    if (layoutProp) return layoutProp;
+    return templateLayouts[data.templateId];
+  }, [data.templateId, layoutProp]);
   // Local buffer for inline text while editing, to avoid React-controlled rerenders
   const bufferRef = useRef<Map<string, string>>(new Map());
   const pageStyle = {
     width: layout.page.width,
     height: layout.page.height,
     position: "relative" as const,
-    background: "#fff",
+    background: layout.page.backgroundColor || "#fff",
     boxShadow: "0 0 0 1px rgba(0,0,0,0.05), 0 10px 30px rgba(0,0,0,0.08)",
     margin: "0 auto",
+    fontFamily: layout.fonts.body,
   };
 
   return (
     <div className="w-full overflow-auto">
       <div style={pageStyle} ref={containerRef || undefined}>
-        {/* Delegate to template-specific renderer for richer layout */}
-        {data.templateId === 1 && (
-          <Template1Renderer
-            data={data}
-            editable={editable}
-            onChangeText={onChangeText}
-            onFocusField={onFocusField}
-            onBlurField={onBlurField}
-          />
-        )}
-        {data.templateId === 2 && (
-          <Template2Renderer
-            data={data}
-            editable={editable}
-            onChangeText={onChangeText}
-            onFocusField={onFocusField}
-            onBlurField={onBlurField}
-          />
-        )}
-        {/* Fallback to generic absolute layout if unknown template */}
-        {![1, 2].includes(data.templateId) && (
-          <>
-          {layout.sections.map((s, idx) => {
+        {/* Render theo layout từ API - áp dụng cho tất cả templates */}
+        {/* Nếu có layout từ API, dùng generic renderer với layout đó */}
+        {layout.sections.map((s, idx) => {
           const style: React.CSSProperties = {
             position: "absolute",
             left: s.x,
@@ -101,7 +109,10 @@ export default function LivePreview({ data, containerRef, editable = false, onCh
               userSelect: "text",
             } as React.CSSProperties,
           });
-          if (s.type === "personal") {
+          // Map section types từ API sang format frontend
+          const sectionType = s.type;
+          
+          if (sectionType === "personalInfo" || sectionType === "personal") {
             return (
               <div key={idx} style={style}>
                 <div
@@ -140,7 +151,7 @@ export default function LivePreview({ data, containerRef, editable = false, onCh
               </div>
             );
           }
-          if (s.type === "experience") {
+          if (sectionType === "experience") {
             return (
               <div key={idx} style={style}>
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>Kinh nghiệm</div>
@@ -189,7 +200,7 @@ export default function LivePreview({ data, containerRef, editable = false, onCh
               </div>
             );
           }
-          if (s.type === "education") {
+          if (sectionType === "education") {
             return (
               <div key={idx} style={style}>
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>Học vấn</div>
@@ -232,7 +243,7 @@ export default function LivePreview({ data, containerRef, editable = false, onCh
               </div>
             );
           }
-          if (s.type === "skills") {
+          if (sectionType === "skills") {
             return (
               <div key={idx} style={style}>
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>Kỹ năng</div>
@@ -250,7 +261,7 @@ export default function LivePreview({ data, containerRef, editable = false, onCh
               </div>
             );
           }
-          if (s.type === "languages") {
+          if (sectionType === "languages") {
             return (
               <div key={idx} style={style}>
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>Ngôn ngữ</div>
@@ -277,7 +288,7 @@ export default function LivePreview({ data, containerRef, editable = false, onCh
               </div>
             );
           }
-          if (s.type === "certifications") {
+          if (sectionType === "certifications") {
             return (
               <div key={idx} style={style}>
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>Chứng chỉ</div>
@@ -311,10 +322,10 @@ export default function LivePreview({ data, containerRef, editable = false, onCh
               </div>
             );
           }
-          if (s.type === "projects") {
+          if (sectionType === "projects") {
             return (
               <div key={idx} style={style}>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>Dự án nổi bật</div>
+                <div style={{ fontWeight: 700, marginBottom: 6, color: layout.colors.primary, fontFamily: layout.fonts.heading }}>Dự án nổi bật</div>
                 <div style={{ display: "grid", gap: 8, fontSize: 12 }}>
                   {(data.projects || []).map((p, i) => (
                     <div key={i} style={{ background: "#fff", borderLeft: `4px solid ${layout.colors.primary}`, borderRadius: 8, padding: 8 }}>
@@ -332,6 +343,42 @@ export default function LivePreview({ data, containerRef, editable = false, onCh
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            );
+          }
+          // Render cho careerObjective, objective, summary
+          if (sectionType === "careerObjective" || sectionType === "objective" || sectionType === "summary") {
+            return (
+              <div key={idx} style={style}>
+                <div style={{ fontWeight: 700, marginBottom: 6, color: layout.colors.primary, fontFamily: layout.fonts.heading }}>
+                  {sectionType === "summary" ? "Tóm tắt" : "Mục tiêu nghề nghiệp"}
+                </div>
+                <div
+                  {...commonEditableProps(["personal", "summary"])}
+                  style={{ ...(commonEditableProps(["personal", "summary"]).style as any), fontSize: 12, color: layout.colors.secondary, whiteSpace: "pre-wrap", lineHeight: 1.6 }}
+                >
+                  {data.personal.summary || "Mô tả mục tiêu nghề nghiệp hoặc tóm tắt kinh nghiệm của bạn..."}
+                </div>
+              </div>
+            );
+          }
+          // Render cho activities, awards, hobbies, references (nếu có trong data)
+          if (sectionType === "activities" || sectionType === "awards" || sectionType === "hobbies" || sectionType === "references") {
+            return (
+              <div key={idx} style={style}>
+                <div style={{ fontWeight: 700, marginBottom: 6, color: layout.colors.primary, fontFamily: layout.fonts.heading }}>
+                  {sectionType === "activities" ? "Hoạt động" : 
+                   sectionType === "awards" ? "Giải thưởng" :
+                   sectionType === "hobbies" ? "Sở thích" : "Người tham khảo"}
+                </div>
+                <div style={{ fontSize: 12, color: layout.colors.secondary }}>
+                  {/* Placeholder - có thể thêm data sau */}
+                  <div style={{ fontStyle: "italic", color: "#9ca3af" }}>
+                    {sectionType === "activities" ? "Các hoạt động ngoại khóa, tình nguyện..." :
+                     sectionType === "awards" ? "Các giải thưởng, thành tích..." :
+                     sectionType === "hobbies" ? "Sở thích cá nhân..." : "Thông tin người tham khảo..."}
+                  </div>
                 </div>
               </div>
             );
@@ -363,10 +410,18 @@ export default function LivePreview({ data, containerRef, editable = false, onCh
               </div>
             );
           }
-            return null;
-          })}
-          </>
-        )}
+          // Nếu không match section type nào, render placeholder
+          return (
+            <div key={idx} style={style}>
+              <div style={{ fontWeight: 700, marginBottom: 6, color: layout.colors.primary, fontFamily: layout.fonts.heading }}>
+                {s.type}
+              </div>
+              <div style={{ fontSize: 12, color: layout.colors.secondary, fontStyle: "italic" }}>
+                Section: {s.type}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
