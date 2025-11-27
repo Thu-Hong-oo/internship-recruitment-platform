@@ -44,24 +44,33 @@ export default function HomePage({ onSearch }: HomePageProps) {
             .filter(Boolean)
         : undefined;
     };
+    const getNumber = (k: string) => {
+      const v = get(k);
+      return v ? Number(v) : undefined;
+    };
     const filters: any = {
-      q: get("q"),
+      q: get("q") || get("search"), // Support both 'q' and 'search'
       location: get("location"),
       skills: getList("skills"),
       employer: get("employer"),
-      status: get("status"),
+      status: get("status") || "active", // Default to active for public
       jobType: get("jobType"),
+      employmentType: get("employmentType"), // New
+      experienceLevel: get("experienceLevel"), // New
       industry: get("industry"),
+      industryCode: get("industryCode"), // New - preferred over industry
       category: get("category"),
-      salaryMin: get("salaryMin"),
-      salaryMax: get("salaryMax"),
+      salaryMin: getNumber("salaryMin") || getNumber("minSalary"), // Support both
+      salaryMax: getNumber("salaryMax") || getNumber("maxSalary"), // Support both
+      minSalary: getNumber("minSalary") || getNumber("salaryMin"), // Support both
+      maxSalary: getNumber("maxSalary") || getNumber("salaryMax"), // Support both
       createdFrom: get("createdFrom"),
       createdTo: get("createdTo"),
       deadlineFrom: get("deadlineFrom"),
       deadlineTo: get("deadlineTo"),
       tags: getList("tags"),
-      sortBy: get("sortBy"),
-      sortOrder: (get("sortOrder") as any) || undefined,
+      sortBy: get("sortBy") || "createdAt",
+      sortOrder: (get("sortOrder") as any) || "desc",
     };
     // remove undefined keys
     Object.keys(filters).forEach((k) => {
@@ -78,6 +87,21 @@ export default function HomePage({ onSearch }: HomePageProps) {
       if (keyword) qs.set("q", keyword);
       router.push(`/search?${qs.toString()}`);
     }
+  };
+
+  const handleFiltersChange = (filters: any) => {
+    const qs = new URLSearchParams();
+    if (filters.search) qs.set("q", filters.search);
+    if (filters.location) qs.set("location", filters.location);
+    if (filters.employmentType)
+      qs.set("employmentType", filters.employmentType);
+    if (filters.experienceLevel)
+      qs.set("experienceLevel", filters.experienceLevel);
+    if (filters.industryCode) qs.set("industryCode", filters.industryCode);
+    if (filters.skills) qs.set("skills", filters.skills.join(","));
+    if (filters.minSalary) qs.set("minSalary", String(filters.minSalary));
+    if (filters.maxSalary) qs.set("maxSalary", String(filters.maxSalary));
+    router.push(`/search?${qs.toString()}`);
   };
   const fetchJobs = async (page = currentPage, limit = pageSize) => {
     try {
@@ -119,7 +143,10 @@ export default function HomePage({ onSearch }: HomePageProps) {
   };
   return (
     <PageLayout>
-      <HeroSection onSearch={handleSearch} />
+      <HeroSection
+        onSearch={handleSearch}
+        onFiltersChange={handleFiltersChange}
+      />
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-12">

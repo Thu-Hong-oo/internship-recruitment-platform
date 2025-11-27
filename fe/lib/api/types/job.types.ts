@@ -84,3 +84,37 @@ export interface BackendJobDetailResponse {
     };
   };
 }
+
+export interface ApplyToJobRequest {
+  coverLetter?: string;
+  resumeId?: string; // "current" or specific resume ID
+  additionalInfo?: {
+    availableStartDate?: string; // ISO date string (YYYY-MM-DD)
+    expectedSalary?: number;
+    noticePeriod?: string;
+  };
+}
+
+export interface ApplicationResponse {
+  success: boolean;
+  data?: {
+    _id: string;
+    jobId: string;
+    candidateId: string;
+    status: string;
+    coverLetter?: string;
+    resume?: {
+      url: string;
+      uploadedAt: string;
+    };
+    attachments?: Array<{
+      name: string;
+      url: string;
+      type: string;
+    }>;
+    createdAt?: string;
+    updatedAt?: string;
+  };
+  message?: string;
+  error?: string;
+}

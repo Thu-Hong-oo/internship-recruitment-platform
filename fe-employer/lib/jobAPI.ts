@@ -3,13 +3,22 @@ const API_BASE_URL =
 
 export type CreateJobPayload = {
   title: string;
+  slug?: string;
   description: string;
-  skills: string[];
   requirements: string;
-  education: string;
-  experience: string;
-  salary: string;
+  benefits?: string;
+  skills: string[];
+  skillIds?: string[];
+  level?: string;
+  jobType?: string;
+  workingMode?: string;
   location: string;
+  address?: string;
+  salaryMin?: number;
+  salaryMax?: number;
+  currency?: string;
+  industryCode?: string;
+  subIndustryCode?: string;
   positions: number;
   deadline: string;
 };
@@ -27,6 +36,28 @@ export interface JobsListResponse {
   total?: number;
   page?: number;
   limit?: number;
+  error?: string;
+}
+
+export interface AnalyticsResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    jobs?: {
+      total?: number;
+      active?: number;
+      draft?: number;
+      closed?: number;
+    };
+    applications?: {
+      total?: number;
+    };
+    summary?: {
+      totalJobs?: number;
+      activeJobs?: number;
+      totalApplications?: number;
+    };
+  };
   error?: string;
 }
 
@@ -192,3 +223,24 @@ export const submitJobForReview = async (
   }
 };
 
+// Get employer analytics
+export const getAnalytics = async (
+  token: string,
+  period: string = "30d"
+): Promise<AnalyticsResponse> => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/employers/analytics?period=${period}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    return (await response.json()) as AnalyticsResponse;
+  } catch (e) {
+    return { success: false, error: "Không thể kết nối máy chủ" };
+  }
+};

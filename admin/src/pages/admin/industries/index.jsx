@@ -124,12 +124,12 @@ const Industries = () => {
         </Tag>
       ),
     },
-    {
-      title: "Sắp xếp",
-      dataIndex: "sortOrder",
-      key: "sortOrder",
-      render: (order) => <span className="font-medium">{order || 0}</span>,
-    },
+    // {
+    //   title: "Sắp xếp",
+    //   dataIndex: "sortOrder",
+    //   key: "sortOrder",
+    //   render: (order) => <span className="font-medium">{order || 0}</span>,
+    // },
     {
       title: "Hành động",
       key: "action",
