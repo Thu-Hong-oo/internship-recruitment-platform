@@ -7,7 +7,7 @@
 | **Railway** | $5 credit/tháng | ❌ Không | ✅ Có | ✅ Có | ⭐⭐⭐⭐⭐ |
 | **Render** | Free | ⚠️ Sleep sau 15 phút | ✅ Có | ✅ Có | ⭐⭐⭐⭐ |
 | **Fly.io** | Free | ❌ Không | ⚠️ Tách riêng | ⚠️ Tách riêng | ⭐⭐⭐⭐ |
-| **Koyeb** | Free | ❌ Không | ⚠️ Tách riêng | ⚠️ Tách riêng | ⭐⭐⭐⭐ |
+| **Koyeb** | Free | ❌ Không | ⚠️ Tách riêng | ⚠️ Tách riêng | ⭐⭐⭐⭐⭐ |
 | **Cyclic** | Free | ❌ Không | ✅ Cột MongoDB | ❌ Không | ⭐⭐⭐ |
 
 ---
@@ -122,7 +122,111 @@ Thêm tất cả biến từ `.env`
 
 ---
 
-## 🥉 Lựa Chọn 3: **Fly.io** (Free Tier)
+## 🥉 Lựa Chọn 3: **Koyeb** (Free Tier) ⭐ Khuyến Nghị
+
+### ✅ Ưu Điểm:
+- **Không sleep** - Server chạy 24/7
+- **Free tier** - Đủ cho backend nhỏ
+- **Auto-deploy từ GitHub** - Tự động cập nhật
+- **Global edge network** - Tốc độ nhanh
+- **Dễ setup** - UI đơn giản, không cần CLI
+- **HTTPS tự động** - SSL certificate tự động
+- **Custom domain** - Hỗ trợ domain riêng
+
+### ⚠️ Lưu ý:
+- MongoDB và Redis cần setup riêng (MongoDB Atlas, Redis Cloud)
+- Free tier có giới hạn resources
+
+### 📝 Hướng Dẫn Setup Koyeb:
+
+#### **Bước 1: Đăng Ký Koyeb**
+1. Truy cập: https://www.koyeb.com
+2. Đăng ký bằng GitHub (miễn phí)
+3. Xác thực email
+
+#### **Bước 2: Tạo App Mới**
+1. Vào **Dashboard** → Click **"Create App"**
+2. Chọn **"GitHub"** → Connect GitHub account
+3. Chọn repo: `internship-recruitment-platform`
+4. Chọn branch: `main` hoặc `develop`
+
+#### **Bước 3: Cấu Hình Build**
+1. **Name:** `internship-backend`
+2. **Root Directory:** `backend`
+3. **Build Command:** `npm install`
+4. **Run Command:** `npm run prod` hoặc `node server.js`
+5. **Port:** `3000` (hoặc để trống, Koyeb tự detect)
+
+#### **Bước 4: Environment Variables**
+1. Vào tab **"Environment Variables"**
+2. Thêm tất cả biến từ `.env`:
+   ```
+   PORT=3000
+   NODE_ENV=production
+   MONGODB_URI=mongodb+srv://...
+   JWT_SECRET=your-secret-key
+   GEMINI_API_KEY=your-api-key
+   CLOUDINARY_CLOUD_NAME=your-cloud-name
+   CLOUDINARY_API_KEY=your-api-key
+   CLOUDINARY_API_SECRET=your-api-secret
+   REDIS_URL=redis://...
+   ```
+
+#### **Bước 5: Setup MongoDB (MongoDB Atlas)**
+1. Truy cập: https://www.mongodb.com/cloud/atlas
+2. Tạo cluster miễn phí (M0 - Free tier)
+3. Tạo database user
+4. Whitelist IP: `0.0.0.0/0` (cho phép mọi IP)
+5. Copy connection string → thêm vào `MONGODB_URI`
+
+#### **Bước 6: Setup Redis (Redis Cloud)**
+1. Truy cập: https://redis.com/try-free/
+2. Tạo account miễn phí
+3. Tạo database (30MB free)
+4. Copy connection string → thêm vào `REDIS_URL`
+5. **Lưu ý:** Redis là optional, backend vẫn chạy được nếu không có
+
+#### **Bước 7: Deploy**
+1. Click **"Deploy"**
+2. Koyeb sẽ tự động:
+   - Clone code từ GitHub
+   - Install dependencies
+   - Build và start server
+3. Đợi vài phút để deploy xong
+
+#### **Bước 8: Custom Domain (Optional)**
+1. Vào **Settings** → **Domains**
+2. Click **"Add Domain"**
+3. Thêm domain của bạn
+4. Koyeb sẽ cung cấp DNS records để config
+
+#### **Bước 9: Kiểm Tra**
+1. Vào **Logs** tab để xem logs real-time
+2. Test API: `https://your-app.koyeb.app/health`
+3. Kiểm tra MongoDB connection trong logs
+
+### 🔧 Cấu Hình Nâng Cao
+
+#### **Health Check:**
+Koyeb tự động check endpoint `/health`. Đảm bảo endpoint này tồn tại:
+```javascript
+// backend/server.js
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+```
+
+#### **Auto-Deploy:**
+- Koyeb tự động deploy khi push code lên GitHub
+- Có thể tắt auto-deploy trong Settings nếu muốn
+
+#### **Scaling:**
+- Free tier: 1 instance
+- Có thể scale lên nếu cần (paid plan)
+
+---
+
+## 🥉 Lựa Chọn 4: **Fly.io** (Free Tier)
 
 ### ✅ Ưu Điểm:
 - **Không sleep**
@@ -275,9 +379,10 @@ VITE_API_URL=https://your-backend-url.railway.app/api
 ## 🎯 Khuyến Nghị Cuối Cùng
 
 ### **Cho Production:**
-1. **Railway** - Tốt nhất, không sleep, dễ setup
-2. **Render** - Free nhưng có sleep (OK nếu traffic ít)
-3. **Fly.io** - Tốt nhưng setup phức tạp hơn
+1. **Railway** - Tốt nhất, không sleep, dễ setup, có MongoDB/Redis tích hợp
+2. **Koyeb** - Rất tốt, không sleep, dễ setup, cần MongoDB/Redis riêng
+3. **Render** - Free nhưng có sleep (OK nếu traffic ít)
+4. **Fly.io** - Tốt nhưng setup phức tạp hơn
 
 ### **Cho Development:**
 - Dùng **ngrok** hoặc **localtunnel** để expose local server
@@ -308,6 +413,7 @@ VITE_API_URL=https://your-backend-url.railway.app/api
 ## 📚 Tài Liệu Tham Khảo
 
 - Railway Docs: https://docs.railway.app
+- Koyeb Docs: https://www.koyeb.com/docs
 - Render Docs: https://render.com/docs
 - Fly.io Docs: https://fly.io/docs
 
