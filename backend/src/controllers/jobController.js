@@ -653,7 +653,7 @@ const applyForJob = async (req, res) => {
     
     // Notify employer về application mới
     try {
-      const NotificationService = require('../services/notificationService');
+      const NotificationService = require('../services/notification/notificationService');
       const EmployerProfile = require('../models/EmployerProfile');
       const User = require('../models/User');
       
@@ -683,7 +683,7 @@ const applyForJob = async (req, res) => {
     
     // Notify candidate về application thành công
     try {
-      const NotificationService = require('../services/notificationService');
+      const NotificationService = require('../services/notification/notificationService');
       await NotificationService.notifyApplicationStatusChange(
         req.user.id.toString(),
         application._id.toString(),
