@@ -1,8 +1,8 @@
 const mongoose = require('mongoose');
 const CandidateProfile = require('../../models/CandidateProfile');
-const uploadService = require('../../services/unifiedUploadService');
+const uploadService = require('../../services/upload/unifiedUploadService');
 const ProfileController = require('./ProfileController'); // Import ProfileController
-const aiService = require('../../services/aiService');
+const aiService = require('../../services/ai/aiService');
 const { ApiResponse } = require('../../utils/responseHandler');
 const { AppError } = require('../../utils/errors');
 const { logger } = require('../../utils/logger');

@@ -3,8 +3,8 @@ const asyncHandler = require('express-async-handler');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { logger } = require('../utils/logger');
-const googleAuthService = require('../services/googleAuth');
-const EmailService = require('../services/emailService');
+const googleAuthService = require('../services/auth/googleAuth');
+const EmailService = require('../services/notification/emailService');
 const {
   OTP,
   VALIDATION,

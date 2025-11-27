@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "build": "next build",
+    "export": "node scripts/export-static.js",
+    "build:export": "npm run build && npm run export",
     "dev": "next dev -p 3002",
     "lint": "next lint",
     "start": "next start -p 3002"

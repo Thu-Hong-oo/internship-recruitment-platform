@@ -1,7 +1,7 @@
 const EmployerServices = require('../services/employers/employerServices');
 const { logger } = require('../utils/logger');
-const { uploadImage, deleteImage } = require('../services/imageUploadService');
-const documentUploadService = require('../services/documentUploadService');
+const { uploadImage, deleteImage } = require('../services/upload/imageUploadService');
+const documentUploadService = require('../services/upload/documentUploadService');
 const asyncHandler = require('express-async-handler');
 const {
   companySchema,
@@ -168,7 +168,7 @@ const updateProfile = [
   asyncHandler(async (req, res) => {
     try {
       const User = require('../models/User');
-      const NotificationService = require('../services/notificationService');
+      const NotificationService = require('../services/notification/notificationService');
       
       // Check if fullName is being updated (from User model, not profile)
       let updatedUser = null;

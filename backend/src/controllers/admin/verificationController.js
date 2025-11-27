@@ -374,7 +374,7 @@ const verifyEmployer = asyncHandler(async (req, res) => {
 
     // Notify employer về verification approved
     try {
-      const NotificationService = require('../../services/notificationService');
+      const NotificationService = require('../../services/notification/notificationService');
       if (employerProfile.owner) {
         await NotificationService.notifyVerificationApproved(
           employerProfile.owner.toString(),
@@ -407,7 +407,7 @@ const verifyEmployer = asyncHandler(async (req, res) => {
 
     // Notify employer về verification rejected
     try {
-      const NotificationService = require('../../services/notificationService');
+      const NotificationService = require('../../services/notification/notificationService');
       if (employerProfile.owner) {
         await NotificationService.notifyVerificationRejected(
           employerProfile.owner.toString(),

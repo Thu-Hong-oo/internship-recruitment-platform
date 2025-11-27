@@ -2,7 +2,7 @@ const SkillRoadmap = require('../models/SkillRoadmap');
 const Job = require('../models/Job');
 const CandidateProfile = require('../models/CandidateProfile');
 const Skill = require('../models/Skill');
-const aiService = require('../services/aiService');
+const aiService = require('../services/ai/aiService');
 const { logger } = require('../utils/logger');
 
 // @desc    Get all roadmaps for user

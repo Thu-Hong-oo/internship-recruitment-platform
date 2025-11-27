@@ -6,6 +6,7 @@ const { logger } = require('../utils/logger');
 const {
   formatJobResponse,
   formatJobsResponse,
+  formatMinimalJobsResponse,
 } = require('../utils/jobFormatter');
 const { processJobData } = require('../utils/jobHelpers');
 const { getCacheService } = require('../config/initializeServices');
@@ -47,6 +48,8 @@ const getAllJobs = async (req, res) => {
       sortBy = 'createdAt', // Default: sort by creation date
       sortOrder = 'desc', // Default: descending (newest first)
     } = req.query;
+
+    const view = req.query.view || 'summary';
 
     const query = {};
     if (q) {
@@ -138,16 +141,57 @@ const getAllJobs = async (req, res) => {
     const sortObj = {};
     sortObj[safeSortBy] = sortOrder === 'desc' ? -1 : 1;
 
-    const jobs = await Job.find(query)
-      .populate(
-        'employer',
-        'company.name company.logo company.industry company.description company.website company.size company.officeAddress contact.phone contact.email'
-      )
-      .populate('postedBy', 'fullName name email avatar')
-      .populate('skillIds', 'name category')
-      .sort(sortObj) // ALWAYS sorted (default: newest first by createdAt)
-      .skip(skip)
-      .limit(parseInt(limit));
+    const projection = {
+      title: 1,
+      slug: 1,
+      description: 1,
+      requirements: 1,
+      benefits: 1,
+      skills: 1,
+      tags: 1,
+      jobType: 1,
+      workingMode: 1,
+      level: 1,
+      salaryMin: 1,
+      salaryMax: 1,
+      currency: 1,
+      experience: 1,
+      education: 1,
+      deadline: 1,
+      positions: 1,
+      status: 1,
+      stats: 1,
+      address: 1,
+      location: 1,
+      industryCode: 1,
+      subIndustryCode: 1,
+      industryPath: 1,
+      skillIds: 1,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+
+    let jobs;
+    if (view === 'full') {
+      jobs = await Job.find(query)
+        .populate(
+          'employer',
+          'company.name company.logo company.industry company.description company.website company.size company.officeAddress contact.phone contact.email'
+        )
+        .populate('postedBy', 'fullName name email avatar')
+        .populate('skillIds', 'name category')
+        .sort(sortObj)
+        .skip(skip)
+        .limit(parseInt(limit));
+    } else {
+      jobs = await Job.find(query)
+        .select(projection)
+        .populate('employer', 'company.name company.logo')
+        .sort(sortObj) // ALWAYS sorted (default: newest first by createdAt)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean({ virtuals: true });
+    }
 
     const total = await Job.countDocuments(query);
 
@@ -156,70 +200,85 @@ const getAllJobs = async (req, res) => {
     let formattedJobs = null;
     
     if (cacheService) {
-      formattedJobs = await cacheService.getCachedJobList(req.query);
+      formattedJobs = await cacheService.getCachedJobList({
+        ...req.query,
+        view,
+      });
     }
 
     // If not in cache, fetch and format
     if (!formattedJobs) {
-      // Process jobs to populate skillIds and industryPath for old jobs
-      const { processJobData } = require('../utils/jobHelpers');
-      const jobsToUpdate = [];
-      
-      // Process jobs that need skillIds or industryPath populated
-      for (const job of jobs) {
-        const jobObj = job.toObject ? job.toObject() : job;
-        const needsProcessing = 
-          (Array.isArray(jobObj.skills) && jobObj.skills.length > 0 && (!jobObj.skillIds || jobObj.skillIds.length === 0)) ||
-          ((jobObj.industryCode || jobObj.subIndustryCode) && (!jobObj.industryPath || jobObj.industryPath.length === 0));
+      if (view === 'full') {
+        // Process jobs to populate skillIds and industryPath for old jobs
+        const { processJobData } = require('../utils/jobHelpers');
+        const jobsToUpdate = [];
         
-        if (needsProcessing) {
-          try {
-            const processedData = await processJobData(jobObj);
-            
-            // Update job document in memory for response
-            if (processedData.skillIds && processedData.skillIds.length > 0) {
-              job.skillIds = processedData.skillIds;
-              // Re-populate skillIds for response
-              await job.populate('skillIds', 'name category');
-            }
-            if (processedData.industryPath && processedData.industryPath.length > 0) {
-              job.industryPath = processedData.industryPath;
-            }
-            
-            // Mark for database update (async, don't wait)
-            jobsToUpdate.push({
-              jobId: job._id,
-              updates: {
-                ...(processedData.skillIds && processedData.skillIds.length > 0 ? { skillIds: processedData.skillIds } : {}),
-                ...(processedData.industryPath && processedData.industryPath.length > 0 ? { industryPath: processedData.industryPath } : {}),
+        // Process jobs that need skillIds or industryPath populated
+        for (const job of jobs) {
+          const jobObj = job.toObject ? job.toObject() : job;
+          const needsProcessing = 
+            (Array.isArray(jobObj.skills) && jobObj.skills.length > 0 && (!jobObj.skillIds || jobObj.skillIds.length === 0)) ||
+            ((jobObj.industryCode || jobObj.subIndustryCode) && (!jobObj.industryPath || jobObj.industryPath.length === 0));
+          
+          if (needsProcessing) {
+            try {
+              const processedData = await processJobData(jobObj);
+              
+              // Update job document in memory for response
+              if (processedData.skillIds && processedData.skillIds.length > 0) {
+                job.skillIds = processedData.skillIds;
+                // Re-populate skillIds for response
+                await job.populate('skillIds', 'name category');
               }
-            });
-          } catch (error) {
-            logger.error(`Error processing job ${job._id}:`, error);
+              if (processedData.industryPath && processedData.industryPath.length > 0) {
+                job.industryPath = processedData.industryPath;
+              }
+              
+              // Mark for database update (async, don't wait)
+              jobsToUpdate.push({
+                jobId: job._id,
+                updates: {
+                  ...(processedData.skillIds && processedData.skillIds.length > 0 ? { skillIds: processedData.skillIds } : {}),
+                  ...(processedData.industryPath && processedData.industryPath.length > 0 ? { industryPath: processedData.industryPath } : {}),
+                }
+              });
+            } catch (error) {
+              logger.error(`Error processing job ${job._id}:`, error);
+            }
           }
         }
-      }
 
-      // Update database in background (don't block response)
-      if (jobsToUpdate.length > 0) {
-        Promise.all(jobsToUpdate.map(async ({ jobId, updates }) => {
-          try {
-            if (Object.keys(updates).length > 0) {
-              await Job.findByIdAndUpdate(jobId, updates, { new: false });
+        // Update database in background (don't block response)
+        if (jobsToUpdate.length > 0) {
+          Promise.all(jobsToUpdate.map(async ({ jobId, updates }) => {
+            try {
+              if (Object.keys(updates).length > 0) {
+                await Job.findByIdAndUpdate(jobId, updates, { new: false });
+              }
+            } catch (error) {
+              logger.error(`Error updating job ${jobId} in database:`, error);
             }
-          } catch (error) {
-            logger.error(`Error updating job ${jobId} in database:`, error);
-          }
-        })).catch(error => {
-          logger.error('Error updating jobs in background:', error);
-        });
-      }
+          })).catch(error => {
+            logger.error('Error updating jobs in background:', error);
+          });
+        }
 
-      formattedJobs = formatJobsResponse(jobs);
+        formattedJobs = formatJobsResponse(jobs, {
+          employerFields: 'full',
+        });
+      } else {
+        formattedJobs = formatMinimalJobsResponse(jobs);
+      }
       
       // Cache the results
       if (cacheService) {
-        await cacheService.cacheJobList(req.query, formattedJobs);
+        await cacheService.cacheJobList(
+          {
+            ...req.query,
+            view,
+          },
+          formattedJobs
+        );
       }
     }
 
@@ -653,7 +712,7 @@ const applyForJob = async (req, res) => {
     
     // Notify employer về application mới
     try {
-      const NotificationService = require('../services/notificationService');
+      const NotificationService = require('../services/notification/notificationService');
       const EmployerProfile = require('../models/EmployerProfile');
       const User = require('../models/User');
       
@@ -683,7 +742,7 @@ const applyForJob = async (req, res) => {
     
     // Notify candidate về application thành công
     try {
-      const NotificationService = require('../services/notificationService');
+      const NotificationService = require('../services/notification/notificationService');
       await NotificationService.notifyApplicationStatusChange(
         req.user.id.toString(),
         application._id.toString(),
@@ -891,7 +950,7 @@ const getRecentJobs = async (req, res) => {
 
     // If not in cache, fetch and format
     if (!formattedJobs) {
-      formattedJobs = formatJobsResponse(jobs);
+      formattedJobs = formatMinimalJobsResponse(jobs);
       
       // Cache the results
       if (cacheService) {
