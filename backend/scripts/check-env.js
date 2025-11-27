@@ -1,73 +1,70 @@
 /**
- * Script to check GEMINI_MODEL value from .env file
- * 
- * Usage:
- *   node scripts/check-env.js
- * 
- * This script helps debug which .env file is being loaded
- * and what value GEMINI_MODEL has.
+ * Script to check if all required environment variables are set
+ * Usage: node scripts/check-env.js
  */
 
-const path = require('path');
-const fs = require('fs');
+require('dotenv').config();
 
-console.log('🔍 Checking .env files...\n');
+const required = [
+  'MONGO_URI',
+  'JWT_SECRET',
+  'CLOUDINARY_CLOUD_NAME',
+  'CLOUDINARY_API_KEY',
+  'CLOUDINARY_API_SECRET'
+];
 
-// Check backend/.env
-const backendEnvPath = path.join(__dirname, '..', '.env');
-console.log(`📁 Checking: ${backendEnvPath}`);
+const optional = [
+  'REDIS_URL',
+  'GEMINI_API_KEY',
+  'GEMINI_MODEL',
+  'EMAIL_HOST',
+  'EMAIL_PORT',
+  'EMAIL_USER',
+  'EMAIL_PASS',
+  'GOOGLE_CLIENT_ID',
+  'GOOGLE_CLIENT_SECRET'
+];
 
-if (fs.existsSync(backendEnvPath)) {
-  const envContent = fs.readFileSync(backendEnvPath, 'utf8');
-  const geminiModelMatch = envContent.match(/^GEMINI_MODEL=(.+)$/m);
-  
-  if (geminiModelMatch) {
-    console.log(`✅ Found GEMINI_MODEL: ${geminiModelMatch[1]}`);
+console.log('🔍 Checking Environment Variables...\n');
+
+let hasErrors = false;
+
+console.log('📋 Required Variables:');
+required.forEach(key => {
+  if (!process.env[key]) {
+    console.error(`   ❌ Missing: ${key}`);
+    hasErrors = true;
   } else {
-    console.log(`❌ GEMINI_MODEL not found in backend/.env`);
+    const value = process.env[key];
+    const preview = value.length > 20 
+      ? `${value.substring(0, 10)}...${value.substring(value.length - 4)}`
+      : value.substring(0, 10) + '...';
+    console.log(`   ✅ ${key}: ${preview}`);
   }
-  
-  // Show all lines containing GEMINI
-  const geminiLines = envContent.split('\n').filter(line => line.includes('GEMINI'));
-  if (geminiLines.length > 0) {
-    console.log(`\n📋 All GEMINI-related lines:`);
-    geminiLines.forEach(line => console.log(`   ${line.trim()}`));
-  }
-} else {
-  console.log(`❌ File does not exist`);
-}
+});
 
-// Check root .env (if exists)
-const rootEnvPath = path.join(__dirname, '..', '..', '.env');
-console.log(`\n📁 Checking root: ${rootEnvPath}`);
-
-if (fs.existsSync(rootEnvPath)) {
-  const envContent = fs.readFileSync(rootEnvPath, 'utf8');
-  const geminiModelMatch = envContent.match(/^GEMINI_MODEL=(.+)$/m);
-  
-  if (geminiModelMatch) {
-    console.log(`✅ Found GEMINI_MODEL: ${geminiModelMatch[1]}`);
-    console.log(`⚠️  WARNING: Root .env file exists and may override backend/.env`);
+console.log('\n📋 Optional Variables:');
+optional.forEach(key => {
+  if (process.env[key]) {
+    const value = process.env[key];
+    const preview = value.length > 20 
+      ? `${value.substring(0, 10)}...${value.substring(value.length - 4)}`
+      : value.substring(0, 10) + '...';
+    console.log(`   ✅ ${key}: ${preview}`);
   } else {
-    console.log(`ℹ️  GEMINI_MODEL not found in root/.env`);
+    console.log(`   ⚠️  ${key}: Not set (optional)`);
   }
+});
+
+console.log('\n📊 Summary:');
+console.log(`   PORT: ${process.env.PORT || '3000 (default)'}`);
+console.log(`   NODE_ENV: ${process.env.NODE_ENV || 'development (default)'}`);
+
+if (hasErrors) {
+  console.error('\n❌ Missing required environment variables!');
+  console.error('   Please check your .env file.');
+  process.exit(1);
 } else {
-  console.log(`ℹ️  Root .env does not exist (this is OK)`);
+  console.log('\n✅ All required environment variables are set!');
+  console.log('   Ready to deploy! 🚀');
 }
-
-// Check what dotenv will load
-console.log(`\n🔍 Testing dotenv.config()...`);
-require('dotenv').config({ path: backendEnvPath });
-
-console.log(`\n📊 process.env.GEMINI_MODEL value:`);
-console.log(`   Raw: "${process.env.GEMINI_MODEL}"`);
-console.log(`   Type: ${typeof process.env.GEMINI_MODEL}`);
-console.log(`   Length: ${process.env.GEMINI_MODEL?.length || 0}`);
-
-if (process.env.GEMINI_MODEL) {
-  console.log(`\n✅ Value loaded successfully: ${process.env.GEMINI_MODEL}`);
-} else {
-  console.log(`\n❌ GEMINI_MODEL is not set in process.env`);
-  console.log(`   Default will be used: gemini-pro`);
-}
-
