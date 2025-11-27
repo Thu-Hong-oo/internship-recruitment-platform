@@ -215,7 +215,9 @@ const getAllJobs = async (req, res) => {
         });
       }
 
-      formattedJobs = formatJobsResponse(jobs);
+      formattedJobs = formatJobsResponse(jobs, {
+        employerFields: 'minimal',
+      });
       
       // Cache the results
       if (cacheService) {

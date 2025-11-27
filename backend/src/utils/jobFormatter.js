@@ -124,7 +124,8 @@ function formatJobAddress(jobObj) {
  * @param {Object} employer - Employer object (populated or not)
  * @returns {Object} Formatted employer with company info
  */
-function formatEmployerInfo(employer) {
+function formatEmployerInfo(employer, options = {}) {
+  const { mode = 'full' } = options;
   // Handle null or undefined employer
   if (!employer) {
     return null;
@@ -147,18 +148,47 @@ function formatEmployerInfo(employer) {
     return employer;
   }
   
+  // Minimal payload mode (public job list)
+  if (mode === 'minimal') {
+    const minimalEmployer = {
+      _id: employer._id,
+      company: null,
+    };
+
+    if (employer.company) {
+      const { name = null, logo = null } = employer.company;
+      minimalEmployer.company = {
+        name,
+        logo: logo
+          ? {
+              url: logo.url || null,
+              cloudinaryId: logo.cloudinaryId || null,
+              filename: logo.filename || null,
+            }
+          : null,
+      };
+    }
+
+    return minimalEmployer;
+  }
+
   // Format officeAddress if it's an object
-  if (employer.company.officeAddress && typeof employer.company.officeAddress === 'object') {
+  if (
+    employer.company.officeAddress &&
+    typeof employer.company.officeAddress === 'object'
+  ) {
     const addr = employer.company.officeAddress;
     employer.company.formattedAddress = [
       addr.street,
       addr.ward,
       addr.district,
       addr.city,
-      addr.country
-    ].filter(Boolean).join(', ');
+      addr.country,
+    ]
+      .filter(Boolean)
+      .join(', ');
   }
-  
+
   return employer;
 }
 
@@ -175,6 +205,7 @@ function formatJobResponse(job, options = {}) {
   const {
     includeLocation = true,
     removeLocationField = true,
+    employerFields = 'full',
   } = options;
   
   // Convert to plain object if Mongoose document
@@ -182,7 +213,9 @@ function formatJobResponse(job, options = {}) {
   
   // Format employer info
   if (jobObj.employer) {
-    jobObj.employer = formatEmployerInfo(jobObj.employer);
+    jobObj.employer = formatEmployerInfo(jobObj.employer, {
+      mode: employerFields,
+    });
   }
   
   // Format address: Convert string address/location to structured object
