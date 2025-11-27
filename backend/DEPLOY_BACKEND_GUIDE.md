@@ -205,6 +205,16 @@ Thêm tất cả biến từ `.env`
 2. Test API: `https://your-app.koyeb.app/health`
 3. Kiểm tra MongoDB connection trong logs
 
+#### **Bước 10: Bật CI/CD GitHub Actions (Optional nhưng khuyến nghị)**
+1. Thêm secrets vào GitHub repo:
+   - `KOYEB_API_TOKEN`: Token tạo tại https://app.koyeb.com/account/api
+   - `KOYEB_SERVICE_ID`: ID của service (vào Service → Settings → Copy Service ID)
+2. Workflow `.github/workflows/deploy-backend-koyeb.yml` sẽ:
+   - Chạy `npm install` + `npm run lint` cho `backend/`
+   - Gọi API của Koyeb để tạo deployment mới
+3. Trigger: push vào `develop` (có thay đổi trong `backend/**`) hoặc chạy tay `workflow_dispatch`
+4. Kiểm tra kết quả ở tab **Actions** và trên Koyeb (Activity/Logs)
+
 ### 🔧 Cấu Hình Nâng Cao
 
 #### **Health Check:**
