@@ -1,6 +1,6 @@
 const EmployerProfile = require('../../models/EmployerProfile');
 const User = require('../../models/User');
-const { uploadImage, deleteImage } = require('../imageUploadService');
+const { uploadImage, deleteImage } = require('../upload/imageUploadService');
 const { AppError } = require('../../utils/errors');
 const { logger } = require('../../utils/logger');
 
@@ -670,7 +670,7 @@ class EmployerService {
    * Upload document for verification
    */
   static async uploadDocument(file, userId, documentType, metadata, profile) {
-    const documentUploadService = require('../documentUploadService');
+    const documentUploadService = require('../upload/documentUploadService');
 
     return await documentUploadService.uploadDocument(file, {
       folder: `internbridge/employer-documents/${userId.toString()}`,
@@ -684,7 +684,7 @@ class EmployerService {
    * Delete document from Cloudinary
    */
   static async deleteDocument(cloudinaryId) {
-    const documentUploadService = require('../documentUploadService');
+    const documentUploadService = require('../upload/documentUploadService');
 
     return await documentUploadService.deleteDocument(cloudinaryId);
   }

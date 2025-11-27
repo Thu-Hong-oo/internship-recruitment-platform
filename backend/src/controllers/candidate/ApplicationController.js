@@ -159,7 +159,7 @@ class ApplicationController {
       // Notify employer về application mới
       try {
         console.log('🔔 [NOTIFICATION] Entering try block for employer notification');
-        const NotificationService = require('../../services/notificationService');
+        const NotificationService = require('../../services/notification/notificationService');
         const User = require('../../models/User');
         const EmployerProfile = require('../../models/EmployerProfile');
         const { logger } = require('../../utils/logger');
@@ -276,7 +276,7 @@ class ApplicationController {
       // Notify candidate về application thành công (optional)
       try {
         console.log('🔔 [NOTIFICATION] Starting candidate notification');
-        const NotificationService = require('../../services/notificationService');
+        const NotificationService = require('../../services/notification/notificationService');
         const { logger } = require('../../utils/logger');
         
         await NotificationService.notifyApplicationStatusChange(
@@ -355,7 +355,7 @@ class ApplicationController {
 
       // Notify employer về application withdrawn
       try {
-        const NotificationService = require('../../services/notificationService');
+        const NotificationService = require('../../services/notification/notificationService');
         const EmployerProfile = require('../../models/EmployerProfile');
         
         await application.populate('jobId', 'employer title');

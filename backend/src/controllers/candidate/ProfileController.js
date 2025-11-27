@@ -447,7 +447,7 @@ class ProfileController {
       // Cập nhật notification nếu candidate thay đổi tên
       if (section === 'profile' && data.personalInfo?.fullName) {
         try {
-          const NotificationService = require('../../services/notificationService');
+          const NotificationService = require('../../services/notification/notificationService');
           await NotificationService.updateCandidateNameInNotifications(
             req.user.id.toString(),
             data.personalInfo.fullName

@@ -1,0 +1,45 @@
+name: Deploy to Firebase Hosting
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      
+      - name: Install dependencies
+        run: |
+          cd fe && npm ci
+          cd ../fe-employer && npm ci
+          cd ../admin && npm ci
+      
+      - name: Build and export FE
+        run: |
+          cd fe
+          npm run build:export
+      
+      - name: Build and export FE-Employer
+        run: |
+          cd fe-employer
+          npm run build:export
+      
+      - name: Build Admin
+        run: |
+          cd admin
+          npm run build
+      
+      - name: Deploy to Firebase
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: "${{ secrets.GITHUB_TOKEN }}"
+          firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"
+          projectId: intern-recruitment-2025
+          channelId: live

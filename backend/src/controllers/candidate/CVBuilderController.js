@@ -1,8 +1,8 @@
 const mongoose = require('mongoose');
 const CandidateProfile = require('../../models/CandidateProfile');
-const aiService = require('../../services/aiService');
-const pdfGenerationService = require('../../services/pdfGenerationService');
-const resumeGeneratorService = require('../../services/resumeGeneratorService');
+const aiService = require('../../services/ai/aiService');
+const pdfGenerationService = require('../../services/resume/pdfGenerationService');
+const resumeGeneratorService = require('../../services/resume/resumeGeneratorService');
 const { ApiResponse } = require('../../utils/responseHandler');
 const { AppError } = require('../../utils/errors');
 
