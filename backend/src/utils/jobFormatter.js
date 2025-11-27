@@ -150,26 +150,7 @@ function formatEmployerInfo(employer, options = {}) {
   
   // Minimal payload mode (public job list)
   if (mode === 'minimal') {
-    const minimalEmployer = {
-      _id: employer._id,
-      company: null,
-    };
-
-    if (employer.company) {
-      const { name = null, logo = null } = employer.company;
-      minimalEmployer.company = {
-        name,
-        logo: logo
-          ? {
-              url: logo.url || null,
-              cloudinaryId: logo.cloudinaryId || null,
-              filename: logo.filename || null,
-            }
-          : null,
-      };
-    }
-
-    return minimalEmployer;
+    return formatMinimalEmployer(employer);
   }
 
   // Format officeAddress if it's an object
@@ -190,6 +171,31 @@ function formatEmployerInfo(employer, options = {}) {
   }
 
   return employer;
+}
+
+function formatMinimalEmployer(employer) {
+  if (!employer) return null;
+
+  const minimalEmployer = {
+    _id: employer._id,
+    company: null,
+  };
+
+  if (employer.company) {
+    const { name = null, logo = null } = employer.company;
+    minimalEmployer.company = {
+      name: name || null,
+      logo: logo
+        ? {
+            url: logo.url || null,
+            cloudinaryId: logo.cloudinaryId || null,
+            filename: logo.filename || null,
+          }
+        : null,
+    };
+  }
+
+  return minimalEmployer;
 }
 
 /**
@@ -414,6 +420,53 @@ function formatJobResponse(job, options = {}) {
   return jobObj;
 }
 
+function formatMinimalJobResponse(job) {
+  if (!job) {
+    return null;
+  }
+
+  const jobObj = job.toObject ? job.toObject() : { ...job };
+
+  const minimalJob = {
+    _id: jobObj._id,
+    title: jobObj.title,
+    slug: jobObj.slug,
+    description: jobObj.description,
+    requirements: jobObj.requirements,
+    benefits: jobObj.benefits,
+    skills: jobObj.skills || [],
+    tags: jobObj.tags || [],
+    jobType: jobObj.jobType || null,
+    workingMode: jobObj.workingMode || null,
+    level: jobObj.level || null,
+    salaryMin: jobObj.salaryMin || null,
+    salaryMax: jobObj.salaryMax || null,
+    currency: jobObj.currency || 'VND',
+    experience: jobObj.experience || null,
+    deadline: jobObj.deadline || null,
+    positions: jobObj.positions || null,
+    status: jobObj.status || null,
+    stats: jobObj.stats || { applications: 0, interviews: 0, offers: 0 },
+    createdAt: jobObj.createdAt,
+    updatedAt: jobObj.updatedAt,
+    address: formatJobAddress(jobObj),
+    industryCode: jobObj.industryCode || null,
+    subIndustryCode: jobObj.subIndustryCode || null,
+  };
+
+  minimalJob.employer = formatMinimalEmployer(jobObj.employer);
+
+  return minimalJob;
+}
+
+function formatMinimalJobsResponse(jobs) {
+  if (!Array.isArray(jobs)) {
+    return [];
+  }
+
+  return jobs.map(job => formatMinimalJobResponse(job));
+}
+
 /**
  * Format multiple jobs for API response
  * @param {Array} jobs - Array of job documents
@@ -433,5 +486,7 @@ module.exports = {
   formatJobsResponse,
   formatJobAddress,
   formatEmployerInfo,
+  formatMinimalJobResponse,
+  formatMinimalJobsResponse,
 };
 

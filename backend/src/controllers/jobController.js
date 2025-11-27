@@ -6,6 +6,7 @@ const { logger } = require('../utils/logger');
 const {
   formatJobResponse,
   formatJobsResponse,
+  formatMinimalJobsResponse,
 } = require('../utils/jobFormatter');
 const { processJobData } = require('../utils/jobHelpers');
 const { getCacheService } = require('../config/initializeServices');
@@ -138,16 +139,43 @@ const getAllJobs = async (req, res) => {
     const sortObj = {};
     sortObj[safeSortBy] = sortOrder === 'desc' ? -1 : 1;
 
+    const projection = {
+      title: 1,
+      slug: 1,
+      description: 1,
+      requirements: 1,
+      benefits: 1,
+      skills: 1,
+      tags: 1,
+      jobType: 1,
+      workingMode: 1,
+      level: 1,
+      salaryMin: 1,
+      salaryMax: 1,
+      currency: 1,
+      experience: 1,
+      education: 1,
+      deadline: 1,
+      positions: 1,
+      status: 1,
+      stats: 1,
+      address: 1,
+      location: 1,
+      industryCode: 1,
+      subIndustryCode: 1,
+      industryPath: 1,
+      skillIds: 1,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+
     const jobs = await Job.find(query)
-      .populate(
-        'employer',
-        'company.name company.logo company.industry company.description company.website company.size company.officeAddress contact.phone contact.email'
-      )
-      .populate('postedBy', 'fullName name email avatar')
-      .populate('skillIds', 'name category')
+      .select(projection)
+      .populate('employer', 'company.name company.logo')
       .sort(sortObj) // ALWAYS sorted (default: newest first by createdAt)
       .skip(skip)
-      .limit(parseInt(limit));
+      .limit(parseInt(limit))
+      .lean({ virtuals: true });
 
     const total = await Job.countDocuments(query);
 
@@ -893,7 +921,7 @@ const getRecentJobs = async (req, res) => {
 
     // If not in cache, fetch and format
     if (!formattedJobs) {
-      formattedJobs = formatJobsResponse(jobs);
+      formattedJobs = formatMinimalJobsResponse(jobs);
       
       // Cache the results
       if (cacheService) {
