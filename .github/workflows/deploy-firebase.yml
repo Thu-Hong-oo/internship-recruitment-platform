@@ -15,25 +15,22 @@ jobs:
         with:
           node-version: 18
       
-      - name: Install dependencies
-        run: |
-          cd fe && npm ci
-          cd ../fe-employer && npm ci
-          cd ../admin && npm ci
-      
-      - name: Build and export FE
+      - name: Install and build FE
         run: |
           cd fe
+          npm install
           npm run build:export
       
-      - name: Build and export FE-Employer
+      - name: Install and build FE-Employer
         run: |
           cd fe-employer
+          npm install
           npm run build:export
       
-      - name: Build Admin
+      - name: Install and build Admin
         run: |
           cd admin
+          npm install
           npm run build
       
       - name: Deploy to Firebase
