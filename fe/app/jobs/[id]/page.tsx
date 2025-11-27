@@ -21,26 +21,33 @@ interface JobDetailPageProps {
 }
 
 // Generate static params for pre-rendering (required for static export)
-// Note: During build, API may not be available, so we return empty array
-// Jobs will be rendered client-side at runtime
+// Next.js 15 requires at least one param when using output: 'export'
+// We return a dummy value for build, actual jobs will be fetched client-side
 export async function generateStaticParams() {
-  // Return empty array to allow static export
-  // Jobs will be fetched and rendered client-side
-  return [];
+  // Return at least one dummy param to satisfy Next.js 15 requirement
+  // Actual job pages will be rendered client-side at runtime
+  return [{ id: 'placeholder' }];
   
-  // TODO: Uncomment below when deploying with API available
+  // TODO: When API is available during build, uncomment below:
   // try {
   //   const response = await jobsAPI.getJobs(1, 100);
-  //   if (!response?.success || !response?.data) return [];
+  //   if (!response?.success || !response?.data) {
+  //     return [{ id: 'placeholder' }]; // Fallback
+  //   }
   //   return response.data.map((job) => ({ id: job.id || job._id }));
   // } catch (error) {
   //   console.error('Error generating static params:', error);
-  //   return [];
+  //   return [{ id: 'placeholder' }]; // Fallback
   // }
 }
 
 export default async function JobDetailPage({ params }: JobDetailPageProps) {
   const { id } = await params;
+
+  // Handle placeholder ID used for static export
+  if (id === 'placeholder') {
+    return notFound();
+  }
 
   try {
     const res = await jobsAPI.getJobById(id);
