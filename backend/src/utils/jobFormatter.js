@@ -124,7 +124,8 @@ function formatJobAddress(jobObj) {
  * @param {Object} employer - Employer object (populated or not)
  * @returns {Object} Formatted employer with company info
  */
-function formatEmployerInfo(employer) {
+function formatEmployerInfo(employer, options = {}) {
+  const { mode = 'full' } = options;
   // Handle null or undefined employer
   if (!employer) {
     return null;
@@ -147,19 +148,54 @@ function formatEmployerInfo(employer) {
     return employer;
   }
   
+  // Minimal payload mode (public job list)
+  if (mode === 'minimal') {
+    return formatMinimalEmployer(employer);
+  }
+
   // Format officeAddress if it's an object
-  if (employer.company.officeAddress && typeof employer.company.officeAddress === 'object') {
+  if (
+    employer.company.officeAddress &&
+    typeof employer.company.officeAddress === 'object'
+  ) {
     const addr = employer.company.officeAddress;
     employer.company.formattedAddress = [
       addr.street,
       addr.ward,
       addr.district,
       addr.city,
-      addr.country
-    ].filter(Boolean).join(', ');
+      addr.country,
+    ]
+      .filter(Boolean)
+      .join(', ');
   }
-  
+
   return employer;
+}
+
+function formatMinimalEmployer(employer) {
+  if (!employer) return null;
+
+  const minimalEmployer = {
+    _id: employer._id,
+    company: null,
+  };
+
+  if (employer.company) {
+    const { name = null, logo = null } = employer.company;
+    minimalEmployer.company = {
+      name: name || null,
+      logo: logo
+        ? {
+            url: logo.url || null,
+            cloudinaryId: logo.cloudinaryId || null,
+            filename: logo.filename || null,
+          }
+        : null,
+    };
+  }
+
+  return minimalEmployer;
 }
 
 /**
@@ -175,6 +211,7 @@ function formatJobResponse(job, options = {}) {
   const {
     includeLocation = true,
     removeLocationField = true,
+    employerFields = 'full',
   } = options;
   
   // Convert to plain object if Mongoose document
@@ -182,7 +219,9 @@ function formatJobResponse(job, options = {}) {
   
   // Format employer info
   if (jobObj.employer) {
-    jobObj.employer = formatEmployerInfo(jobObj.employer);
+    jobObj.employer = formatEmployerInfo(jobObj.employer, {
+      mode: employerFields,
+    });
   }
   
   // Format address: Convert string address/location to structured object
@@ -381,6 +420,53 @@ function formatJobResponse(job, options = {}) {
   return jobObj;
 }
 
+function formatMinimalJobResponse(job) {
+  if (!job) {
+    return null;
+  }
+
+  const jobObj = job.toObject ? job.toObject() : { ...job };
+
+  const minimalJob = {
+    _id: jobObj._id,
+    title: jobObj.title,
+    slug: jobObj.slug,
+    description: jobObj.description,
+    requirements: jobObj.requirements,
+    benefits: jobObj.benefits,
+    skills: jobObj.skills || [],
+    tags: jobObj.tags || [],
+    jobType: jobObj.jobType || null,
+    workingMode: jobObj.workingMode || null,
+    level: jobObj.level || null,
+    salaryMin: jobObj.salaryMin || null,
+    salaryMax: jobObj.salaryMax || null,
+    currency: jobObj.currency || 'VND',
+    experience: jobObj.experience || null,
+    deadline: jobObj.deadline || null,
+    positions: jobObj.positions || null,
+    status: jobObj.status || null,
+    stats: jobObj.stats || { applications: 0, interviews: 0, offers: 0 },
+    createdAt: jobObj.createdAt,
+    updatedAt: jobObj.updatedAt,
+    address: formatJobAddress(jobObj),
+    industryCode: jobObj.industryCode || null,
+    subIndustryCode: jobObj.subIndustryCode || null,
+  };
+
+  minimalJob.employer = formatMinimalEmployer(jobObj.employer);
+
+  return minimalJob;
+}
+
+function formatMinimalJobsResponse(jobs) {
+  if (!Array.isArray(jobs)) {
+    return [];
+  }
+
+  return jobs.map(job => formatMinimalJobResponse(job));
+}
+
 /**
  * Format multiple jobs for API response
  * @param {Array} jobs - Array of job documents
@@ -400,5 +486,7 @@ module.exports = {
   formatJobsResponse,
   formatJobAddress,
   formatEmployerInfo,
+  formatMinimalJobResponse,
+  formatMinimalJobsResponse,
 };
 

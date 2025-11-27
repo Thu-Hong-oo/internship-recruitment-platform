@@ -1,0 +1,73 @@
+name: Deploy Backend to Koyeb
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend-koyeb.yml"
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      BACKEND_DIR: backend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.npm
+            ${{ env.BACKEND_DIR }}/node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('${{ env.BACKEND_DIR }}/package-lock.json', '${{ env.BACKEND_DIR }}/package.json') }}
+
+      - name: Install dependencies
+        env:
+          NODE_ENV: development
+        run: |
+          cd $BACKEND_DIR
+          npm install
+
+      - name: Lint backend
+        run: |
+          cd $BACKEND_DIR
+          npm run lint
+
+      - name: Trigger Koyeb deploy
+        env:
+          KOYEB_API_TOKEN: ${{ secrets.KOYEB_API_TOKEN }}
+          KOYEB_SERVICE_ID: ${{ secrets.KOYEB_SERVICE_ID }}
+        run: |
+          if [ -z "$KOYEB_API_TOKEN" ] || [ -z "$KOYEB_SERVICE_ID" ]; then
+            echo "❌ Missing KOYEB_API_TOKEN or KOYEB_SERVICE_ID secrets"
+            exit 1
+          fi
+
+          DEPLOY_PAYLOAD=$(cat <<EOF
+          {
+            "deployment": {
+              "metadata": {
+                "trigger": "github_actions",
+                "sha": "${{ github.sha }}"
+              }
+            }
+          }
+          EOF
+          )
+
+          curl -X POST \
+            -H "Authorization: Bearer $KOYEB_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$DEPLOY_PAYLOAD" \
+            "https://app.koyeb.com/v1/services/$KOYEB_SERVICE_ID/deployments"
+

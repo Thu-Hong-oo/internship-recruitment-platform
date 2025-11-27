@@ -10,10 +10,10 @@ const Notification = require('../models/Notification');
 
 const asyncHandler = require('express-async-handler');
 const { logger } = require('../utils/logger');
-const { uploadImage } = require('../services/imageUploadService');
+const { uploadImage } = require('../services/upload/imageUploadService');
 const { getAvatarUrl } = require('../utils/avatarUtils');
 const { getIO } = require('../socket');
-const googleAuthService = require('../services/googleAuth');
+const googleAuthService = require('../services/auth/googleAuth');
 
 // Resolve display name consistently
 const resolveFullName = user => {

@@ -269,7 +269,7 @@ const updateApplicationStatus = asyncHandler(async (req, res) => {
     // Notify candidate về status change
     if (oldStatus !== status && application.candidateId && application.candidateId.userId) {
       try {
-        const NotificationService = require('../services/notificationService');
+        const NotificationService = require('../services/notification/notificationService');
         await NotificationService.notifyApplicationStatusChange(
           application.candidateId.userId.toString(),
           application._id.toString(),

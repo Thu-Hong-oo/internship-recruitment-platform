@@ -80,6 +80,7 @@ const LearningRoadmapSchema = new mongoose.Schema(
                     'documentation',
                     'tutorial',
                     'practice',
+                    'project',
                   ],
                   required: true,
                 },

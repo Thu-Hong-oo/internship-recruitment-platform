@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const CVPreviewGenerator = require('../../services/cvPreviewGenerator');
+const CVPreviewGenerator = require('../../services/resume/cvPreviewGenerator');
 const { protect, authorize } = require('../../middleware/auth');
 const { logger } = require('../../utils/logger');
 

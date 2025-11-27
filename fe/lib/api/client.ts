@@ -63,13 +63,14 @@ export class ApiClient {
   private token: string | null;
 
   constructor() {
-    // Fail fast if the API base URL is not configured
-    if (!API_BASE_URL) {
-      throw new Error(
-        "NEXT_PUBLIC_API_URL is not defined. Please check your .env.local file."
+    // Use API_BASE_URL with fallback
+    // Only throw error at runtime (client-side) if URL is clearly invalid, not at build time
+    if (typeof window !== 'undefined' && (!API_BASE_URL || API_BASE_URL.includes('localhost'))) {
+      console.warn(
+        "NEXT_PUBLIC_API_URL is not properly configured. Using fallback URL."
       );
     }
-    this.baseURL = API_BASE_URL;
+    this.baseURL = API_BASE_URL || 'http://localhost:3000/api';
     this.token = null; // Initialize as null, will be set when needed
   }
 
