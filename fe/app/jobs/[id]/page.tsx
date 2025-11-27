@@ -20,9 +20,24 @@ interface JobDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
-// Disable caching for this page to ensure fresh data
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+// Generate static params for pre-rendering (required for static export)
+// Note: During build, API may not be available, so we return empty array
+// Jobs will be rendered client-side at runtime
+export async function generateStaticParams() {
+  // Return empty array to allow static export
+  // Jobs will be fetched and rendered client-side
+  return [];
+  
+  // TODO: Uncomment below when deploying with API available
+  // try {
+  //   const response = await jobsAPI.getJobs(1, 100);
+  //   if (!response?.success || !response?.data) return [];
+  //   return response.data.map((job) => ({ id: job.id || job._id }));
+  // } catch (error) {
+  //   console.error('Error generating static params:', error);
+  //   return [];
+  // }
+}
 
 export default async function JobDetailPage({ params }: JobDetailPageProps) {
   const { id } = await params;

@@ -186,7 +186,7 @@ ApplicationSchema.methods.scheduleInterview = async function (interviewData) {
   
   // Notify candidate và employer về interview scheduled
   try {
-    const NotificationService = require('../services/notificationService');
+    const NotificationService = require('../services/notification/notificationService');
     const CandidateProfile = require('./CandidateProfile');
     const EmployerProfile = require('./EmployerProfile');
     const Job = require('./Job');

@@ -1,0 +1,21 @@
+{
+  "projects": {
+    "default": "intern-recruitment-2025"
+  },
+  "targets": {
+    "intern-recruitment-2025": {
+      "hosting": {
+        "fe": [
+          "internbridge"
+        ],
+        "admin": [
+          "internbridge-admin"
+        ],
+        "employer": [
+          "internbridge-employer"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
