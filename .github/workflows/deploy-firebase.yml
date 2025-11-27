@@ -13,7 +13,7 @@ jobs:
       
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
       
       - name: Install and build FE
         env:
@@ -36,7 +36,7 @@ jobs:
           VITE_API_URL: ${{ secrets.VITE_API_URL || secrets.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api' }}
         run: |
           cd admin
-          npm install --no-optional
+          npm install
           npm run build
       
       - name: Deploy to Firebase
