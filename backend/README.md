@@ -5,6 +5,7 @@
 ## 📋 TỔNG QUAN
 
 InternBridge là nền tảng kết nối thực tập sinh thông minh với các tính năng:
+
 - **Web Crawler**: Thu thập tin tuyển dụng realtime từ các trang web khác
 - **AI Filtering**: Phân tích và lọc công việc intern bằng Computer Vision
 - **Smart Matching**: Gợi ý job thông minh với Explainable AI
@@ -14,6 +15,7 @@ InternBridge là nền tảng kết nối thực tập sinh thông minh với c�
 ## 🎯 TÍNH NĂNG CHÍNH
 
 ### 👥 Cho Nhà Tuyển Dụng
+
 - ✅ Đăng tin tuyển dụng intern
 - ✅ Xem thông tin ứng viên ứng tuyển
 - ✅ Liên hệ với ứng viên trực tiếp
@@ -21,6 +23,7 @@ InternBridge là nền tảng kết nối thực tập sinh thông minh với c�
 - ✅ Analytics và báo cáo
 
 ### 👤 Cho Ứng Viên
+
 - ✅ Tìm kiếm công việc theo địa điểm, mức lương, ngành nghề
 - ✅ Xem thông tin chi tiết và lưu trữ công việc yêu thích
 - ✅ Ứng tuyển trực tiếp với cover letter và resume
@@ -29,8 +32,8 @@ InternBridge là nền tảng kết nối thực tập sinh thông minh với c�
 
 - ✅ Xác thực email để bảo mật tài khoản
 
-
 ### 🤖 AI Features
+
 - ✅ **Smart Job Filtering**: Tự động lọc công việc intern
 - ✅ **Intelligent Matching**: Gợi ý công việc phù hợp
 - ✅ **Chatbot Support**: Hỗ trợ 24/7
@@ -39,6 +42,7 @@ InternBridge là nền tảng kết nối thực tập sinh thông minh với c�
 ## 🛠️ TECHNOLOGY STACK
 
 ### Backend
+
 - **Runtime**: Node.js
 - **Framework**: Express.js
 - **Database**: MongoDB với Mongoose
@@ -52,6 +56,7 @@ InternBridge là nền tảng kết nối thực tập sinh thông minh với c�
 - **Real-time**: Socket.io
 
 ### Frontend
+
 - **Framework**: React.js
 - **Build Tool**: Vite
 - **State Management**: Redux Toolkit
@@ -60,6 +65,7 @@ InternBridge là nền tảng kết nối thực tập sinh thông minh với c�
 - **Real-time**: Socket.io Client
 
 ### DevOps
+
 - **Version Control**: Git
 - **Deployment**: Vercel (Frontend), Railway (Backend)
 - **Database**: MongoDB Atlas
@@ -111,11 +117,13 @@ Xem chi tiết tại [DATABASE_DESIGN.md](./DATABASE_DESIGN.md)
 ## 🚀 CÀI ĐẶT VÀ CHẠY
 
 ### Prerequisites
+
 - Node.js 18+
 - MongoDB 6+
 - Git
 
 ### Backend Setup
+
 ```bash
 cd backend
 npm install
@@ -125,6 +133,7 @@ npm run dev
 ```
 
 ### Frontend Setup
+
 ```bash
 cd frontend
 npm install
@@ -134,49 +143,70 @@ npm run dev
 ```
 
 ### Environment Variables
+
 ```env
 # Backend
 MONGODB_URI=mongodb://localhost:27017/internbridge
 JWT_SECRET=your_jwt_secret
 PORT=5000
+TRANSLATE_BASE_URL=http://localhost:5000/translate
+TRANSLATE_TIMEOUT_MS=10000
 
 # Frontend
 VITE_API_URL=http://localhost:5000/api
 ```
 
+### LibreTranslate (dịch văn bản)
+
+1. Cài Docker + Docker Compose.
+2. Chạy dịch vụ:
+   ```bash
+   cd backend/infra/libretranslate
+   docker compose up -d
+   ```
+3. Đặt biến môi trường `TRANSLATE_BASE_URL=http://localhost:5000/translate`.
+4. Gọi API backend: `POST /api/translate` với payload `{ text, sourceLang?, targetLang }`.
+
 ## 📅 KẾ HOẠCH 15 TUẦN
 
 ### Tuần 1-2: Phân tích và thiết kế
+
 - Phân tích yêu cầu
 - Thiết kế kiến trúc hệ thống
 - Thiết kế database schema
 
 ### Tuần 3-4: Backend Core
+
 - Authentication system
 - Job management APIs
 - User management
 
 ### Tuần 5-6: Crawler & AI
+
 - Web crawler system
 - AI filtering cho intern jobs
 - Data processing pipeline
 
 ### Tuần 7-8: Frontend Core
+
 - React setup
 - Authentication UI
 - Job listing và search
 
 ### Tuần 9-10: User Features
+
 - Employer dashboard
 - Jobseeker features
 - Application system
 
 ### Tuần 11-12: AI Features
+
 - Recommendation system
 - Chatbot integration
 - Personalization
 
 ### Tuần 13-15: Testing & Deployment
+
 - Testing và optimization
 - Security audit
 - Production deployment
@@ -186,12 +216,14 @@ Xem chi tiết tại [KE_HOACH_15_TUAN.md](./KE_HOACH_15_TUAN.md)
 ## 🔧 API ENDPOINTS
 
 ### Authentication
+
 - `POST /api/auth/register` - Đăng ký
 - `POST /api/auth/login` - Đăng nhập
 - `POST /api/auth/logout` - Đăng xuất
 - `GET /api/auth/profile` - Lấy thông tin profile
 
 ### Jobs
+
 - `GET /api/jobs` - Lấy danh sách công việc
 - `GET /api/jobs/:id` - Lấy chi tiết công việc
 - `POST /api/jobs` - Đăng tin tuyển dụng (employer)
@@ -199,12 +231,14 @@ Xem chi tiết tại [KE_HOACH_15_TUAN.md](./KE_HOACH_15_TUAN.md)
 - `DELETE /api/jobs/:id` - Xóa công việc
 
 ### Applications
+
 - `POST /api/applications` - Nộp đơn ứng tuyển
 - `GET /api/applications` - Lấy danh sách đơn ứng tuyển
 - `PUT /api/applications/:id/status` - Cập nhật trạng thái
 - `POST /api/applications/:id/messages` - Gửi tin nhắn
 
 ### Companies
+
 - `GET /api/companies` - Lấy danh sách công ty
 - `GET /api/companies/:id` - Lấy chi tiết công ty
 - `POST /api/companies` - Tạo công ty mới
@@ -212,16 +246,19 @@ Xem chi tiết tại [KE_HOACH_15_TUAN.md](./KE_HOACH_15_TUAN.md)
 ## 🤖 AI FEATURES
 
 ### Job Filtering
+
 - Keyword analysis cho intern jobs
 - Text classification với confidence scoring
 - Automatic tagging và categorization
 
 ### Recommendation System
+
 - Collaborative filtering
 - Content-based filtering
 - User preference learning
 
 ### Chatbot
+
 - Intent recognition
 - Context-aware responses
 - Integration với job search
@@ -229,12 +266,14 @@ Xem chi tiết tại [KE_HOACH_15_TUAN.md](./KE_HOACH_15_TUAN.md)
 ## 📊 METRICS & KPIs
 
 ### Technical Metrics
+
 - Crawler success rate: >90%
 - AI filtering accuracy: >85%
 - API response time: <500ms
 - System uptime: >99%
 
 ### Business Metrics
+
 - User registration: 100+ users
 - Job postings: 500+ jobs
 - Applications: 1000+ applications
@@ -260,12 +299,14 @@ Xem chi tiết tại [KE_HOACH_15_TUAN.md](./KE_HOACH_15_TUAN.md)
 ## 📈 DEPLOYMENT
 
 ### Production
+
 - Frontend: Vercel
 - Backend: Railway
 - Database: MongoDB Atlas
 - File Storage: AWS S3
 
 ### Development
+
 - Local development với Docker
 - Hot reload cho development
 - Environment-specific configs

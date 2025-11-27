@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { X, Plus } from "lucide-react";
+import { getCities, getDistricts, getWards } from "@/lib/vietnamAddress";
 
 const JOB_LEVELS = [
   { value: "Intern", label: "Thực tập sinh" },
@@ -74,11 +75,25 @@ export default function CreateJobPage() {
     deadline: "",
   });
 
+  // Separate state for street address (detailed address)
+  const [streetAddress, setStreetAddress] = useState<string>("");
+
   const [newSkill, setNewSkill] = useState("");
   const [industries, setIndustries] = useState<Industry[]>([]);
   const [subIndustries, setSubIndustries] = useState<Industry[]>([]);
   const [loadingIndustries, setLoadingIndustries] = useState(false);
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+
+  // Address states
+  const [cities, setCities] = useState<{ value: string; label: string }[]>([]);
+  const [districts, setDistricts] = useState<
+    { value: string; label: string }[]
+  >([]);
+  const [wards, setWards] = useState<{ value: string; label: string }[]>([]);
+  const [selectedCity, setSelectedCity] = useState<string>("");
+  const [selectedDistrict, setSelectedDistrict] = useState<string>("");
+  const [selectedWard, setSelectedWard] = useState<string>("");
+  const [loadingAddress, setLoadingAddress] = useState(false);
 
   // Load root industries on mount
   useEffect(() => {
@@ -95,6 +110,98 @@ export default function CreateJobPage() {
     };
     loadIndustries();
   }, []);
+
+  // Load cities on mount
+  useEffect(() => {
+    const loadCities = async () => {
+      setLoadingAddress(true);
+      try {
+        const data = await getCities();
+        setCities(data);
+      } catch (err) {
+        console.error("Failed to load cities:", err);
+      } finally {
+        setLoadingAddress(false);
+      }
+    };
+    loadCities();
+  }, []);
+
+  // Load districts when city changes
+  useEffect(() => {
+    const loadDistricts = async () => {
+      if (selectedCity) {
+        setLoadingAddress(true);
+        try {
+          const data = await getDistricts(selectedCity);
+          setDistricts(data);
+          // Reset district and ward when city changes
+          setSelectedDistrict("");
+          setSelectedWard("");
+          setWards([]);
+        } catch (err) {
+          console.error("Failed to load districts:", err);
+          setDistricts([]);
+        } finally {
+          setLoadingAddress(false);
+        }
+      } else {
+        setDistricts([]);
+        setSelectedDistrict("");
+        setSelectedWard("");
+        setWards([]);
+      }
+    };
+    loadDistricts();
+  }, [selectedCity]);
+
+  // Load wards when district changes
+  useEffect(() => {
+    const loadWards = async () => {
+      if (selectedDistrict) {
+        setLoadingAddress(true);
+        try {
+          const data = await getWards(selectedDistrict);
+          setWards(data);
+          // Reset ward when district changes
+          setSelectedWard("");
+        } catch (err) {
+          console.error("Failed to load wards:", err);
+          setWards([]);
+        } finally {
+          setLoadingAddress(false);
+        }
+      } else {
+        setWards([]);
+        setSelectedWard("");
+      }
+    };
+    loadWards();
+  }, [selectedDistrict]);
+
+  // Update location string when address selections change
+  useEffect(() => {
+    const addressParts: string[] = [];
+    if (selectedWard) {
+      const ward = wards.find((w) => w.value === selectedWard);
+      if (ward) addressParts.push(ward.label);
+    }
+    if (selectedDistrict) {
+      const district = districts.find((d) => d.value === selectedDistrict);
+      if (district) addressParts.push(district.label);
+    }
+    if (selectedCity) {
+      const city = cities.find((c) => c.value === selectedCity);
+      if (city) addressParts.push(city.label);
+    }
+
+    if (addressParts.length > 0) {
+      setFormData((prev) => ({
+        ...prev,
+        location: addressParts.join(", "),
+      }));
+    }
+  }, [selectedCity, selectedDistrict, selectedWard, cities, districts, wards]);
 
   // Load sub-industries when industryCode changes
   useEffect(() => {
@@ -197,6 +304,20 @@ export default function CreateJobPage() {
         }
       }
 
+      // Build address object from selected values
+      const wardObj = wards.find((w) => w.value === selectedWard);
+      const districtObj = districts.find((d) => d.value === selectedDistrict);
+      const cityObj = cities.find((c) => c.value === selectedCity);
+
+      const addressObject = {
+        street: streetAddress || undefined,
+        ward: wardObj?.label || undefined,
+        district: districtObj?.label || undefined,
+        city: cityObj?.label || undefined,
+        country: "Vietnam",
+        fullAddress: formData.location || undefined,
+      };
+
       // Prepare payload
       const payload: CreateJobPayload = {
         ...formData,
@@ -204,7 +325,8 @@ export default function CreateJobPage() {
         // Remove empty optional fields
         slug: formData.slug || undefined,
         benefits: formData.benefits || undefined,
-        address: formData.address || undefined,
+        address: addressObject,
+        location: formData.location || undefined,
         skillIds: formData.skillIds?.length ? formData.skillIds : undefined,
         level: formData.level || undefined,
         jobType: formData.jobType || undefined,
@@ -345,7 +467,9 @@ export default function CreateJobPage() {
               <Label htmlFor="workingMode">Chế độ làm việc *</Label>
               <Select
                 value={formData.workingMode}
-                onValueChange={(value) => handleInputChange("workingMode", value)}
+                onValueChange={(value) =>
+                  handleInputChange("workingMode", value)
+                }
                 required
               >
                 <SelectTrigger id="workingMode" className="w-full">
@@ -399,7 +523,10 @@ export default function CreateJobPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {subIndustries.map((subIndustry) => (
-                      <SelectItem key={subIndustry.code} value={subIndustry.code}>
+                      <SelectItem
+                        key={subIndustry.code}
+                        value={subIndustry.code}
+                      >
                         {subIndustry.name.vi || subIndustry.name.en}
                       </SelectItem>
                     ))}
@@ -409,23 +536,93 @@ export default function CreateJobPage() {
             </div>
 
             <div>
-              <Label htmlFor="location">Địa điểm làm việc *</Label>
-              <Input
-                id="location"
-                value={formData.location}
-                onChange={(e) => handleInputChange("location", e.target.value)}
-                placeholder="Ví dụ: Ho Chi Minh City, District 1"
-                required
-              />
+              <Label>Địa điểm làm việc *</Label>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="city" className="text-sm text-gray-600">
+                    Tỉnh/Thành phố *
+                  </Label>
+                  <Select
+                    value={selectedCity}
+                    onValueChange={setSelectedCity}
+                    disabled={loadingAddress}
+                    required
+                  >
+                    <SelectTrigger id="city" className="w-full">
+                      <SelectValue placeholder="Chọn tỉnh/thành phố" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cities.map((city) => (
+                        <SelectItem key={city.value} value={city.value}>
+                          {city.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="district" className="text-sm text-gray-600">
+                    Quận/Huyện *
+                  </Label>
+                  <Select
+                    value={selectedDistrict}
+                    onValueChange={setSelectedDistrict}
+                    disabled={loadingAddress || !selectedCity}
+                    required
+                  >
+                    <SelectTrigger id="district" className="w-full">
+                      <SelectValue placeholder="Chọn quận/huyện" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {districts.map((district) => (
+                        <SelectItem key={district.value} value={district.value}>
+                          {district.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="ward" className="text-sm text-gray-600">
+                    Phường/Xã *
+                  </Label>
+                  <Select
+                    value={selectedWard}
+                    onValueChange={setSelectedWard}
+                    disabled={loadingAddress || !selectedDistrict}
+                    required
+                  >
+                    <SelectTrigger id="ward" className="w-full">
+                      <SelectValue placeholder="Chọn phường/xã" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {wards.map((ward) => (
+                        <SelectItem key={ward.value} value={ward.value}>
+                          {ward.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {formData.location && (
+                <p className="text-xs text-gray-500 mt-1">
+                  Địa điểm: {formData.location}
+                </p>
+              )}
             </div>
 
             <div>
-              <Label htmlFor="address">Địa chỉ chi tiết</Label>
+              <Label htmlFor="address">
+                Địa chỉ chi tiết (Số nhà, tên đường)
+              </Label>
               <Input
                 id="address"
-                value={formData.address}
-                onChange={(e) => handleInputChange("address", e.target.value)}
-                placeholder="Ví dụ: 123 Nguyen Hue Street"
+                value={streetAddress}
+                onChange={(e) => setStreetAddress(e.target.value)}
+                placeholder="Ví dụ: 123 Nguyễn Huệ, Tòa nhà ABC"
               />
             </div>
 
@@ -470,7 +667,9 @@ export default function CreateJobPage() {
                 <Label htmlFor="currency">Đơn vị tiền tệ *</Label>
                 <Select
                   value={formData.currency}
-                  onValueChange={(value) => handleInputChange("currency", value)}
+                  onValueChange={(value) =>
+                    handleInputChange("currency", value)
+                  }
                   required
                 >
                   <SelectTrigger id="currency" className="w-full">
@@ -495,10 +694,7 @@ export default function CreateJobPage() {
                 min="1"
                 value={formData.positions}
                 onChange={(e) =>
-                  handleInputChange(
-                    "positions",
-                    parseInt(e.target.value) || 1
-                  )
+                  handleInputChange("positions", parseInt(e.target.value) || 1)
                 }
                 required
               />

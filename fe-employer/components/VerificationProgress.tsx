@@ -55,20 +55,44 @@ export default function VerificationProgress() {
     router.push(url);
   };
 
-  // Show component if we have verification data and it's not fully verified
-  // Also show if needsProfile is true (400 status from API)
-  if (
-    loading ||
-    isDismissed ||
-    (verificationData && isFullyVerified && !verificationData.needsProfile)
-  ) {
+  // Debug logging
+  console.log("VerificationProgress render:", {
+    loading,
+    isDismissed,
+    verificationData,
+    isFullyVerified,
+    completedSteps,
+    totalSteps,
+    profileCompleted: verificationData?.profileCompleted,
+    companyCompleted: verificationData?.companyCompleted,
+    documentsCompleted: verificationData?.documentsCompleted,
+  });
+
+  // Hide component if:
+  // 1. Still loading
+  if (loading) {
+    return null; // Don't show while loading
+  }
+
+  // 2. User dismissed it
+  if (isDismissed) {
+    return null; // User dismissed it
+  }
+
+  // 3. Don't show if we have no verification data after loading
+  if (!verificationData) {
+    console.log("No verification data, hiding component");
     return null;
   }
 
-  // Don't show if we have no verification data and no needsProfile flag
-  if (!verificationData && !loading) {
-    return null;
+  // 4. Only hide if all 3 sections are completed (isFullyVerified = true)
+  if (isFullyVerified) {
+    console.log("All sections completed, hiding component");
+    return null; // All completed, hide the component
   }
+
+  // Show component if we have verification data and not all sections are completed
+  console.log("Showing verification progress component");
 
   const steps: VerificationStep[] = [
     {
