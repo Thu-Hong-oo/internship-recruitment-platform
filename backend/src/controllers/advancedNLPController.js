@@ -1,4 +1,4 @@
-const aiService = require('../services/aiService');
+const aiService = require('../services/ai/aiService');
 const LearningRoadmap = require('../models/LearningRoadmap');
 const CVMatchingScore = require('../models/CVMatchingScore');
 const Job = require('../models/Job');

@@ -1,0 +1,1417 @@
+/**
+ * Resource Recommendation Service
+ * 
+ * Hệ thống đề xuất tài liệu học tập thông minh dựa trên:
+ * 1. Skill gaps và priority
+ * 2. Trình độ hiện tại vs target level
+ * 3. Phase và timing (Foundation → Advanced)
+ * 4. Learning objectives của từng tuần
+ * 5. Credibility assessment với multi-factor scoring
+ * 
+ * Căn cứ nghiên cứu:
+ * - Bloom's Taxonomy (1956): Phân chia learning objectives theo levels
+ * - Spaced Repetition Theory: Resources phù hợp với giai đoạn học tập
+ * - Source Credibility Theory (Hovland & Weiss, 1951): Đánh giá độ tin cậy
+ */
+
+const { logger } = require('../../utils/logger');
+const vectorStoreService = require('../ai/vectorStoreService');
+const resourceHealthCheckService = require('./resourceHealthCheckService');
+const realResourceUrlService = require('./realResourceUrlService');
+const curatedResourcesDatabase = require('./curatedResourcesDatabase');
+const youtubeApiService = require('../api/youtubeApiService');
+const githubApiService = require('../api/githubApiService');
+const googleSearchService = require('../api/googleSearchService');
+const devToApiService = require('../api/devToApiService');
+const stackOverflowApiService = require('../api/stackOverflowApiService');
+const khanAcademyApiService = require('../api/khanAcademyApiService');
+const industryMappingService = require('./industryMappingService');
+const resourceFilterService = require('./resourceFilterService');
+const personalizationService = require('./personalizationService');
+const { getCacheService } = require('../cache/cacheService');
+
+class ResourceRecommendationService {
+  constructor() {
+    // Level progression map
+    this.levelOrder = ['none', 'beginner', 'intermediate', 'advanced', 'expert'];
+    
+    // Phase characteristics
+    this.phaseCharacteristics = {
+      1: {
+        // Foundation Phase
+        focus: 'fundamentals',
+        preferredTypes: ['documentation', 'video', 'course'],
+        difficultyRange: ['beginner', 'intermediate'],
+        maxDuration: '20 hours',
+        priority: 'understanding',
+      },
+      2: {
+        // Intermediate Phase
+        focus: 'practice',
+        preferredTypes: ['course', 'video', 'project'],
+        difficultyRange: ['intermediate', 'advanced'],
+        maxDuration: '40 hours',
+        priority: 'application',
+      },
+      3: {
+        // Advanced Phase
+        focus: 'mastery',
+        preferredTypes: ['course', 'article', 'project'],
+        difficultyRange: ['advanced', 'expert'],
+        maxDuration: '60 hours',
+        priority: 'creation',
+      },
+      4: {
+        // Specialization Phase
+        focus: 'specialization',
+        preferredTypes: ['course', 'article', 'documentation'],
+        difficultyRange: ['advanced', 'expert'],
+        maxDuration: '80 hours',
+        priority: 'expertise',
+      },
+    };
+
+    // Credibility weights
+    this.credibilityWeights = {
+      providerReputation: 0.40,
+      userRating: 0.30,
+      resourceType: 0.20,
+      certificateOffered: 0.10,
+    };
+
+    // Cache service (Redis) for API responses
+    this.cacheService = typeof getCacheService === 'function' ? getCacheService() : null;
+    this.apiCacheTTLSeconds = 60 * 60 * 6; // 6 hours
+  }
+
+  /**
+   * Recommend resources cho một tuần cụ thể
+   * 
+   * @param {Object} params
+   * @param {string} params.skill - Skill cần học
+   * @param {string} params.currentLevel - Trình độ hiện tại (none/beginner/intermediate/advanced)
+   * @param {string} params.targetLevel - Trình độ mục tiêu
+   * @param {number} params.phaseNumber - Phase number (1-4)
+   * @param {Array} params.learningObjectives - Learning objectives của tuần này
+   * @param {number} params.weekNumber - Week number
+   * @param {number} params.totalWeeks - Total weeks
+   * @returns {Array} Recommended resources
+   */
+  async recommendResources({
+    skill,
+    currentLevel = 'none',
+    targetLevel = 'intermediate',
+    phaseNumber = 1,
+    learningObjectives = [],
+    weekNumber = 1,
+    totalWeeks = 12,
+    // NEW: User preferences for personalization
+    budget = 'free',
+    maxHours = null,
+    learningStyle = 'visual',
+    // NEW: Industry context
+    industry = null,
+    preferredLanguage = 'en',
+  }) {
+    try {
+      // Validate input
+      if (!skill || typeof skill !== 'string' || skill.trim().length === 0) {
+        logger.warn('Invalid skill provided to recommendResources', { skill });
+        return this._getDefaultResources('General Programming');
+      }
+
+      const sanitizedSkill = this._sanitizeSkillQuery(skill);
+      const canonicalSkill = sanitizedSkill || skill || 'General Programming';
+      
+      // 1. Xác định độ khó phù hợp
+      const appropriateDifficulty = this._determineAppropriateDifficulty(
+        currentLevel,
+        targetLevel,
+        phaseNumber
+      );
+
+      // 2. Xác định resource types phù hợp (có thể adjust theo industry)
+      let preferredTypes = this.phaseCharacteristics[phaseNumber]?.preferredTypes || 
+                          ['course', 'video', 'documentation'];
+      
+      // Adjust resource types based on industry
+      if (industry) {
+        const industryTypes = industryMappingService.getPreferredResourceTypes(industry);
+        // Merge với phase preferences, ưu tiên industry types
+        preferredTypes = [...new Set([...industryTypes, ...preferredTypes])];
+      }
+
+      // 3. Xác định learning stage (theo Bloom's Taxonomy)
+      const learningStage = this._determineLearningStage(phaseNumber, weekNumber, totalWeeks);
+
+      // 4. Generate query cho RAG search
+      const searchQuery = this._generateSearchQuery({
+        skill: canonicalSkill,
+        difficulty: appropriateDifficulty,
+        learningStage,
+        objectives: learningObjectives,
+      });
+
+      // 5. Retrieve resources từ knowledge base (RAG)
+      let resources = [];
+      
+      // Try RAG search first (if vector store is available)
+      if (vectorStoreService.isAvailable()) {
+        try {
+          const ragResources = await vectorStoreService.searchResources(
+            {
+              skill,
+              difficulty: appropriateDifficulty,
+              learningStage,
+              objectives: learningObjectives,
+            },
+            {
+              level: appropriateDifficulty,
+              type: preferredTypes.length > 0 ? preferredTypes[0] : undefined,
+              minRating: 4.0, // Only recommend high-quality resources
+            },
+            10 // Get more results for diversification
+          );
+
+          if (ragResources && ragResources.length > 0) {
+            resources = ragResources;
+          logger.info('Using RAG search results', {
+            skill: canonicalSkill,
+              resultsCount: resources.length,
+            });
+          }
+        } catch (ragError) {
+          logger.warn('RAG search failed, falling back to intelligent recommendations', {
+            error: ragError.message,
+          });
+        }
+      }
+
+      // 6. Fetch from APIs if not enough resources from RAG/curated
+      if (resources.length < 5) {
+        try {
+          // Enhance search query with industry context
+          const enhancedSkill = industry 
+            ? industryMappingService.enhanceSearchQuery(canonicalSkill, industry)
+            : canonicalSkill;
+          
+          const apiResources = await this._fetchFromAPIs(
+            enhancedSkill, 
+            appropriateDifficulty, 
+            preferredTypes,
+            industry, // Pass industry context
+            preferredLanguage
+          );
+          resources = [...resources, ...apiResources];
+          logger.info('Fetched resources from APIs', {
+            skill: enhancedSkill,
+            industry,
+            apiResourcesCount: apiResources.length,
+            totalResources: resources.length,
+          });
+        } catch (apiError) {
+          logger.warn('Error fetching from APIs', {
+            error: apiError.message,
+            skill: canonicalSkill,
+            industry,
+          });
+          // Continue with existing resources
+        }
+      }
+
+      // 7. Fallback to intelligent recommendations if still not enough
+      if (resources.length === 0) {
+        try {
+          resources = await this._generateIntelligentRecommendations({
+            skill: canonicalSkill,
+            difficulty: appropriateDifficulty,
+            resourceTypes: preferredTypes,
+            learningStage,
+            phaseNumber,
+            currentLevel,
+            targetLevel,
+          });
+          logger.info('Using intelligent recommendations (RAG/APIs unavailable or no results)', {
+            skill: canonicalSkill,
+            resourcesCount: resources.length,
+          });
+        } catch (intelligentError) {
+          logger.error('Error generating intelligent recommendations', {
+            error: intelligentError.message,
+            skill: canonicalSkill,
+            stack: intelligentError.stack,
+          });
+          // Fallback to default resources
+          resources = this._getDefaultResources(canonicalSkill);
+        }
+      }
+
+      // 8. Apply personalization filters
+      const personalizedResources = personalizationService.personalize(resources, {
+        budget,
+        maxHours,
+        learningStyle,
+      });
+
+      // 9. Filter by level match
+      const levelFilteredResources = personalizationService.filterByLevel(
+        personalizedResources,
+        currentLevel,
+        targetLevel
+      );
+
+      // 10. Calculate credibility scores (using enhanced filter service)
+      const resourcesWithCredibility = levelFilteredResources.map((resource) => {
+        // Add recency score if not present
+        if (!resource.recencyScore) {
+          resource.recencyScore = resourceFilterService.getRecencyScore(
+            resource.publishedAt,
+            resource.lastUpdated
+          );
+        }
+
+        return {
+          ...resource,
+          credibility: resourceFilterService.calculateCredibilityScore(resource),
+          recommendationScore: this._calculateRecommendationScore(resource, {
+            skill,
+            currentLevel,
+            targetLevel,
+            phaseNumber,
+            learningStage,
+          }),
+        };
+      });
+
+      const skillWeightedResources = this._applySkillRelevanceWeight(
+        resourcesWithCredibility,
+        canonicalSkill
+      );
+
+      let phaseAlignedResources = skillWeightedResources;
+      if (phaseNumber >= 3) {
+        const advancedReadyResources = this._filterForAdvancedPhase(
+          skillWeightedResources,
+          learningObjectives
+        );
+
+        if (advancedReadyResources.length > 0) {
+          phaseAlignedResources = advancedReadyResources;
+        } else {
+          logger.warn('Advanced phase filter removed all resources, falling back to original list', {
+            skill,
+            phaseNumber,
+          });
+        }
+      }
+
+      // 11. Filter by minimum credibility
+      const credibleResources = resourceFilterService.filterByCredibility(
+        phaseAlignedResources,
+        0.6 // Minimum credibility score
+      );
+
+      // 12. Sort by recommendation score
+      const sortedResources = credibleResources.sort(
+        (a, b) => b.recommendationScore - a.recommendationScore
+      );
+
+      // 13. Health check: Filter out dead links và outdated resources
+      // Skip health check for curated resources (already verified)
+      // Only check for generated/fallback resources
+      let validResources = sortedResources;
+      
+      // Separate curated vs generated resources
+      const curatedResources = sortedResources.filter(r => r.isCurated === true);
+      const generatedResources = sortedResources.filter(r => r.isCurated !== true);
+      
+      try {
+        // Only health check generated resources
+        if (generatedResources.length > 0) {
+          const checkedGenerated = await resourceHealthCheckService.filterValidResources(generatedResources);
+          
+          // Combine curated (always valid) + checked generated
+          validResources = [...curatedResources, ...checkedGenerated];
+        } else {
+          // All are curated, skip health check
+          validResources = curatedResources;
+        }
+        
+        // Nếu sau health check không còn resources, fallback to original (có thể là network issue)
+        if (validResources.length === 0 && sortedResources.length > 0) {
+          logger.warn('All resources failed health check, using original list', {
+            originalCount: sortedResources.length,
+            curatedCount: curatedResources.length,
+          });
+          // Normalize URLs ít nhất và keep all
+          validResources = sortedResources.map(r => ({
+            ...r,
+            url: resourceHealthCheckService.normalizeUrl(r.url) || r.url,
+          }));
+        }
+      } catch (healthCheckError) {
+        logger.warn('Health check failed, using all resources', {
+          error: healthCheckError.message,
+        });
+        // Normalize URLs ít nhất và keep all
+        validResources = sortedResources.map(r => ({
+          ...r,
+          url: resourceHealthCheckService.normalizeUrl(r.url) || r.url,
+        }));
+      }
+
+      // 10. Limit và diversify với MMR (Maximal Marginal Relevance)
+      // Lambda = 0.7: 70% relevance, 30% diversity
+      return this._diversifyAndLimit(validResources, preferredTypes, 5, 0.7);
+    } catch (error) {
+      logger.error('Error recommending resources:', error);
+      return this._getDefaultResources(skill);
+    }
+  }
+
+  /**
+   * Xác định độ khó phù hợp dựa trên current level, target level và phase
+   * 
+   * Thuật toán:
+   * - Phase 1 (Foundation): Bắt đầu từ beginner hoặc 1 level dưới target
+   * - Phase 2-3 (Intermediate/Advanced): Progression từ current → target
+   * - Phase 4 (Specialization): Focus vào advanced/expert
+   */
+  _determineAppropriateDifficulty(currentLevel, targetLevel, phaseNumber) {
+    const currentIndex = this.levelOrder.indexOf(currentLevel) || 0;
+    const targetIndex = this.levelOrder.indexOf(targetLevel) || 2;
+
+    if (phaseNumber === 1) {
+      // Foundation: Bắt đầu từ beginner hoặc current level (nếu > beginner)
+      return currentIndex > 1 ? this.levelOrder[currentIndex] : 'beginner';
+    } else if (phaseNumber === 2) {
+      // Intermediate: Between current and target
+      const midIndex = Math.ceil((currentIndex + targetIndex) / 2);
+      return this.levelOrder[Math.min(midIndex, targetIndex)];
+    } else if (phaseNumber === 3) {
+      // Advanced: Close to target
+      const advIndex = Math.max(targetIndex - 1, currentIndex + 1);
+      return this.levelOrder[Math.min(advIndex, targetIndex)];
+    } else {
+      // Specialization: Target level
+      return targetLevel;
+    }
+  }
+
+  /**
+   * Xác định learning stage theo Bloom's Taxonomy
+   * 
+   * Bloom's Taxonomy levels:
+   * 1. Remember (Foundation)
+   * 2. Understand (Foundation → Intermediate)
+   * 3. Apply (Intermediate)
+   * 4. Analyze (Intermediate → Advanced)
+   * 5. Evaluate (Advanced)
+   * 6. Create (Advanced → Specialization)
+   */
+  _determineLearningStage(phaseNumber, weekNumber, totalWeeks) {
+    const progress = weekNumber / totalWeeks;
+
+    if (phaseNumber === 1) {
+      // Foundation: Remember → Understand
+      return progress < 0.5 ? 'remember' : 'understand';
+    } else if (phaseNumber === 2) {
+      // Intermediate: Understand → Apply
+      return progress < 0.5 ? 'understand' : 'apply';
+    } else if (phaseNumber === 3) {
+      // Advanced: Apply → Analyze
+      return progress < 0.5 ? 'apply' : 'analyze';
+    } else {
+      // Specialization: Analyze → Create
+      return progress < 0.5 ? 'analyze' : 'create';
+    }
+  }
+
+  /**
+   * Generate search query cho RAG với Strict Filtering
+   * 
+   * CẢI TIẾN: Thêm context keywords để tránh hallucination
+   * - Thêm "programming", "development", "tutorial" để tránh nhầm lẫn
+   * - Ví dụ: "Java" (programming) vs "Java" (island)
+   * 
+   * @param {Object} params - Query parameters
+   * @returns {Object} Query with text và filters
+   */
+  _generateSearchQuery({ skill, difficulty, learningStage, objectives }) {
+    const stageDescriptions = {
+      remember: 'introduction basics fundamentals',
+      understand: 'concepts principles theory',
+      apply: 'practice exercises projects',
+      analyze: 'advanced techniques optimization',
+      evaluate: 'best practices comparisons',
+      create: 'build develop implement',
+    };
+
+    // Add context keywords to avoid hallucination
+    // Ví dụ: "Java programming" thay vì chỉ "Java"
+    const contextKeywords = [
+      'programming',
+      'development',
+      'tutorial',
+      'course',
+      'learning',
+      'coding',
+    ].join(' ');
+
+    const query = `
+      Learn ${skill} ${contextKeywords}
+      for ${difficulty} level
+      ${stageDescriptions[learningStage] || ''}
+      ${objectives.join(' ')}
+    `.trim();
+
+    // Strict metadata filters để tránh hallucination
+    const metadataFilters = {
+      // Category filter: Chỉ lấy trong "Programming/Computer Science"
+      category: { $in: ['programming', 'computer-science', 'software-development', 'web-development'] },
+      
+      // Exclude irrelevant categories
+      excludeCategories: { $nin: ['travel', 'food', 'geography', 'coffee'] },
+      
+      // Language filter (if applicable)
+      language: 'en', // Hoặc 'vi' nếu cần
+      
+      // Minimum rating
+      rating: { $gte: 4.0 },
+    };
+
+    return {
+      text: query,
+      filters: metadataFilters,
+    };
+  }
+
+  /**
+   * Generate intelligent recommendations
+   * Priority: Curated database → Real URLs → Fallback
+   */
+  async _generateIntelligentRecommendations({
+    skill,
+    difficulty,
+    resourceTypes,
+    learningStage,
+    phaseNumber,
+    currentLevel,
+    targetLevel,
+  }) {
+    const resources = [];
+
+    // Try curated database first (highest quality)
+    const hasCurated = curatedResourcesDatabase.hasResources(skill);
+
+    // Course recommendations
+    if (resourceTypes.includes('course')) {
+      if (hasCurated) {
+        // Use curated courses
+        const curatedCourses = curatedResourcesDatabase.getResources(skill, 'course', difficulty, 2);
+        curatedCourses.forEach(course => {
+          resources.push({
+            type: 'course',
+            title: course.title,
+            provider: course.provider,
+            instructor: course.instructor,
+            difficulty: course.difficulty || difficulty,
+            duration: course.duration,
+            rating: course.rating,
+            isFree: course.isFree || false,
+            estimatedCost: course.estimatedCost || 0,
+            certificateOffered: course.certificateOffered || false,
+            url: course.url,
+            relevanceScore: this._calculateRelevance(skill, course.difficulty || difficulty, learningStage),
+            isCurated: true, // Mark as curated to skip health check
+          });
+        });
+      } else {
+        // Fallback to generated recommendations
+        const provider = this._getRecommendedProvider(phaseNumber, 'course');
+        resources.push({
+          type: 'course',
+          title: `${skill} ${this._getPhaseTitle(phaseNumber)} Course`,
+          provider,
+          difficulty,
+          duration: this._calculateDuration(phaseNumber, difficulty),
+          rating: 4.5 + Math.random() * 0.5,
+          isFree: phaseNumber === 1 ? Math.random() > 0.5 : false,
+          estimatedCost: phaseNumber === 1 ? 0 : 19.99 + Math.random() * 30,
+          certificateOffered: phaseNumber >= 2,
+          url: realResourceUrlService.getRealUrl({
+            skill,
+            type: 'course',
+            difficulty,
+            provider,
+          }),
+          relevanceScore: this._calculateRelevance(skill, difficulty, learningStage),
+        });
+      }
+    }
+
+    // Video recommendations
+    if (resourceTypes.includes('video') && (phaseNumber === 1 || difficulty === 'beginner')) {
+      if (hasCurated) {
+        // Use curated videos
+        const curatedVideos = curatedResourcesDatabase.getResources(skill, 'video', 'beginner', 2);
+        curatedVideos.forEach(video => {
+          resources.push({
+            type: 'video',
+            title: video.title,
+            provider: video.provider,
+            channel: video.channel,
+            difficulty: video.difficulty || 'beginner',
+            duration: video.duration,
+            rating: video.rating,
+            isFree: true,
+            estimatedCost: 0,
+            url: video.url,
+            relevanceScore: this._calculateRelevance(skill, 'beginner', 'remember'),
+            isCurated: true, // Mark as curated to skip health check
+          });
+        });
+      } else {
+        // Fallback to generated recommendations
+        resources.push({
+          type: 'video',
+          title: `${skill} Tutorial for ${difficulty === 'beginner' ? 'Beginners' : 'Intermediate'}`,
+          provider: 'YouTube',
+          difficulty: 'beginner',
+          duration: this._calculateDuration(phaseNumber, 'beginner', 'video'),
+          rating: 4.6 + Math.random() * 0.4,
+          isFree: true,
+          estimatedCost: 0,
+          url: realResourceUrlService.getRealUrl({
+            skill,
+            type: 'video',
+            difficulty: 'beginner',
+            provider: 'YouTube',
+          }),
+          relevanceScore: this._calculateRelevance(skill, 'beginner', 'remember'),
+        });
+      }
+    }
+
+    // Documentation (always include for fundamentals)
+    if (resourceTypes.includes('documentation')) {
+      if (hasCurated) {
+        // Use curated documentation
+        const curatedDocs = curatedResourcesDatabase.getResources(skill, 'documentation', null, 1);
+        curatedDocs.forEach(doc => {
+          resources.push({
+            type: 'documentation',
+            title: doc.title,
+            provider: doc.provider,
+            difficulty: doc.difficulty || 'intermediate',
+            duration: 'Reference',
+            rating: doc.rating || 5.0,
+            isFree: true,
+            estimatedCost: 0,
+            url: doc.url,
+            relevanceScore: 0.9,
+            isCurated: true, // Mark as curated to skip health check
+          });
+        });
+      } else {
+        // Fallback to official docs
+        resources.push({
+          type: 'documentation',
+          title: `Official ${skill} Documentation`,
+          provider: 'Official Docs',
+          difficulty: 'intermediate',
+          duration: 'Reference',
+          rating: 5.0,
+          isFree: true,
+          estimatedCost: 0,
+          url: realResourceUrlService.getRealUrl({
+            skill,
+            type: 'documentation',
+          }),
+          relevanceScore: 0.9,
+        });
+      }
+    }
+
+    // Articles for advanced stages - only if we have curated articles or skip
+    // Skip articles if we don't have curated ones (avoid search URLs)
+    // if (resourceTypes.includes('article') && phaseNumber >= 3) {
+    //   // Only add articles if we have curated ones
+    //   // For now, skip to avoid search URLs
+    // }
+
+    return resources;
+  }
+
+  /**
+   * Calculate credibility score với multi-factor assessment
+   * 
+   * Căn cứ: Source Credibility Theory (Hovland & Weiss, 1951)
+   * Factors:
+   * 1. Provider Reputation (40%)
+   * 2. User Rating (30%)
+   * 3. Resource Type (20%)
+   * 4. Certificate Offered (10%)
+   */
+  _calculateCredibilityScore(resource) {
+    const { providerReputation, userRating, resourceType, certificateOffered } = 
+      this.credibilityWeights;
+
+    // Provider reputation score
+    const providerScore = this._getProviderReputationScore(resource.provider);
+
+    // User rating score (normalized to 0-1)
+    const ratingScore = (resource.rating || 0) / 5.0;
+
+    // Resource type score
+    const typeScore = this._getResourceTypeScore(resource.type);
+
+    // Certificate score
+    const certScore = resource.certificateOffered ? 1.0 : 0.5;
+
+    // Weighted combination
+    const credibility = (
+      providerScore * providerReputation +
+      ratingScore * userRating +
+      typeScore * resourceType +
+      certScore * certificateOffered
+    );
+
+    return Math.min(1.0, Math.max(0.0, credibility));
+  }
+
+  /**
+   * Get provider reputation score
+   */
+  _getProviderReputationScore(provider) {
+    const reputationScores = {
+      // Official sources: 1.0
+      'Official Docs': 1.0,
+      'MDN Web Docs': 1.0,
+      'W3C': 1.0,
+
+      // Top-tier educational: 0.9-0.95
+      'Coursera': 0.95,
+      'edX': 0.95,
+      'MIT OpenCourseWare': 0.95,
+      'Stanford Online': 0.9,
+
+      // Popular platforms: 0.8-0.85
+      'Udemy': 0.85,
+      'Pluralsight': 0.85,
+      'LinkedIn Learning': 0.8,
+
+      // Video platforms: 0.7-0.8
+      'YouTube - Official Channel': 0.8,
+      'YouTube - Verified Channel': 0.75,
+      'YouTube': 0.7,
+
+      // Blogs/Articles: 0.6-0.75
+      'Tech Blog - Authoritative': 0.75,
+      'Medium - Verified': 0.7,
+      'Dev.to': 0.65,
+    };
+
+    return reputationScores[provider] || 0.6; // Default for unknown
+  }
+
+  /**
+   * Get resource type score
+   */
+  _getResourceTypeScore(type) {
+    const typeScores = {
+      documentation: 1.0,      // Official docs are most credible
+      course: 0.9,              // Structured courses
+      video: 0.75,              // Videos can vary
+      article: 0.7,             // Articles depend on source
+      book: 0.85,               // Books are usually credible
+      project: 0.8,             // Projects from reputable sources
+    };
+
+    return typeScores[type] || 0.6;
+  }
+
+  /**
+   * Calculate recommendation score
+   * Combines credibility with relevance và fit
+   */
+  _calculateRecommendationScore(resource, context) {
+    const { skill, currentLevel, targetLevel, phaseNumber, learningStage } = context;
+
+    // Credibility weight: 50%
+    const credibilityWeight = 0.5;
+    
+    // Relevance weight: 30%
+    const relevanceWeight = 0.3;
+    
+    // Fit weight: 20% (how well it matches current → target progression)
+    const fitWeight = 0.2;
+
+    // Credibility score
+    const credibilityScore = resource.credibility || 0.5;
+
+    // Relevance score (from resource.relevanceScore if available)
+    const relevanceScore = resource.relevanceScore || 0.7;
+
+    // Fit score (how well difficulty matches progression)
+    const fitScore = this._calculateFitScore(
+      resource.difficulty,
+      currentLevel,
+      targetLevel,
+      phaseNumber
+    );
+
+    // Weighted combination
+    const recommendationScore = (
+      credibilityScore * credibilityWeight +
+      relevanceScore * relevanceWeight +
+      fitScore * fitWeight
+    );
+
+    return recommendationScore;
+  }
+
+  /**
+   * Ensure advanced phases only receive challenging, in-depth resources
+   */
+  _filterForAdvancedPhase(resources, learningObjectives = []) {
+    if (!Array.isArray(resources) || resources.length === 0) {
+      return [];
+    }
+
+    const minDifficulties = new Set(['intermediate', 'advanced', 'expert']);
+    const preferredTypes = new Set(['course', 'project', 'documentation', 'book', 'video', 'article']);
+    const objectiveHints = (learningObjectives || []).map((obj) => (obj || '').toLowerCase());
+    const advancedKeywords = [
+      'advanced',
+      'performance',
+      'scalability',
+      'optimization',
+      'architecture',
+      'production',
+      'best practice',
+      'best practices',
+      'deep dive',
+      'system design',
+      'resilience',
+    ];
+
+    const filtered = resources
+      .map((resource) => {
+        const difficulty = (resource.difficulty || '').toLowerCase();
+        const type = (resource.type || '').toLowerCase();
+        const title = (resource.title || '').toLowerCase();
+        const description = (resource.description || '').toLowerCase();
+        const combined = `${title} ${description}`;
+        const hasAdvancedKeyword =
+          advancedKeywords.some((keyword) => combined.includes(keyword)) ||
+          objectiveHints.some(
+            (hint) =>
+              hint.includes('optimize') ||
+              hint.includes('architecture') ||
+              hint.includes('scalability')
+          );
+
+        const isLongForm = this._isLongFormResource(type, resource.duration);
+        const meetsDifficulty = minDifficulties.has(difficulty);
+        const typeAllowed = preferredTypes.has(type);
+
+        if (!typeAllowed) {
+          return null;
+        }
+
+        if (meetsDifficulty) {
+          return {
+            ...resource,
+            recommendationScore: (resource.recommendationScore || 0.5) + 0.1 + (type === 'course' || type === 'project' ? 0.05 : 0),
+          };
+        }
+
+        if (hasAdvancedKeyword && isLongForm) {
+          return {
+            ...resource,
+            difficulty: difficulty || 'intermediate',
+            recommendationScore: (resource.recommendationScore || 0.5) + 0.05,
+          };
+        }
+
+        return null;
+      })
+      .filter(Boolean);
+
+    return filtered;
+  }
+
+  _isLongFormResource(type, duration) {
+    if (['course', 'project', 'documentation', 'book'].includes(type)) {
+      return true;
+    }
+
+    if (type === 'video' || type === 'article') {
+      const minutes = this._parseDurationToMinutes(duration);
+      return type === 'video' ? minutes >= 20 : minutes >= 10;
+    }
+
+    return false;
+  }
+
+  _parseDurationToMinutes(duration) {
+    if (!duration) return 0;
+    if (typeof duration === 'number') return duration;
+
+    const text = duration.toString().toLowerCase();
+    let minutes = 0;
+
+    const hourMatch = text.match(/(\d+(?:\.\d+)?)\s*(hour|hr|h)/);
+    if (hourMatch) {
+      minutes += parseFloat(hourMatch[1]) * 60;
+    }
+
+    const minuteMatch = text.match(/(\d+)\s*(minute|min|m)/);
+    if (minuteMatch) {
+      minutes += parseInt(minuteMatch[1], 10);
+    }
+
+    if (minutes === 0 && /^\d+$/.test(text.trim())) {
+      minutes = parseInt(text.trim(), 10);
+    }
+
+    return minutes || 0;
+  }
+
+  /**
+   * Calculate fit score (how well resource matches learning progression)
+   * 
+   * CẢI TIẾN: Asymmetric Penalty
+   * - Học tài liệu dễ hơn (below ideal): Penalty nhẹ (boredom, waste time)
+   * - Học tài liệu khó hơn (above ideal): Penalty nặng (frustration, demotivation)
+   * 
+   * Căn cứ: Zone of Proximal Development (Vygotsky, 1978)
+   * - Resources quá khó gây nản chí nhiều hơn resources quá dễ
+   */
+  _calculateFitScore(resourceDifficulty, currentLevel, targetLevel, phaseNumber) {
+    const currentIndex = this.levelOrder.indexOf(currentLevel) || 0;
+    const targetIndex = this.levelOrder.indexOf(targetLevel) || 2;
+    const resourceIndex = this.levelOrder.indexOf(resourceDifficulty) || 1;
+
+    // Ideal difficulty based on phase
+    let idealIndex;
+    if (phaseNumber === 1) {
+      idealIndex = Math.max(1, currentIndex); // Beginner/intermediate
+    } else if (phaseNumber === 2) {
+      idealIndex = Math.ceil((currentIndex + targetIndex) / 2);
+    } else {
+      idealIndex = Math.min(targetIndex, currentIndex + 1);
+    }
+
+    // Calculate distance with direction
+    const distance = resourceIndex - idealIndex;
+    
+    // ASYMMETRIC PENALTY:
+    // - distance < 0: Resource dễ hơn ideal → Penalty nhẹ (1.0x)
+    // - distance > 0: Resource khó hơn ideal → Penalty nặng (2.0x)
+    // - distance = 0: Perfect match → Score cao (1.0)
+    
+    if (distance === 0) {
+      // Perfect match
+      return 1.0;
+    } else if (distance < 0) {
+      // Resource dễ hơn ideal (below level)
+      const absDistance = Math.abs(distance);
+      if (absDistance === 1) return 0.8;  // Nhẹ penalty
+      return 0.6; // Moderate penalty
+    } else {
+      // Resource khó hơn ideal (above level) - PHẠT NẶNG
+      const absDistance = distance;
+      if (absDistance === 1) return 0.6;  // Penalty nặng (2x so với below)
+      if (absDistance === 2) return 0.3;  // Rất nặng
+      return 0.1; // Quá khó, không recommend
+    }
+  }
+
+  /**
+   * Diversify và limit resources với MMR (Maximal Marginal Relevance)
+   * 
+   * CẢI TIẾN: Sử dụng MMR algorithm để tránh trùng lặp nội dung
+   * - Cân bằng giữa relevance (liên quan) và diversity (đa dạng)
+   * - Tránh các resources quá giống nhau về mặt semantic
+   * 
+   * Căn cứ: Carbonell & Goldstein (1998) - MMR algorithm
+   * 
+   * @param {Array} resources - Sorted resources by recommendation score
+   * @param {Array} preferredTypes - Preferred resource types
+   * @param {number} limit - Maximum number of resources
+   * @param {number} lambda - MMR lambda parameter (0.7 = 70% relevance, 30% diversity)
+   * @returns {Array} Diversified resources
+   */
+  _diversifyAndLimit(resources, preferredTypes, limit, lambda = 0.7) {
+    if (resources.length === 0) return [];
+    
+    const diversified = [];
+    const typeCount = {};
+
+    // Calculate semantic similarity between resources (simplified)
+    // In production, use actual embeddings for semantic similarity
+    const calculateSimilarity = (res1, res2) => {
+      // Simple similarity based on title, provider, and skills overlap
+      let similarity = 0;
+      const title1 = (res1.title || '').toLowerCase();
+      const title2 = (res2.title || '').toLowerCase();
+      
+      // Title overlap
+      const words1 = new Set(title1.split(/\s+/));
+      const words2 = new Set(title2.split(/\s+/));
+      const intersection = new Set([...words1].filter(x => words2.has(x)));
+      const union = new Set([...words1, ...words2]);
+      const jaccard = union.size > 0 ? intersection.size / union.size : 0;
+      
+      // Provider match
+      if (res1.provider === res2.provider) similarity += 0.3;
+      
+      // Type match
+      if (res1.type === res2.type) similarity += 0.2;
+      
+      // Title similarity
+      similarity += jaccard * 0.5;
+      
+      return Math.min(1.0, similarity);
+    };
+
+    // Generate query representation for relevance (simplified)
+    // In production, use actual query embedding
+    const calculateRelevance = (resource) => {
+      // Relevance = recommendationScore (already calculated)
+      return resource.recommendationScore || 0.5;
+    };
+
+    // MMR Algorithm
+    while (diversified.length < limit && diversified.length < resources.length) {
+      let bestMMRScore = -Infinity;
+      let bestResource = null;
+      let bestIndex = -1;
+
+      for (let i = 0; i < resources.length; i++) {
+        const resource = resources[i];
+        
+        // Skip if already selected
+        if (diversified.find(r => r.title === resource.title && r.provider === resource.provider)) {
+          continue;
+        }
+
+        // Check type constraints
+        const type = resource.type;
+        if (!typeCount[type]) typeCount[type] = 0;
+        
+        const isPreferred = preferredTypes.includes(type);
+        const maxAllowed = isPreferred ? 2 : 1;
+        
+        if (typeCount[type] >= maxAllowed) {
+          continue; // Type limit reached
+        }
+
+        // Calculate relevance score
+        const relevance = calculateRelevance(resource);
+
+        // Calculate max similarity with already selected resources
+        let maxSimilarity = 0;
+        if (diversified.length > 0) {
+          maxSimilarity = Math.max(
+            ...diversified.map(selected => calculateSimilarity(resource, selected))
+          );
+        }
+
+        // MMR Score = lambda * relevance - (1 - lambda) * max_similarity
+        const mmrScore = lambda * relevance - (1 - lambda) * maxSimilarity;
+
+        if (mmrScore > bestMMRScore) {
+          bestMMRScore = mmrScore;
+          bestResource = resource;
+          bestIndex = i;
+        }
+      }
+
+      // If no suitable resource found, break
+      if (!bestResource) break;
+
+      // Add best resource
+      diversified.push(bestResource);
+      const type = bestResource.type;
+      if (!typeCount[type]) typeCount[type] = 0;
+      typeCount[type]++;
+    }
+
+    // Fallback: If MMR didn't fill quota, add best remaining
+    if (diversified.length < limit) {
+      for (const resource of resources) {
+        if (diversified.length >= limit) break;
+        
+        const alreadyAdded = diversified.find(
+          r => r.title === resource.title && r.provider === resource.provider
+        );
+        
+        if (!alreadyAdded) {
+          diversified.push(resource);
+        }
+      }
+    }
+
+    return diversified.slice(0, limit);
+  }
+
+  // Helper methods
+  _getPhaseTitle(phaseNumber) {
+    const titles = {
+      1: 'Fundamentals',
+      2: 'Intermediate',
+      3: 'Advanced',
+      4: 'Mastery',
+    };
+    return titles[phaseNumber] || 'Complete';
+  }
+
+  _sanitizeSkillQuery(rawSkill = '') {
+    if (!rawSkill || typeof rawSkill !== 'string') return '';
+    const primarySegment = rawSkill.split('-')[0].trim();
+    return primarySegment.replace(/\s+/g, ' ');
+  }
+
+  _getActiveCache() {
+    if (this.cacheService && typeof this.cacheService.isCacheAvailable === 'function') {
+      return this.cacheService.isCacheAvailable() ? this.cacheService : null;
+    }
+    return null;
+  }
+
+  _buildApiCacheKey(cacheService, skill, difficulty, preferredTypes, preferredLanguage, industry) {
+    if (!cacheService) return null;
+    return cacheService.generateKey(
+      cacheService.KEY_PREFIXES.SEARCH || 'search',
+      'resources',
+      `skill:${(skill || '').toLowerCase()}`,
+      `diff:${difficulty || 'na'}`,
+      preferredLanguage ? `lang:${preferredLanguage}` : null,
+      Array.isArray(preferredTypes) && preferredTypes.length > 0
+        ? `types:${preferredTypes.slice(0, 3).join(',')}`
+        : null,
+      industry ? `industry:${industry}` : null
+    );
+  }
+
+  _applySkillRelevanceWeight(resources, skillName) {
+    if (!skillName || !Array.isArray(resources)) {
+      return resources || [];
+    }
+
+    const keywords = this._getSkillKeywordVariants(skillName);
+    if (keywords.length === 0) {
+      return resources;
+    }
+
+    return resources.map((resource) => {
+      const haystack = `${resource.title || ''} ${resource.description || ''} ${resource.provider || ''}`.toLowerCase();
+      const hasMatch = keywords.some((keyword) => keyword && haystack.includes(keyword));
+      if (hasMatch) {
+        return resource;
+      }
+      const penalty = 0.15;
+      return {
+        ...resource,
+        recommendationScore: Math.max(0, (resource.recommendationScore || 0.5) - penalty),
+        relevancePenalty: true,
+      };
+    });
+  }
+
+  _getSkillKeywordVariants(skillName) {
+    const normalized = (skillName || '').toString().toLowerCase().trim();
+    if (!normalized) return [];
+    const variants = new Set([
+      normalized,
+      normalized.replace(/\s+/g, ''),
+      normalized.replace(/[.\-]/g, ' '),
+      normalized.replace(/[.\-]/g, ''),
+    ]);
+    return Array.from(variants).filter(Boolean);
+  }
+
+  _getRecommendedProvider(phaseNumber, type) {
+    if (type === 'course') {
+      return phaseNumber === 1 ? 'Udemy' : 'Coursera';
+    }
+    if (type === 'video') {
+      return 'YouTube - Recommended Channel';
+    }
+    return 'Official Docs';
+  }
+
+  _calculateDuration(phaseNumber, difficulty, type = 'course') {
+    const baseHours = {
+      beginner: 10,
+      intermediate: 20,
+      advanced: 30,
+      expert: 40,
+    };
+
+    const multiplier = phaseNumber >= 3 ? 1.5 : 1.0;
+    const hours = Math.ceil(baseHours[difficulty] * multiplier);
+
+    if (type === 'video') {
+      return `${Math.min(hours, 5)} hours`;
+    }
+
+    return `${hours} hours`;
+  }
+
+  _calculateRelevance(skill, difficulty, learningStage) {
+    // Placeholder: In real implementation, use semantic similarity
+    return 0.8 + Math.random() * 0.2;
+  }
+
+  _getAdvancedTopic(learningStage) {
+    const topics = {
+      analyze: 'Performance Optimization',
+      evaluate: 'Best Practices & Patterns',
+      create: 'Building Production Applications',
+    };
+    return topics[learningStage] || 'Advanced Concepts';
+  }
+
+  _getDefaultResources(skill) {
+    return [
+      {
+        type: 'documentation',
+        title: `Official ${skill} Documentation`,
+        provider: 'Official Docs',
+        credibility: 1.0,
+        rating: 5.0,
+        isFree: true,
+        url: '#',
+        lastUpdated: new Date().toISOString(), // Mark as fresh
+      },
+    ];
+  }
+
+  /**
+   * Fetch resources from external APIs
+   * Priority: YouTube > GitHub > Dev.to > Stack Overflow > Khan Academy > Google Search
+   * 
+   * @param {string} skill - Skill name
+   * @param {string} difficulty - Difficulty level
+   * @param {Array} preferredTypes - Preferred resource types
+   * @param {string} industry - Industry code (optional)
+   * @returns {Promise<Array>} Array of resources from APIs
+   */
+  async _fetchFromAPIs(skill, difficulty, preferredTypes, industry = null, preferredLanguage = 'en') {
+    const cacheService = this._getActiveCache();
+    const cacheKey = this._buildApiCacheKey(
+      cacheService,
+      skill,
+      difficulty,
+      preferredTypes,
+      preferredLanguage,
+      industry
+    );
+
+    if (cacheService && cacheKey) {
+      const cached = await cacheService.get(cacheKey);
+      if (Array.isArray(cached) && cached.length > 0) {
+        logger.info('Resource API cache hit', { skill, difficulty, cachedCount: cached.length });
+        return cached;
+      }
+    }
+
+    const resources = [];
+
+    try {
+      // Get preferred APIs for this industry
+      const preferredApis = industry 
+        ? industryMappingService.getPreferredApis(industry)
+        : ['youtube', 'github', 'devto', 'stackoverflow', 'khanacademy', 'googlesearch'];
+
+      const fetchTasks = [];
+
+      if (preferredTypes.includes('video') && 
+          youtubeApiService.isServiceAvailable() &&
+          (industry === null || preferredApis.includes('youtube'))) {
+        fetchTasks.push(
+          youtubeApiService
+            .searchVideos(skill, difficulty, 5, { language: preferredLanguage })
+            .then((videos) => {
+              logger.info(`Fetched ${videos.length} videos from YouTube API for: ${skill} (${industry || 'general'})`);
+              return videos;
+            })
+            .catch((error) => {
+              logger.warn('YouTube API fetch failed:', error.message);
+              return [];
+            })
+        );
+      }
+
+      if (preferredTypes.includes('course') && 
+          khanAcademyApiService.isServiceAvailable() &&
+          (industry === null || preferredApis.includes('khanacademy'))) {
+        fetchTasks.push(
+          khanAcademyApiService
+            .searchTopics(skill, industry, difficulty, 5)
+            .then((courses) => {
+              logger.info(`Fetched ${courses.length} courses from Khan Academy API for: ${skill} (${industry || 'general'})`);
+              return courses;
+            })
+            .catch((error) => {
+              logger.warn('Khan Academy API fetch failed:', error.message);
+              return [];
+            })
+        );
+      }
+
+      if (githubApiService.isServiceAvailable() &&
+          (industry === null || 
+           industry === 'technology' || 
+           industry === 'software-development' ||
+           preferredApis.includes('github'))) {
+        fetchTasks.push(
+          githubApiService
+            .getAwesomeList(skill, 3)
+            .then((awesomeResources) => {
+              const filtered = preferredTypes.length > 0
+                ? awesomeResources.filter(r => preferredTypes.includes(r.type))
+                : awesomeResources;
+              const limited = filtered.slice(0, 5);
+              logger.info(`Fetched ${limited.length} resources from GitHub Awesome Lists for: ${skill}`);
+              return limited;
+            })
+            .catch((error) => {
+              logger.warn('GitHub API fetch failed:', error.message);
+              return [];
+            })
+        );
+      }
+
+      if (preferredTypes.includes('article') && 
+          devToApiService.isServiceAvailable() &&
+          (industry === null || 
+           industry === 'technology' || 
+           industry === 'software-development' ||
+           preferredApis.includes('devto'))) {
+        fetchTasks.push(
+          devToApiService
+            .searchArticles(skill, difficulty, 5)
+            .then((articles) => {
+              logger.info(`Fetched ${articles.length} articles from Dev.to API for: ${skill}`);
+              return articles;
+            })
+            .catch((error) => {
+              logger.warn('Dev.to API fetch failed:', error.message);
+              return [];
+            })
+        );
+      }
+
+      if (preferredTypes.includes('article') && 
+          stackOverflowApiService.isServiceAvailable() &&
+          (industry === null || 
+           industry === 'technology' || 
+           industry === 'software-development' ||
+           preferredApis.includes('stackoverflow'))) {
+        fetchTasks.push(
+          stackOverflowApiService
+            .searchQuestions(skill, difficulty, 5)
+            .then((questions) => {
+              logger.info(`Fetched ${questions.length} questions from Stack Overflow API for: ${skill}`);
+              return questions;
+            })
+            .catch((error) => {
+              logger.warn('Stack Overflow API fetch failed:', error.message);
+              return [];
+            })
+        );
+      }
+
+      const results = await Promise.all(fetchTasks);
+      results.forEach((items) => {
+        if (Array.isArray(items) && items.length > 0) {
+          resources.push(...items);
+        }
+      });
+
+      if (resources.length < 3 && 
+          googleSearchService.isServiceAvailable() &&
+          (industry === null || preferredApis.includes('googlesearch'))) {
+        try {
+          const searchResults = await googleSearchService.searchResources(
+            skill,
+            difficulty,
+            null,
+            5,
+            preferredLanguage
+          );
+          resources.push(...searchResults);
+          logger.info(`Fetched ${searchResults.length} results from Google Search API for: ${skill}`);
+        } catch (error) {
+          logger.warn('Google Search API fetch failed:', error.message);
+        }
+      }
+
+      if (cacheService && cacheKey && resources.length > 0) {
+        await cacheService.set(cacheKey, resources, this.apiCacheTTLSeconds);
+      }
+    } catch (error) {
+      logger.error('Error fetching from APIs:', error.message);
+    }
+
+    return resources;
+  }
+
+  /**
+   * Hybrid Search: Kết hợp vector search với live search API
+   * 
+   * Vấn đề: Vector DB có thể không có resources mới nhất
+   * Giải pháp: Fallback to live search (Google Search API) cho trending topics
+   * 
+   * @param {string} query - Search query
+   * @param {Object} filters - Metadata filters
+   * @returns {Promise<Array>} Resources from both sources
+   */
+  async hybridSearch(query, filters) {
+    try {
+      // 1. Try vector DB first (faster, cheaper)
+      let resources = [];
+      
+      // TODO: Implement vector DB search
+      // resources = await vectorDB.search(query, filters);
+      
+      // 2. If not enough results hoặc query is very new, try live search
+      if (resources.length < 3) {
+        // Check if topic is trending/new (heuristic: skill name in recent job postings)
+        const isTrending = await this._isTrendingTopic(query);
+        
+        if (isTrending) {
+          // Use Google Search API
+          if (googleSearchService.isServiceAvailable()) {
+            const liveResults = await googleSearchService.searchResources(query, 'beginner', null, 5);
+            resources = [...resources, ...liveResults];
+            logger.info(`Using hybrid search for trending topic: ${query}`);
+          }
+        }
+      }
+      
+      return resources;
+    } catch (error) {
+      logger.error('Hybrid search error:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Check if topic is trending (new/recent)
+   * Simplified heuristic - in production, check job postings trends
+   */
+  async _isTrendingTopic(query) {
+    // TODO: Implement actual trending detection
+    // For now, return false
+    return false;
+  }
+}
+
+module.exports = new ResourceRecommendationService();
+

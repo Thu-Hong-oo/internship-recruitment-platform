@@ -1,7 +1,7 @@
 
 const { logger } = require('../../utils/logger');
 const { AppError } = require('../../utils/errors');
-const { uploadDocument, deleteDocument } = require('../documentUploadService');
+const { uploadDocument, deleteDocument } = require('../upload/documentUploadService');
 
 class EmployerDocumentService {
   constructor(employerProfile) {
