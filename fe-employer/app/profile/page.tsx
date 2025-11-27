@@ -13,12 +13,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Save, User, Building, Edit3 } from "lucide-react";
-import { User as UserType, getUserData, getToken } from "@/lib/userStorage";
+import {
+  ArrowLeft,
+  Save,
+  User,
+  Building,
+  Edit3,
+  AlertCircle,
+  Upload,
+  Camera,
+  X,
+} from "lucide-react";
+import {
+  User as UserType,
+  getUserData,
+  getToken,
+  saveUserData,
+} from "@/lib/userStorage";
 import { EMPLOYER_LEVEL_LABEL } from "@/lib/labels";
 import { getEmployerProfile } from "@/lib/api";
-import { updateEmployerProfile } from "@/lib/profileAPI";
+import { updateEmployerProfile, uploadAvatar } from "@/lib/profileAPI";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useVerificationContext } from "@/contexts/VerificationContext";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  isPlaceholderProfileData,
+  isPlaceholderText,
+  isPlaceholderEmail,
+  isPlaceholderPhone,
+} from "@/lib/placeholderUtils";
 
 interface ProfileData {
   contact: {
@@ -41,6 +64,12 @@ export default function ProfilePage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isEditing, setIsEditing] = useState(false);
+  const [profileData, setProfileData] = useState<any>(null);
+  const [isPlaceholder, setIsPlaceholder] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
   const levelLabel = EMPLOYER_LEVEL_LABEL;
 
   // Form data
@@ -88,6 +117,11 @@ export default function ProfilePage() {
         const profile = json?.data || json?.profile || null;
         if (!profile) return;
 
+        // Store profile data and check if it's placeholder
+        setProfileData(profile);
+        const isPlaceholderData = isPlaceholderProfileData(profile);
+        setIsPlaceholder(isPlaceholderData);
+
         const apiContact = profile.contact || {};
         const apiPosition = profile.position || {};
         setFormData((prev) => ({
@@ -103,6 +137,13 @@ export default function ProfilePage() {
             department: apiPosition.department ?? prev.position.department,
           },
         }));
+
+        // Set avatar URL from profile
+        if (profile.user?.avatar) {
+          setAvatarUrl(profile.user.avatar);
+        } else if (user?.avatar) {
+          setAvatarUrl(user.avatar);
+        }
       } catch (err) {
         // Silent fail for initial prefill; detailed errors shown on submit flow.
       }
@@ -129,6 +170,132 @@ export default function ProfilePage() {
     });
   };
 
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      setAvatarError("Vui lòng chọn file ảnh");
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError("Kích thước file không được vượt quá 5MB");
+      return;
+    }
+
+    setAvatarError("");
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setAvatarPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAvatarUpload = async () => {
+    if (!avatarPreview) return;
+
+    setUploadingAvatar(true);
+    setAvatarError("");
+
+    try {
+      const token = getToken();
+      if (!token) {
+        setAvatarError("Vui lòng đăng nhập lại");
+        return;
+      }
+
+      // Get the file from the input
+      const fileInput = document.getElementById(
+        "avatar-input"
+      ) as HTMLInputElement;
+      const file = fileInput?.files?.[0];
+      if (!file) {
+        setAvatarError("Không tìm thấy file");
+        return;
+      }
+
+      const result = await uploadAvatar(token, file);
+
+      if (result.success) {
+        // Update avatar URL
+        if (result.data?.avatar) {
+          setAvatarUrl(result.data.avatar);
+        } else if (result.data?.user?.avatar) {
+          setAvatarUrl(result.data.user.avatar);
+        }
+
+        // Clear preview
+        setAvatarPreview(null);
+
+        // Refresh profile data
+        const json = await getEmployerProfile(token);
+        const profile = json?.data || json?.profile || null;
+        if (profile) {
+          setProfileData(profile);
+          if (profile.user?.avatar) {
+            setAvatarUrl(profile.user.avatar);
+            // Update user state
+            setUser((prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                avatar: profile.user.avatar,
+              };
+            });
+
+            // Update localStorage with new avatar
+            const userData = getUserData();
+            if (userData) {
+              const updatedUser = {
+                ...userData,
+                avatar: profile.user.avatar,
+              };
+              // Save to both localStorage and sessionStorage to ensure consistency
+              saveUserData(updatedUser, true); // Save to localStorage
+              if (typeof window !== "undefined") {
+                sessionStorage.setItem("user", JSON.stringify(updatedUser));
+              }
+            }
+          }
+        }
+
+        // Refresh verification status to update header
+        refreshVerification();
+
+        setSuccess("Cập nhật avatar thành công!");
+        setTimeout(() => setSuccess(""), 3000);
+
+        // Reload page after 1.5 seconds to update header and sidebar avatar
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else {
+        setAvatarError(result.error || "Upload avatar thất bại");
+      }
+    } catch (error: any) {
+      setAvatarError(error.message || "Không thể kết nối máy chủ");
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleCancelAvatarUpload = () => {
+    setAvatarPreview(null);
+    setAvatarError("");
+    // Reset file input
+    const fileInput = document.getElementById(
+      "avatar-input"
+    ) as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = "";
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -151,6 +318,13 @@ export default function ProfilePage() {
         setSuccess("Cập nhật thông tin thành công!");
         // Refresh verification status
         refreshVerification();
+        // Refresh profile data to update placeholder status
+        const json = await getEmployerProfile(token);
+        const profile = json?.data || json?.profile || null;
+        if (profile) {
+          setProfileData(profile);
+          setIsPlaceholder(isPlaceholderProfileData(profile));
+        }
         // Update user data in localStorage if needed
         if (data.user) {
           // You might want to update the user data here
@@ -214,6 +388,104 @@ export default function ProfilePage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-6 py-10">
+        {/* Placeholder Data Alert */}
+        {isPlaceholder && !isEditing && (
+          <Alert className="mb-6 border-amber-200 bg-amber-50">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertTitle className="text-amber-800">
+              Dữ liệu mẫu được hiển thị
+            </AlertTitle>
+            <AlertDescription className="text-amber-700">
+              Thông tin hiện tại là dữ liệu mẫu. Vui lòng cập nhật thông tin
+              thực tế của bạn để sử dụng đầy đủ các tính năng của hệ thống.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Avatar Upload Section */}
+        <Card className="mb-6 border border-slate-200 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Camera className="w-5 h-5 text-primary" />
+              Ảnh đại diện
+            </CardTitle>
+            <p className="text-sm text-slate-500">
+              Cập nhật ảnh đại diện của bạn (JPG, PNG, tối đa 5MB)
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-6">
+              {/* Avatar Display */}
+              <div className="relative">
+                <Avatar className="w-24 h-24 border-2 border-slate-200">
+                  {avatarPreview || avatarUrl ? (
+                    <AvatarImage
+                      src={avatarPreview || avatarUrl || ""}
+                      alt={user?.fullName || "Avatar"}
+                      className="object-cover"
+                    />
+                  ) : null}
+                  <AvatarFallback className="bg-primary/10 text-primary text-2xl">
+                    {user?.fullName
+                      ? user.fullName.charAt(0).toUpperCase()
+                      : "U"}
+                  </AvatarFallback>
+                </Avatar>
+                {avatarPreview && (
+                  <div className="absolute -top-2 -right-2 bg-green-500 rounded-full p-1">
+                    <Camera className="w-3 h-3 text-white" />
+                  </div>
+                )}
+              </div>
+
+              {/* Upload Controls */}
+              <div className="flex-1 space-y-3">
+                <div className="flex items-center gap-3">
+                  <label
+                    htmlFor="avatar-input"
+                    className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                  >
+                    <Upload className="w-4 h-4" />
+                    {avatarPreview ? "Chọn ảnh khác" : "Chọn ảnh"}
+                  </label>
+                  <input
+                    id="avatar-input"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    className="hidden"
+                  />
+                  {avatarPreview && (
+                    <>
+                      <Button
+                        type="button"
+                        onClick={handleAvatarUpload}
+                        disabled={uploadingAvatar}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        {uploadingAvatar ? "Đang tải lên..." : "Lưu ảnh"}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleCancelAvatarUpload}
+                        disabled={uploadingAvatar}
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Hủy
+                      </Button>
+                    </>
+                  )}
+                </div>
+                {avatarError && (
+                  <p className="text-sm text-red-600">{avatarError}</p>
+                )}
+                {success && <p className="text-sm text-green-600">{success}</p>}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid gap-8 md:grid-cols-2">
             {/* Contact Information */}
@@ -243,7 +515,9 @@ export default function ProfilePage() {
                       />
                     ) : (
                       <div className="mt-1 text-base font-medium text-slate-900">
-                        {formData.contact.name || "Chưa cập nhật"}
+                        {isPlaceholderText(formData.contact.name)
+                          ? "Chưa cập nhật"
+                          : formData.contact.name || "Chưa cập nhật"}
                       </div>
                     )}
                   </div>
@@ -261,7 +535,9 @@ export default function ProfilePage() {
                       />
                     ) : (
                       <div className="mt-1 text-base font-medium text-slate-900">
-                        {formData.contact.phone || "Chưa cập nhật"}
+                        {isPlaceholderPhone(formData.contact.phone)
+                          ? "Chưa cập nhật"
+                          : formData.contact.phone || "Chưa cập nhật"}
                       </div>
                     )}
                   </div>
@@ -281,7 +557,9 @@ export default function ProfilePage() {
                     />
                   ) : (
                     <div className="mt-1 text-base font-medium text-slate-900">
-                      {formData.contact.email || "Chưa cập nhật"}
+                      {isPlaceholderEmail(formData.contact.email)
+                        ? "Chưa cập nhật"
+                        : formData.contact.email || "Chưa cập nhật"}
                     </div>
                   )}
                 </div>

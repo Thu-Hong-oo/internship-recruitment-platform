@@ -24,9 +24,11 @@ import {
   UserOutlined,
   ReloadOutlined,
   BarChartOutlined,
+  TranslationOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import industriesAPI from "../../../api/industries";
+import translationAPI from "../../../api/translation";
 
 const { TextArea } = Input;
 
@@ -46,6 +48,10 @@ const Industries = () => {
   const [expandedRows, setExpandedRows] = useState([]);
   const [subIndustriesCache, setSubIndustriesCache] = useState(new Map());
   const [loadingSubIndustries, setLoadingSubIndustries] = useState(new Set());
+  const [translating, setTranslating] = useState({
+    name: false,
+    description: false,
+  });
 
   const navigate = useNavigate();
 
@@ -350,6 +356,107 @@ const Industries = () => {
       .split(",")
       .map((item) => item.trim())
       .filter(Boolean);
+  };
+
+  // Convert text to slug (lowercase, replace spaces with hyphens, remove special chars)
+  const textToSlug = (text) => {
+    if (!text) return "";
+    return text
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, "") // Remove special characters except word chars, spaces, and hyphens
+      .replace(/[\s_]+/g, "-") // Replace spaces and underscores with hyphens
+      .replace(/-+/g, "-") // Replace multiple hyphens with single hyphen
+      .replace(/^-+|-+$/g, ""); // Remove leading/trailing hyphens
+  };
+
+  // Auto-generate code from English name
+  const handleNameEnChange = (e) => {
+    const nameEn = e?.target?.value || "";
+    if (nameEn && !isEditing) {
+      // Only auto-generate code when creating new industry, not editing
+      const slug = textToSlug(nameEn);
+      if (slug) {
+        addForm.setFieldsValue({ code: slug });
+      }
+    }
+  };
+
+  const handleTranslateName = async () => {
+    try {
+      const nameVi = addForm.getFieldValue("nameVi");
+      if (!nameVi || !nameVi.trim()) {
+        message.warning("Vui lòng nhập tên tiếng Việt trước");
+        return;
+      }
+
+      setTranslating((prev) => ({ ...prev, name: true }));
+      const result = await translationAPI.translateText({
+        text: nameVi.trim(),
+        targetLang: "en",
+        sourceLang: "vi",
+      });
+
+      if (result.success && result.data) {
+        // API trả về: { success: true, data: { translatedText: "...", ... } }
+        const translatedText = result.data.translatedText;
+        if (translatedText) {
+          addForm.setFieldsValue({ nameEn: translatedText });
+          // Auto-generate code from translated name (only when creating, not editing)
+          if (!isEditing) {
+            const slug = textToSlug(translatedText);
+            addForm.setFieldsValue({ code: slug });
+          }
+          message.success("Dịch tên thành công");
+        } else {
+          console.error("Translation response structure:", result);
+          message.error("Không tìm thấy kết quả dịch trong response");
+        }
+      } else {
+        message.error(result.error || "Không thể dịch tên");
+      }
+    } catch (error) {
+      console.error("Failed to translate name:", error);
+      message.error("Có lỗi xảy ra khi dịch tên");
+    } finally {
+      setTranslating((prev) => ({ ...prev, name: false }));
+    }
+  };
+
+  const handleTranslateDescription = async () => {
+    try {
+      const descriptionVi = addForm.getFieldValue("descriptionVi");
+      if (!descriptionVi || !descriptionVi.trim()) {
+        message.warning("Vui lòng nhập mô tả tiếng Việt trước");
+        return;
+      }
+
+      setTranslating((prev) => ({ ...prev, description: true }));
+      const result = await translationAPI.translateText({
+        text: descriptionVi.trim(),
+        targetLang: "en",
+        sourceLang: "vi",
+      });
+
+      if (result.success && result.data) {
+        // API trả về: { success: true, data: { translatedText: "...", ... } }
+        const translatedText = result.data.translatedText;
+        if (translatedText) {
+          addForm.setFieldsValue({ descriptionEn: translatedText });
+          message.success("Dịch mô tả thành công");
+        } else {
+          console.error("Translation response structure:", result);
+          message.error("Không tìm thấy kết quả dịch trong response");
+        }
+      } else {
+        message.error(result.error || "Không thể dịch mô tả");
+      }
+    } catch (error) {
+      console.error("Failed to translate description:", error);
+      message.error("Có lỗi xảy ra khi dịch mô tả");
+    } finally {
+      setTranslating((prev) => ({ ...prev, description: false }));
+    }
   };
 
   const handleSubmitIndustry = async () => {
@@ -680,10 +787,12 @@ const Industries = () => {
                     message: "Chỉ sử dụng chữ thường, số và dấu gạch ngang",
                   },
                 ]}
+                tooltip="Mã ngành nghề được tự động tạo từ tên tiếng Anh"
               >
                 <Input
-                  placeholder="Ví dụ: construction-real-estate"
-                  disabled={isEditing}
+                  placeholder="Tự động tạo từ tên tiếng Anh"
+                  disabled={true}
+                  readOnly
                 />
               </Form.Item>
             </Col>
@@ -714,6 +823,18 @@ const Industries = () => {
                 rules={[
                   { required: true, message: "Vui lòng nhập tên tiếng Việt" },
                 ]}
+                extra={
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<TranslationOutlined />}
+                    loading={translating.name}
+                    onClick={handleTranslateName}
+                    style={{ padding: 0, height: "auto" }}
+                  >
+                    Dịch sang tiếng Anh
+                  </Button>
+                }
               >
                 <Input placeholder="Tên tiếng Việt" />
               </Form.Item>
@@ -726,14 +847,32 @@ const Industries = () => {
                   { required: true, message: "Vui lòng nhập tên tiếng Anh" },
                 ]}
               >
-                <Input placeholder="Tên tiếng Anh" />
+                <Input
+                  placeholder="Tên tiếng Anh"
+                  onChange={handleNameEnChange}
+                />
               </Form.Item>
             </Col>
           </Row>
 
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="descriptionVi" label="Mô tả (Tiếng Việt)">
+              <Form.Item
+                name="descriptionVi"
+                label="Mô tả (Tiếng Việt)"
+                extra={
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<TranslationOutlined />}
+                    loading={translating.description}
+                    onClick={handleTranslateDescription}
+                    style={{ padding: 0, height: "auto" }}
+                  >
+                    Dịch sang tiếng Anh
+                  </Button>
+                }
+              >
                 <TextArea rows={3} placeholder="Mô tả ngành nghề" />
               </Form.Item>
             </Col>

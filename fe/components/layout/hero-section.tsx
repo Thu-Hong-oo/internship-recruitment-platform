@@ -303,13 +303,23 @@ export default function HeroSection({
   return (
     <>
       {/* Hero Section */}
-      <section className="gradient-hero text-white py-16">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold mb-4">
+      <section className="relative overflow-hidden text-white py-20">
+        <div 
+          className="absolute inset-0"
+          style={{ background: `linear-gradient(135deg, oklch(0.60 0.12 195) 0%, oklch(0.72 0.08 210) 55%, oklch(0.88 0.03 195) 100%)` }}
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,oklch(0.60_0.12_195/.2)_0%,transparent_70%)]" />
+          <div className="pointer-events-none absolute -left-32 top-16 h-96 w-96 rounded-full bg-[radial-gradient(circle,oklch(0.60_0.12_195/.25),transparent_70%)] blur-3xl"
+            style={{ animation: 'float 20s ease-in-out infinite' }} />
+          <div className="pointer-events-none absolute right-[-120px] bottom-20 h-96 w-96 rounded-full bg-[radial-gradient(circle,oklch(0.72_0.08_210/.2),transparent_75%)] blur-3xl"
+            style={{ animation: 'float 25s ease-in-out infinite reverse' }} />
+        </div>
+        <div className="relative z-10 max-w-7xl mx-auto px-4">
+          <div className="text-center mb-10">
+            <h1 className="text-5xl md:text-6xl font-bold mb-6 drop-shadow-lg">
               Công cụ tìm việc làm riêng cho intern
             </h1>
-            <p className="text-xl opacity-90">
+            <p className="text-xl md:text-2xl opacity-95 font-medium max-w-3xl mx-auto leading-relaxed">
               Dễ dàng tìm chỗ thực tập, gợi ý định hướng việc làm cho sinh viên
               và nguồn nhân lực mới, dữ liệu phân tích realtime
             </p>
@@ -317,7 +327,8 @@ export default function HeroSection({
 
           {/* Search Form */}
           <div className="max-w-5xl mx-auto px-4">
-            <div className="search-container p-8">
+            <div className="relative overflow-hidden rounded-3xl border border-white/30 bg-white/90 backdrop-blur-xl shadow-[0_30px_80px_rgba(15,45,95,0.25)] p-8">
+              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.2)_0%,rgba(255,255,255,0)_80%)]" />
               <div className="flex flex-col lg:flex-row gap-4">
                 {/* Main search input - takes most space */}
                 <div className="flex-[3] relative group">
@@ -717,8 +728,8 @@ export default function HeroSection({
                 </Button>
               </div>
 
-              <div className="mt-6 flex flex-wrap gap-2">
-                <span className="text-sm text-muted-foreground font-medium">
+              <div className="mt-6 flex flex-wrap gap-2 relative">
+                <span className="text-sm text-slate-700 font-semibold">
                   Tìm kiếm phổ biến:
                 </span>
                 {[
@@ -731,7 +742,7 @@ export default function HeroSection({
                   <button
                     key={tag}
                     onClick={() => setSearchKeyword(tag)}
-                    className="px-3 py-1 text-sm bg-primary/10 text-primary rounded-full hover:bg-primary/20 transition-colors duration-200 font-medium"
+                    className="px-4 py-2 text-sm bg-white/90 text-slate-700 rounded-xl hover:bg-white hover:text-[oklch(0.60_0.12_195)] transition-all duration-300 font-semibold border border-white/40 backdrop-blur-sm hover:scale-105 hover:shadow-md shadow-sm"
                   >
                     {tag}
                   </button>

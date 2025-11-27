@@ -49,26 +49,33 @@ export default function Accounts() {
         status: formData?.status || undefined,
       });
 
-      const mapped = (res?.users || []).map((u, idx) => ({
-        uid: u?.id || u?._id || String(idx),
-        fullname:
-          u?.fullName ||
-          [u?.profile?.firstName, u?.profile?.lastName]
-            .filter(Boolean)
-            .join(" ") ||
-          "",
-        avatar:
+      const mapped = (res?.users || []).map((u, idx) => {
+        const profileAvatar =
           u?.profile?.avatar && String(u.profile.avatar).trim() !== ""
             ? u.profile.avatar
-            : null,
-        phone: u?.profile?.phone || "",
-        email: u?.email || "",
-        dob: u?.profile?.dateOfBirth
-          ? new Date(u.profile.dateOfBirth).toLocaleDateString()
-          : "",
-        status: u?.isEmailVerified ? "Active" : "InActive",
-        role: u?.role || "",
-      }));
+            : null;
+        const apiAvatar =
+          u?.avatar && u.avatar !== "default-avatar" ? u.avatar : null;
+
+        return {
+          uid: u?.id || u?._id || String(idx),
+          fullname:
+            u?.fullName ||
+            [u?.profile?.firstName, u?.profile?.lastName]
+              .filter(Boolean)
+              .join(" ") ||
+            "",
+          avatar: apiAvatar || profileAvatar,
+          phone: u?.profile?.phone || "",
+          email: u?.email || "",
+          dob: u?.profile?.dateOfBirth
+            ? new Date(u.profile.dateOfBirth).toLocaleDateString()
+            : "",
+          status:
+            u?.statusDisplay || (u?.isEmailVerified ? "Active" : "InActive"),
+          role: u?.role || "",
+        };
+      });
 
       setData(mapped);
       setTotal(res?.total || 0);
@@ -208,7 +215,7 @@ export default function Accounts() {
       title: "Vai trò",
       render: (_, data) => {
         const roleMap = {
-          student: "Người tìm việc",
+          candidate: "Người tìm việc",
           employer: "Nhà tuyển dụng",
           admin: "Quản trị viên",
         };
