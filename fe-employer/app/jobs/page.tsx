@@ -48,6 +48,7 @@ import {
   DollarSign,
   Filter,
   ChevronDown,
+  BarChart3,
 } from "lucide-react";
 import {
   Select,
@@ -242,10 +243,16 @@ export default function JobsPage() {
             Quản lý các bài đăng tuyển dụng của bạn
           </p>
         </div>
-        <Button onClick={() => router.push("/jobs/create-job")}>
-          <Plus className="h-4 w-4 mr-2" />
-          Tạo tin mới
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => router.push("/analytics")}>
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Thống kê
+          </Button>
+          <Button onClick={() => router.push("/jobs/create-job")}>
+            <Plus className="h-4 w-4 mr-2" />
+            Tạo tin mới
+          </Button>
+        </div>
       </div>
 
       {error && (

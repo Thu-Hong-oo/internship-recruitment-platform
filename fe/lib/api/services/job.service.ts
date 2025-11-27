@@ -5,6 +5,8 @@ import type {
   BackendJobsResponse,
   BackendJobDetailResponse,
   BackendJob,
+  ApplyToJobRequest,
+  ApplicationResponse,
 } from "../types";
 
 class JobService {
@@ -13,6 +15,7 @@ class JobService {
     limit = 10,
     params?: {
       q?: string;
+      search?: string; // Alternative search param
       location?: string;
       skills?: string | string[];
       employer?: string;
@@ -20,9 +23,14 @@ class JobService {
       sortBy?: string;
       sortOrder?: "asc" | "desc";
       jobType?: string;
+      employmentType?: string; // New: full-time, part-time, internship, remote
+      experienceLevel?: string; // New: junior, mid, senior, fresh
       industry?: string;
+      industryCode?: string; // New: normalized industry code
       salaryMin?: string | number;
       salaryMax?: string | number;
+      minSalary?: string | number; // Alternative param name
+      maxSalary?: string | number; // Alternative param name
       createdFrom?: string;
       createdTo?: string;
       deadlineFrom?: string;
@@ -46,7 +54,13 @@ class JobService {
         }
       };
 
-      setParam("q", params.q);
+      // Search - use 'q' or 'search' param
+      if (params.q) {
+        setParam("q", params.q);
+      } else if (params.search) {
+        setParam("q", params.search);
+      }
+
       setParam("location", params.location);
       setParam("skills", params.skills);
       setParam("employer", params.employer);
@@ -54,9 +68,24 @@ class JobService {
       setParam("sortBy", params.sortBy);
       setParam("sortOrder", params.sortOrder);
       setParam("jobType", params.jobType);
+      setParam("employmentType", params.employmentType);
+      setParam("experienceLevel", params.experienceLevel);
       setParam("industry", params.industry);
-      setParam("salaryMin", params.salaryMin);
-      setParam("salaryMax", params.salaryMax);
+      setParam("industryCode", params.industryCode);
+
+      // Salary - support both naming conventions
+      if (params.minSalary !== undefined) {
+        setParam("minSalary", params.minSalary);
+      } else if (params.salaryMin !== undefined) {
+        setParam("minSalary", params.salaryMin);
+      }
+
+      if (params.maxSalary !== undefined) {
+        setParam("maxSalary", params.maxSalary);
+      } else if (params.salaryMax !== undefined) {
+        setParam("maxSalary", params.salaryMax);
+      }
+
       setParam("createdFrom", params.createdFrom);
       setParam("createdTo", params.createdTo);
       setParam("deadlineFrom", params.deadlineFrom);
@@ -71,10 +100,24 @@ class JobService {
     );
 
     const mapped: JobItem[] = (backend.data || []).map((job) => {
-      const companyName = job.employer?.company?.name || "Nhà tuyển dụng";
-      const logoUrl = job.employer?.company?.logo?.url;
+      // Handle both old and new response structures
+      const companyName =
+        job.employer?.company?.name ||
+        (job as any).postedBy?.displayFullName ||
+        "Nhà tuyển dụng";
+      const logoUrl =
+        job.employer?.company?.logo?.url || (job as any).postedBy?.avatar;
       const office = job.employer?.company?.officeAddress;
       const fallbackCity = office?.city;
+
+      // Extract salary info from various possible fields
+      const salary =
+        (job as any).salary ||
+        (job as any).salaryRange ||
+        ((job as any).currency
+          ? `${(job as any).currency} - Thỏa thuận`
+          : "Thỏa thuận");
+
       return {
         id: job._id,
         _id: job._id,
@@ -83,18 +126,24 @@ class JobService {
           name: companyName,
           logo: { url: logoUrl },
         },
-        fullLocation: job.location || fallbackCity || "",
-        salaryRange: job.salary,
-        isUrgent: false,
-        isFeatured: false,
-        createdAt: job.createdAt,
+        fullLocation:
+          job.location || fallbackCity || (job as any).location || "",
+        salaryRange: salary,
+        isUrgent: (job as any).isUrgent || false,
+        isFeatured: (job as any).isFeatured || false,
+        createdAt: job.createdAt || (job as any).createdAt,
       };
     });
 
     return {
       success: backend.success,
       data: mapped,
-      pagination: backend.pagination,
+      pagination: backend.pagination || {
+        page,
+        limit,
+        total: 0,
+        pages: 0,
+      },
     };
   }
 
@@ -126,7 +175,11 @@ class JobService {
       };
     };
   }> {
-    const res = await apiClient.get<BackendJobDetailResponse>(`/jobs/${id}`);
+    // Add cache busting timestamp to ensure fresh data
+    const timestamp = Date.now();
+    const res = await apiClient.get<BackendJobDetailResponse>(
+      `/jobs/${id}?t=${timestamp}`
+    );
     const j = res.data;
     return {
       success: res.success,
@@ -159,6 +212,32 @@ class JobService {
           : undefined,
       },
     };
+  }
+
+  /**
+   * Apply to a job
+   * @param jobId - Job ID to apply for
+   * @param data - Application data (coverLetter, resumeUrl, portfolioUrl)
+   * @returns Application response
+   */
+  async applyToJob(
+    jobId: string,
+    data?: ApplyToJobRequest
+  ): Promise<ApplicationResponse> {
+    try {
+      const response = await apiClient.post<ApplicationResponse>(
+        `/jobs/${jobId}/apply`,
+        data || {}
+      );
+      return response;
+    } catch (error: any) {
+      // Handle error response from API
+      if (error && typeof error === "object" && error.success === false) {
+        return error as ApplicationResponse;
+      }
+      // Re-throw other errors
+      throw error;
+    }
   }
 }
 
