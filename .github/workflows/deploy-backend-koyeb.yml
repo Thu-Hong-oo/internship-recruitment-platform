@@ -26,7 +26,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd $BACKEND_DIR
-          npm install
+          npm install --include=dev
 
       - name: Lint backend
         run: |
