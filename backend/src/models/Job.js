@@ -155,6 +155,11 @@ JobSchema.index({ status: 1, createdAt: -1 });
 JobSchema.index({ employer: 1, status: 1 });
 JobSchema.index({ deadline: 1 });
 JobSchema.index({ deletedAt: 1 }); // For soft delete queries
+JobSchema.index({ jobType: 1, status: 1, deadline: 1 });
+JobSchema.index({ level: 1, status: 1 });
+JobSchema.index({ salaryMin: 1, salaryMax: 1 });
+JobSchema.index({ 'address.city': 1, status: 1 });
+JobSchema.index({ 'address.district': 1, status: 1 });
 
 // THÊM: Virtual fields hữu ích
 JobSchema.virtual('isExpired').get(function () {
