@@ -281,4 +281,3 @@ Mỗi template có thể có:
 1. Kiểm tra `customization.colors` và `customization.fonts` trong template config
 2. Kiểm tra `renderLayout` có được pass xuống LivePreview không
 
-
