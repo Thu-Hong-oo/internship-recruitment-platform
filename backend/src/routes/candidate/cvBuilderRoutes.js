@@ -24,8 +24,20 @@ router.put('/', cvController.updateBuilderData);
 // ✅ POST - Tạo CV thông minh với AI
 router.post('/generate', cvController.generateSmartCV);
 
+// ✅ POST - Tạo CV từ template
+router.post('/create-from-template', cvController.createCVFromTemplate);
+
+// ✅ GET - Lấy CV theo ID
+router.get('/resume/:resumeId', cvController.getResumeById);
+
+// ✅ GET - Lấy CV mặc định hoặc mới nhất
+router.get('/default', cvController.getDefaultResume);
+
 // ✅ GET - Lấy danh sách templates
 router.get('/templates', cvController.getTemplates);
+
+// ✅ GET - Lấy thông tin chi tiết một template
+router.get('/template/:templateId', cvController.getTemplateById);
 
 // ========================================
 // 📄 PDF EXPORT ROUTES

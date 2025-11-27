@@ -183,6 +183,120 @@ class CandidateService {
   }
 
   // CV Builder Methods
+  /**
+   * Tạo CV mới từ template
+   * @param templateId - ID của template (ví dụ: "modern", "student-tech")
+   * @param setAsDefault - Có đặt làm CV mặc định không
+   */
+  async createCVFromTemplate(
+    templateId: string,
+    setAsDefault: boolean = false
+  ): Promise<{
+    success: boolean;
+    data: {
+      resume: any;
+      template: {
+        id: string;
+        name: string;
+        style: string;
+        description: string;
+      };
+    };
+    message?: string;
+  }> {
+    return apiClient.post("/candidates/me/cv-builder/create-from-template", {
+      templateId,
+      setAsDefault,
+    });
+  }
+
+  /**
+   * Lấy CV theo ID từ ResumeBuilder
+   */
+  async getResumeById(resumeId: string): Promise<{
+    success: boolean;
+    data: {
+      resumeId: string;
+      templateId: string | null;
+      content: any;
+      customization: any;
+      isDefault: boolean;
+      status: string;
+    };
+  }> {
+    return apiClient.get(`/candidates/me/cv-builder/resume/${resumeId}`);
+  }
+
+  /**
+   * Lấy CV mặc định hoặc mới nhất
+   */
+  async getDefaultResume(): Promise<{
+    success: boolean;
+    data: {
+      resumeId: string | null;
+      templateId: string | null;
+      content: any;
+      customization: any;
+      isDefault: boolean;
+      status: string;
+    };
+  }> {
+    return apiClient.get("/candidates/me/cv-builder/default");
+  }
+
+  /**
+   * Lấy thông tin chi tiết một template (bao gồm renderLayout)
+   */
+  async getTemplateById(templateId: string): Promise<{
+    success: boolean;
+    data: {
+      id: string;
+      name: string;
+      description: string;
+      customization: {
+        colors: { primary: string; secondary: string; accent: string };
+        fonts: { heading: string; body: string };
+        layout: string;
+      };
+      renderLayout: {
+        page: { width: number; height: number; padding: number; backgroundColor: string };
+        sections: Array<{
+          type: string;
+          x: number;
+          y: number;
+          width: number;
+          height: number;
+          order: number;
+        }>;
+      } | null;
+    };
+  }> {
+    return apiClient.get(`/candidates/me/cv-builder/template/${templateId}`);
+  }
+
+  /**
+   * Lấy dữ liệu CV builder từ CandidateProfile
+   */
+  async getBuilderData(): Promise<{
+    success: boolean;
+    data: {
+      personalInfo: any;
+      targetJob: any;
+      careerObjective: string;
+      experience: any[];
+      education: any[];
+      skills: any;
+      projects: any[];
+      certifications: any[];
+      awards: any[];
+      languages: any[];
+      hobbies: any[];
+      references: any[];
+    };
+  }> {
+    return apiClient.get("/candidates/me/cv-builder");
+  }
+
   async getTemplates(
     category?: string,
     style?: string
