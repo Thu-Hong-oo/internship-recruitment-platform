@@ -17,6 +17,7 @@ jobs:
       
       - name: Install and build FE
         env:
+          NODE_ENV: production
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api' }}
         run: |
           cd fe
@@ -25,6 +26,7 @@ jobs:
       
       - name: Install and build FE-Employer
         env:
+          NODE_ENV: production
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api' }}
         run: |
           cd fe-employer
@@ -33,6 +35,7 @@ jobs:
       
       - name: Install and build Admin
         env:
+          NODE_ENV: production
           VITE_API_URL: ${{ secrets.VITE_API_URL || secrets.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api' }}
         run: |
           cd admin
