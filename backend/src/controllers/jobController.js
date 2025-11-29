@@ -1,4 +1,5 @@
 const Job = require('../models/Job');
+const SavedJob = require('../models/SavedJob');
 const Industry = require('../models/Industry');
 const Application = require('../models/Application');
 const CandidateProfile = require('../models/CandidateProfile');
@@ -282,6 +283,28 @@ const getAllJobs = async (req, res) => {
       }
     }
 
+    if (
+      req.user?.role === 'candidate' &&
+      req.user.candidateProfile &&
+      Array.isArray(formattedJobs) &&
+      formattedJobs.length
+    ) {
+      const jobIds = formattedJobs
+        .map(job => (job?._id ? job._id.toString() : null))
+        .filter(Boolean);
+      if (jobIds.length > 0) {
+        const savedJobs = await SavedJob.find({
+          candidateId: req.user.candidateProfile,
+          jobId: { $in: jobIds },
+        }).select('jobId');
+        const savedSet = new Set(savedJobs.map(item => item.jobId.toString()));
+        formattedJobs = formattedJobs.map(job => ({
+          ...job,
+          isSaved: savedSet.has(job._id?.toString()),
+        }));
+      }
+    }
+
     res.status(200).json({
       success: true,
       pagination: {
@@ -329,6 +352,7 @@ const getJob = async (req, res) => {
     // Try to get from cache first (before querying database)
     const cacheService = getCacheService();
     let jobObj = null;
+    let jobDocument = null;
     
     if (cacheService) {
       jobObj = await cacheService.getCachedJobDetail(req.params.id);
@@ -355,6 +379,7 @@ const getJob = async (req, res) => {
 
       // Format job using shared formatter
       jobObj = formatJobResponse(job);
+      jobDocument = job;
       
       // Cache the result
       if (cacheService) {
@@ -382,16 +407,26 @@ const getJob = async (req, res) => {
 
     // Check if current user has applied for this job (if user is authenticated)
     let hasApplied = false;
+    let isSaved = false;
     if (req.user && req.user.role === 'candidate') {
       const candidateProfile = await CandidateProfile.findOne({
         userId: req.user.id,
       });
       if (candidateProfile) {
-        const application = await Application.findOne({
-          jobId: job._id,
-          candidateId: candidateProfile._id,
-        });
+        const jobIdToCheck =
+          (jobDocument ? jobDocument._id : jobObj?._id) || req.params.id;
+        const [application, savedEntry] = await Promise.all([
+          Application.findOne({
+            jobId: jobIdToCheck,
+            candidateId: candidateProfile._id,
+          }),
+          SavedJob.findOne({
+            jobId: jobIdToCheck,
+            candidateId: candidateProfile._id,
+          }),
+        ]);
         hasApplied = !!application;
+        isSaved = !!savedEntry;
       }
     }
 
@@ -400,6 +435,7 @@ const getJob = async (req, res) => {
       data: {
         ...jobObj,
         hasApplied,
+        isSaved,
       },
     });
   } catch (error) {
