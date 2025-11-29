@@ -20,6 +20,8 @@ interface JobDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
+export const dynamicParams = true;
+
 // Generate static params for pre-rendering (required for static export)
 // Next.js 15 requires at least one param when using output: 'export'
 // We return a dummy value for build, actual jobs will be fetched client-side
