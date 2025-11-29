@@ -1,3 +1,6 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,68 +16,132 @@ import {
 } from "lucide-react";
 import { PageLayout } from "@/components/layout";
 import { jobsAPI } from "@/lib/api";
-import { notFound } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { ApplyButton } from "@/components/jobs/ApplyButton";
 
 interface JobDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
-export const dynamicParams = true;
+export default function JobDetailPage({ params }: JobDetailPageProps) {
+  const router = useRouter();
+  const [id, setId] = useState<string | null>(null);
+  const [job, setJob] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-// Generate static params for pre-rendering (required for static export)
-// Next.js 15 requires at least one param when using output: 'export'
-// We return a dummy value for build, actual jobs will be fetched client-side
-export async function generateStaticParams() {
-  // Return at least one dummy param to satisfy Next.js 15 requirement
-  // Actual job pages will be rendered client-side at runtime
-  return [{ id: 'placeholder' }];
-  
-  // TODO: When API is available during build, uncomment below:
-  // try {
-  //   const response = await jobsAPI.getJobs(1, 100);
-  //   if (!response?.success || !response?.data) {
-  //     return [{ id: 'placeholder' }]; // Fallback
-  //   }
-  //   return response.data.map((job) => ({ id: job.id || job._id }));
-  // } catch (error) {
-  //   console.error('Error generating static params:', error);
-  //   return [{ id: 'placeholder' }]; // Fallback
-  // }
-}
+  // Unwrap params Promise
+  useEffect(() => {
+    params.then((resolvedParams) => {
+      const jobId = resolvedParams.id;
+      if (jobId === 'dummy') {
+        // Handle dummy param - don't fetch
+        setLoading(false);
+        return;
+      }
+      setId(jobId);
+    });
+  }, [params]);
 
-export default async function JobDetailPage({ params }: JobDetailPageProps) {
-  const { id } = await params;
+  // Fetch job data
+  useEffect(() => {
+    if (!id || id === 'dummy') return;
 
-  // Handle placeholder ID used for static export
-  if (id === 'placeholder') {
-    return notFound();
-  }
+    async function fetchJob() {
+      try {
+        setLoading(true);
+        const res = await jobsAPI.getJobById(id);
+        if (!res?.success || !res?.data) {
+          setError(true);
+          return;
+        }
+        setJob(res.data);
+      } catch (e) {
+        console.error('Error fetching job:', e);
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    }
 
-  try {
-    const res = await jobsAPI.getJobById(id);
-    if (!res?.success || !res?.data) return notFound();
+    fetchJob();
+  }, [id]);
 
-    const job = res.data;
-    const companyName = job.employer?.company?.name || "Nhà tuyển dụng";
-    const companyLogo = job.employer?.company?.logo?.url;
-    const headerImage = companyLogo || job.postedBy?.avatar || undefined;
-
+  // Loading state
+  if (loading || !id) {
     return (
       <PageLayout>
         <div className="max-w-6xl mx-auto px-4 py-8">
-          {/* Breadcrumbs */}
-          <div className="text-sm text-muted-foreground mb-4 flex items-center gap-2">
-            <Link href="/" className="hover:underline">
-              Trang chủ
-            </Link>
-            <span>/</span>
-            <Link href="/search" className="hover:underline">
-              Việc làm
-            </Link>
-            <span>/</span>
-            <span className="text-foreground line-clamp-1">{job.title}</span>
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Đang tải...</p>
           </div>
+        </div>
+      </PageLayout>
+    );
+  }
+
+  // Error state
+  if (error || !job) {
+    return (
+      <PageLayout>
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <div className="text-center py-12">
+            <h1 className="text-2xl font-bold mb-4">Không tìm thấy tin tuyển dụng</h1>
+            <p className="text-muted-foreground mb-4">
+              Tin tuyển dụng bạn đang tìm không tồn tại hoặc đã bị xóa.
+            </p>
+            <Button onClick={() => router.push('/search')}>
+              Quay lại danh sách việc làm
+            </Button>
+          </div>
+        </div>
+      </PageLayout>
+    );
+  }
+
+  const companyName = job.employer?.company?.name || "Nhà tuyển dụng";
+  const companyLogo = job.employer?.company?.logo?.url;
+  const headerImage = companyLogo || job.postedBy?.avatar || undefined;
+
+  // Format salary
+  const formatSalary = () => {
+    if (job.salary) return job.salary;
+    if (job.salaryMin && job.salaryMax) {
+      const currency = job.currency || 'VND';
+      const formatNumber = (num: number) => {
+        return new Intl.NumberFormat('vi-VN').format(num);
+      };
+      return `${formatNumber(job.salaryMin)} - ${formatNumber(job.salaryMax)} ${currency}`;
+    }
+    return null;
+  };
+
+  // Format location
+  const formatLocation = () => {
+    if (job.location) return job.location;
+    if (job.address?.fullAddress) return job.address.fullAddress;
+    if (job.address?.city) return job.address.city;
+    return null;
+  };
+
+  const formattedSalary = formatSalary();
+  const formattedLocation = formatLocation();
+
+  return (
+    <PageLayout>
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* Breadcrumbs */}
+        <div className="text-sm text-muted-foreground mb-4 flex items-center gap-2">
+          <Link href="/" className="hover:underline">
+            Trang chủ
+          </Link>
+          <span>/</span>
+          <Link href="/search" className="hover:underline">
+            Việc làm
+          </Link>
+          <span>/</span>
+          <span className="text-foreground line-clamp-1">{job.title}</span>
+        </div>
           <div className="flex items-start gap-4 mb-6">
             <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center overflow-hidden border">
               {headerImage ? (
@@ -105,14 +172,14 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                 )}
               </div>
               <div className="flex flex-wrap gap-2 mt-3">
-                {job.salary && (
+                {formattedSalary && (
                   <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-muted text-foreground text-xs">
-                    <Briefcase className="w-3 h-3" /> {job.salary}
+                    <Briefcase className="w-3 h-3" /> {formattedSalary}
                   </span>
                 )}
-                {job.location && (
+                {formattedLocation && (
                   <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-muted text-foreground text-xs">
-                    <MapPin className="w-3 h-3" /> {job.location}
+                    <MapPin className="w-3 h-3" /> {formattedLocation}
                   </span>
                 )}
                 {typeof job.positions === "number" && (
@@ -152,23 +219,23 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
                     Chi tiết tin tuyển dụng
                   </h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                    {job.salary && (
+                    {formattedSalary && (
                       <div className="flex items-center gap-2">
-                        <UsersRound className="w-4 h-4 text-muted-foreground" />
+                        <Briefcase className="w-4 h-4 text-muted-foreground" />
                         <span className="text-muted-foreground">
                           Mức lương:
                         </span>
                         <span className="font-medium text-foreground">
-                          {job.salary}
+                          {formattedSalary}
                         </span>
                       </div>
                     )}
-                    {job.location && (
+                    {formattedLocation && (
                       <div className="flex items-center gap-2">
                         <MapPin className="w-4 h-4 text-muted-foreground" />
                         <span className="text-muted-foreground">Địa điểm:</span>
                         <span className="font-medium text-foreground">
-                          {job.location}
+                          {formattedLocation}
                         </span>
                       </div>
                     )}
@@ -388,7 +455,4 @@ export default async function JobDetailPage({ params }: JobDetailPageProps) {
         </div>
       </PageLayout>
     );
-  } catch (e) {
-    return notFound();
-  }
 }

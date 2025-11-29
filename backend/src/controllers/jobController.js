@@ -175,15 +175,15 @@ const getAllJobs = async (req, res) => {
     let jobs;
     if (view === 'full') {
       jobs = await Job.find(query)
-        .populate(
-          'employer',
-          'company.name company.logo company.industry company.description company.website company.size company.officeAddress contact.phone contact.email'
-        )
-        .populate('postedBy', 'fullName name email avatar')
-        .populate('skillIds', 'name category')
+      .populate(
+        'employer',
+        'company.name company.logo company.industry company.description company.website company.size company.officeAddress contact.phone contact.email'
+      )
+      .populate('postedBy', 'fullName name email avatar')
+      .populate('skillIds', 'name category')
         .sort(sortObj)
-        .skip(skip)
-        .limit(parseInt(limit));
+      .skip(skip)
+      .limit(parseInt(limit));
     } else {
       jobs = await Job.find(query)
         .select(projection)
@@ -210,59 +210,59 @@ const getAllJobs = async (req, res) => {
     // If not in cache, fetch and format
     if (!formattedJobs) {
       if (view === 'full') {
-        // Process jobs to populate skillIds and industryPath for old jobs
-        const { processJobData } = require('../utils/jobHelpers');
-        const jobsToUpdate = [];
+      // Process jobs to populate skillIds and industryPath for old jobs
+      const { processJobData } = require('../utils/jobHelpers');
+      const jobsToUpdate = [];
+      
+      // Process jobs that need skillIds or industryPath populated
+      for (const job of jobs) {
+        const jobObj = job.toObject ? job.toObject() : job;
+        const needsProcessing = 
+          (Array.isArray(jobObj.skills) && jobObj.skills.length > 0 && (!jobObj.skillIds || jobObj.skillIds.length === 0)) ||
+          ((jobObj.industryCode || jobObj.subIndustryCode) && (!jobObj.industryPath || jobObj.industryPath.length === 0));
         
-        // Process jobs that need skillIds or industryPath populated
-        for (const job of jobs) {
-          const jobObj = job.toObject ? job.toObject() : job;
-          const needsProcessing = 
-            (Array.isArray(jobObj.skills) && jobObj.skills.length > 0 && (!jobObj.skillIds || jobObj.skillIds.length === 0)) ||
-            ((jobObj.industryCode || jobObj.subIndustryCode) && (!jobObj.industryPath || jobObj.industryPath.length === 0));
-          
-          if (needsProcessing) {
-            try {
-              const processedData = await processJobData(jobObj);
-              
-              // Update job document in memory for response
-              if (processedData.skillIds && processedData.skillIds.length > 0) {
-                job.skillIds = processedData.skillIds;
-                // Re-populate skillIds for response
-                await job.populate('skillIds', 'name category');
-              }
-              if (processedData.industryPath && processedData.industryPath.length > 0) {
-                job.industryPath = processedData.industryPath;
-              }
-              
-              // Mark for database update (async, don't wait)
-              jobsToUpdate.push({
-                jobId: job._id,
-                updates: {
-                  ...(processedData.skillIds && processedData.skillIds.length > 0 ? { skillIds: processedData.skillIds } : {}),
-                  ...(processedData.industryPath && processedData.industryPath.length > 0 ? { industryPath: processedData.industryPath } : {}),
-                }
-              });
-            } catch (error) {
-              logger.error(`Error processing job ${job._id}:`, error);
+        if (needsProcessing) {
+          try {
+            const processedData = await processJobData(jobObj);
+            
+            // Update job document in memory for response
+            if (processedData.skillIds && processedData.skillIds.length > 0) {
+              job.skillIds = processedData.skillIds;
+              // Re-populate skillIds for response
+              await job.populate('skillIds', 'name category');
             }
+            if (processedData.industryPath && processedData.industryPath.length > 0) {
+              job.industryPath = processedData.industryPath;
+            }
+            
+            // Mark for database update (async, don't wait)
+            jobsToUpdate.push({
+              jobId: job._id,
+              updates: {
+                ...(processedData.skillIds && processedData.skillIds.length > 0 ? { skillIds: processedData.skillIds } : {}),
+                ...(processedData.industryPath && processedData.industryPath.length > 0 ? { industryPath: processedData.industryPath } : {}),
+              }
+            });
+          } catch (error) {
+            logger.error(`Error processing job ${job._id}:`, error);
           }
         }
+      }
 
-        // Update database in background (don't block response)
-        if (jobsToUpdate.length > 0) {
-          Promise.all(jobsToUpdate.map(async ({ jobId, updates }) => {
-            try {
-              if (Object.keys(updates).length > 0) {
-                await Job.findByIdAndUpdate(jobId, updates, { new: false });
-              }
-            } catch (error) {
-              logger.error(`Error updating job ${jobId} in database:`, error);
+      // Update database in background (don't block response)
+      if (jobsToUpdate.length > 0) {
+        Promise.all(jobsToUpdate.map(async ({ jobId, updates }) => {
+          try {
+            if (Object.keys(updates).length > 0) {
+              await Job.findByIdAndUpdate(jobId, updates, { new: false });
             }
-          })).catch(error => {
-            logger.error('Error updating jobs in background:', error);
-          });
-        }
+          } catch (error) {
+            logger.error(`Error updating job ${jobId} in database:`, error);
+          }
+        })).catch(error => {
+          logger.error('Error updating jobs in background:', error);
+        });
+      }
 
         formattedJobs = formatJobsResponse(jobs, {
           employerFields: 'full',
@@ -418,7 +418,7 @@ const getJob = async (req, res) => {
         const [application, savedEntry] = await Promise.all([
           Application.findOne({
             jobId: jobIdToCheck,
-            candidateId: candidateProfile._id,
+          candidateId: candidateProfile._id,
           }),
           SavedJob.findOne({
             jobId: jobIdToCheck,
