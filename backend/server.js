@@ -178,19 +178,33 @@ app.use(globalRateLimit);
 // CORS configuration
 app.use(
   cors({
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:3002',
-      'http://localhost:5173',
-      'http://127.0.0.1:3000',
-      'http://127.0.0.1:3001',
-      'http://127.0.0.1:3002',
-      'http://127.0.0.1:5173',
-      'https://internbridge.web.app',
-      'https://internbridge-employer.web.app',
-      'https://internbridge-admin.web.app',
-    ],
+    origin(origin, callback) {
+      const allowedOrigins = [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:3002',
+        'http://localhost:5173',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:3001',
+        'http://127.0.0.1:3002',
+        'http://127.0.0.1:5173',
+        'https://internbridge.web.app',
+        'https://internbridge-employer.web.app',
+        'https://internbridge-admin.web.app',
+        process.env.FRONTEND_URL,
+        process.env.EMPLOYER_APP_URL,
+        process.env.ADMIN_APP_URL,
+        process.env.DEPLOYED_API_URL,
+      ].filter(Boolean);
+
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, origin);
+      }
+      return callback(
+        new Error(`Origin ${origin} not allowed by CORS`),
+        false
+      );
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept'],

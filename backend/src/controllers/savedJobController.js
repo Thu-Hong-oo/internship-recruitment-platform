@@ -1,4 +1,5 @@
 const SavedJob = require('../models/SavedJob');
+const CandidateProfile = require('../models/CandidateProfile');
 const Job = require('../models/Job');
 const { logger } = require('../utils/logger');
 const asyncHandler = require('express-async-handler');
@@ -11,16 +12,21 @@ const getSavedJobs = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10, category, location } = req.query;
     const skip = (page - 1) * limit;
 
-    const query = { userId: req.user.id };
+    const query = { candidateId: req.user.candidateProfile };
 
     const savedJobs = await SavedJob.find(query)
       .populate({
         path: 'jobId',
         match: { status: 'active' },
+        select:
+          'title status salaryMin salaryMax currency deadline positions employer address createdAt',
         populate: [
-          { path: 'companyId', select: 'name logo industry' },
-          { path: 'requirements.skills.skillId', select: 'name category' }
-        ]
+          {
+            path: 'employer',
+            select: 'company.name company.logo company.industry company.size',
+          },
+          { path: 'requirements.skills.skillId', select: 'name category' },
+        ],
       })
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -68,8 +74,8 @@ const saveJob = asyncHandler(async (req, res) => {
 
     // Check if already saved
     const existingSavedJob = await SavedJob.findOne({
-      userId: req.user.id,
-      jobId
+      candidateId: req.user.candidateProfile,
+      jobId,
     });
 
     if (existingSavedJob) {
@@ -80,16 +86,20 @@ const saveJob = asyncHandler(async (req, res) => {
     }
 
     const savedJob = await SavedJob.create({
-      userId: req.user.id,
-      jobId
+      candidateId: req.user.candidateProfile,
+      jobId,
     });
 
     await savedJob.populate({
       path: 'jobId',
+      select: 'title status deletedAt employer address salaryMin salaryMax',
       populate: [
-        { path: 'companyId', select: 'name logo industry' },
-        { path: 'requirements.skills.skillId', select: 'name category' }
-      ]
+        {
+          path: 'employer',
+          select: 'company.name company.logo',
+        },
+        { path: 'requirements.skills.skillId', select: 'name category' },
+      ],
     });
 
     res.status(201).json({
@@ -120,7 +130,9 @@ const removeSavedJob = asyncHandler(async (req, res) => {
     }
 
     // Check ownership
-    if (savedJob.userId.toString() !== req.user.id) {
+    if (
+      savedJob.candidateId.toString() !== req.user.candidateProfile.toString()
+    ) {
       return res.status(403).json({
         success: false,
         message: 'Không có quyền xóa công việc đã lưu này'
@@ -150,8 +162,8 @@ const removeSavedJobByJobId = asyncHandler(async (req, res) => {
     const { jobId } = req.params;
 
     const savedJob = await SavedJob.findOne({
-      userId: req.user.id,
-      jobId
+      candidateId: req.user.candidateProfile,
+      jobId,
     });
 
     if (!savedJob) {
@@ -184,8 +196,8 @@ const checkJobSaved = asyncHandler(async (req, res) => {
     const { jobId } = req.params;
 
     const savedJob = await SavedJob.findOne({
-      userId: req.user.id,
-      jobId
+      candidateId: req.user.candidateProfile,
+      jobId,
     });
 
     res.status(200).json({
@@ -209,7 +221,9 @@ const checkJobSaved = asyncHandler(async (req, res) => {
 // @access  Private (Candidate)
 const getSavedJobsCount = asyncHandler(async (req, res) => {
   try {
-    const count = await SavedJob.countDocuments({ userId: req.user.id });
+    const count = await SavedJob.countDocuments({
+      candidateId: req.user.candidateProfile,
+    });
 
     res.status(200).json({
       success: true,
@@ -229,7 +243,7 @@ const getSavedJobsCount = asyncHandler(async (req, res) => {
 // @access  Private (Candidate)
 const clearAllSavedJobs = asyncHandler(async (req, res) => {
   try {
-    await SavedJob.deleteMany({ userId: req.user.id });
+    await SavedJob.deleteMany({ candidateId: req.user.candidateProfile });
 
     res.status(200).json({
       success: true,
@@ -253,7 +267,9 @@ const getSavedJobsByCategory = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
     const skip = (page - 1) * limit;
 
-    const savedJobs = await SavedJob.find({ userId: req.user.id })
+    const savedJobs = await SavedJob.find({
+      candidateId: req.user.candidateProfile,
+    })
       .populate({
         path: 'jobId',
         match: { 
@@ -272,7 +288,9 @@ const getSavedJobsByCategory = asyncHandler(async (req, res) => {
     // Filter out null jobIds
     const validSavedJobs = savedJobs.filter(savedJob => savedJob.jobId);
 
-    const total = await SavedJob.countDocuments({ userId: req.user.id });
+    const total = await SavedJob.countDocuments({
+      candidateId: req.user.candidateProfile,
+    });
 
     res.status(200).json({
       success: true,
