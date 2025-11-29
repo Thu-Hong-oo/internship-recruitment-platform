@@ -17,30 +17,27 @@ jobs:
       
       - name: Install and build FE
         env:
-          NODE_ENV: production
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api' }}
         run: |
           cd fe
           npm install
-          npm run build:export
+          NODE_ENV=production npm run build:export
       
       - name: Install and build FE-Employer
         env:
-          NODE_ENV: production
           NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api' }}
         run: |
           cd fe-employer
           npm install
-          npm run build:export
+          NODE_ENV=production npm run build:export
       
       - name: Install and build Admin
         env:
-          NODE_ENV: production
           VITE_API_URL: ${{ secrets.VITE_API_URL || secrets.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api' }}
         run: |
           cd admin
           npm install
-          npm run build
+          NODE_ENV=production npm run build
       
       - name: Deploy to Firebase
         uses: FirebaseExtended/action-hosting-deploy@v0
