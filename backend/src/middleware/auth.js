@@ -1,6 +1,6 @@
-const jwt = require('jsonwebtoken');
 const { verifyToken } = require('../utils/jwt');
 const User = require('../models/User');
+const CandidateProfile = require('../models/CandidateProfile');
 const asyncHandler = require('express-async-handler');
 const { AppError } = require('../utils/errors');
 
@@ -39,6 +39,14 @@ const protect = asyncHandler(async (req, res, next) => {
         success: false,
         error: 'Tài khoản đã bị tạm ngưng, không thể thực hiện thao tác này.',
       });
+    }
+
+    // Ensure candidate profile reference for candidate role
+    if (req.user.role === 'candidate') {
+      const profile = await CandidateProfile.findOne({ userId: req.user.id });
+      if (profile) {
+        req.user.candidateProfile = profile._id;
+      }
     }
 
     next();

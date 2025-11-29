@@ -3,6 +3,22 @@ const EmployerProfile = require('../../models/EmployerProfile');
 const { ApiResponse } = require('../../utils/responseHandler');
 const { AppError } = require('../../utils/errors');
 
+const ensureCandidateProfile = async userId => {
+  let profile = await CandidateProfile.findOne({ userId });
+  if (!profile) {
+    profile = await CandidateProfile.create({
+      userId,
+      personalInfo: { fullName: '', email: '', avatar: null },
+      status: 'active',
+      followedCompanies: [],
+    });
+  }
+  if (!profile.followedCompanies) {
+    profile.followedCompanies = [];
+  }
+  return profile;
+};
+
 class CompanyController {
   constructor() {
     // Bind all methods to preserve this context
@@ -74,55 +90,85 @@ class CompanyController {
    * Follow company
    */
   async _followCompany(companyId, req, res, next) {
-    // Check if company exists
-    const company = await EmployerProfile.findById(companyId);
-    if (!company) {
-      throw new AppError('Company not found', 404);
+    try {
+      // Check if company exists
+      const company = await EmployerProfile.findById(companyId).select(
+        'company stats status verification'
+      );
+      if (!company) {
+        throw new AppError('Company not found', 404);
+      }
+
+      const profile = await ensureCandidateProfile(req.user.id);
+
+      // Check if already following
+      const alreadyFollowing = profile.followedCompanies.some(
+        id => id.toString() === companyId
+      );
+      if (alreadyFollowing) {
+        throw new AppError('Already following this company', 400);
+      }
+
+      profile.followedCompanies.push(companyId);
+      await profile.save();
+
+      const companySummary = {
+        _id: company._id,
+        name: company.company?.name,
+        logo: company.company?.logo?.url,
+        industry: company.company?.industry,
+        size: company.company?.size,
+        description: company.company?.description,
+        website: company.company?.website,
+        stats: company.stats,
+        status: company.status,
+      };
+
+      return ApiResponse.success(
+        res,
+        {
+          company: companySummary,
+          isFollowing: true,
+          totalFollowed: profile.followedCompanies.length,
+        },
+        'Company followed successfully'
+      );
+    } catch (error) {
+      next(error);
     }
-
-    const profile = await CandidateProfile.findOne({ userId: req.user.id });
-    if (!profile) {
-      throw new AppError('Candidate profile not found', 404);
-    }
-
-    // Initialize followedCompanies if not exists
-    if (!profile.followedCompanies) {
-      profile.followedCompanies = [];
-    }
-
-    // Check if already following
-    if (profile.followedCompanies.includes(companyId)) {
-      throw new AppError('Already following this company', 400);
-    }
-
-    profile.followedCompanies.push(companyId);
-    await profile.save();
-
-    return ApiResponse.success(res, null, 'Company followed successfully');
   }
 
   /**
    * Unfollow company
    */
   async _unfollowCompany(companyId, req, res, next) {
-    const profile = await CandidateProfile.findOne({ userId: req.user.id });
-    if (!profile) {
-      throw new AppError('Candidate profile not found', 404);
+    try {
+      const profile = await ensureCandidateProfile(req.user.id);
+
+      const isFollowing = profile.followedCompanies.some(
+        id => id.toString() === companyId
+      );
+      if (!isFollowing) {
+        throw new AppError('Not following this company', 400);
+      }
+
+      profile.followedCompanies = profile.followedCompanies.filter(
+        id => id.toString() !== companyId
+      );
+      await profile.save();
+
+      return ApiResponse.success(
+        res,
+        {
+          companyId,
+          isFollowing: false,
+          totalFollowed: profile.followedCompanies.length,
+        },
+        'Company unfollowed successfully'
+      );
+    } catch (error) {
+      next(error);
     }
-
-    if (
-      !profile.followedCompanies ||
-      !profile.followedCompanies.includes(companyId)
-    ) {
-      throw new AppError('Not following this company', 400);
-    }
-
-    profile.followedCompanies = profile.followedCompanies.filter(
-      id => id.toString() !== companyId
-    );
-    await profile.save();
-
-    return ApiResponse.success(res, null, 'Company unfollowed successfully');
   }
 
   /**
@@ -171,15 +217,32 @@ class CompanyController {
   async _getCompanyDetail(companyId, req, res, next) {
     const company = await EmployerProfile.findById(companyId)
       .populate('userId', 'fullName email')
-      .select('company verification stats');
+      .select('company verification stats status');
 
     if (!company) {
       throw new AppError('Company not found', 404);
     }
 
+    let isFollowing = false;
+    if (req.user?.role === 'candidate') {
+      const profile = await CandidateProfile.findOne({
+        userId: req.user.id,
+      }).select('followedCompanies');
+      if (profile?.followedCompanies?.length) {
+        isFollowing = profile.followedCompanies.some(
+          id => id.toString() === company._id.toString()
+        );
+      }
+    }
+
+    const companyData = {
+      ...company.toObject(),
+      isFollowing,
+    };
+
     return ApiResponse.success(
       res,
-      company,
+      companyData,
       'Company details retrieved successfully'
     );
   }
