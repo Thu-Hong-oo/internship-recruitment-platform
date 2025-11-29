@@ -30,12 +30,25 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  // Unwrap params Promise
+  // Get job ID from URL pathname (works in both dev and production)
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const pathname = window.location.pathname;
+      const match = pathname.match(/^\/jobs\/([^\/]+)/);
+      if (match && match[1]) {
+        const jobId = match[1];
+        // Skip placeholder/dummy IDs
+        if (jobId !== 'placeholder' && jobId !== 'dummy') {
+          setId(jobId);
+          return;
+        }
+      }
+    }
+    
+    // Fallback to params if URL parsing fails
     params.then((resolvedParams) => {
       const jobId = resolvedParams.id;
-      if (jobId === 'dummy') {
-        // Handle dummy param - don't fetch
+      if (jobId === 'dummy' || jobId === 'placeholder') {
         setLoading(false);
         return;
       }
