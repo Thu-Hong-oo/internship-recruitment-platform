@@ -30,13 +30,13 @@ const adminMenuConfig = [
     icon: Icons.HomeIcon,
     element: <Dashboard userRole="admin" />,
   },
-  {
-    key: "charts",
-    label: "Đồ thị",
-    path: "/admin/charts",
-    icon: Icons.ChartIcon,
-    element: <Charts />,
-  },
+  // {
+  //   key: "charts",
+  //   label: "Đồ thị",
+  //   path: "/admin/charts",
+  //   icon: Icons.ChartIcon,
+  //   element: <Charts />,
+  // },
   {
     key: "users",
     label: "Quản lý User",

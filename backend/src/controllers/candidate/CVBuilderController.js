@@ -26,9 +26,13 @@ class CVBuilderController {
 
     // CV Generation
     this.generateSmartCV = this.generateSmartCV.bind(this);
+    this.createCVFromTemplate = this.createCVFromTemplate.bind(this);
+    this.getResumeById = this.getResumeById.bind(this);
+    this.getDefaultResume = this.getDefaultResume.bind(this);
 
     // Templates
     this.getTemplates = this.getTemplates.bind(this);
+    this.getTemplateById = this.getTemplateById.bind(this);
 
     // PDF Export
     this.exportPDF = this.exportPDF.bind(this);
@@ -451,6 +455,275 @@ class CVBuilderController {
   // ========================================
 
   /**
+   * POST /api/candidates/me/cv-builder/create-from-template
+   * Tạo CV mới từ template
+   *
+   * Request body:
+   * {
+   *   templateId: "modern", // ID của template
+   *   setAsDefault: true,    // Có đặt làm CV mặc định không
+   * }
+   */
+  async createCVFromTemplate(req, res, next) {
+    try {
+      const { templateId, setAsDefault = false } = req.body;
+      const userId = req.user.id;
+
+      // 1. Validate templateId
+      const { CV_TEMPLATES } = require('../../config/cvTemplates');
+      if (!CV_TEMPLATES[templateId]) {
+        return ApiResponse.error(res, 'Template not found', 404);
+      }
+
+      // 2. Lấy candidate profile
+      const profile = await CandidateProfile.findOne({ userId });
+      if (!profile) {
+        return ApiResponse.error(
+          res,
+          'Candidate profile not found. Please complete your profile first.',
+          404
+        );
+      }
+
+      // 3. Lấy template config
+      const template = CV_TEMPLATES[templateId];
+
+      // 4. Tạo CV data từ profile hiện tại
+      const cvData = {
+        personalInfo: {
+          fullName: profile.personalInfo?.fullName || '',
+          email: req.user.email || profile.personalInfo?.email || '',
+          phone: profile.personalInfo?.phone || '',
+          address: this.formatAddress(profile.personalInfo?.address) || '',
+          dateOfBirth: profile.personalInfo?.dateOfBirth || null,
+          avatar: profile.personalInfo?.avatar || null,
+          website: profile.personalInfo?.website || '',
+          linkedin: profile.personalInfo?.linkedin || '',
+          github: profile.personalInfo?.github || '',
+        },
+        summary: profile.summary || profile.personalInfo?.bio || '',
+        experience: this.formatExperience(profile.experience),
+        education: this.formatEducation(profile.education),
+        skills: this.formatSkills(profile.skills),
+        projects: this.formatProjects(profile.projects),
+        certifications: this.formatCertifications(profile.certifications),
+      };
+
+      // 5. Tạo ResumeBuilder document
+      const ResumeBuilder = require('../../models/ResumeBuilder');
+      const newResume = new ResumeBuilder({
+        candidateId: profile._id,
+        templateId: templateId,
+        content: cvData,
+        customization: {
+          targetRole: profile.targetJob?.title || '',
+        },
+        isDefault: setAsDefault,
+        status: 'draft',
+      });
+
+      // 6. Nếu setAsDefault = true, unset các CV default khác
+      if (setAsDefault) {
+        await ResumeBuilder.updateMany(
+          {
+            candidateId: profile._id,
+            _id: { $ne: newResume._id },
+          },
+          { isDefault: false }
+        );
+      }
+
+      await newResume.save();
+
+      // 7. Return response
+      return ApiResponse.success(
+        res,
+        {
+          resume: {
+            _id: newResume._id,
+            templateId: newResume.templateId,
+            candidateId: newResume.candidateId,
+            content: newResume.content,
+            isDefault: newResume.isDefault,
+            status: newResume.status,
+            createdAt: newResume.createdAt,
+            updatedAt: newResume.updatedAt,
+          },
+          template: {
+            id: templateId,
+            name: template.name,
+            style: template.style,
+            description: template.description,
+          },
+        },
+        'CV created from template successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/candidates/me/cv-builder/resume/:resumeId
+   * Lấy dữ liệu CV từ ResumeBuilder theo ID
+   */
+  async getResumeById(req, res, next) {
+    try {
+      const { resumeId } = req.params;
+      const userId = req.user.id;
+
+      const profile = await CandidateProfile.findOne({ userId });
+      if (!profile) {
+        return ApiResponse.error(res, 'Candidate profile not found', 404);
+      }
+
+      const ResumeBuilder = require('../../models/ResumeBuilder');
+      const resume = await ResumeBuilder.findOne({
+        _id: resumeId,
+        candidateId: profile._id,
+      });
+
+      if (!resume) {
+        return ApiResponse.error(res, 'CV not found', 404);
+      }
+
+      // Format data để frontend sử dụng
+      const cvData = {
+        resumeId: resume._id,
+        templateId: resume.templateId,
+        content: resume.content,
+        customization: resume.customization,
+        isDefault: resume.isDefault,
+        status: resume.status,
+        createdAt: resume.createdAt,
+        updatedAt: resume.updatedAt,
+      };
+
+      return ApiResponse.success(res, cvData, 'CV data retrieved successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/candidates/me/cv-builder/default
+   * Lấy CV mặc định (isDefault = true) hoặc CV mới nhất
+   */
+  async getDefaultResume(req, res, next) {
+    try {
+      const userId = req.user.id;
+
+      const profile = await CandidateProfile.findOne({ userId });
+      if (!profile) {
+        return ApiResponse.error(res, 'Candidate profile not found', 404);
+      }
+
+      const ResumeBuilder = require('../../models/ResumeBuilder');
+
+      // Tìm CV mặc định
+      let resume = await ResumeBuilder.findOne({
+        candidateId: profile._id,
+        isDefault: true,
+        status: { $ne: 'archived' },
+      }).sort({ updatedAt: -1 });
+
+      // Nếu không có default, lấy CV mới nhất
+      if (!resume) {
+        resume = await ResumeBuilder.findOne({
+          candidateId: profile._id,
+          status: { $ne: 'archived' },
+        }).sort({ updatedAt: -1 });
+      }
+
+      if (!resume) {
+        // Trả về empty data nếu chưa có CV nào
+        return ApiResponse.success(
+          res,
+          {
+            resumeId: null,
+            templateId: null,
+            content: this.getEmptyBuilderData(),
+            customization: {},
+            isDefault: false,
+            status: 'draft',
+          },
+          'No CV found, returning empty data'
+        );
+      }
+
+      // Format data để frontend sử dụng
+      const cvData = {
+        resumeId: resume._id,
+        templateId: resume.templateId,
+        content: resume.content,
+        customization: resume.customization,
+        isDefault: resume.isDefault,
+        status: resume.status,
+        createdAt: resume.createdAt,
+        updatedAt: resume.updatedAt,
+      };
+
+      return ApiResponse.success(
+        res,
+        cvData,
+        'Default CV data retrieved successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/candidates/me/cv-builder/template/:templateId
+   * Lấy thông tin chi tiết của một template (bao gồm renderLayout)
+   */
+  async getTemplateById(req, res, next) {
+    try {
+      const { templateId } = req.params;
+      const { CV_TEMPLATES } = require('../../config/cvTemplates');
+      const {
+        generateRenderLayout,
+      } = require('../../config/templateLayoutHelper');
+
+      if (!CV_TEMPLATES[templateId]) {
+        return ApiResponse.error(res, 'Template not found', 404);
+      }
+
+      const template = CV_TEMPLATES[templateId];
+
+      // Tự động generate renderLayout nếu chưa có
+      let renderLayout = template.renderLayout;
+      if (!renderLayout) {
+        renderLayout = generateRenderLayout(template);
+      }
+
+      return ApiResponse.success(
+        res,
+        {
+          id: templateId,
+          name: template.name,
+          description: template.description,
+          preview: template.preview || {
+            image: `/templates/previews/${templateId}-preview.jpg`,
+            thumbnail: `/templates/previews/${templateId}-thumb.jpg`,
+            description: template.description,
+          },
+          industryCode: template.industryCode || template.category || 'general',
+          color: template.color,
+          style: template.style,
+          sections: template.sections,
+          customization: template.customization,
+          // Trả về renderLayout để frontend có thể render
+          renderLayout: renderLayout,
+        },
+        'Template retrieved successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * GET /api/candidates/me/cv-builder/templates
    * Lấy danh sách CV templates có sẵn
    */
@@ -459,28 +732,42 @@ class CVBuilderController {
       const { CV_TEMPLATES } = require('../../config/cvTemplates');
       const { industryCode, category, style } = req.query;
 
-      let templates = Object.entries(CV_TEMPLATES).map(([key, template]) => ({
-        id: key,
-        name: template.name,
-        description: template.description,
-        preview: template.preview || {
-          image: `/templates/previews/${key}-preview.jpg`,
-          thumbnail: `/templates/previews/${key}-thumb.jpg`,
+      const {
+        generateRenderLayout,
+      } = require('../../config/templateLayoutHelper');
+
+      let templates = Object.entries(CV_TEMPLATES).map(([key, template]) => {
+        // Tự động generate renderLayout nếu chưa có
+        let renderLayout = template.renderLayout;
+        if (!renderLayout) {
+          renderLayout = generateRenderLayout(template);
+        }
+
+        return {
+          id: key,
+          name: template.name,
           description: template.description,
-        },
-        industryCode: template.industryCode || template.category || 'general',
-        color: template.color,
-        style: template.style,
-        sections: template.sections,
-        customization: template.customization,
-        isPopular: ['modern', 'student-tech', 'minimal'].includes(key),
-        customizable: {
-          colors: true,
-          fonts: true,
-          layout: true,
-          sections: true,
-        },
-      }));
+          preview: template.preview || {
+            image: `/templates/previews/${key}-preview.jpg`,
+            thumbnail: `/templates/previews/${key}-thumb.jpg`,
+            description: template.description,
+          },
+          industryCode: template.industryCode || template.category || 'general',
+          color: template.color,
+          style: template.style,
+          sections: template.sections,
+          customization: template.customization,
+          // Thêm renderLayout vào response để frontend có thể render
+          renderLayout: renderLayout,
+          isPopular: ['modern', 'student-tech', 'minimal'].includes(key),
+          customizable: {
+            colors: true,
+            fonts: true,
+            layout: true,
+            sections: true,
+          },
+        };
+      });
 
       // Filter by industryCode (preferred) or legacy category
       const effectiveIndustry = industryCode || category;

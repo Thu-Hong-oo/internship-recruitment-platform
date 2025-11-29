@@ -12,8 +12,15 @@ export type CreateJobPayload = {
   level?: string;
   jobType?: string;
   workingMode?: string;
-  location: string;
-  address?: string;
+  location?: string;
+  address?: {
+    street?: string;
+    ward?: string;
+    district?: string;
+    city?: string;
+    country?: string;
+    fullAddress?: string;
+  } | string;
   salaryMin?: number;
   salaryMax?: number;
   currency?: string;
@@ -57,6 +64,22 @@ export interface AnalyticsResponse {
       activeJobs?: number;
       totalApplications?: number;
     };
+  };
+  error?: string;
+}
+
+export interface EmployerApplicationsResponse {
+  success: boolean;
+  message?: string;
+  data?: {
+    pagination?: {
+      page?: number;
+      limit?: number;
+      totalPages?: number;
+      hasNextPage?: boolean;
+      hasPrevPage?: boolean;
+    };
+    data?: any[];
   };
   error?: string;
 }
@@ -113,6 +136,25 @@ export const getMyJobs = async (
       },
     });
     return (await response.json()) as JobsListResponse;
+  } catch (e) {
+    return { success: false, error: "Không thể kết nối máy chủ" };
+  }
+};
+
+// Get job by ID
+export const getJobById = async (
+  jobId: string,
+  token: string
+): Promise<JobResponse> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/jobs/${jobId}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return (await response.json()) as JobResponse;
   } catch (e) {
     return { success: false, error: "Không thể kết nối máy chủ" };
   }
@@ -190,6 +232,41 @@ export const getJobApplications = async (
       },
     });
     return (await response.json()) as JobsListResponse;
+  } catch (e) {
+    return { success: false, error: "Không thể kết nối máy chủ" };
+  }
+};
+
+// Get all applications submitted to employer jobs
+export const getEmployerApplications = async (
+  token: string,
+  options?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    jobId?: string;
+  }
+): Promise<EmployerApplicationsResponse> => {
+  try {
+    const params = new URLSearchParams();
+    if (options?.page) params.append("page", options.page.toString());
+    if (options?.limit) params.append("limit", options.limit.toString());
+    if (options?.status) params.append("status", options.status);
+    if (options?.jobId) params.append("jobId", options.jobId);
+
+    const queryString = params.toString();
+    const url = `${API_BASE_URL}/employers/applications${
+      queryString ? `?${queryString}` : ""
+    }`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return (await response.json()) as EmployerApplicationsResponse;
   } catch (e) {
     return { success: false, error: "Không thể kết nối máy chủ" };
   }

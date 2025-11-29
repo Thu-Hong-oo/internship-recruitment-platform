@@ -96,7 +96,15 @@ export class ApiClient {
     // Update token from localStorage before each request
     this.updateTokenFromStorage();
 
-    const url = `${this.baseURL}${endpoint}`;
+    // Ensure baseURL is absolute (starts with http:// or https://)
+    // This prevents Next.js from treating it as an internal route
+    let url = `${this.baseURL}${endpoint}`;
+    
+    // If baseURL doesn't start with http:// or https://, it might be relative
+    // In Server Components, we need absolute URLs
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      console.warn('API URL is not absolute. This may cause Next.js to route it internally.');
+    }
 
     // Debug logging
     console.log("API Request:", {
@@ -131,10 +139,12 @@ export class ApiClient {
 
     try {
       // Add cache: 'no-store' to prevent browser/Next.js caching
+      // Use absolute URL to prevent Next.js from intercepting as internal route
       const response = await fetch(url, {
         ...config,
         cache: 'no-store',
-        next: { revalidate: 0 }, // Disable Next.js cache
+        // Remove next: { revalidate: 0 } as it's for Next.js internal routes
+        // For external API calls, we just use cache: 'no-store'
       });
 
       console.log("API Response:", {

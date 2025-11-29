@@ -34,7 +34,7 @@ import {
   Circle,
 } from "lucide-react";
 import { User, getUserData, getToken, clearUserData } from "@/lib/userStorage";
-import { logoutEmployer } from "@/lib/api";
+import { logoutEmployer, getEmployerProfile } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import VerificationProgress from "@/components/VerificationProgress";
 import { useVerificationContext } from "@/contexts/VerificationContext";
@@ -50,7 +50,7 @@ export default function DashboardPage() {
   });
 
   useEffect(() => {
-    // Load user data from localStorage
+    // Load user data from localStorage first (for immediate display)
     const loadUserData = () => {
       const userData = getUserData();
       if (userData) {
@@ -59,6 +59,34 @@ export default function DashboardPage() {
     };
 
     loadUserData();
+
+    // Fetch profile data from API to get latest avatar and name
+    const fetchProfile = async () => {
+      try {
+        const token = getToken();
+        if (!token) return;
+
+        const json = await getEmployerProfile(token);
+        const profile = json?.data || json?.profile || null;
+
+        if (profile && profile.user) {
+          // Update user state with latest avatar from API
+          setUser((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              fullName: profile.user.fullName || prev.fullName,
+              avatar: profile.user.avatar || prev.avatar,
+            };
+          });
+        }
+      } catch (err) {
+        // Silent fail - fallback to localStorage data
+        console.error("Failed to fetch profile:", err);
+      }
+    };
+
+    fetchProfile();
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
@@ -92,7 +120,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="flex">
         {/* Left Sidebar */}
-        <aside className="w-64 bg-white shadow-sm min-h-screen">
+        <aside className="w-74 bg-white shadow-sm min-h-screen">
           {/* User Info */}
           <div className="p-4 border-b">
             <div className="flex items-center gap-3">
@@ -143,58 +171,14 @@ export default function DashboardPage() {
                   Bảng tin
                 </Button>
               </li>
-              <li>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-slate-700 hover:bg-primary/10 hover:text-primary"
-                >
-                  <TrendingUp className="w-4 h-4 mr-3" />
-                  InternBridge Insights
-                </Button>
-              </li>
-              <li>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-slate-700 hover:bg-primary/10 hover:text-primary"
-                >
-                  <Star className="w-4 h-4 mr-3" />
-                  InternBridge Rewards
-                </Button>
-              </li>
-              <li>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-slate-700 hover:bg-primary/10 hover:text-primary"
-                >
-                  <Gift className="w-4 h-4 mr-3" />
-                  Đối qua
-                </Button>
-              </li>
-              <li>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-slate-700 hover:bg-primary/10 hover:text-primary"
-                >
-                  <Bot className="w-4 h-4 mr-3" />
-                  Toppy AI - Đề xuất
-                </Button>
-              </li>
+
               <li>
                 <Button
                   variant="ghost"
                   className="w-full justify-start text-slate-700 hover:bg-primary/10 hover:text-primary"
                 >
                   <FileText className="w-4 h-4 mr-3" />
-                  CV đề xuất
-                </Button>
-              </li>
-              <li>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-slate-700 hover:bg-primary/10 hover:text-primary"
-                >
-                  <Briefcase className="w-4 h-4 mr-3" />
-                  Chiến dịch tuyển dụng
+                  Đề xuất CV
                 </Button>
               </li>
               <li>
@@ -214,7 +198,7 @@ export default function DashboardPage() {
                     className="w-full justify-start text-slate-700 hover:bg-primary/10 hover:text-primary"
                   >
                     <FolderOpen className="w-4 h-4 mr-3" />
-                    Quản lý CV
+                    Quản lý ứng viên
                     <ChevronDown className="w-4 h-4 ml-auto" />
                   </Button>
                   <div className="ml-6 space-y-1">
@@ -222,18 +206,16 @@ export default function DashboardPage() {
                       variant="ghost"
                       size="sm"
                       className="w-full justify-start text-slate-600 hover:bg-primary/10 hover:text-primary"
+                      onClick={() => router.push("/applications")}
                     >
-                      Quản lý nhân CV
-                      <Badge className="ml-auto bg-blue-500 text-white text-xs">
-                        Beta
-                      </Badge>
+                      Quản lý ứng viên đã ứng tuyển
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
                       className="w-full justify-start text-slate-600 hover:bg-primary/10 hover:text-primary"
                     >
-                      Quản lý yêu cầu kết nối CV
+                      Khám phá ứng viên tiềm năng
                     </Button>
                   </div>
                 </div>
@@ -244,7 +226,7 @@ export default function DashboardPage() {
                   className="w-full justify-start text-slate-700 hover:bg-primary/10 hover:text-primary"
                 >
                   <BarChart3 className="w-4 h-4 mr-3" />
-                  Báo cáo tuyển dụng
+                  Thống kê
                 </Button>
               </li>
               <li>
@@ -261,88 +243,107 @@ export default function DashboardPage() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 p-6">
-          <div className="max-w-6xl mx-auto">
-            {/* Debug: Manual refresh button */}
-            <div className="mb-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={refreshVerification}
-                className="text-xs"
-              >
-                🔄 Refresh Verification Status
-              </Button>
-            </div>
+        <main className="flex-1 p-6 min-h-screen bg-slate-50">
+          <div className="max-w-6xl mx-auto space-y-6">
 
             {/* Verification Progress */}
             <VerificationProgress />
 
-            {/* Dashboard Content */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Main content grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
               {/* Welcome Card */}
-              <Card className="md:col-span-2 lg:col-span-1">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className="p-3 bg-primary/10 rounded-full">
-                      <BarChart3 className="w-6 h-6 text-primary" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold">
-                        Chào mừng trở lại!
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        {user?.fullName || "Employer"}
-                      </p>
+              <Card className="md:col-span-2 lg:col-span-2 !shadow-md h-full flex flex-col justify-center">
+                <CardContent className="p-8 flex items-center gap-6">
+                  <div className="p-4 bg-gradient-to-br from-primary/10 to-blue-100 rounded-full">
+                    <BarChart3 className="w-7 h-7 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold text-slate-800 mb-1">
+                      Chào mừng trở lại!
+                    </h3>
+                    <p className="text-base text-gray-500">
+                      {user?.fullName || "Employer"}
+                    </p>
+                    <div className="mt-2 text-xs text-slate-400">
+                      Chúc bạn một ngày làm việc hiệu quả và thành công trong tuyển dụng!
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Quick Stats */}
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Tin đã đăng</p>
-                      <p className="text-2xl font-bold">0</p>
-                    </div>
-                    <Briefcase className="w-8 h-8 text-primary" />
-                  </div>
+              {/* Quick Actions Card */}
+              <Card className="h-full flex flex-col justify-center !shadow-md">
+                <CardHeader className="pb-2 pt-4">
+                  <CardTitle className="text-base text-slate-700 font-medium">Tác vụ nhanh</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 flex flex-col space-y-3">
+                  <Button
+                    variant="outline"
+                    className="flex items-center justify-start gap-2 w-full font-medium"
+                    onClick={() => router.push("/jobs/create-job")}
+                  >
+                    <FileText className="w-5 h-5 text-primary" />
+                    Đăng tin tuyển dụng
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex items-center justify-start gap-2 w-full font-medium"
+                    onClick={() => router.push("/applications")}
+                  >
+                    <FolderOpen className="w-5 h-5 text-primary" />
+                    Ứng viên đã ứng tuyển
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex items-center justify-start gap-2 w-full font-medium"
+                  >
+                    <BarChart3 className="w-5 h-5 text-primary" />
+                    Xem Thống kê
+                  </Button>
                 </CardContent>
               </Card>
+            </div> 
 
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Ứng viên</p>
-                      <p className="text-2xl font-bold">0</p>
-                    </div>
-                    <Users className="w-8 h-8 text-green-500" />
-                  </div>
-                </CardContent>
-              </Card>
+            {/* Bottom grid row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
 
-              {/* Recent Activity */}
-              <Card className="md:col-span-2 lg:col-span-3">
+              {/* Promote action */}
+              <Card className="h-full !shadow-md">
                 <CardHeader>
-                  <CardTitle>Hoạt động gần đây</CardTitle>
+                  <CardTitle className="text-base font-semibold">Đăng thêm tin tuyển dụng?</CardTitle>
+                  <div className="text-sm text-gray-500">
+                    Vị trí mới sẽ giúp bạn tiếp cận nhiều ứng viên hơn.
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-center py-8 text-gray-500">
-                    <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>Chưa có hoạt động nào</p>
+                  <div className="flex flex-col items-center justify-center py-6">
+                    <FileText className="w-12 h-12 mb-4 text-primary/40" />
                     <Button
-                      className="mt-4"
+                      className="mt-2 px-6"
                       onClick={() => router.push("/jobs/create-job")}
                     >
-                      Tạo tin tuyển dụng đầu tiên
+                      Đăng bài tuyển dụng ngay
                     </Button>
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Tips/info card */}
+              <Card className="h-full !shadow-md">
+                <CardHeader>
+                  <CardTitle className="text-base font-semibold">Mẹo giúp tuyển dụng hiệu quả hơn</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="list-disc pl-5 space-y-2 text-slate-600 text-sm">
+                    <li>Cập nhật thường xuyên mô tả công việc và yêu cầu vị trí.</li>
+                    <li>Phản hồi ứng viên nhanh chóng để tạo ấn tượng tốt.</li>
+                    <li>Sử dụng bộ lọc để tìm kiếm ứng viên phù hợp.</li>
+                  </ul>
+                </CardContent>
+              </Card>
             </div>
+
           </div>
         </main>
       </div>
