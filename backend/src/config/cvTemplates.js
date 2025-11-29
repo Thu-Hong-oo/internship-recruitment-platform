@@ -37,6 +37,81 @@ const CV_TEMPLATES = {
       },
       layout: 'two-column',
     },
+    // Layout configuration cho rendering - định nghĩa vị trí, kích thước, màu sắc các sections
+    renderLayout: {
+      page: {
+        width: 794, // A4 width in pixels
+        height: 1123, // A4 height in pixels
+        padding: 24,
+        backgroundColor: '#ffffff',
+      },
+      sections: [
+        {
+          type: 'personalInfo',
+          x: 48,
+          y: 48,
+          width: 520,
+          height: 140,
+          order: 1,
+        },
+        {
+          type: 'careerObjective',
+          x: 48,
+          y: 210,
+          width: 520,
+          height: 80,
+          order: 2,
+        },
+        {
+          type: 'experience',
+          x: 48,
+          y: 310,
+          width: 520,
+          height: 380,
+          order: 3,
+        },
+        {
+          type: 'education',
+          x: 48,
+          y: 710,
+          width: 520,
+          height: 180,
+          order: 4,
+        },
+        {
+          type: 'projects',
+          x: 48,
+          y: 910,
+          width: 520,
+          height: 200,
+          order: 5,
+        },
+        {
+          type: 'skills',
+          x: 596,
+          y: 310,
+          width: 150,
+          height: 300,
+          order: 6,
+        },
+        {
+          type: 'languages',
+          x: 596,
+          y: 630,
+          width: 150,
+          height: 150,
+          order: 7,
+        },
+        {
+          type: 'certifications',
+          x: 596,
+          y: 800,
+          width: 150,
+          height: 200,
+          order: 8,
+        },
+      ],
+    },
   },
 
   // Template cho sinh viên IT
