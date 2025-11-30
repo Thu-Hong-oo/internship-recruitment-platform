@@ -12,7 +12,14 @@ const AppHeader = dynamic(() => import("@/components/layout/AppHeader"), {
 });
 
 export const metadata: Metadata = {
-  title: "InternBridge- Nhà tuyển dụng",
+  title: "Intern Bridge | Nhà tuyển dụng",
+  description:
+    "Intern Bridge - Hệ thống quản lý tuyển dụng và chăm sóc thực tập sinh toàn diện, hỗ trợ nhà tuyển dụng và ứng viên kết nối hiệu quả.",
+  icons: {
+    icon: "/images/logo.png",
+    shortcut: "/images/logo.png",
+    apple: "/images/logo.png",
+  },
 };
 
 export default function RootLayout({

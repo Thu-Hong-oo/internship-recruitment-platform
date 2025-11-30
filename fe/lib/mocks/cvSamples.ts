@@ -4,6 +4,7 @@ export type CVPersonal = {
   phone?: string;
   address?: string;
   summary?: string;
+  avatar?: string;
 };
 
 export type CVExperience = {
@@ -53,6 +54,9 @@ export type CVData = {
   languages?: CVLanguage[];
   certifications?: CVCertification[];
   social?: CVSocial[];
+  sectionTitles?: {
+    [key: string]: string; // e.g., "education": "Kinh nghiệm học tập", "references": "Người tham khảo"
+  };
 };
 
 export const sampleCVs: CVData[] = [

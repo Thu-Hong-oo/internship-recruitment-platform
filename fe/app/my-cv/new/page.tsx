@@ -29,6 +29,7 @@ function convertResumeToCVData(
           ? personalInfo.address
           : personalInfo.address?.street || "",
       summary: content.summary || personalInfo.bio || "",
+      avatar: personalInfo.avatar || undefined,
     },
     experience: (content.experience || []).map((exp: any) => ({
       company: exp.company || exp.position || "",
@@ -125,7 +126,10 @@ export default function Page() {
                 phone: builderData.personalInfo?.phone || "",
                 address: builderData.personalInfo?.address || "",
                 summary: builderData.careerObjective || "",
-              },
+                avatar: builderData.personalInfo?.avatar || undefined,
+                jobTitle: builderData.personalInfo?.jobTitle || undefined,
+                website: builderData.personalInfo?.website || undefined,
+              } as any,
               experience: (builderData.experience || []).map((exp: any) => ({
                 company: exp.company || "",
                 role: exp.position || exp.role || "",
@@ -158,10 +162,23 @@ export default function Page() {
                 (cert: any) => ({
                   name: cert.name || "",
                   issuer: cert.issuer || "",
-                  year: cert.issueDate || cert.year || "",
+                  year: cert.issueDate 
+                    ? new Date(cert.issueDate).getFullYear().toString()
+                    : cert.year || "",
                 })
               ),
-            };
+              awards: (builderData.awards || []).map((award: any) => ({
+                title: award.title || "",
+                issuer: award.issuer || "",
+                year: award.date
+                  ? new Date(award.date).getFullYear().toString()
+                  : award.year || "",
+                description: award.description || "",
+              })),
+              hobbies: (builderData.hobbies || []).map((hobby: any) =>
+                typeof hobby === "string" ? hobby : hobby
+              ),
+            } as any;
             setData(cvData);
           } else {
             // Nếu không có data, dùng empty data

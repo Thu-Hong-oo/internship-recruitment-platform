@@ -13,9 +13,14 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "InternBridge",
+  title: "Intern Bridge | Ứng viên",
   description:
-    "InternBridge - Website tuyển dụng thực tập sinh tích hợp AI phân tích hồ sơ và cá nhân hóa lộ trình phát triển kỹ năng dựa trên phân tích ngôn ngữ tự nhiên",
+    "Intern Bridge - Hệ thống quản lý tuyển dụng và chăm sóc thực tập sinh toàn diện, hỗ trợ nhà tuyển dụng và ứng viên kết nối hiệu quả.",
+  icons: {
+    icon: "/images/logo.png",
+    shortcut: "/images/logo.png",
+    apple: "/images/logo.png",
+  },
 };
 
 export default function RootLayout({
