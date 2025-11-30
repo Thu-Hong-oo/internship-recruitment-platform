@@ -150,6 +150,13 @@ export default function Page() {
               projects: (builderData.projects || []).map((proj: any) => ({
                 title: proj.title || "",
                 description: proj.description || "",
+                technologies: proj.technologies || [],
+                startDate: proj.startDate || "",
+                endDate: proj.endDate || "",
+                status: proj.status || "completed",
+                url: proj.url || null,
+                github: proj.github || null,
+                achievements: proj.achievements || [],
               })),
               languages: (builderData.languages || []).map((lang: any) => ({
                 name:
@@ -163,16 +170,25 @@ export default function Page() {
                   name: cert.name || "",
                   issuer: cert.issuer || "",
                   year: cert.issueDate 
-                    ? new Date(cert.issueDate).getFullYear().toString()
+                    ? (cert.issueDate instanceof Date 
+                        ? cert.issueDate.getFullYear().toString()
+                        : new Date(cert.issueDate).getFullYear().toString())
                     : cert.year || "",
+                  issueDate: cert.issueDate || null,
+                  expiryDate: cert.expiryDate || null,
+                  credentialId: cert.credentialId || null,
+                  url: cert.url || null,
                 })
               ),
               awards: (builderData.awards || []).map((award: any) => ({
                 title: award.title || "",
                 issuer: award.issuer || "",
                 year: award.date
-                  ? new Date(award.date).getFullYear().toString()
+                  ? (award.date instanceof Date
+                      ? award.date.getFullYear().toString()
+                      : new Date(award.date).getFullYear().toString())
                   : award.year || "",
+                date: award.date || null,
                 description: award.description || "",
               })),
               hobbies: (builderData.hobbies || []).map((hobby: any) =>

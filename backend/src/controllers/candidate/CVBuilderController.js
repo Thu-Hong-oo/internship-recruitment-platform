@@ -135,6 +135,7 @@ class CVBuilderController {
       // Debug log để kiểm tra data nhận được
       console.log('📥 Received updateBuilderData:', {
         experienceCount: experience.length,
+        experienceSample: experience[0],
         educationCount: education.length,
         educationSample: education[0],
         projectsCount: projects.length,
@@ -375,13 +376,32 @@ class CVBuilderController {
       }
 
       // Update projects (luôn update, kể cả khi array rỗng để cho phép xóa)
+      // Parse date từ string sang Date object nếu cần
+      const parseDate = (dateStr) => {
+        if (!dateStr || dateStr === '') return null;
+        if (dateStr instanceof Date) return dateStr;
+        // Nếu là string "YYYY-MM" hoặc "YYYY", parse thành Date
+        if (typeof dateStr === 'string') {
+          const dateMatch = dateStr.trim().match(/^(\d{4})(?:-(\d{2}))?/);
+          if (dateMatch) {
+            const year = parseInt(dateMatch[1], 10);
+            const month = dateMatch[2] ? parseInt(dateMatch[2], 10) - 1 : 0; // Month is 0-indexed
+            return new Date(year, month, 1);
+          }
+          // Try to parse as ISO date
+          const parsed = new Date(dateStr);
+          return isNaN(parsed.getTime()) ? null : parsed;
+        }
+        return null;
+      };
+
       profile.projects = projects.map(project => ({
         _id: project._id || new mongoose.Types.ObjectId(),
         title: project.title || '',
         description: project.description || '',
         technologies: project.technologies || [],
-        startDate: project.startDate || null,
-        endDate: project.endDate || null,
+        startDate: parseDate(project.startDate),
+        endDate: parseDate(project.endDate),
         status: project.status || 'completed',
         url: project.url || null,
         github: project.github || null,
@@ -389,22 +409,43 @@ class CVBuilderController {
       }));
 
       // Update certifications (luôn update, kể cả khi array rỗng để cho phép xóa)
+      // Parse date từ string sang Date object nếu cần
+      const parseCertDate = (dateStr) => {
+        if (!dateStr || dateStr === '') return null;
+        if (dateStr instanceof Date) return dateStr;
+        // Nếu là string "YYYY-MM-DD" hoặc "YYYY-MM" hoặc "YYYY", parse thành Date
+        if (typeof dateStr === 'string') {
+          const dateMatch = dateStr.trim().match(/^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?/);
+          if (dateMatch) {
+            const year = parseInt(dateMatch[1], 10);
+            const month = dateMatch[2] ? parseInt(dateMatch[2], 10) - 1 : 0; // Month is 0-indexed
+            const day = dateMatch[3] ? parseInt(dateMatch[3], 10) : 1;
+            return new Date(year, month, day);
+          }
+          // Try to parse as ISO date
+          const parsed = new Date(dateStr);
+          return isNaN(parsed.getTime()) ? null : parsed;
+        }
+        return null;
+      };
+
       profile.certifications = certifications.map(cert => ({
         _id: cert._id || new mongoose.Types.ObjectId(),
         name: cert.name || '',
         issuer: cert.issuer || '',
-        issueDate: cert.issueDate || null,
-        expiryDate: cert.expiryDate || null,
+        issueDate: parseCertDate(cert.issueDate),
+        expiryDate: parseCertDate(cert.expiryDate),
         credentialId: cert.credentialId || null,
         url: cert.url || null,
       }));
 
       // Update awards (luôn update, kể cả khi array rỗng để cho phép xóa)
+      // Parse date từ string sang Date object nếu cần (dùng cùng logic với certifications)
       profile.awards = awards.map(award => ({
         _id: award._id || new mongoose.Types.ObjectId(),
         title: award.title || '',
         issuer: award.issuer || '',
-        date: award.date || null,
+        date: parseCertDate(award.date),
         description: award.description || '',
       }));
 
@@ -432,14 +473,34 @@ class CVBuilderController {
         educationFirstItem: profile.education?.certifications?.[0]
           ? {
               institution: profile.education.certifications[0].institution,
-              startYear: profile.education.certifications[0].startYear,
-              endYear: profile.education.certifications[0].endYear,
+              startDate: profile.education.certifications[0].startDate,
+              endDate: profile.education.certifications[0].endDate,
             }
           : null,
         experienceFulltimeCount: profile.experience?.fulltime?.length || 0,
+        experienceFulltimeSample: profile.experience?.fulltime?.[0]
+          ? {
+              company: profile.experience.fulltime[0].company,
+              position: profile.experience.fulltime[0].position,
+              startDate: profile.experience.fulltime[0].startDate,
+              endDate: profile.experience.fulltime[0].endDate,
+            }
+          : null,
         projectsCount: profile.projects?.length || 0,
         certificationsCount: profile.certifications?.length || 0,
+        certificationsSample: profile.certifications?.[0]
+          ? {
+              name: profile.certifications[0].name,
+              issueDate: profile.certifications[0].issueDate,
+            }
+          : null,
         awardsCount: profile.awards?.length || 0,
+        awardsSample: profile.awards?.[0]
+          ? {
+              title: profile.awards[0].title,
+              date: profile.awards[0].date,
+            }
+          : null,
         hobbiesCount: profile.hobbies?.length || 0,
         jobTitle: profile.personalInfo?.jobTitle,
       });
@@ -1392,30 +1453,71 @@ class CVBuilderController {
 
     const allExp = [];
     ['internships', 'fulltime', 'parttime', 'freelance'].forEach(type => {
-      if (experience[type]) {
+      if (experience[type] && Array.isArray(experience[type])) {
         experience[type].forEach(exp => {
+          // Format date từ Date object sang string "YYYY-MM"
+          const formatDate = (date) => {
+            if (!date) return '';
+            if (date instanceof Date) {
+              const year = date.getFullYear();
+              const month = String(date.getMonth() + 1).padStart(2, '0');
+              return `${year}-${month}`;
+            }
+            if (typeof date === 'string') return date;
+            return String(date);
+          };
+
           allExp.push({
-            ...exp,
+            company: exp.company || '',
+            position: exp.position || '',
+            startDate: formatDate(exp.startDate),
+            endDate: formatDate(exp.endDate),
+            description: exp.description || '',
             type: type.replace('internships', 'internship'),
           });
         });
       }
     });
 
-    return allExp.sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+    return allExp.sort((a, b) => {
+      const dateA = a.startDate ? new Date(a.startDate) : new Date(0);
+      const dateB = b.startDate ? new Date(b.startDate) : new Date(0);
+      return dateB - dateA; // Sort descending (newest first)
+    });
   }
 
   filterExperienceByType(experiences, type) {
+    if (!experiences || !Array.isArray(experiences)) return [];
+    
+    // Parse date từ string sang Date object
+    const parseDate = (dateStr) => {
+      if (!dateStr || dateStr === '') return null;
+      if (dateStr instanceof Date) return dateStr;
+      // Nếu là string "YYYY-MM" hoặc "YYYY", parse thành Date
+      if (typeof dateStr === 'string') {
+        const dateMatch = dateStr.trim().match(/^(\d{4})(?:-(\d{2}))?/);
+        if (dateMatch) {
+          const year = parseInt(dateMatch[1], 10);
+          const month = dateMatch[2] ? parseInt(dateMatch[2], 10) - 1 : 0; // Month is 0-indexed
+          return new Date(year, month, 1);
+        }
+        // Try to parse as ISO date
+        const parsed = new Date(dateStr);
+        return isNaN(parsed.getTime()) ? null : parsed;
+      }
+      return null;
+    };
+    
     return experiences
       .filter(exp => exp.type === type)
       .map(exp => ({
         _id: exp._id || new mongoose.Types.ObjectId(),
-        company: exp.company,
-        position: exp.position,
-        location: exp.location,
-        startDate: exp.startDate,
-        endDate: exp.endDate,
-        description: exp.description,
+        company: exp.company || '',
+        position: exp.position || '',
+        location: exp.location || null,
+        startDate: parseDate(exp.startDate),
+        endDate: parseDate(exp.endDate),
+        description: exp.description || '',
         achievements: exp.achievements || [],
         skills: exp.skills || [],
         current: exp.current || false,
@@ -1535,16 +1637,56 @@ class CVBuilderController {
   }
 
   formatProjects(projects) {
-    return projects || [];
+    if (!projects || !Array.isArray(projects)) return [];
+    
+    // Format date từ Date object sang string "YYYY-MM"
+    const formatDate = (date) => {
+      if (!date) return '';
+      if (date instanceof Date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        return `${year}-${month}`;
+      }
+      if (typeof date === 'string') return date;
+      return String(date);
+    };
+
+    return projects.map(project => ({
+      title: project.title || '',
+      description: project.description || '',
+      technologies: project.technologies || [],
+      startDate: formatDate(project.startDate),
+      endDate: formatDate(project.endDate),
+      status: project.status || 'completed',
+      url: project.url || null,
+      github: project.github || null,
+      achievements: project.achievements || [],
+    }));
   }
 
   formatCertifications(certifications) {
     if (!certifications || !Array.isArray(certifications)) return [];
+    
+    // Format date từ Date object sang string "YYYY-MM-DD" hoặc "YYYY"
+    const formatDate = (date) => {
+      if (!date) return null;
+      if (date instanceof Date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+      if (typeof date === 'string') return date;
+      return String(date);
+    };
+
     return certifications.map(cert => ({
       name: cert.name || '',
       issuer: cert.issuer || '',
-      issueDate: cert.issueDate || null,
-      expiryDate: cert.expiryDate || null,
+      issueDate: formatDate(cert.issueDate),
+      expiryDate: formatDate(cert.expiryDate),
+      credentialId: cert.credentialId || null,
+      url: cert.url || null,
       year: cert.issueDate
         ? String(new Date(cert.issueDate).getFullYear())
         : cert.year || '',
@@ -1553,10 +1695,24 @@ class CVBuilderController {
 
   formatAwards(awards) {
     if (!awards || !Array.isArray(awards)) return [];
+    
+    // Format date từ Date object sang string "YYYY-MM-DD" hoặc "YYYY"
+    const formatDate = (date) => {
+      if (!date) return null;
+      if (date instanceof Date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+      if (typeof date === 'string') return date;
+      return String(date);
+    };
+
     return awards.map(award => ({
       title: award.title || '',
       issuer: award.issuer || '',
-      date: award.date || null,
+      date: formatDate(award.date),
       year: award.date
         ? String(new Date(award.date).getFullYear())
         : award.year || '',

@@ -566,9 +566,9 @@ export default function Template1Renderer({
         </div>
 
         {/* Main content - 2 columns */}
-        <div className="grid grid-cols-[2fr_1fr] gap-8">
+        <div className="grid grid-cols-[2fr_1fr] gap-8 items-stretch">
           {/* Left column */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 h-full">
             <SectionWrapper
               sectionKey="summary"
               defaultTitle="Mục tiêu nghề nghiệp"
@@ -978,7 +978,7 @@ export default function Template1Renderer({
           </div>
 
           {/* Right column */}
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 h-full">
             <SectionWrapper
               sectionKey="certifications"
               defaultTitle="Chứng chỉ"
