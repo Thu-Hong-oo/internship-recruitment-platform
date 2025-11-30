@@ -301,6 +301,8 @@ export default function Template1Renderer({
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [focusedItem, setFocusedItem] = useState<string | null>(null);
   const [isAvatarHovered, setIsAvatarHovered] = useState(false);
+  const [hoveredSection, setHoveredSection] = useState<string | null>(null);
+  const [hiddenSections, setHiddenSections] = useState<Set<string>>(new Set());
   const blurTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -566,9 +568,12 @@ export default function Template1Renderer({
         </div>
 
         {/* Main content - 2 columns */}
-        <div className="grid grid-cols-[2fr_1fr] gap-8 items-stretch">
+        <div
+          className="grid grid-cols-[2fr_1fr] gap-8"
+          style={{ gridAutoRows: "1fr", alignItems: "stretch" }}
+        >
           {/* Left column */}
-          <div className="flex flex-col gap-4 h-full">
+          <div className="flex flex-col gap-4" style={{ minHeight: "100%" }}>
             <SectionWrapper
               sectionKey="summary"
               defaultTitle="Mục tiêu nghề nghiệp"
@@ -705,7 +710,7 @@ export default function Template1Renderer({
               onUpdateSectionTitle={onUpdateSectionTitle}
               getSectionTitle={getSectionTitle}
             >
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3 flex-1">
                 {(data.experience.length > 0
                   ? data.experience
                   : [{} as any]
@@ -978,255 +983,382 @@ export default function Template1Renderer({
           </div>
 
           {/* Right column */}
-          <div className="flex flex-col gap-4 h-full">
-            <SectionWrapper
-              sectionKey="certifications"
-              defaultTitle="Chứng chỉ"
-              editable={editable}
-              onAddItem={onAddItem}
-              onUpdateSectionTitle={onUpdateSectionTitle}
-              getSectionTitle={getSectionTitle}
-            >
-              <div className="flex flex-col gap-2">
-                {(data.certifications && data.certifications.length > 0
-                  ? data.certifications
-                  : [{} as any]
-                ).map((cert: any, idx) => {
-                  const isActive = isItemActive("certifications", idx);
-                  return (
-                    <div
-                      key={`cert-${idx}`}
-                      className="relative mb-2"
-                      onMouseEnter={() =>
-                        editable && setHoveredItem(`certifications.${idx}`)
-                      }
-                      onMouseLeave={() => setHoveredItem(null)}
+          <div className="flex flex-col gap-4" style={{ minHeight: "100%" }}>
+            {!hiddenSections.has("certifications") && (
+              <div
+                className="relative mb-4"
+                onMouseEnter={() =>
+                  editable && setHoveredSection("certifications")
+                }
+                onMouseLeave={() => setHoveredSection(null)}
+              >
+                {hoveredSection === "certifications" && editable && (
+                  <div className="flex items-center gap-1 mb-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setHiddenSections((prev) =>
+                          new Set(prev).add("certifications")
+                        );
+                      }}
+                      className="px-3 py-1.5 text-xs font-medium rounded border-none transition-colors"
+                      style={{ backgroundColor: "#ef4444", color: "white" }}
+                      title="Xóa mục này"
                     >
-                      <ItemControls
-                        section="certifications"
-                        index={idx}
-                        totalItems={(data.certifications || []).length}
-                        editable={editable}
-                        onDeleteItem={onDeleteItem}
-                        onAddItem={onAddItem}
-                        onMoveItemUp={onMoveItemUp}
-                        onMoveItemDown={onMoveItemDown}
-                        show={isActive}
-                      />
-                      <div
-                        className={`text-sm ${
-                          isActive && editable
-                            ? "border-2 border-dashed rounded p-2"
-                            : "border-2 border-dashed border-transparent"
-                        } transition-all duration-200 ease-in-out`}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          borderColor:
-                            isActive && editable ? "#d4d4d4" : "transparent",
-                        }}
-                      >
-                        <div>
-                          <InlineText
-                            path={["certifications", idx, "name"]}
-                            value={cert.name || ""}
-                            placeholder="Tên chứng chỉ"
-                            editable={editable}
-                            onChangeText={onChangeText}
-                            onFocusField={handleFocusField}
-                            onBlurField={handleBlurField}
-                          />
-                        </div>
-                        <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                          <InlineText
-                            path={["certifications", idx, "issuer"]}
-                            value={cert.issuer || ""}
-                            placeholder="Đơn vị cấp"
-                            editable={editable}
-                            onChangeText={onChangeText}
-                            onFocusField={handleFocusField}
-                            onBlurField={handleBlurField}
-                          />
-                          <span>•</span>
-                          <InlineText
-                            path={["certifications", idx, "year"]}
-                            value={cert.year || ""}
-                            placeholder="Năm"
-                            editable={editable}
-                            onChangeText={onChangeText}
-                            onFocusField={handleFocusField}
-                            onBlurField={handleBlurField}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </SectionWrapper>
-
-            <SectionWrapper
-              sectionKey="awards"
-              defaultTitle="Danh hiệu và giải thưởng"
-              editable={editable}
-              onAddItem={onAddItem}
-              onUpdateSectionTitle={onUpdateSectionTitle}
-              getSectionTitle={getSectionTitle}
-            >
-              <div className="flex flex-col gap-3">
-                {((data as any).awards && (data as any).awards.length > 0
-                  ? (data as any).awards
-                  : [{} as any]
-                ).map((award: any, idx: number) => {
-                  const isActive = isItemActive("awards", idx);
-                  return (
-                    <div
-                      key={`award-${idx}`}
-                      className="relative mb-3"
-                      onMouseEnter={() =>
-                        editable && setHoveredItem(`awards.${idx}`)
-                      }
-                      onMouseLeave={() => setHoveredItem(null)}
-                    >
-                      <ItemControls
-                        section={"awards" as any}
-                        index={idx}
-                        totalItems={((data as any).awards || []).length}
-                        editable={editable}
-                        onDeleteItem={onDeleteItem}
-                        onAddItem={onAddItem}
-                        onMoveItemUp={onMoveItemUp}
-                        onMoveItemDown={onMoveItemDown}
-                        show={isActive}
-                      />
-                      <div
-                        className={`text-sm ${
-                          isActive && editable
-                            ? "border-2 border-dashed rounded p-2"
-                            : "border-2 border-dashed border-transparent"
-                        } transition-all duration-200 ease-in-out`}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          borderColor:
-                            isActive && editable ? "#d4d4d4" : "transparent",
-                        }}
-                      >
-                        <div className="font-semibold mb-1">
-                          <InlineText
-                            path={["awards", idx, "title"]}
-                            value={award.title || ""}
-                            placeholder="Tên danh hiệu/giải thưởng"
-                            editable={editable}
-                            onChangeText={onChangeText}
-                            onFocusField={handleFocusField}
-                            onBlurField={handleBlurField}
-                          />
-                        </div>
-                        <div className="text-gray-600 mb-1">
-                          <InlineText
-                            path={["awards", idx, "issuer"]}
-                            value={award.issuer || ""}
-                            placeholder="Đơn vị trao giải"
-                            editable={editable}
-                            onChangeText={onChangeText}
-                            onFocusField={handleFocusField}
-                            onBlurField={handleBlurField}
-                          />
-                        </div>
-                        <div className="text-xs text-gray-500 mb-1 flex items-center gap-1">
-                          <InlineText
-                            path={["awards", idx, "year"]}
-                            value={award.year || ""}
-                            placeholder="Năm"
-                            editable={editable}
-                            onChangeText={onChangeText}
-                            onFocusField={handleFocusField}
-                            onBlurField={handleBlurField}
-                          />
-                        </div>
-                        {(award.description || editable) && (
-                          <div className="text-xs">
-                            <InlineText
-                              path={["awards", idx, "description"]}
-                              value={award.description || ""}
-                              placeholder="Mô tả..."
+                      Xóa mục này
+                    </button>
+                  </div>
+                )}
+                <div
+                  className={`${
+                    hoveredSection === "certifications" && editable
+                      ? "border-2 border-dashed rounded p-3"
+                      : "border-2 border-dashed border-transparent"
+                  } transition-all duration-200 ease-in-out`}
+                  style={{
+                    borderColor:
+                      hoveredSection === "certifications" && editable
+                        ? "#d4d4d4"
+                        : "transparent",
+                  }}
+                >
+                  <SectionWrapper
+                    sectionKey="certifications"
+                    defaultTitle="Chứng chỉ"
+                    editable={editable}
+                    onAddItem={onAddItem}
+                    onUpdateSectionTitle={onUpdateSectionTitle}
+                    getSectionTitle={getSectionTitle}
+                  >
+                    <div className="flex flex-col gap-2">
+                      {(data.certifications && data.certifications.length > 0
+                        ? data.certifications
+                        : [{} as any]
+                      ).map((cert: any, idx) => {
+                        const isActive = isItemActive("certifications", idx);
+                        return (
+                          <div
+                            key={`cert-${idx}`}
+                            className="relative mb-2"
+                            onMouseEnter={() =>
+                              editable &&
+                              setHoveredItem(`certifications.${idx}`)
+                            }
+                            onMouseLeave={() => setHoveredItem(null)}
+                          >
+                            <ItemControls
+                              section="certifications"
+                              index={idx}
+                              totalItems={(data.certifications || []).length}
                               editable={editable}
-                              onChangeText={onChangeText}
-                              onFocusField={handleFocusField}
-                              onBlurField={handleBlurField}
-                              block
-                              className="text-sm leading-6"
+                              onDeleteItem={onDeleteItem}
+                              onAddItem={onAddItem}
+                              onMoveItemUp={onMoveItemUp}
+                              onMoveItemDown={onMoveItemDown}
+                              show={isActive}
                             />
+                            <div
+                              className={`text-sm ${
+                                isActive && editable
+                                  ? "border-2 border-dashed rounded p-2"
+                                  : "border-2 border-dashed border-transparent"
+                              } transition-all duration-200 ease-in-out`}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                borderColor:
+                                  isActive && editable
+                                    ? "#d4d4d4"
+                                    : "transparent",
+                              }}
+                            >
+                              <div>
+                                <InlineText
+                                  path={["certifications", idx, "name"]}
+                                  value={cert.name || ""}
+                                  placeholder="Tên chứng chỉ"
+                                  editable={editable}
+                                  onChangeText={onChangeText}
+                                  onFocusField={handleFocusField}
+                                  onBlurField={handleBlurField}
+                                />
+                              </div>
+                              <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                                <InlineText
+                                  path={["certifications", idx, "issuer"]}
+                                  value={cert.issuer || ""}
+                                  placeholder="Đơn vị cấp"
+                                  editable={editable}
+                                  onChangeText={onChangeText}
+                                  onFocusField={handleFocusField}
+                                  onBlurField={handleBlurField}
+                                />
+                                <span>•</span>
+                                <InlineText
+                                  path={["certifications", idx, "year"]}
+                                  value={cert.year || ""}
+                                  placeholder="Năm"
+                                  editable={editable}
+                                  onChangeText={onChangeText}
+                                  onFocusField={handleFocusField}
+                                  onBlurField={handleBlurField}
+                                />
+                              </div>
+                            </div>
                           </div>
-                        )}
-                      </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
+                  </SectionWrapper>
+                </div>
               </div>
-            </SectionWrapper>
+            )}
 
-            <SectionWrapper
-              sectionKey="hobbies"
-              defaultTitle="Sở thích"
-              editable={editable}
-              onAddItem={onAddItem}
-              onUpdateSectionTitle={onUpdateSectionTitle}
-              getSectionTitle={getSectionTitle}
-            >
-              <div className="flex flex-col gap-2">
-                {((data as any).hobbies && (data as any).hobbies.length > 0
-                  ? (data as any).hobbies
-                  : [""]
-                ).map((hobby: string, idx: number) => {
-                  const isActive = isItemActive("hobbies", idx);
-                  return (
-                    <div
-                      key={idx}
-                      className="relative"
-                      onMouseEnter={() =>
-                        editable && setHoveredItem(`hobbies.${idx}`)
-                      }
-                      onMouseLeave={() => setHoveredItem(null)}
+            {!hiddenSections.has("awards") && (
+              <div
+                className="relative mb-4"
+                onMouseEnter={() => editable && setHoveredSection("awards")}
+                onMouseLeave={() => setHoveredSection(null)}
+              >
+                {hoveredSection === "awards" && editable && (
+                  <div className="flex items-center gap-1 mb-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setHiddenSections((prev) =>
+                          new Set(prev).add("awards")
+                        );
+                      }}
+                      className="px-3 py-1.5 text-xs font-medium rounded border-none transition-colors"
+                      style={{ backgroundColor: "#ef4444", color: "white" }}
+                      title="Xóa mục này"
                     >
-                      <ItemControls
-                        section={"hobbies" as any}
-                        index={idx}
-                        totalItems={((data as any).hobbies || []).length}
-                        editable={editable}
-                        onDeleteItem={onDeleteItem}
-                        onAddItem={onAddItem}
-                        onMoveItemUp={onMoveItemUp}
-                        onMoveItemDown={onMoveItemDown}
-                        show={isActive}
-                      />
-                      <div
-                        className={`text-sm flex items-start gap-2 ${
-                          isActive && editable
-                            ? "border-2 border-dashed rounded p-2"
-                            : "border-2 border-dashed border-transparent"
-                        } transition-all duration-200 ease-in-out`}
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          borderColor:
-                            isActive && editable ? "#d4d4d4" : "transparent",
-                        }}
-                      >
-                        <span className="mr-1">•</span>
-                        <InlineText
-                          path={["hobbies", idx]}
-                          value={hobby || ""}
-                          placeholder="Sở thích"
-                          editable={editable}
-                          onChangeText={onChangeText}
-                          onFocusField={handleFocusField}
-                          onBlurField={handleBlurField}
-                        />
-                      </div>
+                      Xóa mục này
+                    </button>
+                  </div>
+                )}
+                <div
+                  className={`${
+                    hoveredSection === "awards" && editable
+                      ? "border-2 border-dashed rounded p-3"
+                      : "border-2 border-dashed border-transparent"
+                  } transition-all duration-200 ease-in-out`}
+                  style={{
+                    borderColor:
+                      hoveredSection === "awards" && editable
+                        ? "#d4d4d4"
+                        : "transparent",
+                  }}
+                >
+                  <SectionWrapper
+                    sectionKey="awards"
+                    defaultTitle="Danh hiệu và giải thưởng"
+                    editable={editable}
+                    onAddItem={onAddItem}
+                    onUpdateSectionTitle={onUpdateSectionTitle}
+                    getSectionTitle={getSectionTitle}
+                  >
+                    <div className="flex flex-col gap-3">
+                      {((data as any).awards && (data as any).awards.length > 0
+                        ? (data as any).awards
+                        : [{} as any]
+                      ).map((award: any, idx: number) => {
+                        const isActive = isItemActive("awards", idx);
+                        return (
+                          <div
+                            key={`award-${idx}`}
+                            className="relative mb-3"
+                            onMouseEnter={() =>
+                              editable && setHoveredItem(`awards.${idx}`)
+                            }
+                            onMouseLeave={() => setHoveredItem(null)}
+                          >
+                            <ItemControls
+                              section={"awards" as any}
+                              index={idx}
+                              totalItems={((data as any).awards || []).length}
+                              editable={editable}
+                              onDeleteItem={onDeleteItem}
+                              onAddItem={onAddItem}
+                              onMoveItemUp={onMoveItemUp}
+                              onMoveItemDown={onMoveItemDown}
+                              show={isActive}
+                            />
+                            <div
+                              className={`text-sm ${
+                                isActive && editable
+                                  ? "border-2 border-dashed rounded p-2"
+                                  : "border-2 border-dashed border-transparent"
+                              } transition-all duration-200 ease-in-out`}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                borderColor:
+                                  isActive && editable
+                                    ? "#d4d4d4"
+                                    : "transparent",
+                              }}
+                            >
+                              <div className="font-semibold mb-1">
+                                <InlineText
+                                  path={["awards", idx, "title"]}
+                                  value={award.title || ""}
+                                  placeholder="Tên danh hiệu/giải thưởng"
+                                  editable={editable}
+                                  onChangeText={onChangeText}
+                                  onFocusField={handleFocusField}
+                                  onBlurField={handleBlurField}
+                                />
+                              </div>
+                              <div className="text-gray-600 mb-1">
+                                <InlineText
+                                  path={["awards", idx, "issuer"]}
+                                  value={award.issuer || ""}
+                                  placeholder="Đơn vị trao giải"
+                                  editable={editable}
+                                  onChangeText={onChangeText}
+                                  onFocusField={handleFocusField}
+                                  onBlurField={handleBlurField}
+                                />
+                              </div>
+                              <div className="text-xs text-gray-500 mb-1 flex items-center gap-1">
+                                <InlineText
+                                  path={["awards", idx, "year"]}
+                                  value={award.year || ""}
+                                  placeholder="Năm"
+                                  editable={editable}
+                                  onChangeText={onChangeText}
+                                  onFocusField={handleFocusField}
+                                  onBlurField={handleBlurField}
+                                />
+                              </div>
+                              {(award.description || editable) && (
+                                <div className="text-xs">
+                                  <InlineText
+                                    path={["awards", idx, "description"]}
+                                    value={award.description || ""}
+                                    placeholder="Mô tả..."
+                                    editable={editable}
+                                    onChangeText={onChangeText}
+                                    onFocusField={handleFocusField}
+                                    onBlurField={handleBlurField}
+                                    block
+                                    className="text-sm leading-6"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
+                  </SectionWrapper>
+                </div>
               </div>
-            </SectionWrapper>
+            )}
+
+            {!hiddenSections.has("hobbies") && (
+              <div
+                className="relative mb-4"
+                onMouseEnter={() => editable && setHoveredSection("hobbies")}
+                onMouseLeave={() => setHoveredSection(null)}
+              >
+                {hoveredSection === "hobbies" && editable && (
+                  <div className="flex items-center gap-1 mb-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setHiddenSections((prev) =>
+                          new Set(prev).add("hobbies")
+                        );
+                      }}
+                      className="px-3 py-1.5 text-xs font-medium rounded border-none transition-colors"
+                      style={{ backgroundColor: "#ef4444", color: "white" }}
+                      title="Xóa mục này"
+                    >
+                      Xóa mục này
+                    </button>
+                  </div>
+                )}
+                <div
+                  className={`${
+                    hoveredSection === "hobbies" && editable
+                      ? "border-2 border-dashed rounded p-3"
+                      : "border-2 border-dashed border-transparent"
+                  } transition-all duration-200 ease-in-out`}
+                  style={{
+                    borderColor:
+                      hoveredSection === "hobbies" && editable
+                        ? "#d4d4d4"
+                        : "transparent",
+                  }}
+                >
+                  <SectionWrapper
+                    sectionKey="hobbies"
+                    defaultTitle="Sở thích"
+                    editable={editable}
+                    onAddItem={onAddItem}
+                    onUpdateSectionTitle={onUpdateSectionTitle}
+                    getSectionTitle={getSectionTitle}
+                  >
+                    <div className="flex flex-col gap-2">
+                      {((data as any).hobbies &&
+                      (data as any).hobbies.length > 0
+                        ? (data as any).hobbies
+                        : [""]
+                      ).map((hobby: string, idx: number) => {
+                        const isActive = isItemActive("hobbies", idx);
+                        return (
+                          <div
+                            key={idx}
+                            className="relative"
+                            onMouseEnter={() =>
+                              editable && setHoveredItem(`hobbies.${idx}`)
+                            }
+                            onMouseLeave={() => setHoveredItem(null)}
+                          >
+                            <ItemControls
+                              section={"hobbies" as any}
+                              index={idx}
+                              totalItems={((data as any).hobbies || []).length}
+                              editable={editable}
+                              onDeleteItem={onDeleteItem}
+                              onAddItem={onAddItem}
+                              onMoveItemUp={onMoveItemUp}
+                              onMoveItemDown={onMoveItemDown}
+                              show={isActive}
+                            />
+                            <div
+                              className={`text-sm flex items-start gap-2 ${
+                                isActive && editable
+                                  ? "border-2 border-dashed rounded p-2"
+                                  : "border-2 border-dashed border-transparent"
+                              } transition-all duration-200 ease-in-out`}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                borderColor:
+                                  isActive && editable
+                                    ? "#d4d4d4"
+                                    : "transparent",
+                              }}
+                            >
+                              <span className="mr-1">•</span>
+                              <InlineText
+                                path={["hobbies", idx]}
+                                value={hobby || ""}
+                                placeholder="Sở thích"
+                                editable={editable}
+                                onChangeText={onChangeText}
+                                onFocusField={handleFocusField}
+                                onBlurField={handleBlurField}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </SectionWrapper>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

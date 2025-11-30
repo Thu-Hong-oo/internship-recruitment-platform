@@ -1,98 +1,43 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { api } from "../../lib/api";
+
+// Templates có sẵn ở frontend
+const FRONTEND_TEMPLATES = [
+  {
+    id: "modern",
+    name: "Modern",
+    description: "Template hiện đại, phù hợp với mọi ngành nghề",
+    thumbnail: "/templates/previews/modern-thumb.jpg",
+  },
+  {
+    id: "minimal",
+    name: "Minimal",
+    description: "Template đơn giản, sạch sẽ cho người mới bắt đầu",
+    thumbnail: "/templates/previews/minimal-thumb.jpg",
+  },
+];
 
 type Template = {
   id: string;
   name: string;
   description: string;
-  preview?: {
-    thumbnail?: string;
-    image?: string;
-  };
   thumbnail?: string;
 };
 
 export default function TemplateGallery() {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [loadingTemplates, setLoadingTemplates] = useState(true);
+  const templates = FRONTEND_TEMPLATES;
 
-  // Lấy danh sách templates từ API backend
-  useEffect(() => {
-    const loadTemplates = async () => {
-      try {
-        setLoadingTemplates(true);
-        const response = await api.candidateCV.getTemplates();
-
-        if (response.success && response.data?.templates) {
-          setTemplates(response.data.templates);
-        } else {
-          console.error("Failed to load templates:", response);
-          // Fallback: sử dụng danh sách rỗng hoặc mock data
-          setTemplates([]);
-        }
-      } catch (error) {
-        console.error("Error loading templates:", error);
-        setTemplates([]);
-      } finally {
-        setLoadingTemplates(false);
-      }
-    };
-
-    loadTemplates();
-  }, []);
-
-  const handleUseTemplate = async (templateId: string) => {
-    try {
-      setLoading(templateId);
-
-      // Gọi API tạo CV từ template
-      const response = await api.candidateCV.createCVFromTemplate(
-        templateId,
-        true // setAsDefault = true
-      );
-
-      if (response.success) {
-        // Redirect đến trang edit CV với template đã chọn
-        router.push(`/my-cv/new?template=${templateId}`);
-      } else {
-        console.error("Failed to create CV:", response);
-        alert("Không thể tạo CV. Vui lòng thử lại.");
-      }
-    } catch (error) {
-      console.error("Error creating CV from template:", error);
-      alert("Có lỗi xảy ra khi tạo CV. Vui lòng thử lại.");
-    } finally {
-      setLoading(null);
-    }
+  const handleUseTemplate = (templateId: string) => {
+    // Chỉ redirect đến trang edit, không gọi API
+    // API createCVFromTemplate sẽ được gọi khi user bấm "Lưu"
+    router.push(`/my-cv/new?template=${templateId}`);
   };
 
-  if (loadingTemplates) {
-    return (
-      <div className="max-w-5xl mx-auto py-8 px-4">
-        <h1 className="text-2xl font-semibold mb-6">Chọn Template</h1>
-        <div className="text-center py-12">
-          <p className="text-gray-500">Đang tải templates...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (templates.length === 0) {
-    return (
-      <div className="max-w-5xl mx-auto py-8 px-4">
-        <h1 className="text-2xl font-semibold mb-6">Chọn Template</h1>
-        <div className="text-center py-12">
-          <p className="text-gray-500">Không có template nào khả dụng.</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-5xl mx-auto py-8 px-4">
@@ -139,7 +84,7 @@ export default function TemplateGallery() {
                   disabled={loading === t.id}
                   className="w-full text-sm text-white bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {loading === t.id ? "Đang tạo..." : "Dùng template này"}
+                  {loading === t.id ? "Đang chuyển..." : "Dùng template này"}
                 </button>
               </div>
             </div>

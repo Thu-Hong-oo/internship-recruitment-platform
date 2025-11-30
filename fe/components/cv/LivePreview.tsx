@@ -3,6 +3,7 @@ import { templateLayouts } from "../../lib/mocks/templateLayouts";
 import type { CVData } from "../../lib/mocks/cvSamples";
 import Template1Renderer from "./renderers/Template1";
 import Template2Renderer from "./renderers/Template2";
+import TemplateMinimalRenderer from "./renderers/TemplateMinimal";
 
 type LayoutType = {
   page: { width: number; height: number; padding: number; backgroundColor?: string };
@@ -62,9 +63,31 @@ export default function LivePreview({
     return templateLayouts[data.templateId];
   }, [data.templateId, layoutProp]);
   
-  // Map rõ ràng: "modern" → Template1Renderer
+  // Map rõ ràng: "modern" → Template1Renderer, "minimal" → TemplateMinimalRenderer
   // Hoặc nếu không có templateId từ backend, fallback về check data.templateId === 1
   const shouldUseTemplate1 = templateId === "modern" || (!templateId && !layoutProp && data.templateId === 1);
+  const shouldUseTemplateMinimal = templateId === "minimal";
+
+  if (shouldUseTemplateMinimal) {
+    return (
+      <TemplateMinimalRenderer
+        data={data}
+        containerRef={containerRef}
+        editable={editable}
+        onChangeText={onChangeText}
+        onFocusField={onFocusField}
+        onBlurField={onBlurField}
+        onAddItem={onAddItem}
+        onDeleteItem={onDeleteItem}
+        onDuplicateItem={onDuplicateItem}
+        onMoveItemUp={onMoveItemUp}
+        onMoveItemDown={onMoveItemDown}
+        onUpdateSectionTitle={onUpdateSectionTitle}
+        getSectionTitle={getSectionTitle}
+        onAvatarChange={onAvatarChange}
+      />
+    );
+  }
 
   if (shouldUseTemplate1) {
     return (

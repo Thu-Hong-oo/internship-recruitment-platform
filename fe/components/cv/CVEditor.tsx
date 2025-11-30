@@ -9,6 +9,7 @@ import { candidateService } from "../../lib/api/services/candidate.service";
 type Props = {
   data: CVData;
   onChange: (next: CVData) => void;
+  templateId?: string; // Template ID từ frontend (ví dụ: "modern", "minimal")
   templateConfig?: {
     id?: string; // Template ID từ backend (ví dụ: "modern")
     name?: string;
@@ -34,9 +35,10 @@ type Props = {
       }>;
     } | null;
   } | null;
+  resumeId?: string | null; // ResumeBuilder ID nếu đã có (để update thay vì create mới)
 };
 
-export default function CVEditor({ data, onChange, templateConfig }: Props) {
+export default function CVEditor({ data, onChange, templateId, templateConfig, resumeId }: Props) {
   // Ưu tiên dùng layout từ templateConfig, fallback về templateLayouts
   const layout = useMemo(() => {
     if (templateConfig?.renderLayout) {
@@ -184,6 +186,23 @@ export default function CVEditor({ data, onChange, templateConfig }: Props) {
         "📤 Sending data to backend:",
         JSON.stringify(builderData, null, 2)
       );
+
+      // Nếu chưa có resumeId và có templateId, tạo ResumeBuilder mới từ template
+      if (!resumeId && templateId) {
+        console.log("🆕 Creating new ResumeBuilder from template:", templateId);
+        const createResponse = await candidateService.createCVFromTemplate(
+          templateId,
+          true // setAsDefault = true
+        );
+        
+        if (!createResponse.success) {
+          throw new Error("Không thể tạo CV từ template");
+        }
+        
+        console.log("✅ ResumeBuilder created:", createResponse.data);
+      }
+
+      // Cập nhật dữ liệu CV builder (lưu vào CandidateProfile)
       const response = await candidateService.updateBuilderData(builderData);
 
       if (response.success) {

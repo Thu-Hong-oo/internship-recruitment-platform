@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import CVEditor from "../../../components/cv/CVEditor";
 import { type CVData } from "../../../lib/mocks/cvSamples";
 import { api } from "../../../lib/api";
+import { templateLayouts } from "../../../lib/mocks/templateLayouts";
 
 // Convert ResumeBuilder content format sang CVData format
 function convertResumeToCVData(
@@ -66,7 +67,12 @@ function convertResumeToCVData(
 
 // Empty CVData
 function getEmptyCVData(templateId: string | null = null): CVData {
-  const templateIdNum = templateId ? parseInt(templateId) || 1 : 1;
+  // Map templateId string sang number
+  const templateIdMap: Record<string, number> = {
+    modern: 1,
+    minimal: 2,
+  };
+  const templateIdNum = templateId ? (templateIdMap[templateId] || 1) : 1;
   return {
     personal: {
       name: "",
@@ -100,17 +106,43 @@ export default function Page() {
         setLoading(true);
         setError(null);
 
-        // Bước 1: Load template config (bao gồm renderLayout)
-        const templateResponse = await api.candidateCV.getTemplateById(
-          templateId
-        );
-        if (!templateResponse.success || !templateResponse.data) {
-          setError("Không tìm thấy template");
-          setData(getEmptyCVData(templateId));
-          return;
-        }
+        // Không cần gọi API getTemplateById, dùng templateLayouts từ frontend
+        // Map templateId string sang templateId number để dùng với templateLayouts
+        const templateIdMap: Record<string, number> = {
+          modern: 1,
+          minimal: 2,
+        };
+        const templateIdNum = templateIdMap[templateId] || 1;
 
-        setTemplateConfig(templateResponse.data);
+        // Tạo templateConfig từ templateLayouts frontend
+        const layout = templateLayouts[templateIdNum];
+        if (layout) {
+          setTemplateConfig({
+            id: templateId,
+            name: templateId === "modern" ? "Modern" : "Minimal",
+            customization: {
+              colors: {
+                primary: layout.colors.primary,
+                secondary: layout.colors.secondary,
+                accent: layout.colors.primary,
+              },
+              fonts: {
+                heading: layout.fonts.heading,
+                body: layout.fonts.body,
+              },
+            },
+            renderLayout: {
+              page: layout.page,
+              sections: layout.sections.map((s) => ({
+                type: s.type,
+                x: s.x,
+                y: s.y,
+                width: s.width,
+                height: s.height,
+              })),
+            },
+          });
+        }
 
         // Bước 2: Load dữ liệu CV từ profile (không cần ResumeBuilder)
         // Sử dụng getBuilderData để lấy data từ CandidateProfile
@@ -146,7 +178,7 @@ export default function Page() {
               skills: (builderData.skills?.technical || []).map((skill: any) =>
                 typeof skill === "string" ? skill : skill.name || ""
               ),
-              templateId: 1, // Tạm thời, sẽ map từ templateId string
+              templateId: templateIdNum, // Map từ templateId string sang number
               projects: (builderData.projects || []).map((proj: any) => ({
                 title: proj.title || "",
                 description: proj.description || "",
@@ -253,6 +285,12 @@ export default function Page() {
   }
 
   return (
-    <CVEditor data={data} onChange={setData} templateConfig={templateConfig} />
+    <CVEditor 
+      data={data} 
+      onChange={setData} 
+      templateId={templateId}
+      templateConfig={templateConfig}
+      resumeId={null} // Chưa có resumeId, sẽ tạo mới khi bấm "Lưu"
+    />
   );
 }
