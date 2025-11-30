@@ -10,13 +10,13 @@ const FRONTEND_TEMPLATES = [
     id: "modern",
     name: "Modern",
     description: "Template hiện đại, phù hợp với mọi ngành nghề",
-    thumbnail: "/templates/previews/modern-thumb.jpg",
+    thumbnail: "/images/templates/modern-thumb.jpg",
   },
   {
     id: "minimal",
     name: "Minimal",
     description: "Template đơn giản, sạch sẽ cho người mới bắt đầu",
-    thumbnail: "/templates/previews/minimal-thumb.jpg",
+    thumbnail: "/images/templates/minimal-thumb.jpg",
   },
 ];
 
@@ -37,7 +37,6 @@ export default function TemplateGallery() {
     // API createCVFromTemplate sẽ được gọi khi user bấm "Lưu"
     router.push(`/my-cv/new?template=${templateId}`);
   };
-
 
   return (
     <div className="max-w-5xl mx-auto py-8 px-4">
