@@ -6,7 +6,11 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  output: 'export', 
+  // Only use static export for production builds
+  ...(process.env.NODE_ENV === 'production' && { 
+    output: 'export',
+    trailingSlash: true, // Ensure /jobs/placeholder/index.html is created
+  }),
   images: {
     unoptimized: true,
   },
