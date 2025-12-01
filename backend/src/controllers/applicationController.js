@@ -283,6 +283,73 @@ const updateApplicationStatus = asyncHandler(async (req, res) => {
       }
     }
 
+    // *** NEW: Auto collect job matching training data when status changes to final outcome ***
+    if (oldStatus !== status && ['hired', 'rejected', 'interviewed', 'shortlisted'].includes(status)) {
+      try {
+        const TrainingData = require('../models/TrainingData');
+        const CandidateProfile = require('../models/CandidateProfile');
+        const Job = require('../models/Job');
+        
+        // Get full application data with populated fields
+        await application.populate('candidateId');
+        await application.populate('jobId');
+        
+        const candidateProfile = await CandidateProfile.findById(application.candidateId);
+        const job = await Job.findById(application.jobId);
+        
+        if (candidateProfile && job) {
+          // Collect job matching training data
+          const trainingData = {
+            type: 'job_matching',
+            input: {
+              cv: {
+                skills: candidateProfile.skills?.technical || [],
+                experience: candidateProfile.experience?.internships || [],
+                education: candidateProfile.education?.university || {},
+              },
+              job: {
+                title: job.title || '',
+                description: job.description || '',
+                requirements: job.requirements?.skills || [],
+                skills: job.requiredSkills || [],
+              },
+            },
+            output: {
+              predictedScore: application.matchingScore?.overall || 0,
+              actualOutcome: status,
+              outcomeMapping: {
+                'hired': 1.0,
+                'shortlisted': 0.8,
+                'interviewed': 0.6,
+                'rejected': 0.2,
+              }[status] || 0.5,
+            },
+            metadata: {
+              source: 'system_generated',
+              timestamp: new Date(),
+              quality: 1.0, // High quality (real outcomes)
+              verified: true,
+              cvId: candidateProfile._id,
+              jobId: job._id,
+            }
+          };
+          
+          // Save to training data (async, don't block response)
+          TrainingData.create(trainingData).catch(err => {
+            logger.warn('Failed to save job matching training data:', err.message);
+          });
+          logger.info('📊 Job matching training data collected', {
+            applicationId: application._id,
+            status,
+            matchScore: application.matchingScore?.overall,
+          });
+        }
+      } catch (dataCollectionError) {
+        logger.warn('Error collecting job matching training data:', dataCollectionError.message);
+        // Don't fail the request if data collection fails
+      }
+    }
+
     res.status(200).json({
       success: true,
       data: application

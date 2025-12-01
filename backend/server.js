@@ -53,6 +53,9 @@ const { logger } = require('./src/utils/logger');
 // Socket.IO setup
 const { setupSocket } = require('./src/socket');
 
+// Training Data Collection (optional, can be disabled)
+const { getScheduledDataCollectionService } = require('./src/services/training/scheduledDataCollection');
+
 const app = express();
 const server = http.createServer(app);
 
@@ -373,6 +376,20 @@ cron.schedule(
     timezone: 'Asia/Ho_Chi_Minh',
   }
 );
+
+// Initialize scheduled training data collection (if enabled)
+if (process.env.ENABLE_TRAINING_DATA_COLLECTION !== 'false') {
+  try {
+    const scheduledDataCollection = getScheduledDataCollectionService();
+    scheduledDataCollection.start();
+    logger.info('Scheduled training data collection enabled');
+  } catch (error) {
+    logger.warn('Failed to start scheduled training data collection:', error.message);
+    // Don't fail server startup if data collection fails
+  }
+} else {
+  logger.info('Scheduled training data collection disabled (ENABLE_TRAINING_DATA_COLLECTION=false)');
+}
 
 // Graceful shutdown
 const gracefulShutdown = signal => {

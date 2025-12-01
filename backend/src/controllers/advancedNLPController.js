@@ -1,4 +1,5 @@
 const aiService = require('../services/ai/aiService');
+const ragService = require('../services/dataCrawlers/ragService');
 const LearningRoadmap = require('../models/LearningRoadmap');
 const CVMatchingScore = require('../models/CVMatchingScore');
 const Job = require('../models/Job');
@@ -382,7 +383,16 @@ class AdvancedNLPController {
         }
       }
 
-      // Generate roadmap
+      // Get candidate profile for learning preferences
+      const profile = await CandidateProfile.findOne({
+        userId: candidateId,
+      });
+      
+      // Extract learning preferences from profile
+      const learningPreferences = profile?.preferences?.learning || {};
+      const roadmapPreferences = profile?.preferences?.roadmap || {};
+
+      // Generate roadmap with personalization
       const roadmap = await aiService.generatePersonalizedRoadmap({
         candidateId,
         targetJobId,
@@ -391,6 +401,19 @@ class AdvancedNLPController {
         jobData,
         timeframe: parseInt(timeframe),
         saveToDatabase: true,
+        // Add learning preferences
+        learningPreferences: {
+          style: learningPreferences.style || 'visual',
+          budget: learningPreferences.budget || 'free',
+          maxHours: learningPreferences.maxHoursPerWeek || null,
+          preferredResourceTypes: learningPreferences.preferredResourceTypes || [],
+          preferredLanguage: learningPreferences.preferredLanguage || 'en',
+        },
+        roadmapPreferences: {
+          pace: roadmapPreferences.preferredPace || 'normal',
+          focusAreas: roadmapPreferences.focusAreas || [],
+          skipBasics: roadmapPreferences.skipBasics || false,
+        },
       });
 
       res.status(201).json({
@@ -697,6 +720,193 @@ class AdvancedNLPController {
       res.status(500).json({
         success: false,
         message: 'Error initiating recalculation',
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * @route   POST /api/nlp/learning-roadmap-rag
+   * @desc    Generate RAG-powered learning roadmap with real resources
+   * @access  Private (Candidate)
+   */
+  async generateRagRoadmap(req, res) {
+    try {
+      const {
+        targetJobId,
+        targetRole,
+        cvData,
+        timeframe = 12,
+        useRag = true,
+      } = req.body;
+
+      const candidateId = req.user._id;
+
+      logger.info(`🚀 Generating RAG-powered roadmap for candidate: ${candidateId}`);
+
+      // Get matching score to identify skill gaps
+      let skillGaps = [];
+      
+      if (targetJobId) {
+        const matchingScore = await CVMatchingScore.findOne({
+          candidateId,
+          jobId: targetJobId,
+        }).lean();
+
+        if (matchingScore && matchingScore.skillGapAnalysis?.missingSkills) {
+          skillGaps = matchingScore.skillGapAnalysis.missingSkills.map(skill => ({
+            skill: skill.skill || skill,
+            importance: skill.importance || 'important',
+            priority: skill.priority || 5,
+          }));
+        }
+      }
+
+      // If no skill gaps from matching, extract from CVData
+      if (skillGaps.length === 0 && cvData) {
+        // Use AI to extract skill gaps
+        const extractedGaps = await aiService.extractSkillGapsFromCV(cvData, targetRole);
+        skillGaps = extractedGaps || [];
+      }
+
+      if (skillGaps.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Unable to identify skill gaps. Please provide CVData or calculate matching score first.',
+        });
+      }
+
+      logger.info(`📊 Identified ${skillGaps.length} skill gaps`);
+
+      // Initialize RAG service
+      await ragService.initialize();
+
+      // Generate RAG-powered roadmap with real resources
+      const ragRoadmap = await ragService.generateRoadmap(skillGaps, {
+        jobTitle: targetRole || 'Target Position',
+        currentLevel: cvData?.currentLevel || 'beginner',
+        timeframe: timeframe,
+      });
+
+      // Save to database
+      const learningRoadmap = new LearningRoadmap({
+        candidateId: candidateId,
+        targetJobId: targetJobId || null,
+        targetRole: targetRole || 'Target Position',
+        skillGaps: skillGaps,
+        currentLevel: ragRoadmap.currentLevel,
+        targetLevel: ragRoadmap.targetLevel,
+        estimatedDuration: timeframe,
+        phases: ragRoadmap.phases.map(phase => ({
+          phaseNumber: phase.phaseNumber,
+          name: phase.phaseName,
+          duration: phase.duration,
+          learningObjectives: phase.learningObjectives,
+          weeks: this.convertPhaseToWeeks(phase),
+        })),
+        progress: {
+          currentPhase: 1,
+          currentWeek: 1,
+          startedAt: new Date(),
+          completedWeeks: [],
+          completedResources: [],
+        },
+        credibilityMetrics: ragRoadmap.credibilityMetrics,
+        metadata: {
+          generatedBy: 'RAG-powered AI',
+          generationMethod: 'retrieval-augmented-generation',
+          dataSources: ['youtube', 'github', 'vector-database'],
+          verifiable: true,
+          academicValidity: ragRoadmap.credibilityMetrics.academicValidity,
+        },
+      });
+
+      await learningRoadmap.save();
+
+      logger.info(`✅ RAG roadmap saved with ${ragRoadmap.totalResources} real resources`);
+
+      res.status(201).json({
+        success: true,
+        message: 'RAG-powered learning roadmap generated successfully',
+        data: {
+          roadmap: learningRoadmap,
+          credibilityMetrics: ragRoadmap.credibilityMetrics,
+          totalResources: ragRoadmap.totalResources,
+          sourceBreakdown: ragRoadmap.credibilityMetrics.sourceBreakdown,
+        },
+      });
+    } catch (error) {
+      logger.error('❌ Error generating RAG roadmap:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error generating RAG-powered roadmap',
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * Convert RAG phase structure to weekly structure
+   * @param {Object} phase - RAG phase
+   * @returns {Array} Weekly breakdown
+   */
+  convertPhaseToWeeks(phase) {
+    const weeks = [];
+    const weeksInPhase = phase.duration;
+    const skillsPerWeek = Math.ceil(phase.skills.length / weeksInPhase);
+
+    for (let weekNum = 1; weekNum <= weeksInPhase; weekNum++) {
+      const startIdx = (weekNum - 1) * skillsPerWeek;
+      const endIdx = Math.min(startIdx + skillsPerWeek, phase.skills.length);
+      const weekSkills = phase.skills.slice(startIdx, endIdx);
+
+      const weekResources = weekSkills.flatMap(skillGroup => 
+        skillGroup.resources.map(resource => ({
+          type: resource.type,
+          title: resource.title,
+          url: resource.url,
+          provider: resource.provider,
+          duration: resource.duration,
+          difficulty: resource.difficulty,
+          rating: resource.rating,
+          credibility: resource.credibility,
+          source: resource.source,
+          metadata: resource.metadata,
+        }))
+      );
+
+      weeks.push({
+        weekNumber: weekNum,
+        focusSkills: weekSkills.map(s => s.skill),
+        learningObjectives: weekSkills.map(s => `Master ${s.skill} fundamentals`),
+        resources: weekResources,
+        estimatedHours: weekResources.reduce((sum, r) => sum + (r.duration || 0) / 60, 0),
+        completed: false,
+      });
+    }
+
+    return weeks;
+  }
+
+  /**
+   * @route   GET /api/nlp/rag-health
+   * @desc    Check RAG service health and statistics
+   * @access  Private
+   */
+  async checkRagHealth(req, res) {
+    try {
+      await ragService.initialize();
+      const health = await ragService.getHealthStatus();
+
+      res.status(200).json({
+        success: true,
+        data: health,
+      });
+    } catch (error) {
+      logger.error('Error checking RAG health:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error checking RAG service health',
         error: error.message,
       });
     }

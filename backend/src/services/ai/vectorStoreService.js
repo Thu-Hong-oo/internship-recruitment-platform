@@ -49,11 +49,12 @@ class VectorStoreService {
   /**
    * Initialize or get collection
    * Creates collection if it doesn't exist
+   * Returns null if ChromaDB is not available (graceful fallback)
    */
   async initializeCollection() {
     try {
       if (!this.client) {
-        throw new Error('ChromaDB client not initialized');
+        return null; // Graceful fallback
       }
 
       // Check if collection exists
@@ -63,26 +64,55 @@ class VectorStoreService {
       );
 
       if (existingCollection) {
-        this.collection = await this.client.getCollection({
-          name: this.collectionName,
-        });
-        logger.info('Using existing ChromaDB collection', { collectionName: this.collectionName });
-      } else {
-        // Create new collection
+        // Try to get existing collection
+        // Note: May have warning about DefaultEmbeddingFunction if collection was created with it
+        // This is OK - we provide embeddings directly, so we don't need the default function
+        try {
+          this.collection = await this.client.getCollection({
+            name: this.collectionName,
+          });
+          logger.info('Using existing ChromaDB collection', { collectionName: this.collectionName });
+        } catch (error) {
+          // If collection has embedding function issue, delete and recreate
+          logger.warn('Existing collection has embedding function issue, recreating...', {
+            collectionName: this.collectionName,
+            error: error.message
+          });
+          try {
+            await this.client.deleteCollection({ name: this.collectionName });
+            logger.info('Deleted old collection', { collectionName: this.collectionName });
+          } catch (deleteError) {
+            // Ignore delete errors
+          }
+          // Will create new collection below
+          existingCollection = null;
+        }
+      }
+      
+      if (!existingCollection) {
+        // Create new collection without embedding function
+        // We provide embeddings directly, so no need for default embedding function
         this.collection = await this.client.createCollection({
           name: this.collectionName,
           metadata: {
             description: 'Learning resources for personalized roadmaps',
             createdAt: new Date().toISOString(),
           },
+          // Don't specify embedding function - we provide embeddings directly
         });
         logger.info('Created new ChromaDB collection', { collectionName: this.collectionName });
       }
 
       return this.collection;
     } catch (error) {
-      logger.error('Error initializing ChromaDB collection:', error);
-      throw error;
+      // ChromaDB not available - this is expected if not running
+      // Don't log as error, just return null for graceful fallback
+      logger.debug('ChromaDB not available, using fallback', { 
+        error: error.message,
+        note: 'This is expected if ChromaDB is not running. System will use API-based recommendations.'
+      });
+      this.client = null; // Mark as unavailable
+      return null;
     }
   }
 
@@ -132,12 +162,12 @@ class VectorStoreService {
       // Generate embedding
       const embeddingServiceInstance = getEmbeddingService();
       if (!embeddingServiceInstance || !embeddingServiceInstance.isAvailable()) {
-        throw new Error('Embedding service not available. OPENAI_API_KEY is required for vector search.');
+        throw new Error('Embedding service not available.');
       }
 
       const embedding = await embeddingServiceInstance.embedResource(resource);
 
-      if (!embedding) {
+      if (!embedding || !Array.isArray(embedding) || embedding.length === 0) {
         throw new Error('Failed to generate embedding for resource');
       }
 
@@ -197,7 +227,7 @@ class VectorStoreService {
       // Generate embeddings for all resources
       const embeddingServiceInstance = getEmbeddingService();
       if (!embeddingServiceInstance || !embeddingServiceInstance.isAvailable()) {
-        throw new Error('Embedding service not available. OPENAI_API_KEY is required for vector search.');
+        throw new Error('Embedding service not available.');
       }
 
       const embeddings = await embeddingServiceInstance.generateEmbeddings(
@@ -260,24 +290,28 @@ class VectorStoreService {
    * @param {string[]} queryParams.objectives - Learning objectives
    * @param {Object} filters - Metadata filters
    * @param {number} limit - Number of results to return
-   * @returns {Promise<Object[]>} Array of matching resources
+   * @returns {Promise<Object[]>} Array of matching resources (empty if ChromaDB not available)
    */
   async searchResources(queryParams, filters = {}, limit = 10) {
     try {
       if (!this.collection) {
-        await this.initializeCollection();
+        const collection = await this.initializeCollection();
+        if (!collection) {
+          // ChromaDB not available - return empty array for graceful fallback
+          return [];
+        }
       }
 
       // Generate query embedding
       const embeddingServiceInstance = getEmbeddingService();
       if (!embeddingServiceInstance || !embeddingServiceInstance.isAvailable()) {
-        throw new Error('Embedding service not available. OPENAI_API_KEY is required for vector search.');
+        return []; // Graceful fallback
       }
 
       const queryEmbedding = await embeddingServiceInstance.embedSearchQuery(queryParams);
 
-      if (!queryEmbedding) {
-        throw new Error('Failed to generate query embedding');
+      if (!queryEmbedding || !Array.isArray(queryEmbedding) || queryEmbedding.length === 0) {
+        return []; // Graceful fallback
       }
 
       // Build where clause for metadata filtering
@@ -352,12 +386,15 @@ class VectorStoreService {
 
       return resources;
     } catch (error) {
-      logger.error('Error searching vector database:', {
+      // ChromaDB not available - this is expected if not running
+      // Don't log as error, just return empty for graceful fallback
+      logger.debug('Vector search unavailable, using fallback', {
         error: error.message,
-        queryParams,
+        queryParams: queryParams.skill,
+        note: 'ChromaDB not running. System will use API-based recommendations.'
       });
-      // Return empty array on error (fallback to intelligent recommendations)
-      return [];
+      this.client = null; // Mark as unavailable
+      return []; // Return empty array for graceful fallback
     }
   }
 
@@ -418,6 +455,8 @@ class VectorStoreService {
 
   /**
    * Check if vector store is available
+   * Note: This only checks if client is initialized, not if ChromaDB is actually running
+   * The actual connection will be tested when searchResources() is called
    * 
    * @returns {boolean}
    */
@@ -427,6 +466,26 @@ class VectorStoreService {
     return this.client !== null && 
            embeddingServiceInstance !== null && 
            embeddingServiceInstance.isAvailable();
+  }
+
+  /**
+   * Check if ChromaDB is actually running and accessible
+   * This performs a lightweight connection test
+   * 
+   * @returns {Promise<boolean>}
+   */
+  async checkConnection() {
+    try {
+      if (!this.client) {
+        return false;
+      }
+      // Try to list collections (lightweight operation)
+      await this.client.listCollections();
+      return true;
+    } catch (error) {
+      this.client = null; // Mark as unavailable
+      return false;
+    }
   }
 }
 
