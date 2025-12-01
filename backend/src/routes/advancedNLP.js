@@ -146,4 +146,31 @@ router.get(
  */
 router.get('/popular-roadmaps', advancedNLPController.getPopularRoadmaps);
 
+// ============================================================
+// 🤖 RAG-POWERED ROUTES (Credible, Verifiable Resources)
+// ============================================================
+
+/**
+ * @route   POST /api/nlp/learning-roadmap-rag
+ * @desc    Generate RAG-powered learning roadmap with real resources
+ * @access  Private (Candidate/Intern)
+ */
+router.post(
+  '/learning-roadmap-rag',
+  protect,
+  authorize('intern', 'candidate'),
+  advancedNLPController.generateRagRoadmap
+);
+
+/**
+ * @route   GET /api/nlp/rag-health
+ * @desc    Check RAG service health and statistics
+ * @access  Private
+ */
+router.get(
+  '/rag-health',
+  protect,
+  advancedNLPController.checkRagHealth
+);
+
 module.exports = router;

@@ -112,6 +112,8 @@ class ResourceRecommendationService {
     // NEW: Industry context
     industry = null,
     preferredLanguage = 'en',
+    // NEW: Target role for context-aware filtering
+    targetRole = null,
   }) {
     try {
       // Validate input
@@ -175,25 +177,44 @@ class ResourceRecommendationService {
 
           if (ragResources && ragResources.length > 0) {
             resources = ragResources;
-          logger.info('Using RAG search results', {
-            skill: canonicalSkill,
+            logger.info('Using RAG search results', {
+              skill: canonicalSkill,
               resultsCount: resources.length,
+            });
+          } else {
+            // RAG returned empty (ChromaDB not available or no results)
+            // This is expected - continue with API fallback
+            logger.debug('RAG search returned no results, using API fallback', {
+              skill: canonicalSkill,
+              note: 'ChromaDB may not be running. This is expected.'
             });
           }
         } catch (ragError) {
-          logger.warn('RAG search failed, falling back to intelligent recommendations', {
-            error: ragError.message,
+          // RAG error - expected if ChromaDB not running
+          // Don't log as warning, just continue with fallback
+          logger.debug('RAG search unavailable, using API fallback', {
+            skill: canonicalSkill,
+            note: 'ChromaDB not available. Using API-based recommendations.'
           });
         }
+      } else {
+        // Vector store not available - expected if ChromaDB not configured
+        logger.debug('Vector store not available, using API fallback', {
+          skill: canonicalSkill,
+          note: 'ChromaDB not configured. This is expected for basic setup.'
+        });
       }
 
       // 6. Fetch from APIs if not enough resources from RAG/curated
       if (resources.length < 5) {
         try {
-          // Enhance search query with industry context
-          const enhancedSkill = industry 
+          // Enhance search query with industry context AND skill-specific enhancements
+          let enhancedSkill = industry 
             ? industryMappingService.enhanceSearchQuery(canonicalSkill, industry)
             : canonicalSkill;
+          
+          // Further enhance with skill-specific context (e.g., "sketch" → "sketch design tool")
+          enhancedSkill = this._enhanceSkillQueryForSearch(enhancedSkill, targetRole, industry);
           
           const apiResources = await this._fetchFromAPIs(
             enhancedSkill, 
@@ -235,6 +256,14 @@ class ResourceRecommendationService {
             skill: canonicalSkill,
             resourcesCount: resources.length,
           });
+          
+          // If still no resources, use default fallback
+          if (resources.length === 0) {
+            logger.warn('Intelligent recommendations returned empty, using default resources', {
+              skill: canonicalSkill,
+            });
+            resources = this._getDefaultResources(canonicalSkill);
+          }
         } catch (intelligentError) {
           logger.error('Error generating intelligent recommendations', {
             error: intelligentError.message,
@@ -244,6 +273,16 @@ class ResourceRecommendationService {
           // Fallback to default resources
           resources = this._getDefaultResources(canonicalSkill);
         }
+      }
+      
+      // Final check: Ensure we have at least some resources
+      if (resources.length === 0) {
+        logger.warn('No resources found after all fallbacks, providing basic defaults', {
+          skill: canonicalSkill,
+          targetRole,
+          industry,
+        });
+        resources = this._getDefaultResources(canonicalSkill);
       }
 
       // 8. Apply personalization filters
@@ -311,8 +350,13 @@ class ResourceRecommendationService {
         0.6 // Minimum credibility score
       );
 
+      // 11.5. Filter by role relevance (NEW) - Remove resources not relevant to target role
+      const roleRelevantResources = targetRole 
+        ? this._filterByRoleRelevance(credibleResources, skill, targetRole, industry)
+        : credibleResources;
+
       // 12. Sort by recommendation score
-      const sortedResources = credibleResources.sort(
+      const sortedResources = roleRelevantResources.sort(
         (a, b) => b.recommendationScore - a.recommendationScore
       );
 
@@ -1075,6 +1119,200 @@ class ResourceRecommendationService {
     return primarySegment.replace(/\s+/g, ' ');
   }
 
+  /**
+   * Enhance skill query for better API search results
+   * Add context to avoid ambiguous results (e.g., "sketch" → "sketch design tool")
+   * 
+   * @param {string} skill - Skill name
+   * @param {string} targetRole - Target role
+   * @param {string} industry - Industry context
+   * @returns {string} Enhanced skill query
+   */
+  _enhanceSkillQueryForSearch(skill, targetRole = '', industry = '') {
+    if (!skill) return skill;
+    
+    const normalizedSkill = skill.toLowerCase().trim();
+    const normalizedRole = (targetRole || '').toLowerCase();
+    const normalizedIndustry = (industry || '').toLowerCase();
+    
+    // Skill-specific enhancements
+    const skillEnhancements = {
+      'sketch': {
+        // "sketch" is ambiguous - could be Sketch app or drawing
+        context: normalizedRole.includes('design') || normalizedIndustry.includes('design')
+          ? 'sketch design tool app'
+          : 'sketch drawing',
+        exclude: ['sketchup', '3d modeling', 'perspective drawing', 'draw anything']
+      },
+      'design systems': {
+        // "design systems" could be UI/UX or system architecture
+        context: normalizedRole.includes('design') || normalizedIndustry.includes('design')
+          ? 'ui design systems ux design system'
+          : 'system design architecture',
+        exclude: ['system design interview', 'distributed systems', 'microservices']
+      },
+      'adobe xd': {
+        context: 'adobe xd design tool',
+        exclude: []
+      },
+      'figma': {
+        context: 'figma design tool',
+        exclude: []
+      }
+    };
+
+    // Check if skill needs enhancement
+    for (const [key, enhancement] of Object.entries(skillEnhancements)) {
+      if (normalizedSkill.includes(key)) {
+        return enhancement.context;
+      }
+    }
+
+    // Default: add industry/role context if available
+    if (normalizedRole.includes('design') || normalizedIndustry.includes('design')) {
+      if (!normalizedSkill.includes('design')) {
+        return `${skill} design`;
+      }
+    }
+
+    return skill;
+  }
+
+  /**
+   * Filter resources by role relevance
+   * Remove resources that are clearly not relevant to the target role/industry
+   * 
+   * @param {Array} resources - Array of resources
+   * @param {string} skill - Skill name
+   * @param {string} targetRole - Target role (e.g., "UI/UX Designer")
+   * @param {string} industry - Industry context
+   * @returns {Array} Filtered resources
+   */
+  _filterByRoleRelevance(resources, skill, targetRole = '', industry = null) {
+    if (!targetRole || !resources || resources.length === 0) {
+      return resources;
+    }
+
+    const normalizedRole = targetRole.toLowerCase().trim();
+    const normalizedSkill = skill.toLowerCase().trim();
+    
+    // Keywords that indicate irrelevant resources for specific roles
+    const irrelevantKeywords = {
+      'ui/ux designer': ['r programming', 'r language', 'statistical computing', 'data science r', 'r studio'],
+      'ui designer': ['r programming', 'r language', 'backend', 'api', 'server'],
+      'ux designer': ['r programming', 'r language', 'backend', 'api', 'server'],
+      'designer': ['r programming', 'r language', 'backend development', 'server-side'],
+      'developer': ['design principles', 'color theory', 'typography'],
+    };
+
+    // Find matching role pattern
+    let rolePattern = null;
+    for (const [role, keywords] of Object.entries(irrelevantKeywords)) {
+      if (normalizedRole.includes(role) || role.includes(normalizedRole.split('/')[0])) {
+        rolePattern = keywords;
+        break;
+      }
+    }
+
+    // Filter out irrelevant resources
+    const filtered = resources.filter(resource => {
+      const resourceText = `${resource.title} ${resource.description || ''} ${resource.provider || ''}`.toLowerCase();
+      
+      // Check for irrelevant keywords
+      if (rolePattern) {
+        const hasIrrelevantKeyword = rolePattern.some(keyword => resourceText.includes(keyword));
+        if (hasIrrelevantKeyword) {
+          logger.debug('Filtered out irrelevant resource for role', {
+            role: targetRole,
+            resourceTitle: resource.title,
+            keyword: rolePattern.find(k => resourceText.includes(k)),
+          });
+          return false;
+        }
+      }
+
+      // Check if resource title/description mentions unrelated technologies
+      // Example: R programming article for UI/UX Designer
+      const unrelatedTech = {
+        'r programming': ['design', 'ui', 'ux', 'designer', 'figma', 'sketch'],
+        'design': ['r programming', 'statistical computing', 'r language'],
+      };
+
+      // If skill is about design, filter out programming articles
+      if (normalizedSkill.includes('design') || normalizedRole.includes('design')) {
+        if (resourceText.includes('r programming') || resourceText.includes('r language')) {
+          logger.debug('Filtered out R programming resource for design role', {
+            role: targetRole,
+            skill,
+            resourceTitle: resource.title,
+          });
+          return false;
+        }
+      }
+
+      // Enhanced filtering for ambiguous skills
+      // Filter out SketchUp, 3D modeling for "sketch" design skill
+      if (normalizedSkill.includes('sketch') && (normalizedRole.includes('design') || normalizedIndustry === 'design')) {
+        if (resourceText.includes('sketchup') || resourceText.includes('3d modeling') || 
+            resourceText.includes('perspective drawing') || resourceText.includes('draw anything') ||
+            resourceText.includes('illustrator') && !resourceText.includes('sketch app')) {
+          logger.debug('Filtered out unrelated sketch resource for design role', {
+            role: targetRole,
+            skill,
+            resourceTitle: resource.title,
+          });
+          return false;
+        }
+        // Prefer resources that mention "sketch app" or "sketch design"
+        if (resourceText.includes('sketch app') || resourceText.includes('sketch design tool')) {
+          return true; // Keep these
+        }
+      }
+
+      // Filter out system architecture for "design systems" in UI/UX context
+      if (normalizedSkill.includes('design systems') && (normalizedRole.includes('design') || normalizedIndustry === 'design')) {
+        if (resourceText.includes('system design interview') || resourceText.includes('distributed systems') ||
+            resourceText.includes('microservices') || resourceText.includes('backend architecture')) {
+          logger.debug('Filtered out system architecture resource for UI/UX design systems', {
+            role: targetRole,
+            skill,
+            resourceTitle: resource.title,
+          });
+          return false;
+        }
+        // Prefer resources that mention "ui design system" or "ux design system"
+        if (resourceText.includes('ui design system') || resourceText.includes('ux design system') ||
+            resourceText.includes('design system component')) {
+          return true; // Keep these
+        }
+      }
+
+      // If skill is about programming, but resource is clearly about unrelated field
+      if (normalizedSkill.includes('programming') && !normalizedSkill.includes('r')) {
+        // Allow R programming only if explicitly searching for R
+        if (resourceText.includes('r programming') && !normalizedSkill.includes('r')) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    // If filtering removed too many resources, keep some with lower relevance
+    if (filtered.length < 2 && resources.length >= 2) {
+      logger.warn('Role filtering removed too many resources, keeping some lower relevance', {
+        role: targetRole,
+        skill,
+        originalCount: resources.length,
+        filteredCount: filtered.length,
+      });
+      // Return at least top 2 resources even if not perfectly matched
+      return resources.slice(0, 2);
+    }
+
+    return filtered.length > 0 ? filtered : resources; // Fallback to original if all filtered out
+  }
+
   _getActiveCache() {
     if (this.cacheService && typeof this.cacheService.isCacheAvailable === 'function') {
       return this.cacheService.isCacheAvailable() ? this.cacheService : null;
@@ -1177,16 +1415,51 @@ class ResourceRecommendationService {
   }
 
   _getDefaultResources(skill) {
+    // Provide multiple default resources for better coverage
+    const skillName = skill || 'Programming';
     return [
       {
         type: 'documentation',
-        title: `Official ${skill} Documentation`,
+        title: `${skillName} Documentation`,
         provider: 'Official Docs',
+        difficulty: 'beginner',
+        duration: 'Reference',
         credibility: 1.0,
         rating: 5.0,
         isFree: true,
-        url: '#',
-        lastUpdated: new Date().toISOString(), // Mark as fresh
+        estimatedCost: 0,
+        url: `https://www.google.com/search?q=${encodeURIComponent(skillName + ' documentation')}`,
+        lastUpdated: new Date().toISOString(),
+        isCurated: false,
+      },
+      {
+        type: 'video',
+        title: `${skillName} Tutorial for Beginners`,
+        provider: 'YouTube',
+        difficulty: 'beginner',
+        duration: '2-3 hours',
+        credibility: 0.7,
+        rating: 4.5,
+        isFree: true,
+        estimatedCost: 0,
+        url: `https://www.youtube.com/results?search_query=${encodeURIComponent(skillName + ' tutorial beginner')}`,
+        lastUpdated: new Date().toISOString(),
+        isCurated: false,
+      },
+      {
+        type: 'course',
+        title: `Learn ${skillName} - Complete Course`,
+        provider: 'Udemy',
+        difficulty: 'beginner',
+        duration: '10-15 hours',
+        credibility: 0.85,
+        rating: 4.5,
+        isFree: false,
+        estimatedCost: 19.99,
+        certificateOffered: true,
+        url: `https://www.udemy.com/courses/search/?q=${encodeURIComponent(skillName)}`,
+        lastUpdated: new Date().toISOString(),
+        isCurated: false,
       },
     ];
   }

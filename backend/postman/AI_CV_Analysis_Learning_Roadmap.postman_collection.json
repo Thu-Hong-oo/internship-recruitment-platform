@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "AI - CV Analysis & Job Matching",
-    "description": "CV analysis, job recommendations, skill gap analysis, AI suggestions, and candidate insights.\n\n⚠️ **IMPORTANT:**\n- For Learning Roadmap (full CRUD, progress tracking), use **Advanced_NLP_APIs** collection.\n- `/api/ai/skill-roadmap` is DEPRECATED - use `/api/nlp/learning-roadmap` instead.\n- `/api/ai/analyze-job-match` is DEPRECATED - use `/api/nlp/matching-score` instead.",
+    "description": "CV analysis, job recommendations, skill gap analysis, AI suggestions, and candidate insights.\n\n✨ **SELF-SUFFICIENT NLP STACK**:\n- PhoBERT NER (F1 96%) for skill extraction\n- Sentence-BERT (768-dim) for semantic matching\n- TF-IDF + multi-dimensional scoring\n- NO mandatory Gemini dependency (optional for enhancement)\n\n⚠️ **DEPRECATED ENDPOINTS**:\n- ❌ `/api/ai/skill-roadmap` → ✅ Use `/api/nlp/learning-roadmap` (Advanced_NLP_APIs collection)\n- ❌ `/api/ai/analyze-job-match` → ✅ Use `/api/nlp/matching-score` (Advanced_NLP_APIs collection)\n\n🆕 **NEW ENDPOINT**:\n- POST /api/ai/candidate-recommendations - Get top matching candidates for a job (Employer only)",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "internship-platform-ai"
   },
@@ -89,7 +89,34 @@
               "raw": "{{base_url}}/api/ai/job-recommendations",
               "host": ["{{base_url}}"],
               "path": ["api", "ai", "job-recommendations"]
-            }
+            },
+            "description": "Get personalized job recommendations for the authenticated candidate.\n\n✅ Uses self-sufficient NLP stack (PhoBERT + Sentence-BERT + jobMatchingService)\n✅ Returns: jobId, score, tier (A/B/C/D), matchDetails, strengths"
+          }
+        },
+        {
+          "name": "Get Candidate Recommendations (Employer)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{employer_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": \"{{job_id}}\",\n  \"limit\": 10,\n  \"minScore\": 60\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ai/candidate-recommendations",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ai", "candidate-recommendations"]
+            },
+            "description": "🆕 NEW - Get top matching candidates for a specific job (Employer only).\n\n✅ Uses self-sufficient NLP stack (PhoBERT + Sentence-BERT + candidateRecommendationService)\n✅ Returns: candidateId, rank, score, tier (A/B/C/D), matchDetails, strengths, concerns, skillGaps\n✅ Includes skill gap analysis: critical, important, optional\n✅ Provides interview questions based on missing skills\n✅ NO Gemini API required"
           }
         },
         {
@@ -268,23 +295,6 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/api/ai/candidate-insights",
-              "host": ["{{base_url}}"],
-              "path": ["api", "ai", "candidate-insights"]
-            }
-          }
-        },
-        {
-          "name": "Get AI Insights",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{auth_token}}"
-              }
-            ],
-            "url": {
               "raw": "{{base_url}}/api/ai/insights",
               "host": ["{{base_url}}"],
               "path": ["api", "ai", "insights"]
@@ -299,12 +309,18 @@
       "key": "base_url",
       "value": "http://localhost:3000",
       "type": "string",
-      "description": "Base URL - Change to http://localhost:5000 if server runs on port 5000"
+      "description": "Base URL - Server runs on port 3000 by default"
     },
     {
       "key": "auth_token",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "employer_token",
+      "value": "",
+      "type": "string",
+      "description": "Employer authentication token for candidate recommendations"
     },
     {
       "key": "job_id",
