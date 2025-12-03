@@ -22,18 +22,20 @@ import { getCities, getDistricts, getWards } from "@/lib/vietnamAddress";
 
 const JOB_LEVELS = [
   { value: "Intern", label: "Thực tập sinh" },
+  { value: "Fresher", label: "Fresher" },
   { value: "Junior", label: "Junior" },
-  { value: "Middle", label: "Middle" },
   { value: "Senior", label: "Senior" },
-  { value: "Lead", label: "Lead" },
-  { value: "Manager", label: "Quản lý" },
+  { value: "Manager", label: "Manager" },
+  { value: "Director", label: "Director" },
 ];
 
 const JOB_TYPES = [
   { value: "Fulltime", label: "Toàn thời gian" },
   { value: "Parttime", label: "Bán thời gian" },
-  { value: "Contract", label: "Hợp đồng" },
-  { value: "Internship", label: "Thực tập" },
+  { value: "Intern", label: "Thực tập" },
+  { value: "Freelance", label: "Freelance" },
+  { value: "Remote", label: "Làm việc từ xa" },
+  { value: "Hybrid", label: "Kết hợp" },
 ];
 
 const WORKING_MODES = [

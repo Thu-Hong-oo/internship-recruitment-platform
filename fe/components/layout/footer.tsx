@@ -116,14 +116,7 @@ export default function Footer() {
                 Thu Hồng
               </strong>
             </div>
-            <div className="flex items-center space-x-4">
-              {/* dùng màu chữ chính đểlàm màu nền */}
-              <div className="w-16 h-16 bg-foreground rounded grid grid-cols-3 gap-px">
-                {Array.from({ length: 9 }).map((_, i) => (
-                  <div key={i} className="bg-background rounded-sm"></div>
-                ))}
-              </div>
-            </div>
+           
           </div>
           <div className="text-xs text-muted-foreground mt-4">InternBridge</div>
         </div>

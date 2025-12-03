@@ -18,7 +18,13 @@ import { Input } from "@/components/ui/input";
 import { PageLayout } from "@/components/layout";
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { jobsAPI, JobItem, industriesAPI, Industry, skillsAPI } from "@/lib/api";
+import {
+  jobsAPI,
+  JobItem,
+  industriesAPI,
+  Industry,
+  skillsAPI,
+} from "@/lib/api";
 import type { Skill } from "@/lib/api/services/skill.service";
 
 export default function JobSearchResults() {
@@ -34,12 +40,13 @@ export default function JobSearchResults() {
 
   // Filter states
   const [employmentType, setEmploymentType] = useState<string>("");
-  const [experienceLevel, setExperienceLevel] = useState<string>("");
   const [selectedIndustryCode, setSelectedIndustryCode] = useState<string>("");
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [minSalary, setMinSalary] = useState<string>("");
   const [maxSalary, setMaxSalary] = useState<string>("");
   const [location, setLocation] = useState<string>("");
+  const [sortBy, setSortBy] = useState<string>("createdAt");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   // Skills data
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -127,30 +134,28 @@ export default function JobSearchResults() {
     { value: "contract", label: "Hợp đồng" },
   ];
 
-  const experienceLevels = [
-    { value: "", label: "Tất cả kinh nghiệm" },
-    { value: "fresh", label: "Mới tốt nghiệp" },
-    { value: "junior", label: "Junior (0-2 năm)" },
-    { value: "mid", label: "Mid (2-5 năm)" },
-    { value: "senior", label: "Senior (5+ năm)" },
-  ];
-
   // Load filters from URL params
   useEffect(() => {
     const get = (k: string) => searchParams?.get(k) || "";
     const getList = (k: string) => {
       const v = searchParams?.get(k);
-      return v ? v.split(",").map((s) => s.trim()).filter(Boolean) : [];
+      return v
+        ? v
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
     };
 
     setEmploymentType(get("employmentType"));
-    setExperienceLevel(get("experienceLevel"));
     setSelectedIndustryCode(get("industryCode"));
     setSelectedSkills(getList("skills"));
     setMinSalary(get("minSalary"));
     setMaxSalary(get("maxSalary"));
-    const loc = get("location");
+    const loc = get("location") || get("city");
     setLocation(loc || "Tất cả địa điểm");
+    setSortBy(get("sortBy") || "createdAt");
+    setSortOrder((get("sortOrder") || "desc") as "asc" | "desc");
   }, [searchParams]);
 
   // Fetch industries
@@ -208,24 +213,65 @@ export default function JobSearchResults() {
     return () => clearTimeout(timeoutId);
   }, [skillSearchQuery]);
 
-  // Build filters from state
+  // Build filters from state - map to backend supported filters
   const buildFilters = () => {
     const filters: any = {
-      status: "active",
+      status: "active", // Explicitly set status to active
     };
 
     const q = searchParams?.get("q");
     if (q) filters.q = q;
 
+    // Location: use city if available, otherwise use location
     if (location && location !== "Tất cả địa điểm") {
-      filters.location = location;
+      // Check if location is a city name (exact match in locations list)
+      const isCity = locations.slice(1).includes(location);
+      if (isCity) {
+        filters.city = location; // Use city parameter for exact city search
+      } else {
+        filters.location = location; // Use location for fuzzy search
+      }
     }
-    if (employmentType) filters.employmentType = employmentType;
-    if (experienceLevel) filters.experienceLevel = experienceLevel;
-    if (selectedIndustryCode) filters.industryCode = selectedIndustryCode;
-    if (selectedSkills.length > 0) filters.skills = selectedSkills;
-    if (minSalary) filters.minSalary = Number(minSalary);
-    if (maxSalary) filters.maxSalary = Number(maxSalary);
+
+    // Map employmentType to jobType (backend expects jobType)
+    if (employmentType) {
+      const employmentTypeMap: Record<string, string> = {
+        "full-time": "Fulltime",
+        "part-time": "Parttime",
+        internship: "Intern",
+        remote: "Remote",
+        contract: "Freelance",
+      };
+      const mappedJobType = employmentTypeMap[employmentType];
+      if (mappedJobType) {
+        filters.jobType = mappedJobType;
+      }
+    }
+
+    // Industry filters - backend supports industryCode and subIndustryCode
+    if (selectedIndustryCode) {
+      filters.industryCode = selectedIndustryCode;
+    }
+
+    // Skills - backend expects array or comma-separated string
+    if (selectedSkills.length > 0) {
+      filters.skills = selectedSkills;
+    }
+
+    // Salary filters - backend expects salaryMin and salaryMax
+    if (minSalary) {
+      filters.salaryMin = Number(minSalary);
+    }
+    if (maxSalary) {
+      filters.salaryMax = Number(maxSalary);
+    }
+
+    // Sorting - backend supports sortBy and sortOrder
+    // Default: newest first (createdAt desc)
+    const sortBy = searchParams?.get("sortBy");
+    const sortOrder = searchParams?.get("sortOrder");
+    if (sortBy) filters.sortBy = sortBy;
+    if (sortOrder) filters.sortOrder = sortOrder;
 
     return filters;
   };
@@ -256,24 +302,42 @@ export default function JobSearchResults() {
     setCurrentPage(1);
     fetchJobs(1, pageSize);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, employmentType, experienceLevel, selectedIndustryCode, selectedSkills, minSalary, maxSalary, location]);
+  }, [
+    searchParams,
+    employmentType,
+    selectedIndustryCode,
+    selectedSkills,
+    minSalary,
+    maxSalary,
+    location,
+    sortBy,
+    sortOrder,
+  ]);
 
   // Apply filters - update URL
   const applyFilters = () => {
     const params = new URLSearchParams();
-    
+
     const q = searchParams?.get("q");
     if (q) params.set("q", q);
 
     if (location && location !== "Tất cả địa điểm") {
-      params.set("location", location);
+      // Use city if it's an exact city match, otherwise use location
+      const isCity = locations.slice(1).includes(location);
+      if (isCity) {
+        params.set("city", location);
+      } else {
+        params.set("location", location);
+      }
     }
     if (employmentType) params.set("employmentType", employmentType);
-    if (experienceLevel) params.set("experienceLevel", experienceLevel);
     if (selectedIndustryCode) params.set("industryCode", selectedIndustryCode);
-    if (selectedSkills.length > 0) params.set("skills", selectedSkills.join(","));
+    if (selectedSkills.length > 0)
+      params.set("skills", selectedSkills.join(","));
     if (minSalary) params.set("minSalary", minSalary);
     if (maxSalary) params.set("maxSalary", maxSalary);
+    if (sortBy && sortBy !== "createdAt") params.set("sortBy", sortBy);
+    if (sortOrder && sortOrder !== "desc") params.set("sortOrder", sortOrder);
 
     router.push(`/search?${params.toString()}`);
   };
@@ -281,13 +345,14 @@ export default function JobSearchResults() {
   // Reset filters
   const resetFilters = () => {
     setEmploymentType("");
-    setExperienceLevel("");
     setSelectedIndustryCode("");
     setSelectedSkills([]);
     setMinSalary("");
     setMaxSalary("");
     setLocation("Tất cả địa điểm");
     setSkillSearchQuery("");
+    setSortBy("createdAt");
+    setSortOrder("desc");
 
     const params = new URLSearchParams();
     const q = searchParams?.get("q");
@@ -374,7 +439,10 @@ export default function JobSearchResults() {
                     className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
                   >
                     {locations.map((loc) => (
-                      <option key={loc} value={loc === "Tất cả địa điểm" ? "" : loc}>
+                      <option
+                        key={loc}
+                        value={loc === "Tất cả địa điểm" ? "" : loc}
+                      >
                         {loc}
                       </option>
                     ))}
@@ -399,21 +467,32 @@ export default function JobSearchResults() {
                   </select>
                 </div>
 
-                {/* Experience Level */}
+                {/* Sorting */}
                 <div className="mb-6">
                   <h3 className="font-semibold mb-3 text-foreground">
-                    Kinh nghiệm
+                    Sắp xếp
                   </h3>
                   <select
-                    value={experienceLevel}
-                    onChange={(e) => setExperienceLevel(e.target.value)}
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm mb-2"
+                  >
+                    <option value="createdAt">Ngày đăng</option>
+                    <option value="title">Tiêu đề</option>
+                    <option value="salaryMin">Lương tối thiểu</option>
+                    <option value="salaryMax">Lương tối đa</option>
+                    <option value="deadline">Hạn nộp hồ sơ</option>
+                    <option value="views">Lượt xem</option>
+                  </select>
+                  <select
+                    value={sortOrder}
+                    onChange={(e) =>
+                      setSortOrder(e.target.value as "asc" | "desc")
+                    }
                     className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
                   >
-                    {experienceLevels.map((level) => (
-                      <option key={level.value} value={level.value}>
-                        {level.label}
-                      </option>
-                    ))}
+                    <option value="desc">Giảm dần</option>
+                    <option value="asc">Tăng dần</option>
                   </select>
                 </div>
 
@@ -467,7 +546,9 @@ export default function JobSearchResults() {
 
                 {/* Skills Multi-select */}
                 <div className="mb-6">
-                  <h3 className="font-semibold mb-3 text-foreground">Kỹ năng</h3>
+                  <h3 className="font-semibold mb-3 text-foreground">
+                    Kỹ năng
+                  </h3>
                   <div className="relative">
                     <Input
                       placeholder="Tìm kiếm kỹ năng..."
