@@ -1,6 +1,6 @@
 /**
  * Model Versioning Schema
- *
+
  * Lưu trữ thông tin về các versions của models:
  * - Embedding models
  * - NER models
@@ -90,3 +90,4 @@ ModelSchema.index({ createdAt: -1 });
 const Model = mongoose.model('Model', ModelSchema);
 
 module.exports = Model;
+

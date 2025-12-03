@@ -137,7 +137,7 @@ env/
 ENV/
 *.egg-info/
 
-# ML Models (too large for git) - but NOT src/models (Mongoose schemas)
+
 models/phobert-cv-ner-final/
 *.bin
 *.pt
@@ -147,7 +147,7 @@ models/phobert-cv-ner-final/
 *.pkl
 *.joblib
 
-# Allow Mongoose models in src/models/
+
 !src/models/
 
 # Notebooks

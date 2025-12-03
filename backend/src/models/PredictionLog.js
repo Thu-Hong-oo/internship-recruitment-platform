@@ -1,6 +1,6 @@
 /**
  * Prediction Log Model
- *
+
  * Lưu trữ logs của tất cả predictions để monitoring:
  * - Model performance tracking
  * - Latency monitoring
@@ -78,3 +78,4 @@ PredictionLogSchema.index({ timestamp: 1 }, { expireAfterSeconds: 7776000 });
 const PredictionLog = mongoose.model('PredictionLog', PredictionLogSchema);
 
 module.exports = PredictionLog;
+
