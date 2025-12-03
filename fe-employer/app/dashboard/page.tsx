@@ -43,6 +43,9 @@ export default function DashboardPage() {
   const router = useRouter();
   const { refreshVerification } = useVerificationContext();
   const [user, setUser] = useState<User | null>(null);
+  const [employerStatus, setEmployerStatus] = useState<
+    "draft" | "pending" | "verified" | "rejected" | "suspended" | null
+  >(null);
   const [timeLeft, setTimeLeft] = useState({
     days: 7,
     hours: 11,
@@ -79,6 +82,20 @@ export default function DashboardPage() {
               avatar: profile.user.avatar || prev.avatar,
             };
           });
+
+          // Map backend employer status (data.status) to local status state
+          const status = profile.status as string | undefined;
+          if (
+            status === "draft" ||
+            status === "pending" ||
+            status === "verified" ||
+            status === "rejected" ||
+            status === "suspended"
+          ) {
+            setEmployerStatus(status);
+          } else {
+            setEmployerStatus(null);
+          }
         }
       } catch (err) {
         // Silent fail - fallback to localStorage data
@@ -143,17 +160,30 @@ export default function DashboardPage() {
             </div>
             <div className="mt-3 flex items-center gap-2">
               <span className="text-sm text-slate-600">
-                Tài khoản xác thực:
+                Trạng thái tài khoản:
               </span>
               <Badge
-                variant={user?.isEmailVerified ? "default" : "outline"}
+                variant={employerStatus === "verified" ? "default" : "outline"}
                 className={
-                  user?.isEmailVerified
+                  employerStatus === "verified"
                     ? "bg-green-500 text-white"
+                    : employerStatus === "pending"
+                    ? "border-amber-500 text-amber-600"
+                    : employerStatus === "rejected" ||
+                      employerStatus === "suspended"
+                    ? "border-red-500 text-red-600"
                     : "text-primary border-primary"
                 }
               >
-                {user?.isEmailVerified ? "Đã xác thực" : "Chưa xác thực"}
+                {employerStatus === "verified"
+                  ? "Đã xác thực"
+                  : employerStatus === "pending"
+                  ? "Chờ duyệt"
+                  : employerStatus === "rejected"
+                  ? "Bị từ chối"
+                  : employerStatus === "suspended"
+                  ? "Tạm khóa"
+                  : "Chưa hoàn thiện"}
               </Badge>
             </div>
           </div>
@@ -245,13 +275,11 @@ export default function DashboardPage() {
         {/* Main Content */}
         <main className="flex-1 p-6 min-h-screen bg-slate-50">
           <div className="max-w-6xl mx-auto space-y-6">
-
             {/* Verification Progress */}
             <VerificationProgress />
 
             {/* Main content grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
               {/* Welcome Card */}
               <Card className="md:col-span-2 lg:col-span-2 !shadow-md h-full flex flex-col justify-center">
                 <CardContent className="p-8 flex items-center gap-6">
@@ -266,7 +294,8 @@ export default function DashboardPage() {
                       {user?.fullName || "Employer"}
                     </p>
                     <div className="mt-2 text-xs text-slate-400">
-                      Chúc bạn một ngày làm việc hiệu quả và thành công trong tuyển dụng!
+                      Chúc bạn một ngày làm việc hiệu quả và thành công trong
+                      tuyển dụng!
                     </div>
                   </div>
                 </CardContent>
@@ -275,7 +304,9 @@ export default function DashboardPage() {
               {/* Quick Actions Card */}
               <Card className="h-full flex flex-col justify-center !shadow-md">
                 <CardHeader className="pb-2 pt-4">
-                  <CardTitle className="text-base text-slate-700 font-medium">Tác vụ nhanh</CardTitle>
+                  <CardTitle className="text-base text-slate-700 font-medium">
+                    Tác vụ nhanh
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 flex flex-col space-y-3">
                   <Button
@@ -303,15 +334,16 @@ export default function DashboardPage() {
                   </Button>
                 </CardContent>
               </Card>
-            </div> 
+            </div>
 
             {/* Bottom grid row */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2">
-
               {/* Promote action */}
               <Card className="h-full !shadow-md">
                 <CardHeader>
-                  <CardTitle className="text-base font-semibold">Đăng thêm tin tuyển dụng?</CardTitle>
+                  <CardTitle className="text-base font-semibold">
+                    Đăng thêm tin tuyển dụng?
+                  </CardTitle>
                   <div className="text-sm text-gray-500">
                     Vị trí mới sẽ giúp bạn tiếp cận nhiều ứng viên hơn.
                   </div>
@@ -332,18 +364,21 @@ export default function DashboardPage() {
               {/* Tips/info card */}
               <Card className="h-full !shadow-md">
                 <CardHeader>
-                  <CardTitle className="text-base font-semibold">Mẹo giúp tuyển dụng hiệu quả hơn</CardTitle>
+                  <CardTitle className="text-base font-semibold">
+                    Mẹo giúp tuyển dụng hiệu quả hơn
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <ul className="list-disc pl-5 space-y-2 text-slate-600 text-sm">
-                    <li>Cập nhật thường xuyên mô tả công việc và yêu cầu vị trí.</li>
+                    <li>
+                      Cập nhật thường xuyên mô tả công việc và yêu cầu vị trí.
+                    </li>
                     <li>Phản hồi ứng viên nhanh chóng để tạo ấn tượng tốt.</li>
                     <li>Sử dụng bộ lọc để tìm kiếm ứng viên phù hợp.</li>
                   </ul>
                 </CardContent>
               </Card>
             </div>
-
           </div>
         </main>
       </div>
