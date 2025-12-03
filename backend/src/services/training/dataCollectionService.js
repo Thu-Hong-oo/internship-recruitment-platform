@@ -7,12 +7,12 @@
  * - User feedback và corrections
  */
 
-const { logger } = require('../../utils/logger');
-const TrainingData = require('../../models/TrainingData');
-const CandidateProfile = require('../../models/CandidateProfile');
-const Application = require('../../models/Application');
-const Job = require('../../models/Job');
-const Feedback = require('../../models/Feedback');
+const { logger } = require('../../utils/logger.js');
+const TrainingData = require('../../models/TrainingData.js');
+const CandidateProfile = require('../../models/CandidateProfile.js');
+const Application = require('../../models/Application.js');
+const Job = require('../../models/Job.js');
+const Feedback = require('../../models/Feedback.js');
 
 class DataCollectionService {
   constructor() {
