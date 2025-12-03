@@ -13,6 +13,8 @@ import {
   Briefcase,
   UserCircle2,
   CheckCircle2,
+  Sparkles,
+  Heart,
 } from "lucide-react";
 import { PageLayout } from "@/components/layout";
 import { jobsAPI } from "@/lib/api";
@@ -213,13 +215,23 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <ApplyButton
                 jobId={id}
                 jobTitle={job.title}
                 className="font-medium"
               />
-              <Button variant="outline">Lưu việc làm</Button>
+              <Button 
+                variant="outline"
+                onClick={() => router.push(`/skill-gap-analysis?jobId=${id}`)}
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                Phân tích kỹ năng
+              </Button>
+              <Button variant="outline">
+                <Heart className="w-4 h-4 mr-2" />
+                Lưu việc làm
+              </Button>
             </div>
           </div>
 
@@ -344,13 +356,23 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
                       {new Date(job.deadline).toLocaleDateString()}
                     </div>
                   )}
-                  <div className="flex gap-3">
+                  <div className="flex flex-col gap-3">
                     <ApplyButton
                       jobId={id}
                       jobTitle={job.title}
                       className="font-medium"
                     />
-                    <Button variant="outline">Lưu việc làm</Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => router.push(`/skill-gap-analysis?jobId=${id}`)}
+                    >
+                      <Sparkles className="w-4 h-4 mr-2" />
+                      Phân tích khoảng cách kỹ năng
+                    </Button>
+                    <Button variant="outline">
+                      <Heart className="w-4 h-4 mr-2" />
+                      Lưu việc làm
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

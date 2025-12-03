@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Search, MapPin, ChevronDown, X, ChevronRight } from "lucide-react";
+import { Search, MapPin, ChevronDown, X, ChevronRight, Sparkles, TrendingUp, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -748,6 +748,39 @@ export default function HeroSection({
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Quick Action Buttons */}
+            <div className="flex flex-wrap gap-3 justify-center mt-6">
+              <Button 
+                onClick={() => router.push('/cv-analysis')}
+                size="lg"
+                variant="outline"
+                className="gap-2 bg-white/80 hover:bg-white border-white/50 hover:border-white text-primary hover:text-primary shadow-md"
+              >
+                <Sparkles className="w-4 h-4" />
+                Phân tích CV
+              </Button>
+              
+              <Button 
+                onClick={() => router.push('/job-recommendations')}
+                size="lg"
+                variant="outline"
+                className="gap-2 bg-white/80 hover:bg-white border-white/50 hover:border-white text-primary hover:text-primary shadow-md"
+              >
+                <TrendingUp className="w-4 h-4" />
+                Gợi ý việc làm AI
+              </Button>
+              
+              <Button 
+                onClick={() => router.push('/skill-gap-analysis')}
+                size="lg"
+                variant="outline"
+                className="gap-2 bg-white/80 hover:bg-white border-white/50 hover:border-white text-primary hover:text-primary shadow-md"
+              >
+                <Target className="w-4 h-4" />
+                Phân tích kỹ năng
+              </Button>
             </div>
           </div>
         </div>
