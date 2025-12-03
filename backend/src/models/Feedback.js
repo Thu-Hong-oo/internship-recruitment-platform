@@ -1,6 +1,6 @@
 /**
  * Feedback Model
- *
+
  * Lưu trữ feedback từ users để cải thiện models:
  * - User corrections
  * - Model predictions vs actual outcomes
@@ -73,3 +73,4 @@ FeedbackSchema.index({ modelId: 1, timestamp: -1 });
 const Feedback = mongoose.model('Feedback', FeedbackSchema);
 
 module.exports = Feedback;
+

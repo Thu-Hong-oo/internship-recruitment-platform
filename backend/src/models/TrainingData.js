@@ -1,6 +1,6 @@
 /**
  * Training Data Model
- *
+
  * Lưu trữ dữ liệu training cho các models:
  * - CV parsing data
  * - Job matching data
