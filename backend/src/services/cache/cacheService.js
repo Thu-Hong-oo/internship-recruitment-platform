@@ -255,14 +255,33 @@ class CacheService {
    * @param {number} ttl - TTL override (optional)
    */
   async cacheJobList(params, jobs, ttl = null) {
+    // Generate comprehensive cache key matching getCachedJobList
     const key = this.generateKey(
       this.KEY_PREFIXES.JOB_LIST,
       `page:${params.page || 1}`,
       `limit:${params.limit || 10}`,
+      `view:${params.view || 'summary'}`,
+      params.q ? `q:${params.q}` : null,
       params.status ? `status:${params.status}` : null,
-      params.sortBy ? `sort:${params.sortBy}` : null,
+      params.jobType ? `type:${params.jobType}` : null,
+      params.level ? `level:${params.level}` : null,
+      params.workingMode ? `mode:${params.workingMode}` : null,
       params.location ? `loc:${params.location}` : null,
-      params.skills ? `skills:${params.skills}` : null
+      params.city ? `city:${params.city}` : null,
+      params.district ? `dist:${params.district}` : null,
+      params.skills ? `skills:${params.skills}` : null,
+      params.industryCode ? `ind:${params.industryCode}` : null,
+      params.subIndustryCode ? `subind:${params.subIndustryCode}` : null,
+      params.employer ? `emp:${params.employer}` : null,
+      params.salaryMin ? `minsal:${params.salaryMin}` : null,
+      params.salaryMax ? `maxsal:${params.salaryMax}` : null,
+      params.salaryRange ? `salrange:${params.salaryRange}` : null,
+      params.experience ? `exp:${params.experience}` : null,
+      params.education ? `edu:${params.education}` : null,
+      params.positions ? `pos:${params.positions}` : null,
+      params.isUrgent ? `urgent:${params.isUrgent}` : null,
+      params.sortBy ? `sort:${params.sortBy}` : null,
+      params.sortOrder ? `order:${params.sortOrder}` : null
     );
     
     return this.set(key, jobs, ttl || this.DEFAULT_TTL.JOB_LIST);
@@ -274,14 +293,33 @@ class CacheService {
    * @returns {Promise<Array|null>} Cached jobs or null
    */
   async getCachedJobList(params) {
+    // Generate comprehensive cache key including ALL filter params
     const key = this.generateKey(
       this.KEY_PREFIXES.JOB_LIST,
       `page:${params.page || 1}`,
       `limit:${params.limit || 10}`,
+      `view:${params.view || 'summary'}`,
+      params.q ? `q:${params.q}` : null,
       params.status ? `status:${params.status}` : null,
-      params.sortBy ? `sort:${params.sortBy}` : null,
+      params.jobType ? `type:${params.jobType}` : null,
+      params.level ? `level:${params.level}` : null,
+      params.workingMode ? `mode:${params.workingMode}` : null,
       params.location ? `loc:${params.location}` : null,
-      params.skills ? `skills:${params.skills}` : null
+      params.city ? `city:${params.city}` : null,
+      params.district ? `dist:${params.district}` : null,
+      params.skills ? `skills:${params.skills}` : null,
+      params.industryCode ? `ind:${params.industryCode}` : null,
+      params.subIndustryCode ? `subind:${params.subIndustryCode}` : null,
+      params.employer ? `emp:${params.employer}` : null,
+      params.salaryMin ? `minsal:${params.salaryMin}` : null,
+      params.salaryMax ? `maxsal:${params.salaryMax}` : null,
+      params.salaryRange ? `salrange:${params.salaryRange}` : null,
+      params.experience ? `exp:${params.experience}` : null,
+      params.education ? `edu:${params.education}` : null,
+      params.positions ? `pos:${params.positions}` : null,
+      params.isUrgent ? `urgent:${params.isUrgent}` : null,
+      params.sortBy ? `sort:${params.sortBy}` : null,
+      params.sortOrder ? `order:${params.sortOrder}` : null
     );
     
     return this.get(key);

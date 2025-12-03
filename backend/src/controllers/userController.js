@@ -4,8 +4,7 @@ const Job = require('../models/Job');
 const CandidateProfile = require('../models/CandidateProfile');
 const EmployerProfile = require('../models/EmployerProfile');
 const Application = require('../models/Application');
-const SkillRoadmap = require('../models/SkillRoadmap');
-const AIAnalysis = require('../models/AIAnalysis');
+const LearningRoadmap = require('../models/LearningRoadmap');
 const Notification = require('../models/Notification');
 
 const asyncHandler = require('express-async-handler');
@@ -449,8 +448,8 @@ const getUserStats = asyncHandler(async (req, res) => {
       const applications = await Application.find({
         internId: internProfile._id,
       });
-      const currentRoadmap = await SkillRoadmap.findOne({
-        internId: internProfile._id,
+      const currentRoadmap = await LearningRoadmap.findOne({
+        candidateId: internProfile._id,
         status: 'in_progress',
       });
 

@@ -213,6 +213,47 @@ const CandidateProfileSchema = new mongoose.Schema(
         max: Number,
         unit: { type: String, enum: Object.values(DURATION_UNITS) },
       },
+      // Learning preferences for personalized roadmap
+      learning: {
+        style: {
+          type: String,
+          enum: ['visual', 'reading', 'handsOn'],
+          default: 'visual',
+        },
+        budget: {
+          type: String,
+          enum: ['free', '< 50', '< 100', 'any'],
+          default: 'free',
+        },
+        maxHoursPerWeek: {
+          type: Number,
+          default: null, // null means no limit
+          min: 1,
+          max: 168, // Max hours in a week
+        },
+        preferredResourceTypes: [{
+          type: String,
+          enum: ['video', 'course', 'documentation', 'article', 'project', 'book'],
+        }],
+        preferredLanguage: {
+          type: String,
+          enum: ['en', 'vi', 'both'],
+          default: 'en',
+        },
+      },
+      // Roadmap preferences
+      roadmap: {
+        preferredPace: {
+          type: String,
+          enum: ['slow', 'normal', 'fast'],
+          default: 'normal',
+        },
+        focusAreas: [String], // Specific areas to focus on
+        skipBasics: {
+          type: Boolean,
+          default: false, // Skip basics if already know them
+        },
+      },
     },
 
     resume: {

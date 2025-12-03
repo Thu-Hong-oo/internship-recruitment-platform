@@ -1,8 +1,9 @@
-const SkillRoadmap = require('../models/SkillRoadmap');
+const LearningRoadmap = require('../models/LearningRoadmap');
 const Job = require('../models/Job');
 const CandidateProfile = require('../models/CandidateProfile');
 const Skill = require('../models/Skill');
 const aiService = require('../services/ai/aiService');
+const learningRoadmapService = require('../services/ai/learningRoadmapService');
 const { logger } = require('../utils/logger');
 
 // @desc    Get all roadmaps for user
@@ -18,14 +19,13 @@ const getRoadmaps = async (req, res) => {
 
     const skip = (page - 1) * limit;
 
-    const roadmaps = await SkillRoadmap.find(query)
-      .populate('jobId', 'title')
-      .populate('targetSkills.skillId', 'name category')
+    const roadmaps = await LearningRoadmap.find(query)
+      .populate('targetJobId', 'title')
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
 
-    const total = await SkillRoadmap.countDocuments(query);
+    const total = await LearningRoadmap.countDocuments(query);
 
     res.status(200).json({
       success: true,
@@ -51,9 +51,8 @@ const getRoadmaps = async (req, res) => {
 // @access  Private
 const getRoadmap = async (req, res) => {
   try {
-    const roadmap = await SkillRoadmap.findById(req.params.id)
-      .populate('jobId', 'title description requirements')
-      .populate('targetSkills.skillId', 'name category description level');
+    const roadmap = await LearningRoadmap.findById(req.params.id)
+      .populate('targetJobId', 'title description requirements');
 
     if (!roadmap) {
       return res.status(404).json({
@@ -89,12 +88,13 @@ const getRoadmap = async (req, res) => {
 const createRoadmap = async (req, res) => {
   try {
     const roadmapData = req.body;
-    roadmapData.userId = req.user.id;
+    roadmapData.candidateId = req.user.id;
 
-    const roadmap = await SkillRoadmap.create(roadmapData);
+    const roadmap = await LearningRoadmap.create(roadmapData);
 
-    await roadmap.populate('jobId', 'title');
-    await roadmap.populate('targetSkills.skillId', 'name category');
+    if (roadmap.targetJobId) {
+      await roadmap.populate('targetJobId', 'title');
+    }
 
     res.status(201).json({
       success: true,
@@ -114,7 +114,7 @@ const createRoadmap = async (req, res) => {
 // @access  Private
 const updateRoadmap = async (req, res) => {
   try {
-    const roadmap = await SkillRoadmap.findById(req.params.id);
+    const roadmap = await LearningRoadmap.findById(req.params.id);
 
     if (!roadmap) {
       return res.status(404).json({
@@ -131,13 +131,15 @@ const updateRoadmap = async (req, res) => {
       });
     }
 
-    const updatedRoadmap = await SkillRoadmap.findByIdAndUpdate(
+    const updatedRoadmap = await LearningRoadmap.findByIdAndUpdate(
       req.params.id,
       req.body,
       { new: true, runValidators: true }
-    )
-      .populate('jobId', 'title')
-      .populate('targetSkills.skillId', 'name category');
+    );
+    
+    if (updatedRoadmap.targetJobId) {
+      await updatedRoadmap.populate('targetJobId', 'title');
+    }
 
     res.status(200).json({
       success: true,
@@ -157,7 +159,7 @@ const updateRoadmap = async (req, res) => {
 // @access  Private
 const deleteRoadmap = async (req, res) => {
   try {
-    const roadmap = await SkillRoadmap.findById(req.params.id);
+    const roadmap = await LearningRoadmap.findById(req.params.id);
 
     if (!roadmap) {
       return res.status(404).json({
@@ -197,7 +199,7 @@ const completeWeek = async (req, res) => {
     const { id, weekNumber } = req.params;
     const { notes } = req.body;
 
-    const roadmap = await SkillRoadmap.findById(id);
+    const roadmap = await LearningRoadmap.findById(id);
 
     if (!roadmap) {
       return res.status(404).json({
@@ -207,7 +209,7 @@ const completeWeek = async (req, res) => {
     }
 
     // Check ownership
-    if (roadmap.userId.toString() !== req.user.id) {
+    if (roadmap.candidateId.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: 'Không có quyền cập nhật roadmap này',
@@ -238,7 +240,7 @@ const updateProgress = async (req, res) => {
     const { id, weekNumber } = req.params;
     const { objectivesCompleted } = req.body;
 
-    const roadmap = await SkillRoadmap.findById(id);
+    const roadmap = await LearningRoadmap.findById(id);
 
     if (!roadmap) {
       return res.status(404).json({
@@ -276,7 +278,7 @@ const updateProgress = async (req, res) => {
 // @access  Private
 const getRoadmapAnalytics = async (req, res) => {
   try {
-    const roadmap = await SkillRoadmap.findById(req.params.id);
+    const roadmap = await LearningRoadmap.findById(req.params.id);
 
     if (!roadmap) {
       return res.status(404).json({
@@ -286,7 +288,7 @@ const getRoadmapAnalytics = async (req, res) => {
     }
 
     // Check ownership
-    if (roadmap.userId.toString() !== req.user.id) {
+    if (roadmap.candidateId.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: 'Không có quyền xem thống kê roadmap này',
@@ -357,7 +359,10 @@ const generateRoadmapFromJob = async (req, res) => {
     }
 
     // Check if roadmap already exists
-    const existingRoadmap = await SkillRoadmap.findOne({ userId, jobId });
+    const existingRoadmap = await LearningRoadmap.findOne({ 
+      candidateId: userId, 
+      targetJobId: jobId 
+    });
     if (existingRoadmap) {
       return res.status(400).json({
         success: false,
@@ -365,56 +370,70 @@ const generateRoadmapFromJob = async (req, res) => {
       });
     }
 
-    // Generate roadmap using AI
-    const aiRoadmap = await aiService.generateSkillRoadmapForJob(
+    // Generate roadmap using Learning Roadmap Service (self-sufficient)
+    const result = await learningRoadmapService.generateRoadmapForJob(
       job,
       userProfile,
       parseInt(duration)
     );
 
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        message: 'Lỗi khi tạo roadmap: ' + result.error,
+      });
+    }
+
+    const aiRoadmap = result.roadmap;
+
     // Create roadmap document
     const roadmapData = {
       userId,
-      jobId,
-      title: `Roadmap: ${job.title} tại ${job.employer?.company?.name || 'Company'}`,
+      targetJobId: jobId,
+      title: `Roadmap: ${job.title}`,
       description: `Lộ trình phát triển kỹ năng cho vị trí ${job.title}`,
-      targetSkills: job.requirements.skills.map(skill => ({
-        skillId: skill.skillId._id,
-        currentLevel: 'beginner',
-        targetLevel: skill.level === 'required' ? 'intermediate' : 'beginner',
-        priority: skill.importance || 5,
+      targetRole: job.title,
+      targetSkills: aiRoadmap.skillGaps.critical.concat(aiRoadmap.skillGaps.important).map(gap => ({
+        skillName: gap.skillName,
+        currentLevel: gap.currentLevel || 'none',
+        targetLevel: gap.requiredLevel || 'intermediate',
+        category: gap.category,
+        priority: gap.importance === 'critical' ? 1 : 2,
       })),
       weeks: aiRoadmap.weeks || [],
+      phases: this._groupWeeksIntoPhases(aiRoadmap.weeks),
       settings: {
         duration: parseInt(duration),
-        difficulty: aiRoadmap.difficulty || 'beginner',
+        difficulty: aiRoadmap.difficulty || 'intermediate',
         estimatedTotalHours: aiRoadmap.estimatedTotalHours || 0,
         pace: 'normal',
       },
       metadata: {
-        skillGaps: aiRoadmap.skillGaps || [],
+        ...aiRoadmap.metadata,
+        skillGaps: aiRoadmap.skillGaps || {},
         userProfile: {
           currentSkills: userProfile.skills?.map(s => s.name) || [],
-          education: userProfile.education?.fieldOfStudy,
-          experience: userProfile.experience?.length || 0,
+          education: userProfile.education?.degree,
+          experienceYears: userProfile.experience?.reduce((sum, exp) => sum + (exp.duration || 0), 0) || 0,
         },
         targetJob: {
           title: job.title,
           company: job.employer?.company?.name || 'Unknown',
-          category: job.aiAnalysis?.category,
+          level: job.level,
         },
       },
     };
 
-    const roadmap = await SkillRoadmap.create(roadmapData);
+    const roadmap = await LearningRoadmap.create(roadmapData);
 
-    await roadmap.populate('jobId', 'title');
-    await roadmap.populate('targetSkills.skillId', 'name category');
+    if (roadmap.targetJobId) {
+      await roadmap.populate('targetJobId', 'title');
+    }
 
     res.status(201).json({
       success: true,
       data: roadmap,
-      message: 'Tạo roadmap thành công',
+      message: 'Tạo roadmap thành công với Self-Sufficient NLP Stack',
     });
   } catch (error) {
     logger.error('Error generating roadmap from job:', error);
@@ -544,6 +563,24 @@ const generateRecommendations = roadmap => {
   return recommendations;
 };
 
+// Helper: Group weeks into phases (3-4 weeks per phase)
+const _groupWeeksIntoPhases = weeks => {
+  const phases = [];
+  const weeksPerPhase = 3;
+  
+  for (let i = 0; i < weeks.length; i += weeksPerPhase) {
+    const phaseWeeks = weeks.slice(i, i + weeksPerPhase);
+    phases.push({
+      phaseNumber: Math.floor(i / weeksPerPhase) + 1,
+      title: `Phase ${Math.floor(i / weeksPerPhase) + 1}`,
+      weeks: phaseWeeks,
+      skills: [...new Set(phaseWeeks.flatMap(w => w.skills.map(s => s.skillName)))],
+    });
+  }
+  
+  return phases;
+};
+
 module.exports = {
   getRoadmaps,
   getRoadmap,
@@ -555,4 +592,5 @@ module.exports = {
   getRoadmapAnalytics,
   generateRoadmapFromJob,
   getRecommendedRoadmaps,
+  _groupWeeksIntoPhases, // Export helper for testing
 };

@@ -76,6 +76,7 @@ export default function AppRouter() {
         {allRoutes.map((route) => (
           <Route key={route.path} path={route.path} element={route.element} />
         ))}
+        <Route path="/admin/users/detail" element={<AccountsDetail />} />
         <Route path="/admin/companies/:id" element={<CompanyDetail />} />
         <Route path="/admin/posts/:id" element={<AdminJobDetail />} />
         <Route

@@ -1,6 +1,8 @@
 const Application = require('../models/Application');
 const Job = require('../models/Job');
 const User = require('../models/User');
+const CandidateProfile = require('../models/CandidateProfile');
+const aiService = require('../services/ai/aiService');
 const { logger } = require('../utils/logger');
 const asyncHandler = require('express-async-handler');
 
@@ -134,6 +136,126 @@ const createApplication = asyncHandler(async (req, res) => {
 
     await application.populate('jobId', 'title companyId');
     await application.populate('jobId.companyId', 'name logo');
+
+    // Auto-calculate matching score in background (don't block response)
+    setImmediate(async () => {
+      try {
+        logger.info(`📊 Auto-calculating matching score for application ${application._id}`);
+        
+        // Get candidate profile
+        const candidateProfile = await CandidateProfile.findOne({ 
+          userId: req.user.id 
+        }).lean();
+
+        if (!candidateProfile) {
+          logger.warn(`No candidate profile found for user ${req.user.id}`);
+          return;
+        }
+
+        // Convert profile to cvData format
+        const cvData = {
+          skills: [],
+          experience: [],
+          education: [],
+          currentLevel: 'beginner',
+        };
+
+        // Extract technical skills
+        if (candidateProfile.skills?.technical && Array.isArray(candidateProfile.skills.technical)) {
+          cvData.skills.push(...candidateProfile.skills.technical.map(skill => ({
+            name: skill.name || skill,
+            level: skill.level || 'beginner',
+          })));
+        }
+
+        // Extract soft skills
+        if (candidateProfile.skills?.soft && Array.isArray(candidateProfile.skills.soft)) {
+          cvData.skills.push(...candidateProfile.skills.soft.map(skill => ({
+            name: skill.name || skill,
+            level: skill.level || 'beginner',
+          })));
+        }
+
+        // Extract experience
+        if (candidateProfile.experience?.internships && Array.isArray(candidateProfile.experience.internships)) {
+          cvData.experience.push(...candidateProfile.experience.internships.map(exp => ({
+            position: exp.position || '',
+            company: exp.company || '',
+            startDate: exp.startDate || null,
+            endDate: exp.endDate || null,
+            description: exp.description || '',
+          })));
+        }
+
+        // Extract education
+        if (candidateProfile.education?.university && candidateProfile.education.university.name) {
+          cvData.education.push({
+            degree: candidateProfile.education.university.degree,
+            major: candidateProfile.education.university.major || candidateProfile.education.university.field,
+            school: candidateProfile.education.university.name,
+            graduationYear: candidateProfile.education.university.graduationYear,
+          });
+        }
+
+        // Calculate experience level
+        if (cvData.experience.length > 0) {
+          const totalYears = cvData.experience.reduce((total, exp) => {
+            // Validate dates
+            if (!exp.startDate || exp.startDate === 'undefined' || exp.startDate === 'null') {
+              return total;
+            }
+
+            const start = new Date(exp.startDate);
+            if (isNaN(start.getTime())) {
+              return total;
+            }
+
+            // Handle endDate - if null/undefined, use current date
+            let end;
+            if (!exp.endDate || exp.endDate === 'undefined' || exp.endDate === 'null' || exp.endDate === null) {
+              end = new Date();
+            } else {
+              end = new Date(exp.endDate);
+              if (isNaN(end.getTime())) {
+                end = new Date();
+              }
+            }
+
+            // Sanity checks
+            const now = new Date();
+            if (start > now || end < start) {
+              return total;
+            }
+
+            const years = (end - start) / (1000 * 60 * 60 * 24 * 365);
+            
+            // Cap at 50 years to prevent data errors
+            if (years > 50) {
+              return total + 50;
+            }
+
+            return total + Math.max(0, years);
+          }, 0);
+
+          if (totalYears >= 5) cvData.currentLevel = 'expert';
+          else if (totalYears >= 3) cvData.currentLevel = 'advanced';
+          else if (totalYears >= 1) cvData.currentLevel = 'intermediate';
+          else cvData.currentLevel = 'beginner';
+        }
+
+        // Calculate matching score
+        await aiService.calculateAdvancedMatchScore(cvData, job, {
+          candidateId: req.user.id,
+          jobId: jobId,
+          saveToDatabase: true,
+        });
+
+        logger.info(`✅ Matching score calculated for application ${application._id}`);
+      } catch (scoringError) {
+        logger.error('Error calculating matching score:', scoringError);
+        // Don't throw - scoring failure shouldn't affect application creation
+      }
+    });
 
     res.status(201).json({
       success: true,
@@ -280,6 +402,73 @@ const updateApplicationStatus = asyncHandler(async (req, res) => {
       } catch (notifyError) {
         logger.error('Failed to send application status change notification:', notifyError);
         // Không fail request nếu notification fail
+      }
+    }
+
+    // *** NEW: Auto collect job matching training data when status changes to final outcome ***
+    if (oldStatus !== status && ['hired', 'rejected', 'interviewed', 'shortlisted'].includes(status)) {
+      try {
+        const TrainingData = require('../models/TrainingData');
+        const CandidateProfile = require('../models/CandidateProfile');
+        const Job = require('../models/Job');
+        
+        // Get full application data with populated fields
+        await application.populate('candidateId');
+        await application.populate('jobId');
+        
+        const candidateProfile = await CandidateProfile.findById(application.candidateId);
+        const job = await Job.findById(application.jobId);
+        
+        if (candidateProfile && job) {
+          // Collect job matching training data
+          const trainingData = {
+            type: 'job_matching',
+            input: {
+              cv: {
+                skills: candidateProfile.skills?.technical || [],
+                experience: candidateProfile.experience?.internships || [],
+                education: candidateProfile.education?.university || {},
+              },
+              job: {
+                title: job.title || '',
+                description: job.description || '',
+                requirements: job.requirements?.skills || [],
+                skills: job.requiredSkills || [],
+              },
+            },
+            output: {
+              predictedScore: application.matchingScore?.overall || 0,
+              actualOutcome: status,
+              outcomeMapping: {
+                'hired': 1.0,
+                'shortlisted': 0.8,
+                'interviewed': 0.6,
+                'rejected': 0.2,
+              }[status] || 0.5,
+            },
+            metadata: {
+              source: 'system_generated',
+              timestamp: new Date(),
+              quality: 1.0, // High quality (real outcomes)
+              verified: true,
+              cvId: candidateProfile._id,
+              jobId: job._id,
+            }
+          };
+          
+          // Save to training data (async, don't block response)
+          TrainingData.create(trainingData).catch(err => {
+            logger.warn('Failed to save job matching training data:', err.message);
+          });
+          logger.info('📊 Job matching training data collected', {
+            applicationId: application._id,
+            status,
+            matchScore: application.matchingScore?.overall,
+          });
+        }
+      } catch (dataCollectionError) {
+        logger.warn('Error collecting job matching training data:', dataCollectionError.message);
+        // Don't fail the request if data collection fails
       }
     }
 

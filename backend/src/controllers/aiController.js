@@ -66,6 +66,7 @@ class AIController {
 
     // Job & Career AI
     this.getJobRecommendations = this.getJobRecommendations.bind(this);
+    this.getCandidateRecommendations = this.getCandidateRecommendations.bind(this);
     this.analyzeJobPosting = this.analyzeJobPosting.bind(this);
     this.analyzeJobDescription = this.analyzeJobDescription.bind(this);
 
@@ -294,6 +295,130 @@ class AIController {
       return ApiResponse.error(
         res,
         'Failed to generate job recommendations',
+        500
+      );
+    }
+  }
+
+  /**
+   * POST /api/ai/candidate-recommendations
+   * Lấy gợi ý ứng viên phù hợp cho một job (Employer only)
+   */
+  async getCandidateRecommendations(req, res) {
+    const { jobId, limit = 10, minScore = 60 } = req.body;
+
+    try {
+      const Job = require('../models/Job');
+      const CandidateProfile = require('../models/CandidateProfile');
+      const CandidateRecommendation = require('../models/CandidateRecommendation');
+      const { getCacheService } = require('../services/cache/cacheService');
+
+      // Verify job exists
+      const job = await Job.findById(jobId).populate('postedBy', 'id company');
+      if (!job) {
+        return ApiResponse.error(res, 'Job not found', 404);
+      }
+
+      // Verify user is employer and owns the job
+      if (!req.user.role || req.user.role !== 'employer') {
+        return ApiResponse.error(res, 'Only employers can view candidate recommendations', 403);
+      }
+
+      if (job.postedBy && job.postedBy._id.toString() !== req.user.id && job.postedBy.id?.toString() !== req.user.id) {
+        return ApiResponse.error(res, 'Not authorized to view recommendations for this job', 403);
+      }
+
+      // Check cache first
+      const cacheService = getCacheService();
+      const cached = await cacheService.getCachedCandidateRecommendations(jobId);
+      if (cached && cached.length > 0) {
+        logger.info(`Retrieved ${cached.length} candidate recommendations from cache for job ${jobId}`);
+        return ApiResponse.success(
+          res,
+          {
+            recommendations: cached,
+            totalCandidates: cached.length,
+            filteredCount: cached.length,
+            cached: true,
+          },
+          'Candidate recommendations retrieved from cache'
+        );
+      }
+
+      // Get all active candidate profiles
+      // Filter candidates that are searchable and active
+      const candidates = await CandidateProfile.find({
+        status: 'active',
+        'settings.searchable': true,
+        $or: [
+          { deletedAt: { $exists: false } },
+          { deletedAt: null },
+        ],
+      })
+        .populate('userId', 'email')
+        .limit(1000) // Limit to avoid performance issues with large datasets
+        .lean();
+
+      if (candidates.length === 0) {
+        return ApiResponse.success(
+          res,
+          {
+            recommendations: [],
+            message: 'No active candidates available at the moment',
+          },
+          'No candidates found'
+        );
+      }
+
+      // Generate recommendations
+      const recommendations = await aiService.getCandidateRecommendations(
+        job,
+        candidates,
+        {
+          limit: parseInt(limit),
+          minScore: parseInt(minScore),
+        }
+      );
+
+      // Cache results (1 hour)
+      if (recommendations.length > 0) {
+        await cacheService.cacheCandidateRecommendations(jobId, recommendations, 3600);
+      }
+
+      // Save to database
+      if (recommendations.length > 0) {
+        await CandidateRecommendation.findOneAndUpdate(
+          { jobId },
+          {
+            jobId,
+            recommendations,
+            generatedAt: new Date(),
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+            isStale: false,
+          },
+          { upsert: true, new: true }
+        );
+      }
+
+      logger.info(
+        `Generated ${recommendations.length} candidate recommendations for job ${jobId}`
+      );
+
+      return ApiResponse.success(
+        res,
+        {
+          recommendations,
+          totalCandidates: candidates.length,
+          filteredCount: recommendations.length,
+          cached: false,
+        },
+        'Candidate recommendations generated successfully'
+      );
+    } catch (error) {
+      logger.error('Candidate recommendations error:', error);
+      return ApiResponse.error(
+        res,
+        'Failed to generate candidate recommendations',
         500
       );
     }
