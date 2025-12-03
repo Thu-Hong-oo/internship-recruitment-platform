@@ -137,8 +137,8 @@ env/
 ENV/
 *.egg-info/
 
-# ML Models (too large for git)
-models/
+
+models/phobert-cv-ner-final/
 *.bin
 *.pt
 *.pth
@@ -146,6 +146,9 @@ models/
 *.h5
 *.pkl
 *.joblib
+
+
+!src/models/
 
 # Notebooks
 notebooks/
