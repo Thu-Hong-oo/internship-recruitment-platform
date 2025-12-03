@@ -137,7 +137,7 @@ env/
 ENV/
 *.egg-info/
 
-# ML Models (too large for git)
+
 models/phobert-cv-ner-final/
 *.bin
 *.pt
@@ -147,7 +147,7 @@ models/phobert-cv-ner-final/
 *.pkl
 *.joblib
 
-# But include Mongoose models
+
 !src/models/
 
 # Notebooks

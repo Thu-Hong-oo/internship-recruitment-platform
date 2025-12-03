@@ -1,6 +1,6 @@
 /**
  * Prediction Log Model
- * 
+
  * Lưu trữ logs của tất cả predictions để monitoring:
  * - Model performance tracking
  * - Latency monitoring
