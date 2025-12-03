@@ -54,7 +54,7 @@ const { logger } = require('./src/utils/logger');
 const { setupSocket } = require('./src/socket');
 
 // Training Data Collection (optional, can be disabled)
-const { getScheduledDataCollectionService } = require('./src/services/training/scheduledDataCollection');
+const { getScheduledDataCollectionService } = require('./src/services/training/scheduledDataCollection.js');
 
 const app = express();
 const server = http.createServer(app);
