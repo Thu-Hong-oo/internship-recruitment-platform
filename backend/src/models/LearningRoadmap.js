@@ -103,6 +103,17 @@ const LearningRoadmapSchema = new mongoose.Schema(
                   default: 0.7,
                 }, // Độ tin cậy 0-1
                 certificateOffered: { type: Boolean, default: false },
+                // RAG-specific fields
+                source: {
+                  type: String,
+                  enum: ['youtube', 'github', 'coursera', 'udemy', 'vector-db', 'other'],
+                },
+                popularity: { type: Number, default: 0 }, // views, stars, etc.
+                similarity: { type: Number, min: 0, max: 1 }, // Vector search similarity
+                metadata: {
+                  type: mongoose.Schema.Types.Mixed,
+                  default: {},
+                }, // Source-specific metadata
               },
             ],
 
@@ -174,11 +185,43 @@ const LearningRoadmapSchema = new mongoose.Schema(
     // AI Generation metadata
     generatedBy: {
       type: String,
-      enum: ['ai', 'manual', 'hybrid'],
+      enum: ['ai', 'manual', 'hybrid', 'rag'],
       default: 'ai',
     },
     aiModelVersion: String,
     generatedAt: { type: Date, default: Date.now },
+
+    // 🎓 RAG & Credibility Metrics (for thesis validation)
+    credibilityMetrics: {
+      totalResources: { type: Number, default: 0 },
+      averageCredibility: { type: Number, default: 0 }, // 0-1 scale
+      verificationRate: { type: Number, default: 0 }, // % of resources with URLs
+      trustedSourceRate: { type: Number, default: 0 }, // % from trusted sources
+      sourceBreakdown: {
+        youtube: { type: Number, default: 0 },
+        github: { type: Number, default: 0 },
+        vectorDB: { type: Number, default: 0 },
+        other: { type: Number, default: 0 },
+      },
+      academicValidity: {
+        type: String,
+        default: 'All resources are verifiable with URLs and credibility scores',
+      },
+      lastVerified: { type: Date, default: Date.now },
+    },
+
+    // Additional metadata for thesis documentation
+    metadata: {
+      generationMethod: {
+        type: String,
+        enum: ['rule-based', 'ai-generation', 'retrieval-augmented-generation'],
+        default: 'ai-generation',
+      },
+      dataSources: [String], // ['youtube', 'github', 'vector-database']
+      verifiable: { type: Boolean, default: false },
+      academicValidity: String,
+      thesisDocumentation: String, // Link to thesis documentation
+    },
 
     // User feedback
     feedback: {

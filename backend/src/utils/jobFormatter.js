@@ -174,7 +174,10 @@ function formatEmployerInfo(employer, options = {}) {
 }
 
 function formatMinimalEmployer(employer) {
-  if (!employer) return null;
+  if (!employer) {
+    console.warn('⚠️  formatMinimalEmployer: employer is null/undefined');
+    return null;
+  }
 
   const minimalEmployer = {
     _id: employer._id,
@@ -183,15 +186,18 @@ function formatMinimalEmployer(employer) {
 
   if (employer.company) {
     const { name = null, logo = null } = employer.company;
+    
+    // Handle logo - can be string URL or object with url property
+    let logoUrl = null;
+    if (typeof logo === 'string') {
+      logoUrl = logo;
+    } else if (logo && typeof logo === 'object' && logo.url) {
+      logoUrl = logo.url;
+    }
+    
     minimalEmployer.company = {
       name: name || null,
-      logo: logo
-        ? {
-            url: logo.url || null,
-            cloudinaryId: logo.cloudinaryId || null,
-            filename: logo.filename || null,
-          }
-        : null,
+      logo: logoUrl,
     };
   }
 
@@ -425,38 +431,63 @@ function formatMinimalJobResponse(job) {
     return null;
   }
 
-  const jobObj = job.toObject ? job.toObject() : { ...job };
+  try {
+    const jobObj = job.toObject ? job.toObject() : { ...job };
 
-  const minimalJob = {
-    _id: jobObj._id,
-    title: jobObj.title,
-    slug: jobObj.slug,
-    description: jobObj.description,
-    requirements: jobObj.requirements,
-    benefits: jobObj.benefits,
-    skills: jobObj.skills || [],
-    tags: jobObj.tags || [],
-    jobType: jobObj.jobType || null,
-    workingMode: jobObj.workingMode || null,
-    level: jobObj.level || null,
-    salaryMin: jobObj.salaryMin || null,
-    salaryMax: jobObj.salaryMax || null,
-    currency: jobObj.currency || 'VND',
-    experience: jobObj.experience || null,
-    deadline: jobObj.deadline || null,
-    positions: jobObj.positions || null,
-    status: jobObj.status || null,
-    stats: jobObj.stats || { applications: 0, interviews: 0, offers: 0 },
-    createdAt: jobObj.createdAt,
-    updatedAt: jobObj.updatedAt,
-    address: formatJobAddress(jobObj),
-    industryCode: jobObj.industryCode || null,
-    subIndustryCode: jobObj.subIndustryCode || null,
-  };
+    const minimalJob = {
+      _id: jobObj._id,
+      title: jobObj.title,
+      slug: jobObj.slug,
+      description: jobObj.description,
+      requirements: jobObj.requirements,
+      benefits: jobObj.benefits,
+      skills: jobObj.skills || [],
+      tags: jobObj.tags || [],
+      aiTags: jobObj.aiTags || [], // AI generated tags
+      jobType: jobObj.jobType || null,
+      workingMode: jobObj.workingMode || null,
+      level: jobObj.level || null,
+      salaryMin: jobObj.salaryMin || null,
+      salaryMax: jobObj.salaryMax || null,
+      currency: jobObj.currency || 'VND',
+      experience: jobObj.experience || null,
+      education: jobObj.education || null, // Education requirement
+      deadline: jobObj.deadline || null,
+      positions: jobObj.positions || null,
+      status: jobObj.status || null,
+      views: jobObj.views || 0, // Number of views
+      hotScore: jobObj.hotScore || null, // AI hot score
+      stats: jobObj.stats || { applications: 0, interviews: 0, offers: 0 },
+      address: formatJobAddress(jobObj),
+      industryCode: jobObj.industryCode || null,
+      subIndustryCode: jobObj.subIndustryCode || null,
+      industryPath: jobObj.industryPath || [], // Industry path for hierarchical filtering
+      createdAt: jobObj.createdAt,
+      updatedAt: jobObj.updatedAt,
+    };
 
-  minimalJob.employer = formatMinimalEmployer(jobObj.employer);
+    // Format employer info (minimal)
+    minimalJob.employer = formatMinimalEmployer(jobObj.employer);
 
-  return minimalJob;
+    // Add skillIds if populated
+    if (jobObj.skillIds && Array.isArray(jobObj.skillIds)) {
+      minimalJob.skillIds = jobObj.skillIds.map(skill => {
+        if (typeof skill === 'object' && skill !== null) {
+          return {
+            _id: skill._id,
+            name: skill.name,
+            category: skill.category || null,
+          };
+        }
+        return skill; // Return ID if not populated
+      });
+    }
+
+    return minimalJob;
+  } catch (error) {
+    console.error('Error formatting job:', job?._id || 'unknown', error);
+    return null; // Return null for failed jobs instead of throwing
+  }
 }
 
 function formatMinimalJobsResponse(jobs) {
@@ -464,7 +495,31 @@ function formatMinimalJobsResponse(jobs) {
     return [];
   }
 
-  return jobs.map(job => formatMinimalJobResponse(job));
+  console.log(`🎨 formatMinimalJobsResponse: Processing ${jobs.length} jobs`);
+
+  const formatted = jobs.map((job, index) => {
+    try {
+      const result = formatMinimalJobResponse(job);
+      if (!result) {
+        console.warn(`⚠️  Job #${index} (${job?._id}) returned null from formatMinimalJobResponse`);
+      }
+      return result;
+    } catch (error) {
+      console.error('Error in formatMinimalJobsResponse:', job?._id || 'unknown', error);
+      return null;
+    }
+  });
+
+  // Filter out null values (failed formatting)
+  const validJobs = formatted.filter(Boolean);
+  
+  if (validJobs.length !== jobs.length) {
+    console.warn(`⚠️  Formatting lost ${jobs.length - validJobs.length} job(s): ${jobs.length} input → ${validJobs.length} output`);
+  } else {
+    console.log(`✅ All ${validJobs.length} jobs formatted successfully`);
+  }
+
+  return validJobs;
 }
 
 /**

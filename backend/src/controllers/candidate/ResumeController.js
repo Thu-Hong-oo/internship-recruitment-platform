@@ -881,6 +881,8 @@ class ResumeController {
 
     const profile = await this.ensureCandidateProfile(req.user.id, req.user);
     let parseResult;
+    
+    // Step 1: Parse CV (phần quan trọng nhất - cần trả về ngay)
     try {
       parseResult = await aiService.parseResumeFromBuffer(
         req.file.buffer,
@@ -889,15 +891,60 @@ class ResumeController {
       console.log('✅ Successfully parsed resume from buffer');
     } catch (parseError) {
       console.warn('❌ Failed to parse from buffer:', parseError.message);
+      
+      // Fallback to rule-based parsing if AI fails
+      if (process.env.ALLOW_RULE_BASED_FALLBACK === 'true') {
+        console.log('🔄 Attempting rule-based parsing as fallback...');
+        try {
+          const ruleBasedParser = require('../../services/ai/ruleBasedCVParser');
+          parseResult = await ruleBasedParser.parseCV(req.file.buffer, req.file.mimetype);
+          console.log('✅ Rule-based parsing succeeded');
+        } catch (ruleBasedError) {
+          console.error('❌ Rule-based parsing also failed:', ruleBasedError.message);
       parseResult = null;
+        }
+      } else {
+        parseResult = null;
+      }
     }
 
+    // TỐI ƯU: Trả response ngay sau khi parsing xong (không đợi upload)
+    // Upload và update sẽ chạy ở background
+    const parsingResponse = {
+      parsing: parseResult
+        ? {
+            extractedData: parseResult.extractedData || {},
+            skills: parseResult.skills || [],
+            suggestions: parseResult.suggestions || [],
+            analyzedAt: new Date(),
+          }
+        : { error: 'Parsing failed', analyzedAt: new Date() },
+      upload: {
+        status: 'processing',
+        message: 'File is being uploaded in background. Use GET /api/candidates/me/resume to check upload status.',
+      },
+    };
+
+    // Trả response ngay lập tức (chỉ sau parsing, không đợi upload)
+    ApiResponse.success(
+      res,
+      parsingResponse,
+      'Resume parsed successfully. Upload in progress...'
+    );
+
+    // Step 2: Upload, update profile và các tasks khác ở background (không block response)
+    setImmediate(async () => {
+      try {
+        console.log('📤 Starting background upload...');
+        
+        // Upload file
     const uploadResult = await uploadService.uploadFile({
       file: req.file,
       type: 'resume',
       userId: req.user.id,
       publicId: `resume_${req.user.id}_${Date.now()}`,
     });
+        console.log('✅ File uploaded successfully (background)');
 
     const newResumeEntry = this._createNewResumeEntry({
       ...uploadResult,
@@ -913,35 +960,50 @@ class ResumeController {
         : { error: 'Parsing failed during upload', analyzedAt: new Date() },
     });
 
-    // KHÔNG xóa file cũ khi upload CV mới - giữ lại trong history để user có thể xem
+        // Update profile với resume mới
     await this._updateResumeInProfile(profile, newResumeEntry, true, false);
+        console.log('✅ Profile update completed (background)');
 
-    // *** FIX: Auto-fill profile after parsing ***
+        // Profile auto-fill
     if (parseResult && parseResult.extractedData) {
-      console.log('🚀 Triggering profile auto-fill from parsed data...');
+          try {
+            console.log('🚀 Triggering profile auto-fill from parsed data (background)...');
       const profileController = new ProfileController();
-      // Pass the profile object directly to be updated
       await profileController.mapParsedCVToProfile(profile);
       console.log('✅ Profile auto-fill process completed.');
-    }
-
-    return ApiResponse.success(
-      res,
-      {
-        upload: {
-          url: uploadResult.url,
-          publicId: uploadResult.publicId,
-          filename: newResumeEntry.filename,
-          displayName: newResumeEntry.displayName,
-          format: newResumeEntry.format,
-          size: newResumeEntry.size,
-          mimeType: newResumeEntry.mimeType,
-          uploadedAt: newResumeEntry.uploadedAt,
-        },
-        parsing: newResumeEntry.aiAnalysis,
-      },
-      'Resume uploaded and parsed successfully'
-    );
+          } catch (error) {
+            console.warn('⚠️ Profile auto-fill failed (non-blocking):', error.message);
+          }
+        }
+      
+        // Training data collection
+        if (parseResult && parseResult.extractedData) {
+      try {
+        const TrainingData = require('../../models/TrainingData');
+        const trainingData = {
+          type: 'cv_parsing',
+              input: req.file.buffer.toString('utf-8'),
+          output: parseResult.extractedData || parseResult,
+          metadata: {
+            source: 'api_response',
+            timestamp: new Date(),
+                quality: 0.8,
+            verified: false,
+            userId: req.user.id,
+          }
+        };
+            await TrainingData.create(trainingData);
+            console.log('📊 CV parsing training data collected (background)');
+          } catch (error) {
+            console.warn('⚠️ Training data collection failed (non-blocking):', error.message);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Background upload/update failed:', error.message);
+        // Log error nhưng không throw (vì response đã được gửi)
+        // Có thể log vào database để retry sau
+      }
+    });
   }
 
   /**

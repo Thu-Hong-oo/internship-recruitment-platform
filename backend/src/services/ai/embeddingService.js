@@ -1,55 +1,199 @@
 /**
  * Embedding Service
  * 
- * NOTE: OpenAI embeddings đã được bỏ để tránh phụ thuộc vào ChatGPT API.
- * Hiện tại hệ thống sử dụng Intelligent Recommendations (không cần embeddings).
+ * Sử dụng Hugging Face Inference API cho embeddings
+ * Model: sentence-transformers/all-MiniLM-L6-v2 (384 dimensions)
  * 
- * Nếu cần vector search trong tương lai, có thể:
- * 1. Dùng Gemini embeddings (nếu Google cung cấp)
- * 2. Dùng sentence-transformers (local, free)
- * 3. Dùng các embedding models miễn phí khác
+ * ⚠️ NOTE: Service này CHỈ dùng cho vectorStoreService (learning resources)
+ * Job matching dùng sentenceBertService (paraphrase-multilingual-mpnet-base-v2, 768-dim)
  */
 
 const { logger } = require('../../utils/logger');
+const axios = require('axios');
 require('dotenv').config();
 
 class EmbeddingService {
   constructor() {
-    // Embedding service đã được disable để tránh phụ thuộc OpenAI
-    // Hệ thống sử dụng Intelligent Recommendations thay thế
+    this.huggingFaceApiUrl = 'https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2';
+    this.huggingFaceApiKey = process.env.HUGGING_FACE_API_KEY || null;
+    this.modelDimensions = 384;
     this._isInitialized = true;
+    
+    // Fallback: Simple text-based similarity (no API needed)
+    this.useFallback = !this.huggingFaceApiKey;
+    
+    if (this.useFallback) {
+      logger.info('Embedding Service: Using fallback mode (TF-IDF based) - no API key required');
+    } else {
+      logger.info('Embedding Service: Using Hugging Face API for embeddings');
+    }
   }
 
   /**
    * Check if embedding service is available
-   * Always returns false - embeddings are disabled
    */
   isAvailable() {
-    return false; // Embeddings disabled - using intelligent recommendations instead
+    // Always available - either via API or fallback
+    return true;
   }
 
   /**
    * Generate embedding for a single text
+   * Strategy: Hugging Face API → TF-IDF Fallback
    * 
    * @param {string} text - Text to embed
-   * @returns {Promise<number[]>} Embedding vector (1536 dimensions)
+   * @returns {Promise<number[]>} Embedding vector (384 dimensions)
    */
   async generateEmbedding(text) {
-    // Embeddings disabled - system uses intelligent recommendations instead
-    logger.warn('Embedding service is disabled. Use intelligent recommendations instead.');
-    return null;
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      logger.warn('Empty text provided to generateEmbedding');
+      return this._generateFallbackEmbedding(text || '');
+    }
+
+    // Strategy 1: Try Hugging Face API
+    if (!this.useFallback && this.huggingFaceApiKey) {
+      try {
+        const response = await axios.post(
+          this.huggingFaceApiUrl,
+          { inputs: text },
+          {
+            headers: {
+              'Authorization': `Bearer ${this.huggingFaceApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            timeout: 10000, // 10 seconds
+          }
+        );
+
+        if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+          // Handle both single and batch responses
+          const embedding = Array.isArray(response.data[0]) ? response.data[0] : response.data;
+          return embedding;
+        }
+
+        logger.warn('Unexpected response format from Hugging Face API, using fallback');
+      } catch (error) {
+        logger.warn('Hugging Face API error, using fallback:', error.message);
+      }
+    }
+
+    // Strategy 2: Fallback to TF-IDF
+    return this._generateFallbackEmbedding(text);
   }
 
   /**
    * Generate embeddings for multiple texts (batch)
+   * Strategy: Hugging Face API → TF-IDF Fallback
    * 
    * @param {string[]} texts - Array of texts to embed
    * @returns {Promise<number[][]>} Array of embedding vectors
    */
   async generateEmbeddings(texts) {
-    // Embeddings disabled - system uses intelligent recommendations instead
-    logger.warn('Embedding service is disabled. Use intelligent recommendations instead.');
-    return [];
+    if (!Array.isArray(texts) || texts.length === 0) {
+      return [];
+    }
+
+    // Strategy 1: Try Hugging Face API
+    if (!this.useFallback && this.huggingFaceApiKey) {
+      try {
+        const response = await axios.post(
+          this.huggingFaceApiUrl,
+          { inputs: texts },
+          {
+            headers: {
+              'Authorization': `Bearer ${this.huggingFaceApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            timeout: 30000, // 30 seconds for batch
+          }
+        );
+
+        if (response.data && Array.isArray(response.data)) {
+          return response.data;
+        }
+
+        logger.warn('Unexpected batch response format, using fallback');
+      } catch (error) {
+        logger.warn('Hugging Face batch API error, using fallback:', error.message);
+      }
+    }
+
+    // Strategy 3: Final fallback to TF-IDF
+    return texts.map(text => this._generateFallbackEmbedding(text));
+  }
+
+  /**
+   * Fallback embedding using simple text features
+   * Creates a simple vector based on word frequencies and text characteristics
+   * 
+   * @param {string} text - Text to embed
+   * @returns {number[]} Simple embedding vector (384 dimensions)
+   */
+  _generateFallbackEmbedding(text) {
+    if (!text || typeof text !== 'string') {
+      text = '';
+    }
+
+    const normalized = text.toLowerCase().trim();
+    const words = normalized.split(/\s+/).filter(w => w.length > 0);
+    const uniqueWords = [...new Set(words)];
+    
+    // Create a simple feature vector
+    const vector = new Array(this.modelDimensions).fill(0);
+    
+    // Feature 1: Text length features (first 10 dimensions)
+    vector[0] = Math.min(normalized.length / 1000, 1); // Normalized length
+    vector[1] = Math.min(words.length / 100, 1); // Word count
+    vector[2] = Math.min(uniqueWords.length / 50, 1); // Unique words
+    
+    // Feature 2: Word hash features (distribute words across dimensions)
+    words.forEach((word, idx) => {
+      const hash = this._simpleHash(word);
+      const dim = (hash % (this.modelDimensions - 10)) + 10;
+      vector[dim] += 1 / (words.length || 1);
+    });
+    
+    // Feature 3: Character n-grams (last 50 dimensions)
+    const ngrams = this._getCharacterNgrams(normalized, 3);
+    ngrams.forEach((ngram, idx) => {
+      if (idx < 50) {
+        const hash = this._simpleHash(ngram);
+        const dim = this.modelDimensions - 50 + (hash % 50);
+        vector[dim] += 0.1;
+      }
+    });
+    
+    // Normalize vector
+    const magnitude = Math.sqrt(vector.reduce((sum, val) => sum + val * val, 0));
+    if (magnitude > 0) {
+      return vector.map(val => val / magnitude);
+    }
+    
+    return vector;
+  }
+
+  /**
+   * Simple hash function for distributing words
+   */
+  _simpleHash(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash);
+  }
+
+  /**
+   * Get character n-grams from text
+   */
+  _getCharacterNgrams(text, n) {
+    const ngrams = [];
+    for (let i = 0; i <= text.length - n; i++) {
+      ngrams.push(text.substring(i, i + n));
+    }
+    return ngrams;
   }
 
   /**
@@ -66,8 +210,33 @@ class EmbeddingService {
    * @returns {Promise<number[]>} Embedding vector
    */
   async embedResource(resource) {
-    // Embeddings disabled - system uses intelligent recommendations instead
-    return null;
+    if (!resource || !resource.title) {
+      logger.warn('Invalid resource provided to embedResource');
+      return this._generateFallbackEmbedding('');
+    }
+
+    const {
+      title = '',
+      description = '',
+      skills = [],
+      level = '',
+      provider = '',
+      type = '',
+    } = resource;
+
+    // Combine all resource information into a single text
+    const text = [
+      title,
+      description,
+      `Skills: ${Array.isArray(skills) ? skills.join(', ') : skills}`,
+      `Level: ${level}`,
+      `Provider: ${provider}`,
+      `Type: ${type}`,
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    return this.generateEmbedding(text);
   }
 
   /**
@@ -82,8 +251,29 @@ class EmbeddingService {
    * @returns {Promise<number[]>} Embedding vector
    */
   async embedSearchQuery(queryParams) {
-    // Embeddings disabled - system uses intelligent recommendations instead
-    return null;
+    if (!queryParams || !queryParams.skill) {
+      logger.warn('Invalid queryParams provided to embedSearchQuery');
+      return this._generateFallbackEmbedding('');
+    }
+
+    const {
+      skill = '',
+      difficulty = '',
+      learningStage = '',
+      objectives = [],
+    } = queryParams;
+
+    // Combine query parameters into a search text
+    const text = [
+      skill,
+      `Difficulty: ${difficulty}`,
+      `Learning stage: ${learningStage}`,
+      Array.isArray(objectives) ? objectives.join(' ') : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    return this.generateEmbedding(text);
   }
 
   /**
@@ -91,9 +281,16 @@ class EmbeddingService {
    */
   getModelInfo() {
     return {
-      model: 'disabled',
-      dimensions: 0,
-      note: 'Embeddings disabled - using intelligent recommendations instead',
+      model: this.useFallback 
+        ? 'fallback-tfidf' 
+        : 'sentence-transformers/all-MiniLM-L6-v2 (API)',
+      dimensions: this.modelDimensions,
+      provider: this.useFallback 
+        ? 'local-fallback' 
+        : 'huggingface',
+      note: this.useFallback 
+        ? 'Using fallback embedding (no API key required)' 
+        : 'Using Hugging Face Inference API',
     };
   }
 }
