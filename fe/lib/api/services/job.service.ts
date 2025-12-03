@@ -105,18 +105,70 @@ class JobService {
         job.employer?.company?.name ||
         (job as any).postedBy?.displayFullName ||
         "Nhà tuyển dụng";
+
+      // Backend có thể trả logo là string URL hoặc object { url }
+      const rawLogo = job.employer?.company?.logo as any;
       const logoUrl =
-        job.employer?.company?.logo?.url || (job as any).postedBy?.avatar;
+        (rawLogo && typeof rawLogo === "object" ? rawLogo.url : rawLogo) ||
+        (job as any).postedBy?.avatar ||
+        "";
+
       const office = job.employer?.company?.officeAddress;
       const fallbackCity = office?.city;
 
-      // Extract salary info from various possible fields
-      const salary =
-        (job as any).salary ||
-        (job as any).salaryRange ||
-        ((job as any).currency
-          ? `${(job as any).currency} - Thỏa thuận`
-          : "Thỏa thuận");
+      // Format salary từ salaryMin, salaryMax, currency (ưu tiên nếu có)
+      let salary: string =
+        (job as any).salary || (job as any).salaryRange || "";
+      if (!salary && ((job as any).salaryMin || (job as any).salaryMax)) {
+        const min = (job as any).salaryMin as number | undefined;
+        const max = (job as any).salaryMax as number | undefined;
+        const currency = (job as any).currency || "VND";
+
+        if (min && max) {
+          if (currency === "VND") {
+            salary = `${(min / 1000000).toFixed(0)}M - ${(max / 1000000).toFixed(
+              0
+            )}M VND`;
+          } else {
+            salary = `${min.toLocaleString()} - ${max.toLocaleString()} ${currency}`;
+          }
+        } else if (min) {
+          if (currency === "VND") {
+            salary = `Từ ${(min / 1000000).toFixed(0)}M VND`;
+          } else {
+            salary = `Từ ${min.toLocaleString()} ${currency}`;
+          }
+        } else if (max) {
+          if (currency === "VND") {
+            salary = `Đến ${(max / 1000000).toFixed(0)}M VND`;
+          } else {
+            salary = `Đến ${max.toLocaleString()} ${currency}`;
+          }
+        }
+      }
+
+      if (!salary) {
+        salary =
+          (job as any).currency
+            ? `${(job as any).currency} - Thỏa thuận`
+            : "Thỏa thuận";
+      }
+
+      // Format location từ address hoặc location string
+      let fullLocation: string =
+        (job as any).location || (job as any).fullLocation || "";
+      if (!fullLocation && (job as any).address) {
+        const addr = (job as any).address;
+        fullLocation =
+          addr.fullAddress ||
+          [addr.street, addr.ward, addr.district, addr.city, addr.country]
+            .filter(Boolean)
+            .join(", ");
+      }
+
+      if (!fullLocation) {
+        fullLocation = fallbackCity || "";
+      }
 
       return {
         id: job._id,
@@ -126,8 +178,7 @@ class JobService {
           name: companyName,
           logo: { url: logoUrl },
         },
-        fullLocation:
-          job.location || fallbackCity || (job as any).location || "",
+        fullLocation,
         salaryRange: salary,
         isUrgent: (job as any).isUrgent || false,
         isFeatured: (job as any).isFeatured || false,

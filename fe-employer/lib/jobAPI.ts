@@ -40,9 +40,24 @@ export interface JobResponse {
 export interface JobsListResponse {
   success: boolean;
   data?: any[];
+  // Tổng số job (có thể nằm trực tiếp trên root hoặc trong pagination/statistics)
   total?: number;
   page?: number;
   limit?: number;
+  // Thông tin phân trang đầy đủ từ backend
+  pagination?: {
+    page?: number;
+    limit?: number;
+    total?: number;
+    totalPages?: number;
+    hasNextPage?: boolean;
+    hasPrevPage?: boolean;
+  };
+  // Thống kê bổ sung (ví dụ: byStatus)
+  statistics?: {
+    total?: number;
+    byStatus?: Record<string, number>;
+  };
   error?: string;
 }
 

@@ -18,13 +18,15 @@ export function usePdfExport() {
     }
 
     // Prefer html-to-image for better CSS fidelity
+    // Tối ưu dung lượng: dùng JPEG + giảm pixelRatio/quality để PDF ~ vài trăm KB
     let dataUrl: string | null = null;
     try {
       const rect = el.getBoundingClientRect();
       const width = Math.max(1, Math.round(rect.width));
       const height = Math.max(1, Math.round(rect.height));
-      const pixelRatio = 2;
-      dataUrl = await htmlToImage.toPng(el, {
+      // pixelRatio thấp hơn => ảnh nhỏ hơn => PDF nhẹ hơn
+      const pixelRatio = 1.2;
+      dataUrl = await htmlToImage.toJpeg(el, {
         cacheBust: true,
         pixelRatio,
         backgroundColor: "#ffffff",
@@ -32,6 +34,8 @@ export function usePdfExport() {
         height,
         canvasWidth: width * pixelRatio,
         canvasHeight: height * pixelRatio,
+        // quality 0.7–0.8 thường cho PDF ~200–500KB tùy nội dung
+        quality: 0.75,
         style: {
           boxShadow: "none",
           margin: "0",
@@ -58,7 +62,8 @@ export function usePdfExport() {
       const width = Math.max(1, Math.round(rect.width));
       const height = Math.max(1, Math.round(rect.height));
       const canvas = await html2canvas(el, {
-        scale: 2,
+        // scale thấp hơn để giảm độ phân giải -> dung lượng PDF nhỏ hơn
+        scale: 1.2,
         useCORS: true,
         backgroundColor: "#ffffff",
         x: 0,
@@ -93,7 +98,8 @@ export function usePdfExport() {
           doc.head.appendChild(style);
         },
       });
-      dataUrl = canvas.toDataURL("image/png");
+      // Export JPEG với quality trung bình để giảm kích thước
+      dataUrl = canvas.toDataURL("image/jpeg", 0.75);
     }
 
     // Restore classes
@@ -107,7 +113,13 @@ export function usePdfExport() {
       img.onerror = () => resolve();
     });
 
-    const pdf = new jsPDF("p", "pt", "a4");
+    // Bật nén PDF để giảm dung lượng
+    const pdf = new jsPDF({
+      orientation: "p",
+      unit: "pt",
+      format: "a4",
+      compressPdf: true,
+    });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const naturalW = img.naturalWidth || 1;
@@ -117,7 +129,8 @@ export function usePdfExport() {
     const imgHeight = naturalH * ratio;
     const x = (pageWidth - imgWidth) / 2;
     const y = (pageHeight - imgHeight) / 2;
-    pdf.addImage(dataUrl!, "PNG", x, y, imgWidth, imgHeight);
+    // Sử dụng JPEG để PDF nhẹ hơn
+    pdf.addImage(dataUrl!, "JPEG", x, y, imgWidth, imgHeight);
     pdf.save(filename);
   }
   return { exportElementToPdf };
