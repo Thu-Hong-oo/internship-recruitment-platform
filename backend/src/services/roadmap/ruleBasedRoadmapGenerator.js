@@ -323,12 +323,18 @@ class RuleBasedRoadmapGenerator {
     });
     
     const distribution = {};
-    const skillsPerPhase = Math.ceil(sorted.length / phases.length);
     
+    // Better distribution: spread skills more evenly
+    // For example: 4 skills / 3 phases = 2, 1, 1 (not 2, 2, 0)
+    const baseSkillsPerPhase = Math.floor(sorted.length / phases.length);
+    const extraSkills = sorted.length % phases.length;
+    
+    let skillIndex = 0;
     phases.forEach((phase, index) => {
-      const start = index * skillsPerPhase;
-      const end = Math.min(start + skillsPerPhase, sorted.length);
-      distribution[phase.phaseNumber] = sorted.slice(start, end);
+      // First 'extraSkills' phases get one extra skill
+      const skillsForThisPhase = baseSkillsPerPhase + (index < extraSkills ? 1 : 0);
+      distribution[phase.phaseNumber] = sorted.slice(skillIndex, skillIndex + skillsForThisPhase);
+      skillIndex += skillsForThisPhase;
     });
     
     return distribution;
@@ -361,53 +367,30 @@ class RuleBasedRoadmapGenerator {
       return weeks;
     }
     
-    // Distribute skills across weeks
-    const skillsPerWeek = Math.ceil(skills.length / weeksPerPhase);
-    
+    // Distribute skills across weeks - cycle through skills if more weeks than skills
     for (let weekNum = 1; weekNum <= weeksPerPhase; weekNum++) {
-      const skillIndex = Math.min(
-        Math.floor((weekNum - 1) * skillsPerWeek),
-        skills.length - 1
-      );
-      const weekSkills = skills.slice(skillIndex, skillIndex + skillsPerWeek);
+      // Cycle through skills: if 1 skill and 4 weeks, reuse the same skill
+      const skillIndex = (weekNum - 1) % skills.length;
+      const weekSkill = skills[skillIndex];
       
       const progressionStage = this._getProgressionStage(weekNum, weeksPerPhase);
       
-      if (weekSkills.length > 0) {
-        const week = this._createWeek(
-          startWeekNumber + weekNum - 1,
-          phase,
-          weekSkills,
-          weekNum,
-          weeksPerPhase,
-          currentLevel
-        );
-        this._applyProgressionEnhancements(
-          week,
-          weekSkills,
-          progressionStage,
-          phase,
-          currentLevel
-        );
-        weeks.push(week);
-      } else {
-        // Fallback: generic week
-        const genericWeek = this._createGenericWeek(
-          startWeekNumber + weekNum - 1,
-          phase,
-          weekNum,
-          weeksPerPhase,
-          currentLevel
-        );
-        this._applyProgressionEnhancements(
-          genericWeek,
-          [{ skill: phase.focus || 'Skill' }],
-          progressionStage,
-          phase,
-          currentLevel
-        );
-        weeks.push(genericWeek);
-      }
+      const week = this._createWeek(
+        startWeekNumber + weekNum - 1,
+        phase,
+        [weekSkill], // Single skill per week for focused learning
+        weekNum,
+        weeksPerPhase,
+        currentLevel
+      );
+      this._applyProgressionEnhancements(
+        week,
+        [weekSkill],
+        progressionStage,
+        phase,
+        currentLevel
+      );
+      weeks.push(week);
     }
     
     return weeks;
@@ -457,7 +440,9 @@ class RuleBasedRoadmapGenerator {
     const bloomLevel = this._determineBloomLevel(phase, weekIndex, totalWeeksInPhase, currentLevel);
     
     // Generate projects and assessments for generic week
-    const genericSkill = { skill: phase.focus || 'Programming' };
+    // Use a more descriptive skill name based on phase title
+    const phaseSkillName = phase.title.replace(' Phase', '').trim();
+    const genericSkill = { skill: phaseSkillName || 'Programming' };
     const projects = this._generateProjects(genericSkill, bloomLevel, phase, currentLevel);
     const assessments = this._generateAssessments(genericSkill, bloomLevel, phase, currentLevel);
     
@@ -466,7 +451,7 @@ class RuleBasedRoadmapGenerator {
     
     return {
       weekNumber,
-      focus: `${phase.focus} - Week ${weekIndex}`,
+      focus: `${phaseSkillName} Concepts - Week ${weekIndex}`,
       learningObjectives: this._generateGenericObjectives(phase, bloomLevel, currentLevel),
       timeCommitment,
       resources: [],

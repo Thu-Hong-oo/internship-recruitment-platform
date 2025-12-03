@@ -16,6 +16,10 @@ const {
   // Analytics & Dashboard
   getDashboardStats,
   getUserAnalytics,
+  getJobAnalytics,
+  getApplicationAnalytics,
+  getEmployerAnalytics,
+  getSystemMetrics,
 } = require('../../controllers/admin/analyticsController');
 
 const {
@@ -87,6 +91,10 @@ router.put('/users/:id/role', updateUserRole);
 
 router.get('/dashboard', getDashboardStats);
 router.get('/analytics/users', getUserAnalytics);
+router.get('/analytics/jobs', getJobAnalytics);
+router.get('/analytics/applications', getApplicationAnalytics);
+router.get('/analytics/employers', getEmployerAnalytics);
+router.get('/analytics/system', getSystemMetrics);
 
 // ========================================
 // EMPLOYER MANAGEMENT

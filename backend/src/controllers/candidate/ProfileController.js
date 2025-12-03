@@ -68,28 +68,59 @@ class ProfileController {
         awards: Array.isArray(aiAnalysis.awards) ? aiAnalysis.awards.length : 0,
       });
 
-      // Personal Info
+      // Personal Info - FIX: Update even if exists (CV data is more recent)
       if (aiAnalysis.personalInfo) {
         const { fullName, email, phone, address, dateOfBirth } =
           aiAnalysis.personalInfo;
-        if (fullName && !profile.personalInfo.fullName)
-          profile.personalInfo.fullName = fullName;
-        if (email && !profile.personalInfo.email)
-          profile.personalInfo.email = email;
-        if (phone && !profile.personalInfo.phone)
-          profile.personalInfo.phone = phone;
-        if (address && !profile.personalInfo.address) {
-          // Validate address is not empty string before setting
+        
+        // Update fullName if provided (CV is source of truth)
+        if (fullName && fullName.trim()) {
+          profile.personalInfo.fullName = fullName.trim();
+        }
+        
+        // Update email if provided and valid
+        if (email && email.trim() && email.includes('@')) {
+          profile.personalInfo.email = email.trim().toLowerCase();
+        }
+        
+        // Update phone if provided
+        if (phone && phone.trim()) {
+          profile.personalInfo.phone = phone.trim();
+        }
+        
+        // Update address if provided
+        if (address) {
           if (typeof address === 'string' && address.trim() !== '') {
-            profile.personalInfo.address = address;
+            // Try to parse structured address
+            const addressParts = address.split(',').map(s => s.trim());
+            if (addressParts.length > 1) {
+              profile.personalInfo.address = {
+                street: addressParts[0] || '',
+                ward: addressParts[1] || '',
+                district: addressParts[2] || '',
+                city: addressParts[addressParts.length - 1] || '',
+                country: 'Vietnam',
+              };
+            } else {
+              // Simple address string
+              profile.personalInfo.address = {
+                street: address.trim(),
+                city: '',
+                country: 'Vietnam',
+              };
+            }
           } else if (typeof address === 'object' && address !== null) {
             profile.personalInfo.address = address;
           }
-          // Skip if address is empty string to prevent MongoDB error
         }
-        if (dateOfBirth && !profile.personalInfo.dateOfBirth)
-          // FIX: Use the _parseDate helper to correctly handle date formats like "DD/MM/YYYY"
-          profile.personalInfo.dateOfBirth = this._parseDate(dateOfBirth);
+        
+        // Update dateOfBirth if provided
+        if (dateOfBirth) {
+          const parsedDate = this._parseDate(dateOfBirth);
+          if (parsedDate) {
+            profile.personalInfo.dateOfBirth = parsedDate;
+          }
+        }
       }
 
       // Education
@@ -165,7 +196,7 @@ class ProfileController {
         }
       }
 
-      // Experience (array)
+      // Experience (array) - FIX: Better duplicate check and preserve description
       if (
         Array.isArray(aiAnalysis.experience) &&
         aiAnalysis.experience.length > 0
@@ -177,19 +208,48 @@ class ProfileController {
           if (expType === 'internship' || expType === 'job') {
             if (!profile.experience.internships)
               profile.experience.internships = [];
-            const exists = profile.experience.internships.some(
-              e =>
-                e.company?.trim() === exp.company?.trim() &&
-                e.position?.trim() === exp.position?.trim()
-            );
-            if (!exists) {
+            
+            // Normalize company and position for comparison
+            const expCompany = (exp.company || '').trim().toLowerCase();
+            const expPosition = (exp.position || '').trim().toLowerCase();
+            
+            // Check if experience already exists
+            const existingIndex = profile.experience.internships.findIndex(e => {
+              const eCompany = (e.company || '').trim().toLowerCase();
+              const ePosition = (e.position || '').trim().toLowerCase();
+              return eCompany === expCompany && ePosition === expPosition;
+            });
+            
+            if (existingIndex >= 0) {
+              // Update existing experience with new data (merge description)
+              const existing = profile.experience.internships[existingIndex];
+              if (exp.description && exp.description.trim()) {
+                // Merge descriptions if both exist
+                if (existing.description && existing.description.trim()) {
+                  existing.description = existing.description + '\n\n' + exp.description.trim();
+                } else {
+                  existing.description = exp.description.trim();
+                }
+              }
+              // Update dates if provided
+              if (exp.startDate) {
+                const parsedStart = this._parseDate(exp.startDate);
+                if (parsedStart) existing.startDate = parsedStart;
+              }
+              if (exp.endDate) {
+                const parsedEnd = this._parseDate(exp.endDate);
+                if (parsedEnd) existing.endDate = parsedEnd;
+              }
+            } else {
+              // Add new experience
               profile.experience.internships.push({
                 _id: new mongoose.Types.ObjectId(),
                 company: exp.company || '',
                 position: exp.position || '',
                 startDate: this._parseDate(exp.startDate),
                 endDate: this._parseDate(exp.endDate),
-                description: exp.description || '',
+                description: (exp.description || '').trim(),
+                location: exp.location || '',
                 skills: exp.skills || [],
                 projects: exp.projects || [],
               });
@@ -204,7 +264,7 @@ class ProfileController {
                 _id: new mongoose.Types.ObjectId(),
                 title: exp.position || '',
                 name: exp.company || '',
-                description: exp.description || '',
+                description: (exp.description || '').trim(),
                 technologies: exp.technologies || [],
                 url: exp.url || '',
                 startDate: this._parseDate(exp.startDate),
@@ -214,23 +274,46 @@ class ProfileController {
           }
         }
       }
-      // Certifications
+      // Certifications - FIX: Better duplicate detection
       if (
         Array.isArray(aiAnalysis.certificates) &&
         aiAnalysis.certificates.length > 0
       ) {
         if (!profile.education.certifications)
           profile.education.certifications = [];
+        
+        // Normalize certification name for comparison
+        const normalizeCertName = (name) => {
+          if (!name) return '';
+          return name.toLowerCase()
+            .trim()
+            .replace(/\s+/g, ' ')
+            .replace(/[^\w\s]/g, ''); // Remove special chars
+        };
+        
         for (const cert of aiAnalysis.certificates) {
-          const exists = profile.education.certifications.some(
-            c => c.name === cert.name && c.year === cert.year
-          );
+          const certName = (cert.name || '').trim();
+          if (!certName) continue;
+          
+          const normalizedName = normalizeCertName(certName);
+          
+          // Check if certification already exists (by normalized name, case-insensitive)
+          const exists = profile.education.certifications.some(c => {
+            const existingName = normalizeCertName(c.name);
+            // Match if names are similar (exact match or one contains the other)
+            return existingName === normalizedName || 
+                   existingName.includes(normalizedName) || 
+                   normalizedName.includes(existingName);
+          });
+          
           if (!exists) {
             profile.education.certifications.push({
               _id: new mongoose.Types.ObjectId(),
-              name: cert.name || '',
-              issuer: cert.issuer || '',
+              type: 'certification',
+              name: certName,
+              issuer: (cert.issuer || '').trim() || '',
               year: cert.year || null,
+              achievements: [],
             });
           }
         }

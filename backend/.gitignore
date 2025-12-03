@@ -125,3 +125,46 @@ dump.rdb
 .dockerignore
 docker-compose.override.yml
 ".env" 
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+
+# ML Models (too large for git)
+models/
+*.bin
+*.pt
+*.pth
+*.onnx
+*.h5
+*.pkl
+*.joblib
+
+# Notebooks
+notebooks/
+*.ipynb_checkpoints/
+
+# Research data and results
+thesis/datasets/
+thesis/results/*.json
+thesis/figures/*.png
+
+# Python packages
+python/__pycache__/
+python/*.pyc
+python/venv/
+
+# Training data
+src/research/datasets/raw/
+src/research/datasets/processed/*.jsonl
+
+# Test outputs
+tests/outputs/
+tests/__pycache__/

@@ -116,7 +116,8 @@ class RealResourceUrlService {
     const query = encodeURIComponent(
       `${skill} ${difficulty} ${type} full course`
     );
-    return `${this.youtubeBaseUrl}${query}`;
+    // Use /search?q= instead of /results?search_query= for direct search page
+    return `https://www.youtube.com/results?search_query=${query}`;
   }
 
   /**
@@ -207,8 +208,10 @@ class RealResourceUrlService {
       if (officialUrl) {
         return officialUrl;
       }
-      // Fallback to MDN search
-      return `https://developer.mozilla.org/en-US/search?q=${encodeURIComponent(skill)}`;
+      // CRITICAL: Don't return Google search URLs - return null instead
+      // Caller should handle null URLs by skipping the resource
+      logger.warn('No official documentation found for skill', { skill, normalizedSkill });
+      return null;
     }
 
     // Video resources

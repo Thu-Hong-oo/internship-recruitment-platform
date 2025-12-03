@@ -108,6 +108,66 @@ router.post('/job-recommendations', aiController.getJobRecommendations);
 
 /**
  * @swagger
+ * /api/ai/candidate-recommendations:
+ *   post:
+ *     summary: Get AI-powered candidate recommendations for a job (for employers)
+ *     tags: [AI - Candidates]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - jobId
+ *             properties:
+ *               jobId:
+ *                 type: string
+ *                 description: Job ID to find candidates for
+ *               limit:
+ *                 type: integer
+ *                 default: 10
+ *                 description: Number of recommendations to return
+ *               minScore:
+ *                 type: integer
+ *                 default: 60
+ *                 description: Minimum match score threshold
+ *     responses:
+ *       200:
+ *         description: List of recommended candidates with match scores and skill gaps
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 recommendations:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       candidateId:
+ *                         type: string
+ *                       rank:
+ *                         type: integer
+ *                       score:
+ *                         type: number
+ *                       tier:
+ *                         type: string
+ *                       skillGaps:
+ *                         type: object
+ *       400:
+ *         description: Missing jobId
+ *       404:
+ *         description: Job not found
+ */
+router.post('/candidate-recommendations', aiController.getCandidateRecommendations);
+
+/**
+ * @swagger
  * /api/ai/job-suggestions/{userId}:
  *   get:
  *     summary: Get AI-powered job suggestions for user (alias for job-recommendations)
@@ -166,6 +226,44 @@ router.get('/job-suggestions/:userId', async (req, res, next) => {
  *         description: Not authorized to analyze this job
  */
 router.post('/analyze-job-posting', aiController.analyzeJobPosting);
+
+/**
+ * @swagger
+ * /api/ai/candidate-recommendations:
+ *   post:
+ *     summary: Get candidate recommendations for a job (Employer only)
+ *     tags: [AI - Candidates]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - jobId
+ *             properties:
+ *               jobId:
+ *                 type: string
+ *                 description: Job ID to get recommendations for
+ *               limit:
+ *                 type: integer
+ *                 default: 10
+ *                 description: Number of recommendations to return
+ *               minScore:
+ *                 type: integer
+ *                 default: 60
+ *                 description: Minimum match score threshold
+ *     responses:
+ *       200:
+ *         description: List of candidate recommendations with match scores
+ *       403:
+ *         description: Not authorized to view recommendations for this job
+ *       404:
+ *         description: Job not found
+ */
+router.post('/candidate-recommendations', aiController.getCandidateRecommendations);
 
 /**
  * @swagger

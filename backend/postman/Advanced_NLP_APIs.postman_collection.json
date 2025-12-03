@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Advanced NLP - Matching Score & Learning Roadmap",
-    "description": "API collection for advanced NLP features: Matching Score calculation and Personalized Learning Roadmap generation",
+    "description": "API collection for advanced NLP features: Matching Score calculation and Personalized Learning Roadmap generation\n\n✨ **SELF-SUFFICIENT NLP STACK**:\n- PhoBERT NER (F1 96%) for skill extraction\n- Sentence-BERT (768-dim, paraphrase-multilingual-mpnet-base-v2) for semantic embeddings\n- TF-IDF + cosine similarity for text matching\n- Multi-dimensional scoring: skills (40%), experience (30%), education (15%), projects (15%)\n- Reverse matching for candidate recommendations\n- NO mandatory Gemini dependency (optional for enhancement)\n\n📊 **Matching Score Features**:\n- Calculate detailed CV-Job match scores with tier system (A/B/C/D)\n- Get top candidates for jobs (employer view)\n- Get best matching jobs for candidates\n- Recalculate scores when job/CV changes\n\n🎓 **Learning Roadmap Features**:\n- Generate personalized learning paths with prerequisites\n- Track progress by week/phase\n- Get AI-recommended resources (courses, articles, videos)\n- Submit feedback and ratings",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -322,7 +322,7 @@
       "key": "baseUrl",
       "value": "http://localhost:3000",
       "type": "string",
-      "description": "Base URL - Change to http://localhost:5000 if server runs on port 5000"
+      "description": "Base URL - Server runs on port 3000 by default"
     },
     {
       "key": "candidateToken",

@@ -1,67 +1,70 @@
-import { Avatar, Image, Spin, message } from "antd";
+import {
+  Alert,
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  Col,
+  Descriptions,
+  Divider,
+  Empty,
+  Row,
+  Space,
+  Spin,
+  Statistic,
+  Tag,
+  Typography,
+  message,
+} from "antd";
+import {
+  ArrowLeftOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  MailOutlined,
+  PhoneOutlined,
+  UserOutlined,
+} from "@ant-design/icons";
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { StatusWidget } from "./components/common-renderers";
 import { usersAPI } from "../../api/users";
 
-const getUserData = (data) => [
-  {
-    label: "Họ và tên",
-    value:
-      data?.fullName ||
-      `${data?.profile?.firstName || ""} ${
-        data?.profile?.lastName || ""
-      }`.trim(),
-  },
-  { label: "Email", value: data?.email },
-  { label: "Vai trò", value: getRoleText(data?.role) },
-  {
-    label: "Phương thức đăng nhập",
-    value: getAuthMethodText(data?.authMethod),
-  },
-  {
-    label: "Trạng thái email",
-    value: data?.isEmailVerified ? "Đã xác thực" : "Chưa xác thực",
-  },
-  {
-    label: "Trạng thái tài khoản",
-    value: data?.isActive ? "Đang hoạt động" : "Chưa kích hoạt",
-  },
-  {
-    label: "Ngày tạo",
-    value: data?.createdAt
-      ? new Date(data.createdAt).toLocaleDateString("vi-VN")
-      : "",
-  },
-  {
-    label: "Lần đăng nhập cuối",
-    value: data?.lastLogin
-      ? new Date(data.lastLogin).toLocaleDateString("vi-VN")
-      : "",
-  },
-];
+const { Title, Text } = Typography;
 
-const getRoleText = (role) => {
-  const roleMap = {
-    student: "Người tìm việc",
-    employer: "Nhà tuyển dụng",
-    admin: "Quản trị viên",
-  };
-  return roleMap[role] || role || "-";
+const SYSTEM_PRIMARY = "oklch(0.55 0.18 195)";
+const SYSTEM_ACCENT = "#4f46e5";
+const SYSTEM_BG = "linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%)";
+
+const ROLE_META = {
+  student: {
+    label: "Ứng viên",
+    color: "green",
+    description: "Tìm kiếm cơ hội việc làm và quản lý hồ sơ ứng tuyển",
+  },
+  employer: {
+    label: "Nhà tuyển dụng",
+    color: "blue",
+    description: "Đăng tin tuyển dụng và quản lý ứng viên",
+  },
+  admin: {
+    label: "Quản trị viên",
+    color: "magenta",
+    description: "Quản lý hệ thống và phê duyệt hoạt động",
+  },
 };
 
-const getAuthMethodText = (authMethod) => {
-  const authMap = {
-    local: "Email/Password",
-    google: "Google OAuth",
-  };
-  return authMap[authMethod] || authMethod || "-";
+const STATUS_META = {
+  Active: { label: "Đang hoạt động", color: "green" },
+  InActive: { label: "Chưa kích hoạt", color: "default" },
+  Locked: { label: "Đã khóa", color: "red" },
 };
+
+const formatDateTime = (date) =>
+  date ? new Date(date).toLocaleString("vi-VN") : "-";
 
 export default function AccountsDetail() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [detailData, setDetailData] = useState({});
+  const [detailData, setDetailData] = useState(null);
   const [loadingPage, setLoadingPage] = useState(false);
 
   const userId = searchParams.get("uid");
@@ -92,175 +95,292 @@ export default function AccountsDetail() {
     }
   }, [userId, fetchUserDetail]);
 
+  const roleMeta = ROLE_META[detailData?.role] || {
+    label: detailData?.role || "Không xác định",
+    color: "default",
+    description: "",
+  };
+
+  const statusMeta =
+    STATUS_META[detailData?.statusDisplay] ||
+    STATUS_META[detailData?.isActive ? "Active" : "InActive"];
+
+  const summaryItems = [
+    {
+      label: "Email",
+      value: detailData?.email || "-",
+      icon: <MailOutlined />,
+    },
+    {
+      label: "Số điện thoại",
+      value: detailData?.profile?.phone || "-",
+      icon: <PhoneOutlined />,
+    },
+    {
+      label: "Ngày tạo",
+      value: formatDateTime(detailData?.createdAt),
+      icon: <ClockCircleOutlined />,
+    },
+    {
+      label: "Lần đăng nhập cuối",
+      value: formatDateTime(detailData?.lastLogin),
+      icon: <ClockCircleOutlined />,
+    },
+  ];
+
   return (
-    <Spin spinning={loadingPage} delay={500}>
-      <div className="flex items-center gap-1">
-        <img
-          src="/icons/accounts/btn-back.svg"
-          onClick={() => navigate("/admin/users")}
-          className="mr-1 w-[28px] cursor-pointer"
-        />
-        <div className="text-[16px] cursor-pointer ">Quản lý tài khoản</div>
-        <img src="/icons/accounts/ic-chevron-right.svg" />
-        <div className="text-[16px]">Xem chi tiết</div>
-      </div>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: SYSTEM_BG,
+        padding: "24px",
+      }}
+    >
+      <Spin spinning={loadingPage} delay={500}>
+        <Card
+          style={{ borderRadius: 16, marginBottom: 24 }}
+          bodyStyle={{ padding: "16px 24px" }}
+        >
+          <Space align="center" size={16}>
+            <Button
+              icon={<ArrowLeftOutlined />}
+              onClick={() => navigate("/admin/users")}
+            >
+              Quay lại
+            </Button>
+            <Title
+              level={4}
+              style={{ margin: 0, color: "#1f2937", fontWeight: 600 }}
+            >
+              Hồ sơ người dùng
+            </Title>
+            <Tag color={roleMeta.color}>{roleMeta.label}</Tag>
+            {statusMeta && (
+              <Tag color={statusMeta.color}>{statusMeta.label}</Tag>
+            )}
+          </Space>
+        </Card>
 
-      {!detailData?.isActive && (
-        <div className="bg-[#FDF0F1] border border-[#D2D2D2]/50 px-[30px] py-[15px] mt-5 rounded-[24px]">
-          <div className="title flex font-medium text-[20px] mb-[5px]">
-            <img
-              src="/icons/accounts/block-account.svg"
-              alt="block"
-              className="mr-1"
-            />
-            <span> Tài khoản chưa kích hoạt</span>
-          </div>
-          <div>Tài khoản này chưa được kích hoạt hoặc đã bị vô hiệu hóa</div>
-        </div>
-      )}
-      <div className="flex gap-4">
-        <div className="w-[70%] bg-white shadow-md rounded-2xl p-6 mt-4">
-          <div className="flex items-center gap-2 text-left">
-            <div className="inline-block rounded-full p-[2px] bg-gradient-to-b from-[#09BAFD] to-[#4285ED]">
-              <div className="rounded-full p-[2px] bg-white">
-                <Avatar
-                  size={45}
-                  src={detailData?.profile?.avatar || "/images/logo.png"}
+        {!loadingPage && !detailData && (
+          <Card>
+            <Empty description="Không tìm thấy người dùng" />
+          </Card>
+        )}
+
+        {detailData && (
+          <Row gutter={20}>
+            <Col xs={24} lg={16}>
+              <Card
+                style={{
+                  borderRadius: 16,
+                  marginBottom: 20,
+              background: `linear-gradient(135deg, ${SYSTEM_PRIMARY} 0%, ${SYSTEM_ACCENT} 100%)`,
+                  color: "#fff",
+                }}
+                bodyStyle={{ padding: 24 }}
+              >
+                <Space align="center" size={16}>
+                  <Badge dot color={statusMeta?.color || "blue"}>
+                    <Avatar
+                      size={72}
+                      src={
+                        detailData?.profile?.avatar ||
+                        "/images/default-avatar.png"
+                      }
+                      icon={<UserOutlined />}
+                    />
+                  </Badge>
+                  <div>
+                    <Title level={3} style={{ color: "#fff", marginBottom: 4 }}>
+                      {detailData?.fullName ||
+                        `${detailData?.profile?.firstName || ""} ${
+                          detailData?.profile?.lastName || ""
+                        }`.trim() ||
+                        "Chưa cập nhật"}
+                    </Title>
+                    <Text style={{ color: "#e0e7ff" }}>
+                      {roleMeta.description}
+                    </Text>
+                  </div>
+                </Space>
+
+                <Divider style={{ borderColor: "rgba(255,255,255,0.2)" }} />
+
+                <Row gutter={[16, 16]}>
+                  {summaryItems.map((item) => (
+                    <Col xs={24} sm={12} key={item.label}>
+                      <Space align="start">
+                        <span style={{ color: "#c7d2fe" }}>{item.icon}</span>
+                        <div>
+                          <div style={{ color: "#c7d2fe", fontSize: 12 }}>
+                            {item.label}
+                          </div>
+                          <div style={{ fontWeight: 600 }}>{item.value}</div>
+                        </div>
+                      </Space>
+                    </Col>
+                  ))}
+                </Row>
+              </Card>
+
+              <Card
+                title="Thông tin tài khoản"
+                style={{ borderRadius: 16, marginBottom: 20 }}
+                bodyStyle={{ padding: 24 }}
+              >
+                <Descriptions
+                  column={2}
+                  labelStyle={{ fontWeight: 500 }}
+                  contentStyle={{ fontWeight: 600 }}
+                >
+                  <Descriptions.Item label="ID người dùng">
+                    {detailData?._id}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Phương thức đăng nhập">
+                    {detailData?.authMethod === "google"
+                      ? "Google OAuth"
+                      : "Email / Mật khẩu"}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Email đã xác thực">
+                    {detailData?.isEmailVerified ? (
+                      <Tag color="green">Đã xác thực</Tag>
+                    ) : (
+                      <Tag color="default">Chưa xác thực</Tag>
+                    )}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Trạng thái tài khoản">
+                    {detailData?.statusDisplay || statusMeta?.label || "-"}
+                  </Descriptions.Item>
+                </Descriptions>
+              </Card>
+
+              <Card
+                title="Hoạt động & Thông tin tuyển dụng"
+                style={{ borderRadius: 16, marginBottom: 20 }}
+              >
+                {detailData?.analytics ? (
+                  <Row gutter={16}>
+                    <Col xs={12} md={6}>
+                      <Statistic
+                        title="Số job đã đăng"
+                        value={detailData.analytics.totalJobsPosted || 0}
+                      />
+                    </Col>
+                    <Col xs={12} md={6}>
+                      <Statistic
+                        title="Đơn ứng tuyển"
+                        value={detailData.analytics.totalApplications || 0}
+                      />
+                    </Col>
+                    <Col xs={12} md={6}>
+                      <Statistic
+                        title="Việc đang hoạt động"
+                        value={detailData.analytics.activeJobs || 0}
+                      />
+                    </Col>
+                    <Col xs={12} md={6}>
+                      <Statistic
+                        title="Tỷ lệ chấp nhận"
+                        value={
+                          detailData.analytics.acceptanceRate
+                            ? `${detailData.analytics.acceptanceRate}%`
+                            : "0%"
+                        }
+                      />
+                    </Col>
+                  </Row>
+                ) : (
+                  <Empty description="Chưa có dữ liệu hoạt động" />
+                )}
+              </Card>
+
+              {detailData?.preferences && (
+                <Card title="Tuỳ chỉnh & Cài đặt" style={{ borderRadius: 16 }}>
+                  <Row gutter={16}>
+                    <Col xs={24} md={12}>
+                      <Descriptions column={1} size="small">
+                        <Descriptions.Item label="Language">
+                          {detailData.preferences.language || "vi"}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Timezone">
+                          {detailData.preferences.timezone ||
+                            "Asia/Ho_Chi_Minh"}
+                        </Descriptions.Item>
+                      </Descriptions>
+                    </Col>
+                    <Col xs={24} md={12}>
+                      <Descriptions column={1} size="small">
+                        <Descriptions.Item label="Thông báo email">
+                          {detailData.preferences.notifications
+                            ?.emailNotifications
+                            ? "Bật"
+                            : "Tắt"}
+                        </Descriptions.Item>
+                        <Descriptions.Item label="Thông báo job alerts">
+                          {detailData.preferences.notifications?.jobAlerts
+                            ? "Bật"
+                            : "Tắt"}
+                        </Descriptions.Item>
+                      </Descriptions>
+                    </Col>
+                  </Row>
+                </Card>
+              )}
+            </Col>
+
+            <Col xs={24} lg={8}>
+              {!detailData?.isActive && (
+                <Alert
+                  type="warning"
+                  showIcon
+                  message="Tài khoản chưa kích hoạt"
+                  description="Người dùng này cần được kích hoạt trước khi sử dụng tính năng tuyển dụng."
+                  style={{ borderRadius: 16, marginBottom: 20 }}
                 />
-              </div>
-            </div>
-            <div>
-              <div className="text-base text-[#003478] font-semibold">
-                {detailData?.fullName ||
-                  `${detailData?.profile?.firstName || ""} ${
-                    detailData?.profile?.lastName || ""
-                  }`.trim() ||
-                  "Chưa có tên"}
-              </div>
-              <div className="text-xs text-[#969696]">
-                {getRoleText(detailData?.role)}
-              </div>
-              <StatusWidget
-                status={detailData?.isActive ? "Active" : "InActive"}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-x-8 gap-y-4 mt-6 text-sm">
-            {getUserData(detailData).map((item) => (
-              <div key={item.label}>
-                <div className="text-[#003478]">{item.label}</div>
-                <div className="h-[0.5px] max-w-[80px] bg-[#003478] mt-[0.5px] mb-1"></div>
-                <div className="text-gray-900">{item.value || "-"}</div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4">
-            <button className="btn btn-active flex gap-[5px]">
-              <img src="/icons/accounts/ic-btn-approve.svg" />
-              Duyệt tài khoản
-            </button>
-          </div>
-        </div>
-        <div className="w-[30%] bg-white shadow-md rounded-2xl p-6 mt-4">
-          <div className="text-[#003478] font-semibold mb-4">
-            Thông tin bổ sung
-          </div>
+              )}
 
-          {/* Preferences */}
-          {detailData?.preferences && (
-            <div className="mb-6">
-              <div className="text-[#003478] text-sm font-medium mb-2">
-                Cài đặt riêng tư
-              </div>
-              <div className="space-y-1 text-xs text-gray-600">
-                <div>
-                  Hiển thị hồ sơ:{" "}
-                  {detailData.preferences.privacySettings?.profileVisibility ===
-                  "public"
-                    ? "Công khai"
-                    : "Riêng tư"}
-                </div>
-                <div>
-                  Hiển thị email:{" "}
-                  {detailData.preferences.privacySettings?.showEmail
-                    ? "Có"
-                    : "Không"}
-                </div>
-                <div>
-                  Hiển thị SĐT:{" "}
-                  {detailData.preferences.privacySettings?.showPhone
-                    ? "Có"
-                    : "Không"}
-                </div>
-              </div>
-            </div>
-          )}
+              <Card
+                title="Thông tin liên hệ"
+                style={{ borderRadius: 16, marginBottom: 20 }}
+              >
+                <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                  <div>
+                    <Text type="secondary">Email</Text>
+                    <div style={{ fontWeight: 600 }}>
+                      {detailData?.email || "-"}
+                    </div>
+                  </div>
+                  <Divider style={{ margin: "8px 0" }} />
+                  <div>
+                    <Text type="secondary">Số điện thoại</Text>
+                    <div style={{ fontWeight: 600 }}>
+                      {detailData?.profile?.phone || "-"}
+                    </div>
+                  </div>
+                  <Divider style={{ margin: "8px 0" }} />
+                  <div>
+                    <Text type="secondary">Địa điểm</Text>
+                    <div style={{ fontWeight: 600 }}>
+                      {detailData?.profile?.location?.country || "Không rõ"}
+                    </div>
+                  </div>
+                </Space>
+              </Card>
 
-          {/* Notifications */}
-          {detailData?.preferences?.notifications && (
-            <div className="mb-6">
-              <div className="text-[#003478] text-sm font-medium mb-2">
-                Thông báo
-              </div>
-              <div className="space-y-1 text-xs text-gray-600">
-                <div>
-                  Email:{" "}
-                  {detailData.preferences.notifications.emailNotifications
-                    ? "Bật"
-                    : "Tắt"}
-                </div>
-                <div>
-                  Push:{" "}
-                  {detailData.preferences.notifications.pushNotifications
-                    ? "Bật"
-                    : "Tắt"}
-                </div>
-                <div>
-                  Cảnh báo việc làm:{" "}
-                  {detailData.preferences.notifications.jobAlerts
-                    ? "Bật"
-                    : "Tắt"}
-                </div>
-                <div>
-                  Cập nhật ứng tuyển:{" "}
-                  {detailData.preferences.notifications.applicationUpdates
-                    ? "Bật"
-                    : "Tắt"}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* System Info */}
-          <div className="mb-6">
-            <div className="text-[#003478] text-sm font-medium mb-2">
-              Thông tin hệ thống
-            </div>
-            <div className="space-y-1 text-xs text-gray-600">
-              <div>Ngôn ngữ: {detailData?.preferences?.language || "vi"}</div>
-              <div>
-                Múi giờ:{" "}
-                {detailData?.preferences?.timezone || "Asia/Ho_Chi_Minh"}
-              </div>
-              <div>Email Status: {detailData?.emailStatus || "unknown"}</div>
-            </div>
-          </div>
-
-          {/* Location */}
-          {detailData?.profile?.location && (
-            <div className="mb-6">
-              <div className="text-[#003478] text-sm font-medium mb-2">
-                Vị trí
-              </div>
-              <div className="space-y-1 text-xs text-gray-600">
-                <div>
-                  Quốc gia: {detailData.profile.location.country || "-"}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </Spin>
+              <Card title="Hành động" style={{ borderRadius: 16 }}>
+                <Space direction="vertical" style={{ width: "100%" }}>
+                  <Button type="primary" icon={<CheckCircleOutlined />}>
+                    Phê duyệt / kích hoạt
+                  </Button>
+                  <Button danger icon={<ClockCircleOutlined />}>
+                    Khoá tài khoản
+                  </Button>
+                </Space>
+              </Card>
+            </Col>
+          </Row>
+        )}
+      </Spin>
+    </div>
   );
 }
