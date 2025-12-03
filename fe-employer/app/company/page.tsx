@@ -854,15 +854,15 @@ export default function CompanyPage() {
                     <Label htmlFor="company.website">Website</Label>
                     <Input
                       id="company.website"
-                      type="url"
-                      placeholder="https://example.com hoặc example.com"
+                      // Chuyển thành type="text" để cho phép nhập các dạng như bluewaveagency.vn, example.com, v.v.
+                      type="text"
+                      placeholder="https://example.com, example.com"
                       value={formData.company.website}
-                      onChange={(e) =>
-                        setField("company.website", e.target.value)
-                      }
+                      onChange={(e) => setField("company.website", e.target.value)}
+                      pattern="^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(\/.*)?$"
                     />
                     <p className="text-xs text-slate-500 mt-1">
-                      Hệ thống sẽ tự động thêm https:// nếu bạn chưa nhập
+                      Bạn có thể nhập dạng https://example.com, example.com hoặc bluewaveagency.vn - hệ thống sẽ tự động thêm https:// nếu bạn chưa nhập.
                     </p>
                   </div>
                 </div>

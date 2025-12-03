@@ -20,6 +20,9 @@ import HeroSection from "@/components/layout/hero-section";
 import { useEffect, useState } from "react";
 import { jobsAPI, JobItem } from "@/lib/api";
 import { Row, Col } from "antd";
+import JobFilters, {
+  JobFilters as JobFiltersType,
+} from "@/components/jobs/JobFilters";
 interface HomePageProps {
   onSearch?: (keyword: string) => void;
 }
@@ -33,6 +36,7 @@ export default function HomePage({ onSearch }: HomePageProps) {
   const [pageSize, setPageSize] = useState(9);
   const [totalJobs, setTotalJobs] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [filters, setFilters] = useState<JobFiltersType>({});
   const searchParams = useSearchParams();
 
   const buildFiltersFromSearchParams = () => {
@@ -54,23 +58,30 @@ export default function HomePage({ onSearch }: HomePageProps) {
     const filters: any = {
       q: get("q") || get("search"), // Support both 'q' and 'search'
       location: get("location"),
+      city: get("city"),
+      district: get("district"),
       skills: getList("skills"),
       employer: get("employer"),
       status: get("status") || "active", // Default to active for public
       jobType: get("jobType"),
+      level: get("level"),
+      workingMode: get("workingMode"),
       employmentType: get("employmentType"), // New
       experienceLevel: get("experienceLevel"), // New
       industry: get("industry"),
       industryCode: get("industryCode"), // New - preferred over industry
+      subIndustryCode: get("subIndustryCode"),
       category: get("category"),
       salaryMin: getNumber("salaryMin") || getNumber("minSalary"), // Support both
       salaryMax: getNumber("salaryMax") || getNumber("maxSalary"), // Support both
       minSalary: getNumber("minSalary") || getNumber("salaryMin"), // Support both
       maxSalary: getNumber("maxSalary") || getNumber("salaryMax"), // Support both
+      salaryRange: get("salaryRange"),
       createdFrom: get("createdFrom"),
       createdTo: get("createdTo"),
       deadlineFrom: get("deadlineFrom"),
       deadlineTo: get("deadlineTo"),
+      isUrgent: get("isUrgent") === "true",
       tags: getList("tags"),
       sortBy: get("sortBy") || "createdAt",
       sortOrder: (get("sortOrder") as any) || "desc",
@@ -92,19 +103,45 @@ export default function HomePage({ onSearch }: HomePageProps) {
     }
   };
 
-  const handleFiltersChange = (filters: any) => {
+  const handleFiltersChange = (newFilters: JobFiltersType) => {
+    setFilters(newFilters);
+    // Update URL params
     const qs = new URLSearchParams();
-    if (filters.search) qs.set("q", filters.search);
-    if (filters.location) qs.set("location", filters.location);
-    if (filters.employmentType)
-      qs.set("employmentType", filters.employmentType);
-    if (filters.experienceLevel)
-      qs.set("experienceLevel", filters.experienceLevel);
-    if (filters.industryCode) qs.set("industryCode", filters.industryCode);
-    if (filters.skills) qs.set("skills", filters.skills.join(","));
-    if (filters.minSalary) qs.set("minSalary", String(filters.minSalary));
-    if (filters.maxSalary) qs.set("maxSalary", String(filters.maxSalary));
-    router.push(`/search?${qs.toString()}`);
+    if (newFilters.q) qs.set("q", newFilters.q);
+    if (newFilters.location) qs.set("location", newFilters.location);
+    if (newFilters.city) qs.set("city", newFilters.city);
+    if (newFilters.district) qs.set("district", newFilters.district);
+    if (newFilters.jobType) qs.set("jobType", newFilters.jobType);
+    if (newFilters.level) qs.set("level", newFilters.level);
+    if (newFilters.workingMode) qs.set("workingMode", newFilters.workingMode);
+    if (newFilters.industryCode)
+      qs.set("industryCode", newFilters.industryCode);
+    if (newFilters.subIndustryCode)
+      qs.set("subIndustryCode", newFilters.subIndustryCode);
+    if (newFilters.skills && newFilters.skills.length > 0)
+      qs.set("skills", newFilters.skills.join(","));
+    if (newFilters.salaryMin || newFilters.minSalary)
+      qs.set("minSalary", String(newFilters.salaryMin || newFilters.minSalary));
+    if (newFilters.salaryMax || newFilters.maxSalary)
+      qs.set("maxSalary", String(newFilters.salaryMax || newFilters.maxSalary));
+    if (newFilters.salaryRange) qs.set("salaryRange", newFilters.salaryRange);
+    if (newFilters.createdFrom) qs.set("createdFrom", newFilters.createdFrom);
+    if (newFilters.createdTo) qs.set("createdTo", newFilters.createdTo);
+    if (newFilters.deadlineFrom)
+      qs.set("deadlineFrom", newFilters.deadlineFrom);
+    if (newFilters.deadlineTo) qs.set("deadlineTo", newFilters.deadlineTo);
+    if (newFilters.isUrgent) qs.set("isUrgent", "true");
+    if (newFilters.sortBy) qs.set("sortBy", newFilters.sortBy);
+    if (newFilters.sortOrder) qs.set("sortOrder", newFilters.sortOrder);
+
+    // Update URL - this will trigger useEffect to re-fetch
+    const newUrl = qs.toString() ? `/?${qs.toString()}` : "/";
+    router.push(newUrl);
+  };
+
+  const handleFiltersReset = () => {
+    setFilters({});
+    router.push("/");
   };
   const fetchJobs = async (page = currentPage, limit = pageSize) => {
     try {
@@ -128,6 +165,14 @@ export default function HomePage({ onSearch }: HomePageProps) {
       setLoading(false);
     }
   };
+
+  // Sync filters from URL params on mount and when URL changes
+  useEffect(() => {
+    const urlFilters = buildFiltersFromSearchParams();
+    if (urlFilters) {
+      setFilters(urlFilters);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     // re-fetch when URL filters change
@@ -163,6 +208,16 @@ export default function HomePage({ onSearch }: HomePageProps) {
         />
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 py-12">
+          {/* Job Filters */}
+          <div className="mb-6">
+            <JobFilters
+              filters={filters}
+              onChange={handleFiltersChange}
+              onReset={handleFiltersReset}
+              showAdvanced={false}
+            />
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             {/* Main Content */}
             <div className="lg:col-span-3">
@@ -171,7 +226,7 @@ export default function HomePage({ onSearch }: HomePageProps) {
                 <div className="flex items-center justify-between mb-6">
                   <div>
                     <h2 className="text-3xl font-bold text-slate-900 mb-2">
-                      Việc làm tốt nhất
+                      Việc làm từ InternBridge
                     </h2>
                     <p className="text-sm text-slate-600">
                       Khám phá cơ hội nghề nghiệp phù hợp với bạn
