@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { Download, Loader2, Save } from "lucide-react";
 import type { CVData } from "../../lib/mocks/cvSamples";
 import { templateLayouts } from "../../lib/mocks/templateLayouts";
 import LivePreview from "./LivePreview";
@@ -38,7 +39,13 @@ type Props = {
   resumeId?: string | null; // ResumeBuilder ID nếu đã có (để update thay vì create mới)
 };
 
-export default function CVEditor({ data, onChange, templateId, templateConfig, resumeId }: Props) {
+export default function CVEditor({
+  data,
+  onChange,
+  templateId,
+  templateConfig,
+  resumeId,
+}: Props) {
   // Ưu tiên dùng layout từ templateConfig, fallback về templateLayouts
   const layout = useMemo(() => {
     if (templateConfig?.renderLayout) {
@@ -194,11 +201,11 @@ export default function CVEditor({ data, onChange, templateId, templateConfig, r
           templateId,
           true // setAsDefault = true
         );
-        
+
         if (!createResponse.success) {
           throw new Error("Không thể tạo CV từ template");
         }
-        
+
         console.log("✅ ResumeBuilder created:", createResponse.data);
       }
 
@@ -264,25 +271,23 @@ export default function CVEditor({ data, onChange, templateId, templateConfig, r
   };
 
   return (
-    <div className="p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-sm text-gray-500">
-          Font: {layout.fonts.heading}/{layout.fonts.body} • Màu:{" "}
-          {layout.colors.primary}
-          {hasUnsavedChanges && (
-            <span className="ml-2 text-orange-600">• Có thay đổi chưa lưu</span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-border/40 bg-white/80 px-5 py-4 shadow-sm backdrop-blur dark:border-slate-800 dark:bg-slate-950/40">
+        <div className="flex flex-wrap items-center justify-end gap-3">
           <button
-            className="bg-green-600 hover:bg-green-700 text-white rounded px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
             onClick={handleSave}
             disabled={saving || !hasUnsavedChanges}
           >
-            {saving ? "Đang lưu..." : "Lưu"}
+            {saving ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
+            <span>{saving ? "Đang lưu..." : "Lưu thay đổi"}</span>
           </button>
           <button
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded px-3 py-2"
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-300 hover:shadow dark:border-slate-700 dark:bg-slate-900 dark:text-white"
             onClick={async () => {
               setExporting(true);
               if (previewRef.current) {
@@ -291,61 +296,82 @@ export default function CVEditor({ data, onChange, templateId, templateConfig, r
               setExporting(false);
             }}
           >
-            Xuất PDF
+            {exporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            <span>{exporting ? "Đang xuất..." : "Xuất PDF"}</span>
           </button>
         </div>
+        <p
+          className={`mt-3 text-right text-xs font-medium ${
+            hasUnsavedChanges
+              ? "text-amber-600 dark:text-amber-400"
+              : "text-emerald-600 dark:text-emerald-400"
+          }`}
+        >
+          {hasUnsavedChanges
+            ? "Có thay đổi chưa lưu"
+            : "Mọi thay đổi đã được đồng bộ"}
+        </p>
       </div>
-      <div>
-        <LivePreview
-          data={state.cvData}
-          layout={layout}
-          templateId={templateConfig?.id} // Truyền template ID để map với renderer
-          containerRef={(el) => (previewRef.current = el)}
-          editable={inlineEditing && !exporting}
-          onChangeText={(path, value) => {
-            state.updateCvText(path, value);
-            onChange(state.cvData);
-            setHasUnsavedChanges(true);
-          }}
-          onFocusField={(fp) => state.setEditingField(fp)}
-          onBlurField={() => {
-            onChange(state.cvData);
-            state.setEditingField(null);
-          }}
-          editingField={state.editingField}
-          onAddItem={(section, index) => {
-            state.addItem(section, index);
-            onChange(state.cvData);
-            setHasUnsavedChanges(true);
-          }}
-          onDeleteItem={(section, index) => {
-            state.deleteItem(section, index);
-            onChange(state.cvData);
-            setHasUnsavedChanges(true);
-          }}
-          onDuplicateItem={(section, index) => {
-            state.duplicateItem(section, index);
-            onChange(state.cvData);
-            setHasUnsavedChanges(true);
-          }}
-          onMoveItemUp={(section, index) => {
-            state.moveItemUp(section, index);
-            onChange(state.cvData);
-            setHasUnsavedChanges(true);
-          }}
-          onMoveItemDown={(section, index) => {
-            state.moveItemDown(section, index);
-            onChange(state.cvData);
-            setHasUnsavedChanges(true);
-          }}
-          onUpdateSectionTitle={(section, newTitle) => {
-            state.updateSectionTitle(section, newTitle);
-            onChange(state.cvData);
-            setHasUnsavedChanges(true);
-          }}
-          getSectionTitle={state.getSectionTitle}
-          onAvatarChange={handleAvatarChange}
-        />
+
+      <div className="relative rounded-[40px] border border-slate-200 bg-gradient-to-b from-white to-slate-50 p-4 shadow-2xl ring-1 ring-black/5 dark:border-slate-800 dark:from-slate-900 dark:to-slate-900/80">
+        <div className="mx-auto w-full max-w-[880px]">
+          <LivePreview
+            data={state.cvData}
+            layout={layout}
+            templateId={templateConfig?.id} // Truyền template ID để map với renderer
+            containerRef={(el) => (previewRef.current = el)}
+            editable={inlineEditing && !exporting}
+            onChangeText={(path, value) => {
+              state.updateCvText(path, value);
+              onChange(state.cvData);
+              setHasUnsavedChanges(true);
+            }}
+            onFocusField={(fp) => state.setEditingField(fp)}
+            onBlurField={() => {
+              onChange(state.cvData);
+              state.setEditingField(null);
+            }}
+            editingField={state.editingField}
+            onAddItem={(section, index) => {
+              state.addItem(section, index);
+              onChange(state.cvData);
+              setHasUnsavedChanges(true);
+            }}
+            onDeleteItem={(section, index) => {
+              state.deleteItem(section, index);
+              onChange(state.cvData);
+              setHasUnsavedChanges(true);
+            }}
+            onDuplicateItem={(section, index) => {
+              state.duplicateItem(section, index);
+              onChange(state.cvData);
+              setHasUnsavedChanges(true);
+            }}
+            onMoveItemUp={(section, index) => {
+              state.moveItemUp(section, index);
+              onChange(state.cvData);
+              setHasUnsavedChanges(true);
+            }}
+            onMoveItemDown={(section, index) => {
+              state.moveItemDown(section, index);
+              onChange(state.cvData);
+              setHasUnsavedChanges(true);
+            }}
+            onUpdateSectionTitle={(section, newTitle) => {
+              state.updateSectionTitle(section, newTitle);
+              onChange(state.cvData);
+              setHasUnsavedChanges(true);
+            }}
+            getSectionTitle={state.getSectionTitle}
+            onAvatarChange={handleAvatarChange}
+          />
+        </div>
+
+        <div className="pointer-events-none absolute inset-0 rounded-[40px] ring-1 ring-white/60 dark:ring-white/10" />
       </div>
     </div>
   );

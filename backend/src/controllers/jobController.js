@@ -17,6 +17,73 @@ const {
   APPLICATION_STATUS,
 } = require('../constants/common.constants');
 
+const JOB_TYPE_ALIAS = {
+  fulltime: 'Fulltime',
+  'full-time': 'Fulltime',
+  parttime: 'Parttime',
+  'part-time': 'Parttime',
+  intern: 'Intern',
+  internship: 'Intern',
+  freelance: 'Freelance',
+  contractor: 'Freelance',
+  contract: 'Freelance',
+  remote: 'Remote',
+  hybrid: 'Hybrid',
+};
+
+const STATUS_ALIAS = {
+  open: JOB_STATUS.ACTIVE,
+  active: JOB_STATUS.ACTIVE,
+  published: JOB_STATUS.ACTIVE,
+  draft: JOB_STATUS.DRAFT,
+  pending: JOB_STATUS.PENDING,
+  paused: JOB_STATUS.PAUSED,
+  closed: JOB_STATUS.CLOSED,
+  filled: JOB_STATUS.FILLED,
+  rejected: JOB_STATUS.REJECTED,
+  deleted: JOB_STATUS.DELETED,
+};
+
+const ESCAPE_REGEX = /[.*+?^${}()|[\]\\]/g;
+const escapeRegex = value => value.replace(ESCAPE_REGEX, '\\$&');
+const buildContainsRegex = value => new RegExp(escapeRegex(value), 'i');
+const buildExactRegex = value => new RegExp(`^${escapeRegex(value)}$`, 'i');
+
+const normalizeJobType = type => {
+  if (!type) return null;
+  const raw = type.toString().trim();
+  const alias = JOB_TYPE_ALIAS[raw.toLowerCase()];
+  if (alias) return alias;
+  const allowed = [
+    'Fulltime',
+    'Parttime',
+    'Intern',
+    'Freelance',
+    'Remote',
+    'Hybrid',
+  ];
+  return allowed.includes(raw) ? raw : null;
+};
+
+const normalizeStatus = status => {
+  if (!status) return null;
+  const raw = status.toString().trim().toLowerCase();
+  if (STATUS_ALIAS[raw]) return STATUS_ALIAS[raw];
+  return Object.values(JOB_STATUS).includes(raw) ? raw : null;
+};
+
+const parsePositiveNumber = value => {
+  if (value === undefined || value === null || value === '') return null;
+  const num = Number(value);
+  return Number.isFinite(num) && num >= 0 ? num : null;
+};
+
+const parseDateValue = value => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 // @desc    Get all jobs with filtering and pagination (supports text search)
 // @route   GET /api/jobs
 // @access  Public
@@ -28,17 +95,15 @@ const getAllJobs = async (req, res) => {
     const {
       page = 1,
       limit = 10,
-      q, // Text search query
+      q,
       location,
+      city,
       skills,
       employer,
       status,
       jobType,
-      industry, // legacy string filter
-      industryCode, // new normalized filter (root or leaf)
-      subIndustryCode, // new leaf filter
-      includeDescendants = 'true', // include children via industryPath
-      category,
+      industryCode,
+      subIndustryCode,
       salaryMin,
       salaryMax,
       createdFrom,
@@ -46,88 +111,154 @@ const getAllJobs = async (req, res) => {
       deadlineFrom,
       deadlineTo,
       tags,
-      sortBy = 'createdAt', // Default: sort by creation date
-      sortOrder = 'desc', // Default: descending (newest first)
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
     } = req.query;
 
     const view = req.query.view || 'summary';
+    const currentPage = Math.max(parseInt(page, 10) || 1, 1);
+    const perPage = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100);
+    const skip = (currentPage - 1) * perPage;
 
-    const query = {};
-    if (q) {
-      query.$text = { $search: q };
+    const baseFilters = {};
+    const compoundFilters = [];
+
+    if (q && q.trim()) {
+      const searchRegex = buildContainsRegex(q.trim());
+      compoundFilters.push({
+        $or: [
+          { title: searchRegex },
+          { description: searchRegex },
+          { requirements: searchRegex },
+          { 'address.fullAddress': searchRegex },
+        ],
+      });
     }
-    if (location) {
-      query['location'] = { $regex: location, $options: 'i' };
+
+    if (city && city.trim()) {
+      baseFilters['address.city'] = buildContainsRegex(city.trim());
     }
-    if (skills) {
-      const skillArray = skills.split(',').map(skill => skill.trim());
-      query['skills'] = { $in: skillArray };
+
+    if (location && location.trim()) {
+      const locationRegex = buildContainsRegex(location.trim());
+      compoundFilters.push({
+        $or: [
+          { 'address.fullAddress': locationRegex },
+          { 'address.street': locationRegex },
+          { 'address.ward': locationRegex },
+          { 'address.district': locationRegex },
+          { 'address.city': locationRegex },
+          { 'address.country': locationRegex },
+          { location: locationRegex },
+        ],
+      });
     }
-    if (employer) {
-      query['employer'] = employer;
+
+    if (skills && skills.trim()) {
+      const skillArray = skills
+        .split(',')
+        .map(skill => skill.trim())
+        .filter(Boolean);
+      if (skillArray.length > 0) {
+        compoundFilters.push({
+          $or: skillArray.map(skill => ({
+            skills: buildContainsRegex(skill),
+          })),
+        });
+      }
     }
-    if (status) {
-      query['status'] = status;
+
+    if (employer && employer.trim()) {
+      baseFilters.employer = employer.trim();
+    }
+
+    const normalizedStatus = normalizeStatus(status);
+    if (normalizedStatus) {
+      baseFilters.status = normalizedStatus;
     } else if (req.user?.role !== 'admin') {
-      // Public users chỉ thấy jobs đang mở/active
-      query['status'] = { $in: [JOB_STATUS.OPEN, JOB_STATUS.ACTIVE] };
-    } else {
-      // Admin có thể thấy tất cả trừ deleted (trừ khi explicitly request)
-      if (req.query.includeDeleted !== 'true') {
-        query['status'] = { $ne: JOB_STATUS.DELETED };
-      }
+      baseFilters.status = JOB_STATUS.ACTIVE;
     }
-    if (jobType) {
-      query['jobType'] = jobType;
-    }
-    // New normalized industry filters
-    if (subIndustryCode) {
-      query['subIndustryCode'] = subIndustryCode;
-    } else if (industryCode) {
-      if (includeDescendants !== 'false') {
-        // Use industryPath array contains to include children without extra queries
-        query['industryPath'] = industryCode;
-      } else {
-        query['industryCode'] = industryCode;
-      }
-    } else if (industry) {
-      // Backward-compatibility: legacy string filter
-      query['industry'] = { $regex: industry, $options: 'i' };
-    }
-    if (category) {
-      query['category'] = { $regex: category, $options: 'i' };
-    }
-    if (salaryMin || salaryMax) {
-      query['salaryMin'] = salaryMin ? { $gte: Number(salaryMin) } : undefined;
-      query['salaryMax'] = salaryMax ? { $lte: Number(salaryMax) } : undefined;
-    }
-    if (createdFrom || createdTo) {
-      query['createdAt'] = {};
-      if (createdFrom) query['createdAt'].$gte = new Date(createdFrom);
-      if (createdTo) query['createdAt'].$lte = new Date(createdTo);
-    }
-    if (deadlineFrom || deadlineTo) {
-      query['deadline'] = {};
-      if (deadlineFrom) query['deadline'].$gte = new Date(deadlineFrom);
-      if (deadlineTo) query['deadline'].$lte = new Date(deadlineTo);
-    }
-    if (tags) {
-      const tagArray = tags.split(',').map(tag => tag.trim());
-      query['tags'] = { $in: tagArray };
-    }
-    // Xóa các filter undefined
-    Object.keys(query).forEach(key => {
-      if (
-        query[key] === undefined ||
-        (typeof query[key] === 'object' && Object.keys(query[key]).length === 0)
-      ) {
-        delete query[key];
-      }
-    });
 
-    const skip = (page - 1) * limit;
+    if (req.user?.role === 'admin' && req.query.includeDeleted === 'true') {
+      // admins can see everything including deleted if explicitly requested
+    } else if (req.user?.role === 'admin') {
+      baseFilters.status = baseFilters.status || { $ne: JOB_STATUS.DELETED };
+    }
 
-    // Build sort object - ALWAYS sort (default: createdAt desc = newest first)
+    const normalizedJobType = normalizeJobType(jobType);
+    if (normalizedJobType) {
+      baseFilters.jobType = normalizedJobType;
+    }
+
+    if (subIndustryCode && subIndustryCode.trim()) {
+      baseFilters.subIndustryCode = buildExactRegex(subIndustryCode.trim());
+    } else if (industryCode && industryCode.trim()) {
+      baseFilters.industryCode = buildExactRegex(industryCode.trim());
+    }
+
+    const minSalaryValue = parsePositiveNumber(salaryMin);
+    if (minSalaryValue !== null) {
+      baseFilters.salaryMax = {
+        ...(baseFilters.salaryMax || {}),
+        $gte: minSalaryValue,
+      };
+    }
+
+    const maxSalaryValue = parsePositiveNumber(salaryMax);
+    if (maxSalaryValue !== null) {
+      baseFilters.salaryMin = {
+        ...(baseFilters.salaryMin || {}),
+        $lte: maxSalaryValue,
+      };
+    }
+
+    const createdFromDate = parseDateValue(createdFrom);
+    const createdToDate = parseDateValue(createdTo);
+    if (createdFromDate || createdToDate) {
+      baseFilters.createdAt = {};
+      if (createdFromDate) {
+        baseFilters.createdAt.$gte = createdFromDate;
+      }
+      if (createdToDate) {
+        baseFilters.createdAt.$lte = createdToDate;
+      }
+      if (!Object.keys(baseFilters.createdAt).length) {
+        delete baseFilters.createdAt;
+      }
+    }
+
+    const deadlineFromDate = parseDateValue(deadlineFrom);
+    const deadlineToDate = parseDateValue(deadlineTo);
+    if (deadlineFromDate || deadlineToDate) {
+      baseFilters.deadline = {};
+      if (deadlineFromDate) {
+        baseFilters.deadline.$gte = deadlineFromDate;
+      }
+      if (deadlineToDate) {
+        baseFilters.deadline.$lte = deadlineToDate;
+      }
+      if (!Object.keys(baseFilters.deadline).length) {
+        delete baseFilters.deadline;
+      }
+    }
+
+    if (tags && tags.trim()) {
+      const tagArray = tags
+        .split(',')
+        .map(tag => tag.trim())
+        .filter(Boolean);
+      if (tagArray.length > 0) {
+        baseFilters.tags = { $in: tagArray };
+      }
+    }
+
+    let query = { ...baseFilters };
+    if (compoundFilters.length === 1) {
+      query = { ...query, ...compoundFilters[0] };
+    } else if (compoundFilters.length > 1) {
+      query.$and = compoundFilters;
+    }
+
     const validSortFields = [
       'createdAt',
       'updatedAt',
@@ -138,9 +269,9 @@ const getAllJobs = async (req, res) => {
       'views',
       'stats.applications',
     ];
-    const safeSortBy = validSortFields.includes(sortBy) ? sortBy : 'createdAt'; // Fallback to createdAt if invalid
-    const sortObj = {};
-    sortObj[safeSortBy] = sortOrder === 'desc' ? -1 : 1;
+    const safeSortBy = validSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const sortDirection = sortOrder === 'asc' ? 1 : -1;
+    const sortObj = { [safeSortBy]: sortDirection };
 
     const projection = {
       title: 1,
@@ -175,73 +306,69 @@ const getAllJobs = async (req, res) => {
     let jobs;
     if (view === 'full') {
       jobs = await Job.find(query)
-      .populate(
-        'employer',
-        'company.name company.logo company.industry company.description company.website company.size company.officeAddress contact.phone contact.email'
-      )
-      .populate('postedBy', 'fullName name email avatar')
-      .populate('skillIds', 'name category')
+        .populate(
+          'employer',
+          'company.name company.logo company.industry company.description company.website company.size company.officeAddress contact.phone contact.email'
+        )
+        .populate('postedBy', 'fullName name email avatar')
+        .populate('skillIds', 'name category')
         .sort(sortObj)
-      .skip(skip)
-      .limit(parseInt(limit));
+        .skip(skip)
+        .limit(perPage);
     } else {
       jobs = await Job.find(query)
         .select(projection)
         .populate('employer', 'company.name company.logo')
-        .sort(sortObj) // ALWAYS sorted (default: newest first by createdAt)
+        .sort(sortObj)
         .skip(skip)
-        .limit(parseInt(limit))
+        .limit(perPage)
         .lean({ virtuals: true });
     }
 
     const total = await Job.countDocuments(query);
 
-    // Try to get from cache first
-    const cacheService = getCacheService();
-    let formattedJobs = null;
-    
-    if (cacheService) {
-      formattedJobs = await cacheService.getCachedJobList({
-        ...req.query,
-        view,
-      });
-    }
-
-    // If not in cache, fetch and format
-    if (!formattedJobs) {
-      if (view === 'full') {
+    // Always format directly from DB results (no cache)
+    let formattedJobs;
+    if (view === 'full') {
       // Process jobs to populate skillIds and industryPath for old jobs
       const { processJobData } = require('../utils/jobHelpers');
       const jobsToUpdate = [];
-      
-      // Process jobs that need skillIds or industryPath populated
+
       for (const job of jobs) {
         const jobObj = job.toObject ? job.toObject() : job;
-        const needsProcessing = 
-          (Array.isArray(jobObj.skills) && jobObj.skills.length > 0 && (!jobObj.skillIds || jobObj.skillIds.length === 0)) ||
-          ((jobObj.industryCode || jobObj.subIndustryCode) && (!jobObj.industryPath || jobObj.industryPath.length === 0));
-        
+        const needsProcessing =
+          (Array.isArray(jobObj.skills) &&
+            jobObj.skills.length > 0 &&
+            (!jobObj.skillIds || jobObj.skillIds.length === 0)) ||
+          ((jobObj.industryCode || jobObj.subIndustryCode) &&
+            (!jobObj.industryPath || jobObj.industryPath.length === 0));
+
         if (needsProcessing) {
           try {
             const processedData = await processJobData(jobObj);
-            
-            // Update job document in memory for response
+
             if (processedData.skillIds && processedData.skillIds.length > 0) {
               job.skillIds = processedData.skillIds;
-              // Re-populate skillIds for response
               await job.populate('skillIds', 'name category');
             }
-            if (processedData.industryPath && processedData.industryPath.length > 0) {
+            if (
+              processedData.industryPath &&
+              processedData.industryPath.length > 0
+            ) {
               job.industryPath = processedData.industryPath;
             }
-            
-            // Mark for database update (async, don't wait)
+
             jobsToUpdate.push({
               jobId: job._id,
               updates: {
-                ...(processedData.skillIds && processedData.skillIds.length > 0 ? { skillIds: processedData.skillIds } : {}),
-                ...(processedData.industryPath && processedData.industryPath.length > 0 ? { industryPath: processedData.industryPath } : {}),
-              }
+                ...(processedData.skillIds && processedData.skillIds.length > 0
+                  ? { skillIds: processedData.skillIds }
+                  : {}),
+                ...(processedData.industryPath &&
+                processedData.industryPath.length > 0
+                  ? { industryPath: processedData.industryPath }
+                  : {}),
+              },
             });
           } catch (error) {
             logger.error(`Error processing job ${job._id}:`, error);
@@ -249,38 +376,27 @@ const getAllJobs = async (req, res) => {
         }
       }
 
-      // Update database in background (don't block response)
       if (jobsToUpdate.length > 0) {
-        Promise.all(jobsToUpdate.map(async ({ jobId, updates }) => {
-          try {
-            if (Object.keys(updates).length > 0) {
-              await Job.findByIdAndUpdate(jobId, updates, { new: false });
+        Promise.all(
+          jobsToUpdate.map(async ({ jobId, updates }) => {
+            try {
+              if (Object.keys(updates).length > 0) {
+                await Job.findByIdAndUpdate(jobId, updates, { new: false });
+              }
+            } catch (error) {
+              logger.error(`Error updating job ${jobId} in database:`, error);
             }
-          } catch (error) {
-            logger.error(`Error updating job ${jobId} in database:`, error);
-          }
-        })).catch(error => {
+          })
+        ).catch(error => {
           logger.error('Error updating jobs in background:', error);
         });
       }
 
-        formattedJobs = formatJobsResponse(jobs, {
-          employerFields: 'full',
-        });
-      } else {
-        formattedJobs = formatMinimalJobsResponse(jobs);
-      }
-      
-      // Cache the results
-      if (cacheService) {
-        await cacheService.cacheJobList(
-          {
-            ...req.query,
-            view,
-          },
-          formattedJobs
-        );
-      }
+      formattedJobs = formatJobsResponse(jobs, {
+        employerFields: 'full',
+      });
+    } else {
+      formattedJobs = formatMinimalJobsResponse(jobs);
     }
 
     if (
@@ -305,33 +421,56 @@ const getAllJobs = async (req, res) => {
       }
     }
 
+    const appliedFiltersCount = [
+      q,
+      location,
+      city,
+      skills,
+      employer,
+      status,
+      jobType,
+      industryCode,
+      subIndustryCode,
+      salaryMin,
+      salaryMax,
+      createdFrom,
+      createdTo,
+      deadlineFrom,
+      deadlineTo,
+      tags,
+    ].filter(
+      value =>
+        value !== undefined && value !== null && String(value).trim() !== ''
+    ).length;
+
     res.status(200).json({
       success: true,
       pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page: currentPage,
+        limit: perPage,
         total,
-        pages: Math.ceil(total / limit),
+        pages: Math.ceil(total / perPage),
       },
       data: formattedJobs,
       filters: {
-        appliedFilters: Object.keys(query).length,
-        searchQuery: q || null,
+        appliedFilters: appliedFiltersCount,
+        searchQuery: q?.trim() || null,
         availableFilters: {
-          location: !!location,
-          skills: !!skills,
-          employer: !!employer,
-          status: !!status,
-          jobType: !!jobType,
-          industry: !!industry,
-          category: !!category,
-          salaryMin: !!salaryMin,
-          salaryMax: !!salaryMax,
-          createdFrom: !!createdFrom,
-          createdTo: !!createdTo,
-          deadlineFrom: !!deadlineFrom,
-          deadlineTo: !!deadlineTo,
-          tags: !!tags,
+          location: Boolean(location && location.trim()),
+          city: Boolean(city && city.trim()),
+          skills: Boolean(skills && skills.trim()),
+          employer: Boolean(employer && employer.trim()),
+          status: Boolean(status && status.trim()),
+          jobType: Boolean(jobType && jobType.trim()),
+          industryCode: Boolean(industryCode && industryCode.trim()),
+          subIndustryCode: Boolean(subIndustryCode && subIndustryCode.trim()),
+          salaryMin: minSalaryValue !== null,
+          salaryMax: maxSalaryValue !== null,
+          createdFrom: Boolean(createdFrom),
+          createdTo: Boolean(createdTo),
+          deadlineFrom: Boolean(deadlineFrom),
+          deadlineTo: Boolean(deadlineTo),
+          tags: Boolean(tags && tags.trim()),
         },
       },
     });
@@ -353,7 +492,7 @@ const getJob = async (req, res) => {
     const cacheService = getCacheService();
     let jobObj = null;
     let jobDocument = null;
-    
+
     if (cacheService) {
       jobObj = await cacheService.getCachedJobDetail(req.params.id);
     }
@@ -380,13 +519,13 @@ const getJob = async (req, res) => {
       // Format job using shared formatter
       jobObj = formatJobResponse(job);
       jobDocument = job;
-      
+
       // Cache the result
       if (cacheService) {
         await cacheService.cacheJobDetail(req.params.id, jobObj);
       }
     }
-    
+
     if (jobObj.postedBy) {
       const pb = jobObj.postedBy;
       const computedFullName =
@@ -418,7 +557,7 @@ const getJob = async (req, res) => {
         const [application, savedEntry] = await Promise.all([
           Application.findOne({
             jobId: jobIdToCheck,
-          candidateId: candidateProfile._id,
+            candidateId: candidateProfile._id,
           }),
           SavedJob.findOne({
             jobId: jobIdToCheck,
@@ -487,7 +626,7 @@ const createJob = async (req, res) => {
         addr.ward,
         addr.district,
         addr.city,
-        addr.country || 'Vietnam'
+        addr.country || 'Vietnam',
       ].filter(Boolean);
       jobData.address.fullAddress = addressParts.join(', ');
       // Set default country if not provided
@@ -570,7 +709,7 @@ const updateJob = async (req, res) => {
         addr.ward,
         addr.district,
         addr.city,
-        addr.country || 'Vietnam'
+        addr.country || 'Vietnam',
       ].filter(Boolean);
       updateData.address.fullAddress = addressParts.join(', ');
       // Set default country if not provided
@@ -590,13 +729,13 @@ const updateJob = async (req, res) => {
       .populate('employer', 'name logo industry description')
       .populate('postedBy', 'fullName name email avatar')
       .populate('skillIds', 'name category');
-    
+
     // Invalidate job caches when job is updated
     const cacheService = getCacheService();
     if (cacheService) {
       await cacheService.invalidateJobCache(req.params.id);
     }
-    
+
     res.status(200).json({ success: true, data: updatedJob });
   } catch (error) {
     logger.error('Error updating job:', error);
@@ -660,13 +799,13 @@ const deleteJob = async (req, res) => {
     job.deletedAt = new Date();
     job.deletedBy = req.user.id;
     await job.save();
-    
+
     // Invalidate job caches when job is deleted
     const cacheService = getCacheService();
     if (cacheService) {
       await cacheService.invalidateJobCache(req.params.id);
     }
-    
+
     res
       .status(200)
       .json({ success: true, message: 'Đã xóa công việc thành công' });
@@ -745,13 +884,13 @@ const applyForJob = async (req, res) => {
     });
     // Update job stats
     await Job.findByIdAndUpdate(id, { $inc: { 'stats.applications': 1 } });
-    
+
     // Notify employer về application mới
     try {
       const NotificationService = require('../services/notification/notificationService');
       const EmployerProfile = require('../models/EmployerProfile');
       const User = require('../models/User');
-      
+
       const employerProfile = await EmployerProfile.findById(job.employer);
       if (employerProfile && employerProfile.owner) {
         const employerUser = await User.findById(employerProfile.owner);
@@ -775,7 +914,7 @@ const applyForJob = async (req, res) => {
         applicationId: application._id,
       });
     }
-    
+
     // Notify candidate về application thành công
     try {
       const NotificationService = require('../services/notification/notificationService');
@@ -796,7 +935,7 @@ const applyForJob = async (req, res) => {
         candidateId: req.user.id,
       });
     }
-    
+
     res.status(201).json({ success: true, data: application });
   } catch (error) {
     logger.error('Error applying for job:', error);
@@ -976,18 +1115,18 @@ const getRecentJobs = async (req, res) => {
     // Try to get from cache first
     const cacheService = getCacheService();
     let formattedJobs = null;
-    
+
     if (cacheService) {
       formattedJobs = await cacheService.getCachedJobList({
         ...req.query,
-        sortBy: sortField
+        sortBy: sortField,
       });
     }
 
     // If not in cache, fetch and format
     if (!formattedJobs) {
       formattedJobs = formatMinimalJobsResponse(jobs);
-      
+
       // Cache the results
       if (cacheService) {
         await cacheService.cacheJobList(
@@ -1340,12 +1479,18 @@ const bulkCreateJobs = async (req, res) => {
         };
 
         // Process deadline: convert string to Date if needed
-        if (processedJobData.deadline && typeof processedJobData.deadline === 'string') {
+        if (
+          processedJobData.deadline &&
+          typeof processedJobData.deadline === 'string'
+        ) {
           processedJobData.deadline = new Date(processedJobData.deadline);
         }
 
         // Process address: build fullAddress if address is structured object
-        if (processedJobData.address && typeof processedJobData.address === 'object') {
+        if (
+          processedJobData.address &&
+          typeof processedJobData.address === 'object'
+        ) {
           const addr = processedJobData.address;
           const addressParts = [
             addr.street,
@@ -1395,10 +1540,13 @@ const bulkCreateJobs = async (req, res) => {
     }
 
     // Log result
-    logger.info(`Bulk create jobs: ${results.created.length} created, ${results.failed.length} failed`, {
-      userId: req.user.id,
-      employerId: employerProfile._id,
-    });
+    logger.info(
+      `Bulk create jobs: ${results.created.length} created, ${results.failed.length} failed`,
+      {
+        userId: req.user.id,
+        employerId: employerProfile._id,
+      }
+    );
 
     // Return response
     const allSucceeded = results.failed.length === 0;
@@ -1407,12 +1555,11 @@ const bulkCreateJobs = async (req, res) => {
     res.status(allSucceeded ? 201 : allFailed ? 400 : 207).json({
       success: !allFailed,
       data: results,
-      message:
-        allSucceeded
-          ? `Đã tạo thành công ${results.created.length} jobs`
-          : allFailed
-            ? `Không thể tạo job nào (${results.failed.length} lỗi)`
-            : `Đã tạo ${results.created.length}/${results.total} jobs thành công`,
+      message: allSucceeded
+        ? `Đã tạo thành công ${results.created.length} jobs`
+        : allFailed
+        ? `Không thể tạo job nào (${results.failed.length} lỗi)`
+        : `Đã tạo ${results.created.length}/${results.total} jobs thành công`,
     });
   } catch (error) {
     logger.error('Error in bulk create jobs:', error);
