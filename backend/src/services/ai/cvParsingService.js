@@ -502,13 +502,30 @@ Lưu ý: JSON thuần túy, không markdown. Trích xuất chính xác, giữ d�
       if (edu.field) edu.field = cleanText(edu.field);
     }
 
-    // Clean experience
+    // Clean experience AND validate dates
     if (parsedData.extractedData.experience && Array.isArray(parsedData.extractedData.experience)) {
-      parsedData.extractedData.experience.forEach(exp => {
+      parsedData.extractedData.experience = parsedData.extractedData.experience.map(exp => {
         if (exp.company) exp.company = cleanText(exp.company);
         if (exp.position) exp.position = cleanText(exp.position);
         if (exp.type) exp.type = cleanText(exp.type);
         if (exp.description) exp.description = cleanText(exp.description);
+        
+        // IMPORTANT: Validate and normalize dates
+        if (exp.startDate) {
+          exp.startDate = this.normalizeDate(exp.startDate);
+        }
+        if (exp.endDate) {
+          exp.endDate = this.normalizeDate(exp.endDate);
+        }
+        
+        return exp;
+      }).filter(exp => {
+        // Remove experiences with invalid startDate (unless they have meaningful data)
+        if (!exp.startDate && !exp.position && !exp.company) {
+          console.warn('⚠️ Removing experience with no startDate and no position/company');
+          return false;
+        }
+        return true;
       });
     }
 
@@ -736,12 +753,16 @@ Lưu ý: JSON thuần túy, không markdown. Trích xuất chính xác, giữ d�
       if (dateMatch) {
         if (currentExp) experiences.push(currentExp);
 
+        // Validate and normalize dates
+        const startDate = this.normalizeDate(dateMatch[1]);
+        const endDate = this.normalizeDate(dateMatch[2]);
+
         currentExp = {
           type: this.inferExperienceType(line),
           position: null,
           company: null,
-          startDate: dateMatch[1],
-          endDate: dateMatch[2],
+          startDate: startDate,
+          endDate: endDate,
           description: '',
           location: null,
         };
@@ -782,6 +803,59 @@ Lưu ý: JSON thuần túy, không markdown. Trích xuất chính xác, giữ d�
 
     if (currentExp) experiences.push(currentExp);
     return experiences;
+  }
+
+  /**
+   * Normalize date string to valid format or null
+   * Handles: MM/YYYY, "Hiện tại", "Present", "Current", null, undefined
+   * Returns: Valid date string, null (for present), or null (for invalid)
+   */
+  normalizeDate(dateStr) {
+    if (!dateStr) return null;
+
+    // Handle string "null" or "undefined"
+    if (typeof dateStr === 'string') {
+      const lower = dateStr.toLowerCase().trim();
+      
+      // Check for "present" indicators
+      if (lower === 'hiện tại' || lower === 'present' || lower === 'current' || lower === 'now') {
+        return null; // null means "present/current position"
+      }
+
+      // Check for literal "null" or "undefined"
+      if (lower === 'null' || lower === 'undefined') {
+        return null;
+      }
+
+      // Validate MM/YYYY format
+      const dateMatch = dateStr.match(/^(\d{1,2})\/(\d{4})$/);
+      if (dateMatch) {
+        const month = parseInt(dateMatch[1]);
+        const year = parseInt(dateMatch[2]);
+
+        // Validate month (1-12)
+        if (month < 1 || month > 12) {
+          console.warn(`⚠️ Invalid month in date: ${dateStr}`);
+          return null;
+        }
+
+        // Validate year (1950-2030)
+        if (year < 1950 || year > 2030) {
+          console.warn(`⚠️ Invalid year in date: ${dateStr}`);
+          return null;
+        }
+
+        // Pad month to 2 digits
+        const normalizedDate = `${month.toString().padStart(2, '0')}/${year}`;
+        return normalizedDate;
+      }
+
+      // If doesn't match MM/YYYY pattern
+      console.warn(`⚠️ Invalid date format: ${dateStr} (expected MM/YYYY)`);
+      return null;
+    }
+
+    return null;
   }
 
   /**

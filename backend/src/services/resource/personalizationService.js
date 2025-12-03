@@ -46,6 +46,11 @@ class PersonalizationService {
    * @returns {Array} Filtered resources
    */
   filterByBudget(resources, budget = 'free') {
+    // Convert budget to string if it's a number
+    if (typeof budget === 'number') {
+      budget = `< ${budget}`;
+    }
+    
     if (budget === 'any') {
       return resources;
     }

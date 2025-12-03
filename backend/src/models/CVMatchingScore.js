@@ -290,7 +290,7 @@ CVMatchingScoreSchema.statics.getCandidateMatchesForJobs = function (
 
 CVMatchingScoreSchema.statics.getMatchStatistics = async function (jobId) {
   const stats = await this.aggregate([
-    { $match: { jobId: mongoose.Types.ObjectId(jobId) } },
+    { $match: { jobId: new mongoose.Types.ObjectId(jobId) } },
     {
       $group: {
         _id: null,

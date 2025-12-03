@@ -14,6 +14,7 @@
  */
 
 const { logger } = require('../../utils/logger');
+const additionalResources = require('./curatedResourcesExtensions');
 
 class CuratedResourcesDatabase {
   constructor() {
@@ -365,6 +366,14 @@ class CuratedResourcesDatabase {
         ],
       },
     };
+    
+    // Merge additional resources from extensions
+    Object.assign(this.resources, additionalResources);
+    
+    logger.info('Curated Resources Database initialized', {
+      totalSkills: Object.keys(this.resources).length,
+      skills: Object.keys(this.resources).join(', ')
+    });
   }
 
   /**
@@ -385,6 +394,25 @@ class CuratedResourcesDatabase {
       'k8s': 'kubernetes',
       'js': 'javascript',
       'ts': 'typescript',
+      // UI/UX Design tools
+      'figma design tool': 'figma',
+      'figma design': 'figma',
+      'adobe xd design tool': 'adobe xd',
+      'adobe xd design': 'adobe xd',
+      'xd': 'adobe xd',
+      'sketch design tool': 'sketch',
+      'sketch app': 'sketch',
+      'design system': 'design systems',
+      // Frontend
+      'reactjs': 'react',
+      'react.js': 'react',
+      'vuejs': 'vue',
+      'vue.js': 'vue',
+      // Backend
+      'expressjs': 'express',
+      'express.js': 'express',
+      // Databases
+      'mongo': 'mongodb',
     };
     
     return aliases[normalized] || normalized;
@@ -415,10 +443,20 @@ class CuratedResourcesDatabase {
     let filtered = skillResources[type];
     if (difficulty) {
       filtered = filtered.filter(r => {
-        // Match exact difficulty or allow 'beginner' for all levels
-        return r.difficulty === difficulty || 
-               (difficulty === 'beginner' && !r.difficulty) ||
-               (difficulty === 'intermediate' && r.difficulty !== 'advanced');
+        if (!r.difficulty) return true; // No difficulty = suitable for all
+        
+        // Match logic:
+        // - beginner: show beginner only
+        // - intermediate: show beginner + intermediate
+        // - advanced: show all (beginner + intermediate + advanced)
+        if (difficulty === 'beginner') {
+          return r.difficulty === 'beginner';
+        } else if (difficulty === 'intermediate') {
+          return r.difficulty === 'beginner' || r.difficulty === 'intermediate';
+        } else if (difficulty === 'advanced') {
+          return true; // Show all levels for advanced users
+        }
+        return r.difficulty === difficulty;
       });
     }
     
