@@ -7962,7 +7962,7 @@ Return ONLY valid JSON (no markdown):
 
   _extractSkillFromWeekFocus(focusSkill = '', skillGap = {}) {
     if (skillGap?.skill) {
-      return this._normalizeSkillName(skillGap.skill);
+      return this._normalizeSkillNameSync(skillGap.skill);
     }
     if (!focusSkill || typeof focusSkill !== 'string') {
       return '';
@@ -7971,7 +7971,7 @@ Return ONLY valid JSON (no markdown):
     if (!base) {
       return '';
     }
-    return this._normalizeSkillName(base);
+    return this._normalizeSkillNameSync(base);
   }
 
   _determinePreferredLanguage(cvData = {}, jobData = {}) {
@@ -8026,7 +8026,7 @@ Return ONLY valid JSON (no markdown):
     const map = new Map();
     skillGaps.forEach((gap) => {
       if (!gap || !gap.skill) return;
-      const canonical = this._normalizeSkillName(gap.skill);
+      const canonical = this._normalizeSkillNameSync(gap.skill);
       const key = canonical || gap.skill.toLowerCase();
       if (!key) return;
 
@@ -8147,11 +8147,51 @@ Return ONLY valid JSON (no markdown):
 
   _calculateYearsOfExperience(startDate, endDate) {
     try {
+      // Validate startDate
+      if (!startDate || startDate === 'undefined' || startDate === 'null') {
+        return 0;
+      }
+
       const start = new Date(startDate);
-      const end = endDate ? new Date(endDate) : new Date();
+      
+      // Check if start date is valid
+      if (isNaN(start.getTime())) {
+        return 0;
+      }
+
+      // Validate endDate - if null/undefined/invalid, use current date
+      let end;
+      if (!endDate || endDate === 'undefined' || endDate === 'null' || endDate === null) {
+        end = new Date(); // Current position - use today
+      } else {
+        end = new Date(endDate);
+        // If end date is invalid, use current date
+        if (isNaN(end.getTime())) {
+          end = new Date();
+        }
+      }
+
+      // Sanity check: start date should not be in the future
+      const now = new Date();
+      if (start > now) {
+        return 0;
+      }
+
+      // Sanity check: end date should not be before start date
+      if (end < start) {
+        return 0;
+      }
+
+      // Sanity check: duration should not exceed 50 years (likely data error)
       const years = (end - start) / (1000 * 60 * 60 * 24 * 365);
+      if (years > 50) {
+        logger.warn(`Suspicious experience duration: ${years.toFixed(1)} years. Capping at 50.`);
+        return 50;
+      }
+
       return Math.max(0, Math.round(years * 10) / 10);
-    } catch {
+    } catch (error) {
+      logger.error('Error calculating years of experience:', error);
       return 0;
     }
   }

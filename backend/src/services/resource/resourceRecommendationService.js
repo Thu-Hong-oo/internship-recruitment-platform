@@ -19,6 +19,7 @@ const vectorStoreService = require('../ai/vectorStoreService');
 const resourceHealthCheckService = require('./resourceHealthCheckService');
 const realResourceUrlService = require('./realResourceUrlService');
 const curatedResourcesDatabase = require('./curatedResourcesDatabase');
+const intelligentResourceService = require('./intelligentResourceService'); // NEW: Intelligent fallback
 const youtubeApiService = require('../api/youtubeApiService');
 const githubApiService = require('../api/githubApiService');
 const googleSearchService = require('../api/googleSearchService');
@@ -119,7 +120,8 @@ class ResourceRecommendationService {
       // Validate input
       if (!skill || typeof skill !== 'string' || skill.trim().length === 0) {
         logger.warn('Invalid skill provided to recommendResources', { skill });
-        return this._getDefaultResources('General Programming');
+        // Return empty array instead of search URL fallback
+        return [];
       }
 
       const sanitizedSkill = this._sanitizeSkillQuery(skill);
@@ -205,8 +207,38 @@ class ResourceRecommendationService {
         });
       }
 
-      // 6. Fetch from APIs if not enough resources from RAG/curated
+      // 6. Use intelligent recommendations if not enough from RAG
+      // PRIORITY CHANGE: IntelligentResourceService provides curated, verified resources
+      // This should come BEFORE APIs (which return search URLs as last resort)
       if (resources.length < 5) {
+        try {
+          const intelligentResources = await this._generateIntelligentRecommendations({
+            skill: canonicalSkill,
+            difficulty: appropriateDifficulty,
+            resourceTypes: preferredTypes,
+            learningStage,
+            phaseNumber,
+            currentLevel,
+            targetLevel,
+          });
+          resources = [...resources, ...intelligentResources];
+          logger.info('Using intelligent recommendations', {
+            skill: canonicalSkill,
+            intelligentResourcesCount: intelligentResources.length,
+            totalResources: resources.length,
+          });
+        } catch (intelligentError) {
+          logger.warn('Error generating intelligent recommendations', {
+            error: intelligentError.message,
+            skill: canonicalSkill,
+          });
+          // Continue to API fallback
+        }
+      }
+
+      // 7. Fetch from APIs only if still not enough resources (LAST RESORT)
+      // APIs provide search URLs, not direct resources, so use only when needed
+      if (resources.length < 3) {
         try {
           // Enhance search query with industry context AND skill-specific enhancements
           let enhancedSkill = industry 
@@ -224,7 +256,7 @@ class ResourceRecommendationService {
             preferredLanguage
           );
           resources = [...resources, ...apiResources];
-          logger.info('Fetched resources from APIs', {
+          logger.info('Fetched resources from APIs (last resort fallback)', {
             skill: enhancedSkill,
             industry,
             apiResourcesCount: apiResources.length,
@@ -240,49 +272,17 @@ class ResourceRecommendationService {
         }
       }
 
-      // 7. Fallback to intelligent recommendations if still not enough
+      // 8. Final fallback if still no resources
       if (resources.length === 0) {
-        try {
-          resources = await this._generateIntelligentRecommendations({
-            skill: canonicalSkill,
-            difficulty: appropriateDifficulty,
-            resourceTypes: preferredTypes,
-            learningStage,
-            phaseNumber,
-            currentLevel,
-            targetLevel,
-          });
-          logger.info('Using intelligent recommendations (RAG/APIs unavailable or no results)', {
-            skill: canonicalSkill,
-            resourcesCount: resources.length,
-          });
-          
-          // If still no resources, use default fallback
-          if (resources.length === 0) {
-            logger.warn('Intelligent recommendations returned empty, using default resources', {
-              skill: canonicalSkill,
-            });
-            resources = this._getDefaultResources(canonicalSkill);
-          }
-        } catch (intelligentError) {
-          logger.error('Error generating intelligent recommendations', {
-            error: intelligentError.message,
-            skill: canonicalSkill,
-            stack: intelligentError.stack,
-          });
-          // Fallback to default resources
-          resources = this._getDefaultResources(canonicalSkill);
-        }
-      }
-      
-      // Final check: Ensure we have at least some resources
-      if (resources.length === 0) {
-        logger.warn('No resources found after all fallbacks, providing basic defaults', {
+        logger.warn('No resources found after all fallbacks - returning empty array', {
           skill: canonicalSkill,
           targetRole,
           industry,
+          recommendation: 'Add skill to IntelligentResourceService curated database or check API quota'
         });
-        resources = this._getDefaultResources(canonicalSkill);
+        // Don't use _getDefaultResources() - it returns search URLs
+        // Better to return empty array than broken search links
+        resources = [];
       }
 
       // 8. Apply personalization filters
@@ -406,10 +406,43 @@ class ResourceRecommendationService {
 
       // 10. Limit và diversify với MMR (Maximal Marginal Relevance)
       // Lambda = 0.7: 70% relevance, 30% diversity
-      return this._diversifyAndLimit(validResources, preferredTypes, 5, 0.7);
+      const finalResources = this._diversifyAndLimit(validResources, preferredTypes, 5, 0.7);
+      
+      // 11. CRITICAL: Ensure ALL resources have required 'type' field (Mongoose validation)
+      // This is the final safety net before returning to prevent validation errors
+      const sanitizedResources = finalResources.map(resource => {
+        if (!resource.type) {
+          // Infer type from URL or use default
+          if (resource.url) {
+            if (resource.url.includes('youtube.com') || resource.url.includes('vimeo.com')) {
+              resource.type = 'video';
+            } else if (resource.url.includes('udemy.com') || resource.url.includes('coursera.org') || resource.url.includes('edx.org')) {
+              resource.type = 'course';
+            } else if (resource.url.includes('github.com') || resource.url.includes('gitlab.com')) {
+              resource.type = 'project';
+            } else if (resource.url.includes('docs.') || resource.url.includes('documentation') || resource.url.includes('/docs/')) {
+              resource.type = 'documentation';
+            } else {
+              resource.type = 'article'; // Default fallback
+            }
+          } else {
+            resource.type = 'article'; // Ultimate fallback
+          }
+          logger.warn('Resource missing type field, inferred as:', {
+            title: resource.title,
+            inferredType: resource.type,
+          });
+        }
+        return resource;
+      });
+      
+      return sanitizedResources;
     } catch (error) {
       logger.error('Error recommending resources:', error);
-      return this._getDefaultResources(skill);
+      // CRITICAL: Don't return search URLs as fallback - return empty array instead
+      // User experience: Empty is better than broken search URLs
+      logger.warn('Returning empty resources due to error - avoid search URL fallback');
+      return [];
     }
   }
 
@@ -543,6 +576,58 @@ class ResourceRecommendationService {
     currentLevel,
     targetLevel,
   }) {
+    // Use new IntelligentResourceService with multi-level fallback
+    try {
+      const allResources = [];
+      
+      // Get resources for each requested type
+      for (const type of resourceTypes) {
+        const typeResources = await intelligentResourceService.getRecommendations({
+          skill,
+          difficulty,
+          type,
+          limit: 2, // 2 per type
+        });
+        allResources.push(...typeResources);
+      }
+      
+      // If no type specified, get mixed recommendations
+      if (resourceTypes.length === 0 || !resourceTypes) {
+        const mixedResources = await intelligentResourceService.getRecommendations({
+          skill,
+          difficulty,
+          type: null,
+          limit: 5,
+        });
+        allResources.push(...mixedResources);
+      }
+      
+      return allResources;
+    } catch (error) {
+      logger.error('IntelligentResourceService failed, using legacy fallback', error);
+      // Legacy fallback
+      return this._generateLegacyRecommendations({
+        skill,
+        difficulty,
+        resourceTypes,
+        learningStage,
+        phaseNumber,
+        currentLevel,
+        targetLevel,
+      });
+    }
+  }
+
+  /**
+   * Legacy recommendation generator (fallback only)
+   */
+  async _generateLegacyRecommendations({
+    skill,
+    difficulty,
+    resourceTypes,
+    learningStage,
+    phaseNumber,
+  }) {
     const resources = [];
 
     // Try curated database first (highest quality)
@@ -571,26 +656,13 @@ class ResourceRecommendationService {
           });
         });
       } else {
-        // Fallback to generated recommendations
-        const provider = this._getRecommendedProvider(phaseNumber, 'course');
-        resources.push({
-          type: 'course',
-          title: `${skill} ${this._getPhaseTitle(phaseNumber)} Course`,
-          provider,
-          difficulty,
-          duration: this._calculateDuration(phaseNumber, difficulty),
-          rating: 4.5 + Math.random() * 0.5,
-          isFree: phaseNumber === 1 ? Math.random() > 0.5 : false,
-          estimatedCost: phaseNumber === 1 ? 0 : 19.99 + Math.random() * 30,
-          certificateOffered: phaseNumber >= 2,
-          url: realResourceUrlService.getRealUrl({
-            skill,
-            type: 'course',
-            difficulty,
-            provider,
-          }),
-          relevanceScore: this._calculateRelevance(skill, difficulty, learningStage),
+        // CRITICAL: Don't generate fake courses with Udemy search URLs
+        // Better to have no resources than search URLs that confuse users
+        logger.warn('No curated courses found for skill - skipping course recommendations', {
+          skill,
+          recommendation: 'Add curated courses to curatedResourcesExtensions.js'
         });
+        // Don't push anything - empty is better than broken
       }
     }
 
@@ -616,24 +688,13 @@ class ResourceRecommendationService {
           });
         });
       } else {
-        // Fallback to generated recommendations
-        resources.push({
-          type: 'video',
-          title: `${skill} Tutorial for ${difficulty === 'beginner' ? 'Beginners' : 'Intermediate'}`,
-          provider: 'YouTube',
-          difficulty: 'beginner',
-          duration: this._calculateDuration(phaseNumber, 'beginner', 'video'),
-          rating: 4.6 + Math.random() * 0.4,
-          isFree: true,
-          estimatedCost: 0,
-          url: realResourceUrlService.getRealUrl({
-            skill,
-            type: 'video',
-            difficulty: 'beginner',
-            provider: 'YouTube',
-          }),
-          relevanceScore: this._calculateRelevance(skill, 'beginner', 'remember'),
+        // CRITICAL: Don't generate fake resources with YouTube search URLs
+        // Better to have no resources than search URLs that confuse users
+        logger.warn('No curated videos found for skill - skipping video recommendations', {
+          skill,
+          recommendation: 'Add curated videos to curatedResourcesExtensions.js'
         });
+        // Don't push anything - empty is better than broken
       }
     }
 
@@ -658,22 +719,31 @@ class ResourceRecommendationService {
           });
         });
       } else {
-        // Fallback to official docs
-        resources.push({
+        // Fallback to official docs only if URL exists (not Google search)
+        const docUrl = realResourceUrlService.getRealUrl({
+          skill,
           type: 'documentation',
-          title: `Official ${skill} Documentation`,
-          provider: 'Official Docs',
-          difficulty: 'intermediate',
-          duration: 'Reference',
-          rating: 5.0,
-          isFree: true,
-          estimatedCost: 0,
-          url: realResourceUrlService.getRealUrl({
-            skill,
-            type: 'documentation',
-          }),
-          relevanceScore: 0.9,
         });
+        
+        if (docUrl) {
+          resources.push({
+            type: 'documentation',
+            title: `Official ${skill} Documentation`,
+            provider: 'Official Docs',
+            difficulty: 'intermediate',
+            duration: 'Reference',
+            rating: 5.0,
+            isFree: true,
+            estimatedCost: 0,
+            url: docUrl,
+            relevanceScore: 0.9,
+          });
+        } else {
+          logger.warn('No official documentation URL found for skill - skipping documentation', {
+            skill,
+            recommendation: 'Add official docs URL to realResourceUrlService.officialDocs mapping'
+          });
+        }
       }
     }
 
@@ -1415,53 +1485,18 @@ class ResourceRecommendationService {
   }
 
   _getDefaultResources(skill) {
-    // Provide multiple default resources for better coverage
+    // DEPRECATED: Returning search URLs creates terrible UX
+    // Users click on YouTube search results instead of specific videos
+    // Better to return empty array and force system to use curated resources
     const skillName = skill || 'Programming';
-    return [
-      {
-        type: 'documentation',
-        title: `${skillName} Documentation`,
-        provider: 'Official Docs',
-        difficulty: 'beginner',
-        duration: 'Reference',
-        credibility: 1.0,
-        rating: 5.0,
-        isFree: true,
-        estimatedCost: 0,
-        url: `https://www.google.com/search?q=${encodeURIComponent(skillName + ' documentation')}`,
-        lastUpdated: new Date().toISOString(),
-        isCurated: false,
-      },
-      {
-        type: 'video',
-        title: `${skillName} Tutorial for Beginners`,
-        provider: 'YouTube',
-        difficulty: 'beginner',
-        duration: '2-3 hours',
-        credibility: 0.7,
-        rating: 4.5,
-        isFree: true,
-        estimatedCost: 0,
-        url: `https://www.youtube.com/results?search_query=${encodeURIComponent(skillName + ' tutorial beginner')}`,
-        lastUpdated: new Date().toISOString(),
-        isCurated: false,
-      },
-      {
-        type: 'course',
-        title: `Learn ${skillName} - Complete Course`,
-        provider: 'Udemy',
-        difficulty: 'beginner',
-        duration: '10-15 hours',
-        credibility: 0.85,
-        rating: 4.5,
-        isFree: false,
-        estimatedCost: 19.99,
-        certificateOffered: true,
-        url: `https://www.udemy.com/courses/search/?q=${encodeURIComponent(skillName)}`,
-        lastUpdated: new Date().toISOString(),
-        isCurated: false,
-      },
-    ];
+    
+    logger.warn('_getDefaultResources called - returning empty array to avoid search URL fallback', {
+      skill: skillName,
+      recommendation: 'Add skill to IntelligentResourceService curated database or enable API fallback'
+    });
+    
+    // Return empty array instead of broken search URLs
+    return [];
   }
 
   /**

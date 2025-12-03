@@ -29,11 +29,18 @@ const getAllJobs = async (req, res) => {
       page = 1,
       limit = 10,
       q, // Text search query
-      location,
+      location, // Legacy location field
+      city, // New: filter by city in address
+      district, // New: filter by district in address
       skills,
       employer,
       status,
       jobType,
+      level, // New: filter by job level (Intern, Fresher, Junior, Senior, Manager, Director)
+      workingMode, // New: filter by working mode (Onsite, Remote, Hybrid)
+      experience, // New: filter by experience requirement
+      education, // New: filter by education requirement
+      positions, // New: filter by number of positions
       industry, // legacy string filter
       industryCode, // new normalized filter (root or leaf)
       subIndustryCode, // new leaf filter
@@ -41,10 +48,12 @@ const getAllJobs = async (req, res) => {
       category,
       salaryMin,
       salaryMax,
+      salaryRange, // New: combined salary filter (e.g., "5000000-10000000")
       createdFrom,
       createdTo,
       deadlineFrom,
       deadlineTo,
+      isUrgent, // New: filter urgent jobs (deadline within 7 days)
       tags,
       sortBy = 'createdAt', // Default: sort by creation date
       sortOrder = 'desc', // Default: descending (newest first)
@@ -53,16 +62,57 @@ const getAllJobs = async (req, res) => {
     const view = req.query.view || 'summary';
 
     const query = {};
+    
+    // Text search
     if (q) {
       query.$text = { $search: q };
     }
-    if (location) {
-      query['location'] = { $regex: location, $options: 'i' };
+    
+    // Location filters (search in both legacy location and new address fields)
+    if (city || district || location) {
+      const locationConditions = [];
+      
+      if (city) {
+        locationConditions.push({ 'address.city': { $regex: city, $options: 'i' } });
+      }
+      
+      if (district) {
+        locationConditions.push({ 'address.district': { $regex: district, $options: 'i' } });
+      }
+      
+      if (location) {
+        // General location search in multiple fields
+        locationConditions.push(
+          { location: { $regex: location, $options: 'i' } },
+          { 'address.city': { $regex: location, $options: 'i' } },
+          { 'address.district': { $regex: location, $options: 'i' } },
+          { 'address.fullAddress': { $regex: location, $options: 'i' } }
+        );
+      }
+      
+      // Combine location conditions with AND logic if multiple specific filters
+      // or OR logic if general location search
+      if (city && district) {
+        // Both city and district specified - must match both
+        query['address.city'] = { $regex: city, $options: 'i' };
+        query['address.district'] = { $regex: district, $options: 'i' };
+      } else if (city || district) {
+        // Only one specific location filter
+        if (city) query['address.city'] = { $regex: city, $options: 'i' };
+        if (district) query['address.district'] = { $regex: district, $options: 'i' };
+      } else if (location) {
+        // General location search - use OR
+        query.$or = locationConditions;
+      }
     }
+    
+    // Skills filter
     if (skills) {
       const skillArray = skills.split(',').map(skill => skill.trim());
       query['skills'] = { $in: skillArray };
     }
+    
+    // Employer filter
     if (employer) {
       query['employer'] = employer;
     }
@@ -80,26 +130,91 @@ const getAllJobs = async (req, res) => {
     if (jobType) {
       query['jobType'] = jobType;
     }
+    
+    // Job level filter (Intern, Fresher, Junior, Senior, Manager, Director)
+    if (level) {
+      const levelArray = level.split(',').map(l => l.trim());
+      query['level'] = { $in: levelArray };
+    }
+    
+    // Working mode filter (Onsite, Remote, Hybrid)
+    if (workingMode) {
+      const modeArray = workingMode.split(',').map(m => m.trim());
+      query['workingMode'] = { $in: modeArray };
+    }
+    
+    // Experience filter
+    if (experience) {
+      query['experience'] = { $regex: experience, $options: 'i' };
+    }
+    
+    // Education filter
+    if (education) {
+      query['education'] = { $regex: education, $options: 'i' };
+    }
+    
+    // Positions filter (number of open positions)
+    if (positions) {
+      query['positions'] = { $gte: Number(positions) };
+    }
+    
     // New normalized industry filters
     if (subIndustryCode) {
       query['subIndustryCode'] = subIndustryCode;
-    } else if (industryCode) {
+    }
+    if (industryCode) {
       if (includeDescendants !== 'false') {
-        // Use industryPath array contains to include children without extra queries
-        query['industryPath'] = industryCode;
+        // Use industryPath array contains to include children
+        query['industryPath'] = { $in: [industryCode] };
       } else {
         query['industryCode'] = industryCode;
       }
-    } else if (industry) {
+    }
+    if (!subIndustryCode && !industryCode && industry) {
       // Backward-compatibility: legacy string filter
       query['industry'] = { $regex: industry, $options: 'i' };
     }
     if (category) {
       query['category'] = { $regex: category, $options: 'i' };
     }
-    if (salaryMin || salaryMax) {
-      query['salaryMin'] = salaryMin ? { $gte: Number(salaryMin) } : undefined;
-      query['salaryMax'] = salaryMax ? { $lte: Number(salaryMax) } : undefined;
+    
+    // Salary filters
+    if (salaryRange) {
+      // Handle common salary range patterns
+      const rangeMap = {
+        'below-10m': { max: 10000000 },
+        '10m-20m': { min: 10000000, max: 20000000 },
+        '20m-50m': { min: 20000000, max: 50000000 },
+        'above-50m': { min: 50000000 }
+      };
+      
+      // Check if it's a predefined range pattern
+      if (rangeMap[salaryRange]) {
+        const range = rangeMap[salaryRange];
+        if (range.min) {
+          query['salaryMin'] = { $gte: range.min };
+        }
+        if (range.max) {
+          query['salaryMax'] = { $lte: range.max };
+        }
+      } else {
+        // Handle numeric range (e.g., "5000000-10000000")
+        const [minSalary, maxSalary] = salaryRange.split('-').map(s => Number(s.trim()));
+        if (minSalary && !isNaN(minSalary)) {
+          query['salaryMin'] = { $gte: minSalary };
+        }
+        if (maxSalary && !isNaN(maxSalary)) {
+          query['salaryMax'] = { $lte: maxSalary };
+        }
+      }
+    } else if (salaryMin || salaryMax) {
+      // Handle separate min/max filters
+      if (salaryMin) {
+        query['salaryMin'] = { $gte: Number(salaryMin) };
+      }
+      if (salaryMax) {
+        query['salaryMax'] = { $lte: Number(salaryMax) };
+      }
     }
     if (createdFrom || createdTo) {
       query['createdAt'] = {};
@@ -111,6 +226,18 @@ const getAllJobs = async (req, res) => {
       if (deadlineFrom) query['deadline'].$gte = new Date(deadlineFrom);
       if (deadlineTo) query['deadline'].$lte = new Date(deadlineTo);
     }
+    
+    // Urgent jobs filter (deadline within 7 days)
+    if (isUrgent === 'true') {
+      const now = new Date();
+      const sevenDaysLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      query['deadline'] = {
+        $gte: now,
+        $lte: sevenDaysLater,
+      };
+    }
+    
+    // Tags filter
     if (tags) {
       const tagArray = tags.split(',').map(tag => tag.trim());
       query['tags'] = { $in: tagArray };
@@ -125,6 +252,9 @@ const getAllJobs = async (req, res) => {
       }
     });
 
+    // Debug logging
+    console.log('🔍 Final MongoDB Query:', JSON.stringify(query, null, 2));
+
     const skip = (page - 1) * limit;
 
     // Build sort object - ALWAYS sort (default: createdAt desc = newest first)
@@ -136,11 +266,20 @@ const getAllJobs = async (req, res) => {
       'salaryMax',
       'deadline',
       'views',
+      'positions',
+      'hotScore',
       'stats.applications',
+      'stats.interviews',
+      'stats.offers',
     ];
     const safeSortBy = validSortFields.includes(sortBy) ? sortBy : 'createdAt'; // Fallback to createdAt if invalid
     const sortObj = {};
     sortObj[safeSortBy] = sortOrder === 'desc' ? -1 : 1;
+    
+    // Add secondary sort by createdAt desc if primary sort is not createdAt
+    if (safeSortBy !== 'createdAt') {
+      sortObj['createdAt'] = -1; // Always sort by newest as secondary
+    }
 
     const projection = {
       title: 1,
@@ -150,6 +289,7 @@ const getAllJobs = async (req, res) => {
       benefits: 1,
       skills: 1,
       tags: 1,
+      aiTags: 1,
       jobType: 1,
       workingMode: 1,
       level: 1,
@@ -161,6 +301,8 @@ const getAllJobs = async (req, res) => {
       deadline: 1,
       positions: 1,
       status: 1,
+      views: 1,
+      hotScore: 1,
       stats: 1,
       address: 1,
       location: 1,
@@ -188,6 +330,7 @@ const getAllJobs = async (req, res) => {
       jobs = await Job.find(query)
         .select(projection)
         .populate('employer', 'company.name company.logo')
+        .populate('skillIds', 'name category') // Populate skillIds for summary view too
         .sort(sortObj) // ALWAYS sorted (default: newest first by createdAt)
         .skip(skip)
         .limit(parseInt(limit))
@@ -195,6 +338,8 @@ const getAllJobs = async (req, res) => {
     }
 
     const total = await Job.countDocuments(query);
+    
+    console.log(`📊 Total matching jobs: ${total}`);
 
     // Try to get from cache first
     const cacheService = getCacheService();
@@ -205,10 +350,16 @@ const getAllJobs = async (req, res) => {
         ...req.query,
         view,
       });
+      if (formattedJobs) {
+        console.log('💾 Returning CACHED data, length:', formattedJobs.length);
+      }
     }
 
     // If not in cache, fetch and format
     if (!formattedJobs) {
+      console.log('🔄 Cache miss, fetching from DB...');
+      console.log(`📦 Query returned ${jobs.length} jobs from MongoDB`);
+      
       if (view === 'full') {
       // Process jobs to populate skillIds and industryPath for old jobs
       const { processJobData } = require('../utils/jobHelpers');
@@ -318,20 +469,31 @@ const getAllJobs = async (req, res) => {
         appliedFilters: Object.keys(query).length,
         searchQuery: q || null,
         availableFilters: {
-          location: !!location,
-          skills: !!skills,
-          employer: !!employer,
-          status: !!status,
-          jobType: !!jobType,
-          industry: !!industry,
-          category: !!category,
-          salaryMin: !!salaryMin,
-          salaryMax: !!salaryMax,
-          createdFrom: !!createdFrom,
-          createdTo: !!createdTo,
-          deadlineFrom: !!deadlineFrom,
-          deadlineTo: !!deadlineTo,
-          tags: !!tags,
+          location: !!req.query.location,
+          city: !!req.query.city,
+          district: !!req.query.district,
+          skills: !!req.query.skills,
+          employer: !!req.query.employer,
+          status: !!req.query.status,
+          jobType: !!req.query.jobType,
+          level: !!req.query.level,
+          workingMode: !!req.query.workingMode,
+          experience: !!req.query.experience,
+          education: !!req.query.education,
+          positions: !!req.query.positions,
+          industry: !!req.query.industry,
+          industryCode: !!req.query.industryCode,
+          subIndustryCode: !!req.query.subIndustryCode,
+          category: !!req.query.category,
+          salaryMin: !!req.query.salaryMin,
+          salaryMax: !!req.query.salaryMax,
+          salaryRange: !!req.query.salaryRange,
+          createdFrom: !!req.query.createdFrom,
+          createdTo: !!req.query.createdTo,
+          deadlineFrom: !!req.query.deadlineFrom,
+          deadlineTo: !!req.query.deadlineTo,
+          isUrgent: !!req.query.isUrgent,
+          tags: !!req.query.tags,
         },
       },
     });

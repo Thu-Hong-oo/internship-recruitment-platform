@@ -165,7 +165,7 @@ module.exports = {
     FREELANCE: 'freelance',
   },
 
-  // Job categories
+  // Job categories (legacy - consider using Industry model from DB)
   JOB_CATEGORIES: {
     TECHNOLOGY: 'technology',
     DESIGN: 'design',
@@ -187,6 +187,32 @@ module.exports = {
     ENGINEERING: 'engineering',
     LEGAL: 'legal',
     OTHER: 'other',
+  },
+
+  // Job levels (standardized)
+  JOB_LEVELS: {
+    INTERN: 'Intern',
+    FRESHER: 'Fresher',
+    JUNIOR: 'Junior',
+    SENIOR: 'Senior',
+    MANAGER: 'Manager',
+    DIRECTOR: 'Director',
+  },
+
+  // Working modes (standardized)
+  WORKING_MODES: {
+    ONSITE: 'Onsite',
+    REMOTE: 'Remote',
+    HYBRID: 'Hybrid',
+  },
+
+  // Job types (standardized - note the capitalization)
+  JOB_TYPE_VALUES: {
+    FULLTIME: 'Fulltime',
+    PARTTIME: 'Parttime',
+    INTERN: 'Intern',
+    FREELANCE: 'Freelance',
+    CONTRACT: 'Contract',
   },
 
   // Location types

@@ -144,6 +144,14 @@ class AdvancedNLPController {
       const { jobId } = req.params;
       const { limit = 20, minScore = 70, tier } = req.query;
 
+      // Check authentication
+      if (!req.user || !req.user._id) {
+        return res.status(401).json({
+          success: false,
+          message: 'Authentication required',
+        });
+      }
+
       // Verify job belongs to employer
       const job = await Job.findById(jobId);
       if (!job) {
@@ -153,10 +161,21 @@ class AdvancedNLPController {
         });
       }
 
-      if (job.employerId.toString() !== req.user._id.toString()) {
+      // Check if job has employer
+      const employerId = job.employerId || job.employer?._id;
+      if (!employerId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Job has no employer assigned',
+        });
+      }
+
+      // Check if current user is employer and owns this job
+      // job.postedBy is the User ID who posted the job
+      if (job.postedBy.toString() !== req.user._id.toString()) {
         return res.status(403).json({
           success: false,
-          message: 'Access denied',
+          message: 'Access denied - You can only view candidates for jobs you posted',
         });
       }
 
@@ -169,6 +188,18 @@ class AdvancedNLPController {
       if (tier) {
         query['ranking.tier'] = tier;
       }
+
+      // Debug: Check total applications for this job
+      const totalApplications = await CVMatchingScore.countDocuments({ jobId });
+      const applicationsAboveThreshold = await CVMatchingScore.countDocuments(query);
+
+      logger.info('Top candidates query', {
+        jobId,
+        minScore,
+        totalApplications,
+        applicationsAboveThreshold,
+        tier: tier || 'all',
+      });
 
       const topCandidates = await CVMatchingScore.find(query)
         .sort({ overallScore: -1, calculatedAt: -1 })
@@ -185,6 +216,8 @@ class AdvancedNLPController {
           candidates: topCandidates,
           statistics,
           total: topCandidates.length,
+          totalApplications,
+          minScoreFilter: parseInt(minScore),
         },
       });
     } catch (error) {
