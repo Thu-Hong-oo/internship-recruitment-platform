@@ -4,6 +4,7 @@ const Industry = require('../models/Industry');
 const Application = require('../models/Application');
 const CandidateProfile = require('../models/CandidateProfile');
 const { logger } = require('../utils/logger');
+const { createFlexibleRegex } = require('../utils/textUtils');
 const {
   formatJobResponse,
   formatJobsResponse,
@@ -69,24 +70,28 @@ const getAllJobs = async (req, res) => {
     }
     
     // Location filters (search in both legacy location and new address fields)
+    // Supports accent-insensitive search: "Da Nang" matches "Đà Nẵng" and vice versa
     if (city || district || location) {
       const locationConditions = [];
       
       if (city) {
-        locationConditions.push({ 'address.city': { $regex: city, $options: 'i' } });
+        const cityRegex = createFlexibleRegex(city);
+        locationConditions.push({ 'address.city': cityRegex });
       }
       
       if (district) {
-        locationConditions.push({ 'address.district': { $regex: district, $options: 'i' } });
+        const districtRegex = createFlexibleRegex(district);
+        locationConditions.push({ 'address.district': districtRegex });
       }
       
       if (location) {
         // General location search in multiple fields
+        const locationRegex = createFlexibleRegex(location);
         locationConditions.push(
-          { location: { $regex: location, $options: 'i' } },
-          { 'address.city': { $regex: location, $options: 'i' } },
-          { 'address.district': { $regex: location, $options: 'i' } },
-          { 'address.fullAddress': { $regex: location, $options: 'i' } }
+          { location: locationRegex },
+          { 'address.city': locationRegex },
+          { 'address.district': locationRegex },
+          { 'address.fullAddress': locationRegex }
         );
       }
       
@@ -94,12 +99,12 @@ const getAllJobs = async (req, res) => {
       // or OR logic if general location search
       if (city && district) {
         // Both city and district specified - must match both
-        query['address.city'] = { $regex: city, $options: 'i' };
-        query['address.district'] = { $regex: district, $options: 'i' };
+        query['address.city'] = createFlexibleRegex(city);
+        query['address.district'] = createFlexibleRegex(district);
       } else if (city || district) {
         // Only one specific location filter
-        if (city) query['address.city'] = { $regex: city, $options: 'i' };
-        if (district) query['address.district'] = { $regex: district, $options: 'i' };
+        if (city) query['address.city'] = createFlexibleRegex(city);
+        if (district) query['address.district'] = createFlexibleRegex(district);
       } else if (location) {
         // General location search - use OR
         query.$or = locationConditions;
