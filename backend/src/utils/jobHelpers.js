@@ -118,15 +118,27 @@ async function buildIndustryPath(industryCode, subIndustryCode = null) {
   const path = [];
 
   try {
-    // If subIndustryCode is provided, use it as the leaf
-    let currentCode = subIndustryCode || industryCode;
+    // Case 1: Both industryCode and subIndustryCode provided
+    // Simply add both to path (root -> leaf order)
+    if (industryCode && subIndustryCode) {
+      path.push(industryCode);
+      if (subIndustryCode !== industryCode) {
+        path.push(subIndustryCode);
+      }
+      return path;
+    }
 
-    if (!currentCode) {
+    // Case 2: Only one code provided - traverse up to find parents
+    const startCode = subIndustryCode || industryCode;
+    
+    if (!startCode) {
       return path;
     }
 
     // Traverse up the hierarchy to build the path
     const visited = new Set(); // Prevent infinite loops
+    let currentCode = startCode;
+    
     while (currentCode && !visited.has(currentCode)) {
       visited.add(currentCode);
       
@@ -137,29 +149,11 @@ async function buildIndustryPath(industryCode, subIndustryCode = null) {
         break;
       }
 
-      // Add to path (at the beginning to maintain hierarchy order)
+      // Add to path (at the beginning to maintain hierarchy order: root -> leaf)
       path.unshift(currentCode);
 
       // Move to parent
       currentCode = industry.parentCode;
-    }
-
-    // If subIndustryCode was provided, ensure industryCode is in the path
-    if (subIndustryCode && industryCode && !path.includes(industryCode)) {
-      // Check if industryCode is a parent of subIndustryCode
-      const subIndustry = await Industry.findOne({ code: subIndustryCode }).lean();
-      if (subIndustry && subIndustry.parentCode === industryCode) {
-        path.unshift(industryCode);
-      }
-    }
-
-    // Ensure industryCode is always first if provided
-    if (industryCode && path.length > 0 && path[0] !== industryCode) {
-      // Check if industryCode is a valid root
-      const rootIndustry = await Industry.findOne({ code: industryCode }).lean();
-      if (rootIndustry && !rootIndustry.parentCode) {
-        path.unshift(industryCode);
-      }
     }
   } catch (error) {
     logger.error('Error building industry path:', error);
