@@ -124,19 +124,40 @@ export default function ProfilePage() {
 
         const apiContact = profile.contact || {};
         const apiPosition = profile.position || {};
-        setFormData((prev) => ({
-          ...prev,
-          contact: {
-            name: apiContact.name ?? prev.contact.name,
-            phone: apiContact.phone ?? prev.contact.phone,
-            email: apiContact.email ?? prev.contact.email,
-          },
-          position: {
-            title: apiPosition.title ?? prev.position.title,
-            level: apiPosition.level ?? prev.position.level,
-            department: apiPosition.department ?? prev.position.department,
-          },
-        }));
+
+        // Ưu tiên lấy Họ và tên từ profile.user.fullName (nếu có),
+        // sau đó đến contact.name, cuối cùng là giá trị hiện có trong form
+        const apiUser = profile.user || {};
+        setFormData((prev) => {
+          const resolvedContactName =
+            apiContact.name && !isPlaceholderText(apiContact.name)
+              ? apiContact.name
+              : apiUser.fullName && !isPlaceholderText(apiUser.fullName)
+              ? apiUser.fullName
+              : prev.contact.name;
+          const resolvedContactPhone =
+            apiContact.phone && !isPlaceholderPhone(apiContact.phone)
+              ? apiContact.phone
+              : prev.contact.phone;
+          const resolvedContactEmail =
+            apiContact.email && !isPlaceholderEmail(apiContact.email)
+              ? apiContact.email
+              : prev.contact.email;
+
+          return {
+            ...prev,
+            contact: {
+              name: resolvedContactName,
+              phone: resolvedContactPhone,
+              email: resolvedContactEmail,
+            },
+            position: {
+              title: apiPosition.title ?? prev.position.title,
+              level: apiPosition.level ?? prev.position.level,
+              department: apiPosition.department ?? prev.position.department,
+            },
+          };
+        });
 
         // Set avatar URL from profile
         if (profile.user?.avatar) {
@@ -318,6 +339,7 @@ export default function ProfilePage() {
         setSuccess("Cập nhật thông tin thành công!");
         // Refresh verification status
         refreshVerification();
+        setIsEditing(false);
         // Refresh profile data to update placeholder status
         const json = await getEmployerProfile(token);
         const profile = json?.data || json?.profile || null;
