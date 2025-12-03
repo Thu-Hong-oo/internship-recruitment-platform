@@ -8,8 +8,8 @@
  */
 
 const cron = require('node-cron');
-const { logger } = require('../../utils/logger');
-const dataCollectionService = require('./dataCollectionService');
+const { logger } = require('../../utils/logger.js');
+const dataCollectionService = require('./dataCollectionService.js');
 
 class ScheduledDataCollectionService {
   constructor() {
