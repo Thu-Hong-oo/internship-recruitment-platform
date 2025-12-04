@@ -103,7 +103,7 @@ export const nlpService = {
     success: boolean;
     data: MatchingScore;
   }> {
-    return apiClient.post("/api/nlp/matching-score", params);
+    return apiClient.post("/nlp/matching-score", params);
   },
 
   /**
@@ -116,7 +116,7 @@ export const nlpService = {
     success: boolean;
     data: MatchingScore;
   }> {
-    return apiClient.get(`/api/nlp/matching-score/${jobId}/${candidateId}`);
+    return apiClient.get(`/nlp/matching-score/${jobId}/${candidateId}`);
   },
 
   /**
@@ -150,7 +150,7 @@ export const nlpService = {
 
     const query = queryParams.toString();
     return apiClient.get(
-      `/api/nlp/top-candidates/${jobId}${query ? `?${query}` : ""}`
+      `/nlp/top-candidates/${jobId}${query ? `?${query}` : ""}`
     );
   },
 
@@ -184,7 +184,7 @@ export const nlpService = {
       queryParams.append("minScore", params.minScore.toString());
 
     const query = queryParams.toString();
-    return apiClient.get(`/api/nlp/best-matches${query ? `?${query}` : ""}`);
+    return apiClient.get(`/nlp/best-matches${query ? `?${query}` : ""}`);
   },
 
   /**
@@ -194,7 +194,7 @@ export const nlpService = {
     success: boolean;
     message: string;
   }> {
-    return apiClient.post(`/api/nlp/recalculate-scores/${jobId}`);
+    return apiClient.post(`/nlp/recalculate-scores/${jobId}`);
   },
 
   // ============================================
@@ -213,7 +213,23 @@ export const nlpService = {
     success: boolean;
     data: LearningRoadmap;
   }> {
-    return apiClient.post("/api/nlp/learning-roadmap", params);
+    return apiClient.post("/nlp/learning-roadmap", params);
+  },
+
+  /**
+   * Generate RAG-powered learning roadmap (sử dụng dữ liệu thực tế)
+   */
+  async generateLearningRoadmapRag(params: {
+    candidateId?: string;
+    jobId: string;
+    targetRole?: string;
+    timeframe?: number;
+    cvData?: CVData;
+  }): Promise<{
+    success: boolean;
+    data: LearningRoadmap;
+  }> {
+    return apiClient.post("/nlp/learning-roadmap-rag", params);
   },
 
   /**
@@ -223,7 +239,7 @@ export const nlpService = {
     success: boolean;
     data: LearningRoadmap;
   }> {
-    return apiClient.get(`/api/nlp/learning-roadmap/${roadmapId}`);
+    return apiClient.get(`/nlp/learning-roadmap/${roadmapId}`);
   },
 
   /**
@@ -236,7 +252,7 @@ export const nlpService = {
     data: LearningRoadmap[];
   }> {
     const query = params?.status ? `?status=${params.status}` : "";
-    return apiClient.get(`/api/nlp/my-roadmaps${query}`);
+    return apiClient.get(`/nlp/my-roadmaps${query}`);
   },
 
   /**
@@ -253,7 +269,7 @@ export const nlpService = {
     success: boolean;
     data: LearningRoadmap;
   }> {
-    return apiClient.put(`/api/nlp/learning-roadmap/${roadmapId}/progress`, params);
+    return apiClient.put(`/nlp/learning-roadmap/${roadmapId}/progress`, params);
   },
 
   /**
@@ -270,7 +286,7 @@ export const nlpService = {
     success: boolean;
     data: LearningRoadmap;
   }> {
-    return apiClient.put(`/api/nlp/learning-roadmap/${roadmapId}/feedback`, feedback);
+    return apiClient.put(`/nlp/learning-roadmap/${roadmapId}/feedback`, feedback);
   },
 
   /**
@@ -292,7 +308,7 @@ export const nlpService = {
 
     const query = queryParams.toString();
     return apiClient.get(
-      `/api/nlp/roadmap/recommended-resources/${roadmapId}${query ? `?${query}` : ""}`
+      `/nlp/roadmap/recommended-resources/${roadmapId}${query ? `?${query}` : ""}`
     );
   },
 
@@ -304,6 +320,6 @@ export const nlpService = {
     data: LearningRoadmap[];
   }> {
     const query = limit ? `?limit=${limit}` : "";
-    return apiClient.get(`/api/nlp/popular-roadmaps${query}`);
+    return apiClient.get(`/nlp/popular-roadmaps${query}`);
   },
 };

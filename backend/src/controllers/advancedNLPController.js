@@ -832,6 +832,17 @@ class AdvancedNLPController {
         logger.info(`✅ Loaded CV data from profile`);
       }
 
+      // Convert candidateProfile to cvData format for selfSufficientAI
+      const convertedCvData = {
+        skills: {
+          technical: candidateProfile.skills?.technical || [],
+          soft: candidateProfile.skills?.soft || [],
+          languages: candidateProfile.skills?.languages || []
+        },
+        experience: candidateProfile.experience?.internships || candidateProfile.experience?.projects || [],
+        education: candidateProfile.education?.university ? [candidateProfile.education.university] : []
+      };
+
       // Get matching score to identify skill gaps
       let skillGaps = [];
       let jobData = null;
@@ -868,7 +879,7 @@ class AdvancedNLPController {
           const selfSufficientAI = getSelfSufficientAIService();
           
           const skillGapResult = await selfSufficientAI.analyzeSkillGaps(
-            candidateProfile,
+            convertedCvData,
             jobData
           );
 
@@ -958,7 +969,7 @@ class AdvancedNLPController {
             };
             
             const skillGapResult = await selfSufficientAI.analyzeSkillGaps(
-              candidateProfile,
+              convertedCvData,
               mockJobData
             );
             
@@ -1013,7 +1024,7 @@ class AdvancedNLPController {
           };
           
           const skillGapResult = await selfSufficientAI.analyzeSkillGaps(
-            candidateProfile,
+            convertedCvData,
             mockJobData
           );
           
@@ -1223,6 +1234,148 @@ class AdvancedNLPController {
       res.status(500).json({
         success: false,
         message: 'Error checking RAG service health',
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * @route   POST /api/nlp/calculate-all-matches
+   * @desc    Calculate matching scores for all active jobs for current candidate
+   * @access  Private (Candidate/Intern)
+   */
+  async calculateAllJobMatches(req, res) {
+    try {
+      const candidateUserId = req.user._id;
+      
+      logger.info(`Calculating all job matches for candidate: ${candidateUserId}`);
+
+      // 1. Fetch candidate profile
+      const candidateProfile = await CandidateProfile.findOne({ 
+        userId: candidateUserId 
+      }).populate('userId', 'fullName email');
+
+      if (!candidateProfile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Candidate profile not found',
+        });
+      }
+
+      // 2. Build cvData from candidate profile
+      const profileSkills = candidateProfile.skills || {};
+      const allSkills = [
+        ...(profileSkills.technical || []),
+        ...(profileSkills.soft || []),
+        ...(profileSkills.languages || [])
+      ];
+
+      const profileExperience = candidateProfile.experience || {};
+      const allExperience = [
+        ...(profileExperience.internships || []),
+        ...(profileExperience.fullTime || []),
+        ...(profileExperience.projects || [])
+      ];
+
+      const cvData = {
+        personalInfo: candidateProfile.personalInfo || {},
+        education: candidateProfile.education || {},
+        experience: allExperience,
+        skills: allSkills,
+        resume: candidateProfile.resume?.current,
+        extractedText: candidateProfile.resume?.current?.aiAnalysis?.extractedData || {},
+      };
+
+      // 3. Fetch all active jobs
+      const activeJobs = await Job.find({ status: 'active' })
+        .populate('skills')
+        .populate('employer', 'companyName')
+        .lean();
+
+      if (activeJobs.length === 0) {
+        return res.status(200).json({
+          success: true,
+          message: 'No active jobs available',
+          data: {
+            calculated: 0,
+            total: 0,
+          },
+        });
+      }
+
+      // 4. Calculate matching scores for each job
+      let successCount = 0;
+      let errorCount = 0;
+      const topMatches = [];
+
+      for (const job of activeJobs) {
+        try {
+          // Prepare job data
+          const jobData = {
+            _id: job._id,
+            title: job.title,
+            description: job.description,
+            requirements: job.requirements,
+            skills: job.skills,
+            industryCode: job.industryCode,
+            location: job.location,
+            salaryRange: job.salaryRange,
+            employmentType: job.employmentType,
+          };
+
+          // Calculate matching score
+          const matchingResult = await aiService.calculateCVJobMatch({
+            cvData,
+            jobData,
+            candidateId: candidateUserId,
+          });
+
+          // Delete existing score if any
+          await CVMatchingScore.deleteMany({
+            candidateId: candidateUserId,
+            jobId: job._id,
+          });
+
+          // Save new score
+          const savedScore = await CVMatchingScore.create(matchingResult);
+
+          successCount++;
+
+          // Keep track of top matches for response
+          if (matchingResult.overallScore >= 60) {
+            topMatches.push({
+              jobId: job._id,
+              title: job.title,
+              company: job.employer?.companyName,
+              score: matchingResult.overallScore,
+            });
+          }
+
+        } catch (error) {
+          logger.error(`Error calculating match for job ${job._id}:`, error);
+          errorCount++;
+        }
+      }
+
+      // Sort top matches by score
+      topMatches.sort((a, b) => b.score - a.score);
+
+      res.status(200).json({
+        success: true,
+        message: 'Job matching scores calculated successfully',
+        data: {
+          calculated: successCount,
+          failed: errorCount,
+          total: activeJobs.length,
+          topMatches: topMatches.slice(0, 10), // Return top 10
+        },
+      });
+
+    } catch (error) {
+      logger.error('Error calculating all job matches:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error calculating job matches',
         error: error.message,
       });
     }

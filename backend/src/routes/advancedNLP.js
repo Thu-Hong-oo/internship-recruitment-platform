@@ -176,4 +176,17 @@ router.get(
   advancedNLPController.checkRagHealth
 );
 
+/**
+ * @route   POST /api/nlp/calculate-all-matches
+ * @desc    Calculate matching scores for all active jobs for current candidate
+ * @access  Private (Candidate/Intern only)
+ */
+router.post(
+  '/calculate-all-matches',
+  protect,
+  authorize('intern', 'candidate'),
+  noCache(),
+  advancedNLPController.calculateAllJobMatches
+);
+
 module.exports = router;

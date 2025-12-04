@@ -31,8 +31,11 @@ class SelfSufficientAIService {
       database: ['mongodb', 'postgresql', 'mysql', 'redis', 'elasticsearch', 'dynamodb', 'oracle'],
       cloud: ['aws', 'azure', 'gcp', 'docker', 'kubernetes', 'terraform', 'jenkins'],
       mobile: ['react native', 'flutter', 'ios', 'android', 'xamarin'],
-      tools: ['git', 'jira', 'postman', 'figma', 'vscode', 'intellij'],
-      softSkill: ['leadership', 'communication', 'teamwork', 'problem solving', 'agile', 'scrum']
+      tools: ['git', 'jira', 'postman', 'figma', 'vscode', 'intellij', 'excel', 'microsoft office', 'powerpoint', 'word'],
+      accounting: ['accounting', 'sap', 'misa', 'financial reporting', 'taxation', 'bookkeeping', 'audit', 'erp'],
+      marketing: ['marketing', 'seo', 'sem', 'google analytics', 'facebook ads', 'content', 'social media', 'branding'],
+      hr: ['recruitment', 'hr', 'human resource', 'employee relations', 'labor law', 'organizational'],
+      softSkill: ['leadership', 'communication', 'teamwork', 'problem solving', 'agile', 'scrum', 'time management', 'attention to detail', 'organizational', 'analytical']
     };
 
     // Cache for database skills (refresh periodically)
@@ -190,10 +193,20 @@ class SelfSufficientAIService {
         ...(cvData.skills?.languages || [])
       ].map(s => (typeof s === 'string' ? s : s.name).toLowerCase().trim());
 
-      const allRequiredSkills = [
+      let allRequiredSkills = [
         ...requiredSkills,
         ...(jobData.skills || [])
       ].map(s => (typeof s === 'string' ? s : s.name).toLowerCase().trim());
+
+      // 🔥 AUTO-GENERATE required skills if empty (using job title)
+      if (allRequiredSkills.length === 0 && jobData.title) {
+        logger.info(`🤖 Auto-generating required skills for job title: "${jobData.title}"`);
+        const suggestedSkills = await this.suggestSkills(jobData.title, 'mid-level');
+        if (suggestedSkills && suggestedSkills.suggestions) {
+          allRequiredSkills = suggestedSkills.suggestions.map(s => s.toLowerCase().trim());
+          logger.info(`✅ Auto-generated ${allRequiredSkills.length} required skills:`, allRequiredSkills.join(', '));
+        }
+      }
 
       // 3. Enhanced fuzzy matching with database aliases
       let matched = [];
@@ -500,24 +513,56 @@ class SelfSufficientAIService {
 
   /**
    * Calculate skill importance based on job context
+   * Enhanced to handle auto-generated skills
    */
   _calculateSkillImportance(skill, jobData) {
     const jobText = (jobData.description || '').toLowerCase();
     const title = (jobData.title || '').toLowerCase();
+    const skillLower = skill.toLowerCase();
 
-    // Check if skill is mentioned in job title
-    if (title.includes(skill.toLowerCase())) {
+    // 1. Check if skill is mentioned in job title (HIGHEST priority)
+    if (title.includes(skillLower)) {
       return 'high';
     }
 
-    // Check frequency in job description
-    const regex = new RegExp(skill.toLowerCase(), 'g');
+    // 2. Check frequency in job description
+    const regex = new RegExp(skillLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
     const matches = jobText.match(regex);
     
     if (matches && matches.length >= 3) return 'high';
     if (matches && matches.length >= 1) return 'medium';
+
+    // 3. For auto-generated skills (not in description), infer importance from skill type and position in list
+    // Core skills for the job category should be high importance
+    if (skillLower.includes('excel') || skillLower.includes('office') || 
+        skillLower.includes('communication') || skillLower.includes('teamwork')) {
+      return 'high'; // Essential soft skills
+    }
+
+    // Domain-specific core skills
+    if (title.includes('marketing')) {
+      if (skillLower.includes('marketing') || skillLower.includes('social') || 
+          skillLower.includes('content') || skillLower.includes('seo')) {
+        return 'high';
+      }
+    }
     
-    return 'low';
+    if (title.includes('kế toán') || title.includes('chứng từ') || title.includes('accounting')) {
+      if (skillLower.includes('accounting') || skillLower.includes('excel') || 
+          skillLower.includes('sap') || skillLower.includes('financial')) {
+        return 'high';
+      }
+    }
+
+    if (title.includes('developer') || title.includes('engineer')) {
+      if (skillLower.includes('programming') || skillLower.includes('javascript') || 
+          skillLower.includes('python') || skillLower.includes('git')) {
+        return 'high';
+      }
+    }
+
+    // Default to medium for auto-generated skills
+    return 'medium';
   }
 
   /**
@@ -663,7 +708,10 @@ class SelfSufficientAIService {
     // Education (limit to 2)
     if (cvData.education && Array.isArray(cvData.education)) {
       cvData.education.slice(0, 2).forEach(edu => {
-        parts.push(`${edu.degree} in ${edu.major} from ${edu.school}`);
+        const degree = edu.degree || 'Degree';
+        const major = edu.major || edu.field || 'Field';
+        const school = edu.school || edu.institution || 'Institution';
+        parts.push(`${degree} in ${major} from ${school}`);
       });
     }
 
@@ -861,6 +909,20 @@ class SelfSufficientAIService {
         category = 'data';
         searchKeywords = ['python', 'sql', 'pandas', 'excel', 'power bi', 'tableau'];
       }
+      else if (jobLower.includes('kế toán') || jobLower.includes('accountant') || 
+               jobLower.includes('chứng từ') || jobLower.includes('tài chính') || 
+               jobLower.includes('finance') || jobLower.includes('accounting')) {
+        category = 'accounting';
+        searchKeywords = ['excel', 'sap', 'misa', 'accounting', 'financial reporting', 'taxation'];
+      }
+      else if (jobLower.includes('marketing') || jobLower.includes('sale') || jobLower.includes('bán hàng')) {
+        category = 'marketing';
+        searchKeywords = ['digital marketing', 'seo', 'google analytics', 'facebook ads', 'content creation', 'communication'];
+      }
+      else if (jobLower.includes('hr') || jobLower.includes('nhân sự') || jobLower.includes('human resource')) {
+        category = 'hr';
+        searchKeywords = ['recruitment', 'employee relations', 'hr management', 'communication', 'organizational skills'];
+      }
 
       // Query database for relevant skills
       let suggestedSkills = [];
@@ -901,8 +963,17 @@ class SelfSufficientAIService {
         else if (category === 'data') {
           suggestedSkills = ['Python', 'SQL', 'Power BI', 'Excel', 'Data Analysis', 'Statistics'];
         }
+        else if (category === 'accounting') {
+          suggestedSkills = ['Microsoft Excel', 'SAP', 'MISA', 'Financial Reporting', 'Taxation Knowledge', 'Attention to Detail'];
+        }
+        else if (category === 'marketing') {
+          suggestedSkills = ['Digital Marketing', 'SEO/SEM', 'Google Analytics', 'Social Media Marketing', 'Content Creation', 'Communication'];
+        }
+        else if (category === 'hr') {
+          suggestedSkills = ['Recruitment', 'Employee Relations', 'HR Management Systems', 'Communication', 'Organizational Skills', 'Labor Law Knowledge'];
+        }
         else {
-          suggestedSkills = ['JavaScript', 'Python', 'Git', 'Problem Solving', 'Communication', 'Teamwork'];
+          suggestedSkills = ['Microsoft Office', 'Communication', 'Problem Solving', 'Teamwork', 'Time Management', 'Attention to Detail'];
         }
       }
 

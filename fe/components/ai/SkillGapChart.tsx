@@ -44,7 +44,7 @@ export function SkillGapChart({
   const gapSections = [
     {
       key: "critical",
-      title: "Critical Skills",
+      title: "Kỹ năng quan trọng (Critical)",
       icon: AlertTriangle,
       skills: skillGaps.critical,
       color: "text-red-600",
@@ -53,7 +53,7 @@ export function SkillGapChart({
     },
     {
       key: "important",
-      title: "Important Skills",
+      title: "Kỹ năng ưu tiên (Important)",
       icon: AlertCircle,
       skills: skillGaps.important,
       color: "text-orange-600",
@@ -62,7 +62,7 @@ export function SkillGapChart({
     },
     {
       key: "optional",
-      title: "Optional Skills",
+      title: "Kỹ năng bổ sung (Optional)",
       icon: Info,
       skills: skillGaps.optional,
       color: "text-blue-600",
@@ -75,10 +75,10 @@ export function SkillGapChart({
     <Card className={className}>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <span>Skill Gap Analysis</span>
+          <span>Phân tích khoảng cách kỹ năng</span>
           {matchScore !== undefined && (
             <Badge variant="secondary" className="text-lg font-bold">
-              {matchScore}% Match
+              {matchScore}% phù hợp
             </Badge>
           )}
         </CardTitle>
@@ -90,19 +90,19 @@ export function SkillGapChart({
             <div className="text-3xl font-bold text-green-700">
               {currentSkills.length}
             </div>
-            <div className="text-sm text-gray-600">Your Skills</div>
+            <div className="text-sm text-gray-600">Kỹ năng hiện tại</div>
           </div>
           <div className="text-center p-4 bg-blue-50 rounded-lg">
             <div className="text-3xl font-bold text-blue-700">
               {requiredSkills.length}
             </div>
-            <div className="text-sm text-gray-600">Required Skills</div>
+            <div className="text-sm text-gray-600">Kỹ năng yêu cầu</div>
           </div>
         </div>
 
         {/* Skill Gaps by Category */}
         <div className="space-y-3">
-          <h4 className="font-semibold text-sm">Skills to Develop</h4>
+          <h4 className="font-semibold text-sm">Kỹ năng cần phát triển</h4>
           {gapSections.map((section) => {
             if (section.skills.length === 0) return null;
             const isExpanded = expandedSection === section.key;
@@ -152,7 +152,7 @@ export function SkillGapChart({
         {/* Recommendations */}
         {recommendations && recommendations.length > 0 && (
           <div className="pt-4 border-t space-y-2">
-            <h4 className="font-semibold text-sm">Recommendations</h4>
+            <h4 className="font-semibold text-sm">Gợi ý cải thiện</h4>
             <ul className="space-y-2">
               {recommendations.map((rec, index) => (
                 <li
@@ -169,7 +169,7 @@ export function SkillGapChart({
 
         {/* Action Button */}
         <Button className="w-full" size="lg">
-          Generate Learning Roadmap
+          Tạo lộ trình học tập
         </Button>
       </CardContent>
     </Card>
