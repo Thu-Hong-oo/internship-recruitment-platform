@@ -49,6 +49,12 @@ router.post('/create-from-template', cvController.createCVFromTemplate);
 // ✅ GET - Lấy CV theo ID
 router.get('/resume/:resumeId', cvController.getResumeById);
 
+// ✅ PUT - Cập nhật nội dung ResumeBuilder theo ID (builder state riêng cho từng CV)
+router.put('/resume/:resumeId', cvController.updateResumeBuilder);
+
+// ✅ GET - Map templateId -> resumeId đã tạo trước đó
+router.get('/template-map', cvController.getTemplateResumeMap);
+
 // ✅ GET - Lấy CV mặc định hoặc mới nhất
 router.get('/default', cvController.getDefaultResume);
 

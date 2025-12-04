@@ -324,6 +324,41 @@ class CandidateService {
   }
 
   /**
+   * Cập nhật nội dung một ResumeBuilder (state riêng cho từng CV/template)
+   * PUT /candidates/me/cv-builder/resume/:resumeId
+   */
+  async updateResumeBuilder(resumeId: string, payload: {
+    content: any;
+    customization?: any;
+    createVersion?: boolean;
+    status?: "draft" | "completed" | "archived";
+  }): Promise<{
+    success: boolean;
+    data: {
+      resumeId: string;
+      templateId: string | null;
+      content: any;
+      customization: any;
+      status: string;
+      updatedAt: string;
+    };
+  }> {
+    return apiClient.put(`/candidates/me/cv-builder/resume/${resumeId}`, payload);
+  }
+
+  /**
+   * Lấy map templateId -> resumeId đã tạo trước đó
+   */
+  async getTemplateResumeMap(): Promise<{
+    success: boolean;
+    data: {
+      map: Record<string, string>;
+    };
+  }> {
+    return apiClient.get("/candidates/me/cv-builder/template-map");
+  }
+
+  /**
    * Upload avatar cho CV builder
    */
   async uploadAvatar(file: File): Promise<{

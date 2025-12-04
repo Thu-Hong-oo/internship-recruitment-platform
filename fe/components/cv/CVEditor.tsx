@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Download, Loader2, Save } from "lucide-react";
 import type { CVData } from "../../lib/mocks/cvSamples";
 import { templateLayouts } from "../../lib/mocks/templateLayouts";
@@ -80,54 +80,71 @@ export default function CVEditor({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const state = useCvEditorState(data);
 
-  // Convert CVData sang format backend cần
+  // Quản lý resumeId nội bộ để có thể tạo ResumeBuilder lần đầu nếu cần
+  const [currentResumeId, setCurrentResumeId] = useState<string | null>(
+    resumeId ?? null
+  );
+
+  // Nếu prop resumeId thay đổi (ví dụ từ parent /cv/new), đồng bộ lại
+  useEffect(() => {
+    if (resumeId && resumeId !== currentResumeId) {
+      setCurrentResumeId(resumeId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeId]);
+
+  // Chuyển CVData sang format backend ResumeBuilder schema
   const convertCVDataToBuilderFormat = (cvData: CVData) => {
     return {
       personalInfo: {
         fullName: cvData.personal.name || "",
         email: cvData.personal.email || "",
         phone: cvData.personal.phone || "",
-        address: cvData.personal.address || null,
+        address: cvData.personal.address || "",
         avatar: (cvData.personal as any).avatar || null,
         website: (cvData.personal as any).website || "",
         linkedin: (cvData.personal as any).linkedin || "",
         github: (cvData.personal as any).github || "",
         jobTitle: (cvData.personal as any).jobTitle || "",
+        bio: cvData.personal.summary || "",
       },
-      careerObjective: cvData.personal.summary || "",
+      summary: cvData.personal.summary || "",
       experience: cvData.experience.map((exp) => ({
         company: exp.company || "",
         position: exp.role || "",
         startDate: exp.startDate || "",
         endDate: exp.endDate || "",
         description: exp.description || "",
-        type: "fulltime", // Default type, backend sẽ filter theo type
+        type: "fulltime",
       })),
       education: cvData.education.map((edu) => ({
         institution: edu.school || "",
         degree: edu.degree || "",
         startYear: edu.startDate || "",
         endYear: edu.endDate || "",
-        type: "university", // Default type, backend sẽ filter theo type
+        type: "university",
+        achievements: (edu as any).achievements || [],
+        coursework: (edu as any).coursework || [],
       })),
       skills: {
-        technical: cvData.skills.map((skill: string | any) => {
-          // Backend mong đợi object với name field
-          if (typeof skill === "string") {
-            return { name: skill, level: "intermediate" };
-          }
-          return {
-            name: (skill as any).name || skill,
-            level: (skill as any).level || "intermediate",
-          };
-        }),
-        soft: [],
-        languages: (cvData.languages || []).map((lang) => ({
-          name: lang.name || "",
+        technical: cvData.skills.map((skill: any) =>
+          typeof skill === "string"
+            ? { name: skill, level: "intermediate" }
+            : {
+                name: skill.name || "",
+                level: skill.level || "intermediate",
+              }
+        ),
+        soft: ((cvData as any).softSkills || []).map((skill: any) => ({
+          name: skill.name || skill || "",
+          level: skill.level || "intermediate",
+        })),
+        languages: cvData.languages.map((lang) => ({
+          language: lang.name || "",
           level: lang.level || "",
         })),
       },
-      projects: (cvData.projects || []).map((proj) => ({
+      projects: cvData.projects.map((proj) => ({
         title: proj.title || "",
         description: proj.description || "",
         technologies: (proj as any).technologies || [],
@@ -136,39 +153,11 @@ export default function CVEditor({
         status: (proj as any).status || "completed",
         url: (proj as any).url || null,
         github: (proj as any).github || null,
-        achievements: (proj as any).achievements || [],
       })),
-      certifications: (cvData.certifications || []).map((cert) => {
-        // Backend mong đợi issueDate và expiryDate, không phải year
-        const year = cert.year || "";
-        const issueDate = year ? `${year}-01-01` : null;
-        return {
-          name: cert.name || "",
-          issuer: cert.issuer || "",
-          issueDate: issueDate,
-          expiryDate: null,
-          credentialId: null,
-          url: null,
-        };
-      }),
-      awards: ((cvData as any).awards || []).map((award: any) => {
-        // Backend mong đợi date, không phải year
-        const year = award.year || "";
-        const date = year ? `${year}-01-01` : null;
-        return {
-          title: award.title || "",
-          issuer: award.issuer || "",
-          date: date,
-          description: award.description || "",
-        };
-      }),
-      hobbies: ((cvData as any).hobbies || []).map((hobby: any) =>
-        typeof hobby === "string" ? hobby : hobby
-      ),
-      references: ((cvData as any).references || []).map((ref: any) => ({
-        name: ref.name || "",
-        position: ref.position || "",
-        contact: ref.contact || "",
+      certifications: cvData.certifications.map((cert) => ({
+        name: cert.name || "",
+        issuer: cert.issuer || "",
+        issueDate: cert.year || "",
       })),
     };
   };
@@ -189,28 +178,43 @@ export default function CVEditor({
         personal: currentCvData.personal,
       });
       const builderData = convertCVDataToBuilderFormat(currentCvData);
-      console.log(
-        "📤 Sending data to backend:",
-        JSON.stringify(builderData, null, 2)
-      );
+      console.log("📤 Sending data to backend (ResumeBuilder.content):", {
+        resumeId: currentResumeId,
+        templateId,
+        builderData,
+      });
 
-      // Nếu chưa có resumeId và có templateId, tạo ResumeBuilder mới từ template
-      if (!resumeId && templateId) {
+      let resumeIdToUse = currentResumeId;
+
+      // Nếu chưa có resumeId thì tạo ResumeBuilder mới từ template (một lần)
+      if (!resumeIdToUse) {
+        if (!templateId) {
+          throw new Error(
+            "Không có resumeId hoặc templateId để tạo ResumeBuilder mới."
+          );
+        }
         console.log("🆕 Creating new ResumeBuilder from template:", templateId);
         const createResponse = await candidateService.createCVFromTemplate(
           templateId,
           true // setAsDefault = true
         );
 
-        if (!createResponse.success) {
+        if (!createResponse.success || !createResponse.data?.resume?._id) {
           throw new Error("Không thể tạo CV từ template");
         }
 
-        console.log("✅ ResumeBuilder created:", createResponse.data);
+        resumeIdToUse = createResponse.data.resume._id;
+        setCurrentResumeId(resumeIdToUse);
+
+        console.log("✅ ResumeBuilder created:", createResponse.data.resume);
       }
 
-      // Cập nhật dữ liệu CV builder (lưu vào CandidateProfile)
-      const response = await candidateService.updateBuilderData(builderData);
+      // Cập nhật nội dung ResumeBuilder (không ghi đè CandidateProfile nữa)
+      const response = await candidateService.updateResumeBuilder(resumeIdToUse, {
+        content: builderData,
+        createVersion: true,
+        status: "draft",
+      });
 
       if (response.success) {
         setHasUnsavedChanges(false);
