@@ -20,9 +20,7 @@ import HeroSection from "@/components/layout/hero-section";
 import { useEffect, useState } from "react";
 import { jobsAPI, JobItem } from "@/lib/api";
 import { Row, Col } from "antd";
-import JobFilters, {
-  JobFilters as JobFiltersType,
-} from "@/components/jobs/JobFilters";
+import { JobFilters as JobFiltersType } from "@/components/jobs/JobFilters";
 interface HomePageProps {
   onSearch?: (keyword: string) => void;
 }
@@ -134,14 +132,14 @@ export default function HomePage({ onSearch }: HomePageProps) {
     if (newFilters.sortBy) qs.set("sortBy", newFilters.sortBy);
     if (newFilters.sortOrder) qs.set("sortOrder", newFilters.sortOrder);
 
-    // Update URL - this will trigger useEffect to re-fetch
-    const newUrl = qs.toString() ? `/?${qs.toString()}` : "/";
+    // Navigate to search page with filters
+    const newUrl = qs.toString() ? `/search?${qs.toString()}` : "/search";
     router.push(newUrl);
   };
 
   const handleFiltersReset = () => {
     setFilters({});
-    router.push("/");
+    router.push("/search");
   };
   const fetchJobs = async (page = currentPage, limit = pageSize) => {
     try {
@@ -194,6 +192,7 @@ export default function HomePage({ onSearch }: HomePageProps) {
       <HeroSection
         onSearch={handleSearch}
         onFiltersChange={handleFiltersChange}
+        filters={filters}
       />
 
       {/* Main Content */}
@@ -208,16 +207,6 @@ export default function HomePage({ onSearch }: HomePageProps) {
         />
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 py-12">
-          {/* Job Filters */}
-          <div className="mb-6">
-            <JobFilters
-              filters={filters}
-              onChange={handleFiltersChange}
-              onReset={handleFiltersReset}
-              showAdvanced={false}
-            />
-          </div>
-
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             {/* Main Content */}
             <div className="lg:col-span-3">
