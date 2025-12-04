@@ -37,6 +37,13 @@ class SentenceBertService {
       
       if (this.isAvailable) {
         logger.info(`✅ Sentence-BERT model available: ${this.modelName}`);
+        // Pre-warm model with dummy encoding to speed up first real request
+        try {
+          await this._runPython(['--encode', 'warmup']);
+          logger.info('✅ Sentence-BERT model pre-warmed');
+        } catch (warmupError) {
+          logger.warn('⚠️ Model warmup failed:', warmupError.message);
+        }
       } else {
         logger.warn('⚠️ Sentence-BERT model not available. Run: pip install sentence-transformers');
       }
@@ -209,14 +216,20 @@ class SentenceBertService {
       });
 
       pythonProcess.on('error', (error) => {
+        logger.error('❌ Python process error:', error.message);
         reject(new Error(`Failed to start Python process: ${error.message}`));
       });
 
-      // Timeout after 30 seconds
-      setTimeout(() => {
-        pythonProcess.kill();
-        reject(new Error('Python script timeout (30s)'));
+      // Timeout after 30 seconds (model is pre-warmed)
+      const timeoutId = setTimeout(() => {
+        pythonProcess.kill('SIGKILL');
+        logger.error('⏱️ Sentence-BERT timeout after 30s');
+        reject(new Error('Sentence-BERT timeout (30s)'));
       }, 30000);
+      
+      pythonProcess.on('close', () => {
+        clearTimeout(timeoutId);
+      });
     });
   }
 

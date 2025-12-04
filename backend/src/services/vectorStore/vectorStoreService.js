@@ -1,5 +1,5 @@
 const { ChromaClient } = require('chromadb');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { HuggingFaceInferenceEmbeddings } = require('@langchain/community/embeddings/hf');
 const { logger } = require('../../utils/logger');
 
 /**
@@ -9,13 +9,21 @@ const { logger } = require('../../utils/logger');
  * @description Provides credible, verifiable learning resources for thesis
  * @author Thu-Hong-oo
  * @date 2025-12-01
+ * 
+ * UPDATED 2025-12-04: Replaced Gemini embeddings with HuggingFace (free, no quota limits)
  */
 class VectorStoreService {
   constructor() {
     this.client = null;
     this.collection = null;
     this.collectionName = 'learning_resources';
-    this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    
+    // HuggingFace embeddings (FREE, no quota limits!)
+    this.embeddings = new HuggingFaceInferenceEmbeddings({
+      apiKey: process.env.HUGGING_FACE_API_KEY || 'hf_default', // Free tier available
+      model: 'sentence-transformers/all-mpnet-base-v2', // Most popular stable model (768-dim)
+    });
+    
     this.initialized = false;
   }
 
@@ -64,17 +72,17 @@ class VectorStoreService {
   }
 
   /**
-   * Generate embedding vector using Gemini
+   * Generate embedding vector using HuggingFace (FREE, no quota limits!)
    * @param {string} text - Text to embed
    * @returns {Promise<number[]>} Embedding vector
    */
   async generateEmbedding(text) {
     try {
-      const model = this.genAI.getGenerativeModel({ model: 'embedding-001' });
-      const result = await model.embedContent(text);
-      return result.embedding.values;
+      // Use HuggingFace sentence-transformers (100% free, no billing)
+      const embedding = await this.embeddings.embedQuery(text);
+      return embedding;
     } catch (error) {
-      logger.error('❌ Embedding generation failed:', error);
+      logger.error('❌ HuggingFace embedding generation failed:', error);
       throw error;
     }
   }
@@ -200,17 +208,22 @@ class VectorStoreService {
       // Generate query embedding
       const queryEmbedding = await this.generateEmbedding(query);
 
-      // Build where filter
-      const whereFilter = {};
-      if (skill) whereFilter.skill = skill;
-      if (difficulty) whereFilter.difficulty = difficulty;
-      if (type) whereFilter.type = type;
+      // Build where filter with proper ChromaDB operators
+      const whereConditions = [];
+      if (skill) whereConditions.push({ skill: { $eq: skill } });
+      if (difficulty) whereConditions.push({ difficulty: { $eq: difficulty } });
+      if (type) whereConditions.push({ type: { $eq: type } });
+
+      // Combine conditions with $and operator if multiple filters
+      const whereFilter = whereConditions.length === 0 ? undefined :
+                         whereConditions.length === 1 ? whereConditions[0] :
+                         { $and: whereConditions };
 
       // Query collection
       const results = await this.collection.query({
         queryEmbeddings: [queryEmbedding],
         nResults: topK * 2, // Get more results for filtering
-        where: Object.keys(whereFilter).length > 0 ? whereFilter : undefined,
+        where: whereFilter,
       });
 
       // Format and filter results

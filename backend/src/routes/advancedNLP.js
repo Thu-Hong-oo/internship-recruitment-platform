@@ -2,19 +2,22 @@ const express = require('express');
 const router = express.Router();
 const advancedNLPController = require('../controllers/advancedNLPController');
 const { protect, authorize } = require('../middleware/auth');
+const { noCache } = require('../middleware/cacheControl');
 
 // ============================================================
-// 📊 MATCHING SCORE ROUTES
+// 📊 MATCHING SCORE ROUTES (NO CACHE - Always Fresh)
 // ============================================================
 
 /**
  * @route   POST /api/nlp/matching-score
  * @desc    Calculate advanced matching score between CV and Job
  * @access  Private (Candidate + Employer)
+ * @cache   DISABLED - Always calculate fresh (algorithm changes, CV updates)
  */
 router.post(
   '/matching-score',
   protect,
+  noCache(), // DISABLE CACHE
   advancedNLPController.calculateMatchingScore
 );
 

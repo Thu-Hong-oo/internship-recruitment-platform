@@ -6144,31 +6144,28 @@ Return JSON:
           ? cvData
           : cvData.text || JSON.stringify(cvData);
 
-      // Initialize score breakdown
+      // Initialize score breakdown with improved algorithms
       const scoreBreakdown = {
         skillsScore: await this._calculateSkillsMatch(cvData, jobData),
         experienceScore: await this._calculateExperienceMatch(cvData, jobData),
         educationScore: await this._calculateEducationMatch(cvData, jobData),
-        keywordScore: await this._calculateKeywordMatch(cvText, jobData),
+        semanticScore: await this._calculateSemanticSimilarity(cvText, jobData),
         softSkillsScore: await this._calculateSoftSkillsMatch(cvText, jobData),
       };
 
       // Calculate weighted overall score
-      // CĂN CỨ TRỌNG SỐ (dựa trên meta-analysis của Schmidt & Hunter, 1998):
-      // - Skills (45%): Correlation cao nhất với job performance (0.40-0.50)
-      // - Experience (20%): Correlation 0.33 với performance
-      // - Education (10%): Correlation 0.20, quan trọng nhưng ít hơn
-      // - Keywords (15%): Đo semantic match, quan trọng cho ATS systems
-      // - Soft Skills (10%): Quan trọng nhưng khó đánh giá từ CV
+      // TRỌNG SỐ MỚI (dựa trên Schmidt & Hunter 1998 + hiện đại hóa):
+      // - Skills (50%): Yếu tố quan trọng nhất, tăng từ 45%
+      // - Experience (20%): Giữ nguyên, relevant experience rất quan trọng
+      // - Semantic Similarity (15%): Thay keyword matching, dùng embeddings
+      // - Education (10%): Ít quan trọng hơn skills thực tế
+      // - Soft Skills (5%): Giảm từ 10%, khó đánh giá chính xác từ CV
       const overallScore =
         scoreBreakdown.skillsScore.score * scoreBreakdown.skillsScore.weight +
-        scoreBreakdown.experienceScore.score *
-          scoreBreakdown.experienceScore.weight +
-        scoreBreakdown.educationScore.score *
-          scoreBreakdown.educationScore.weight +
-        scoreBreakdown.keywordScore.score * scoreBreakdown.keywordScore.weight +
-        scoreBreakdown.softSkillsScore.score *
-          scoreBreakdown.softSkillsScore.weight;
+        scoreBreakdown.experienceScore.score * scoreBreakdown.experienceScore.weight +
+        scoreBreakdown.educationScore.score * scoreBreakdown.educationScore.weight +
+        scoreBreakdown.semanticScore.score * scoreBreakdown.semanticScore.weight +
+        scoreBreakdown.softSkillsScore.score * scoreBreakdown.softSkillsScore.weight;
 
       // Generate AI insights
       const insights = await this._generateMatchInsights(
@@ -6246,7 +6243,7 @@ Return JSON:
       if (jobSkills.length === 0) {
         return {
           score: 50,
-          weight: 0.45,
+          weight: 0.5, // Updated from 0.45
           details: {
             requiredSkillsMatched: 0,
             requiredSkillsTotal: 0,
@@ -6260,8 +6257,10 @@ Return JSON:
         };
       }
 
-      const requiredSkills = jobSkills.filter((s) => s.required);
-      const niceToHaveSkills = jobSkills.filter((s) => !s.required);
+      // LOGIC: Default ALL skills are REQUIRED unless explicitly marked as optional
+      // Rationale: Job posting skills are minimum requirements, not nice-to-haves
+      const requiredSkills = jobSkills.filter((s) => s.required !== false);
+      const niceToHaveSkills = jobSkills.filter((s) => s.required === false);
 
       const matchedSkills = [];
       const missingSkills = [];
@@ -6269,25 +6268,43 @@ Return JSON:
       // Normalize CV skills với AI-powered service (async)
       const cvSkillNames = await Promise.all(
         cvSkills.map(async (s) => {
-        const skill = (typeof s === 'string' ? s : s.name).toLowerCase().trim();
+          if (!s) return '';
+          const skill = (typeof s === 'string' ? s : s.name);
+          if (!skill || typeof skill !== 'string') return '';
           // Normalize skill name using AI-powered service
-          return await this._normalizeSkillName(skill);
+          return await this._normalizeSkillName(skill.toLowerCase().trim());
         })
       );
+
+      // Filter out empty strings
+      const validCvSkillNames = cvSkillNames.filter(s => s && s.length > 0);
 
       // Check required skills với semantic matching cải tiến
       let requiredMatched = 0;
       for (const jobSkill of requiredSkills) {
+        // Handle both string and object formats
+        const skillName = typeof jobSkill === 'string' 
+          ? jobSkill 
+          : (jobSkill?.name || '');
+        
+        // Validate skill before processing
+        if (!skillName || typeof skillName !== 'string') {
+          logger.warn('Invalid job skill in required list:', jobSkill);
+          continue;
+        }
+        
         // Use AI-powered normalization (async)
-        const skillName = await this._normalizeSkillName(jobSkill.name.toLowerCase().trim());
+        const normalizedSkillName = await this._normalizeSkillName(skillName.toLowerCase().trim());
         // Improved matching: exact match, substring match, hoặc synonym match
         const isMatched = await Promise.all(
-          cvSkillNames.map(async (cvSkill) => {
+          validCvSkillNames.map(async (cvSkill) => {
+            if (!cvSkill) return false;
             const normalizedCvSkill = await this._normalizeSkillName(cvSkill);
+            if (!normalizedCvSkill) return false;
           // Exact match sau khi normalize
-            if (normalizedCvSkill === skillName) return true;
+            if (normalizedCvSkill === normalizedSkillName) return true;
           // Substring match (để xử lý "React" vs "React.js")
-            if (normalizedCvSkill.includes(skillName) || skillName.includes(normalizedCvSkill)) return true;
+            if (normalizedCvSkill.includes(normalizedSkillName) || normalizedSkillName.includes(normalizedCvSkill)) return true;
           return false;
           })
         ).then(results => results.some(r => r === true));
@@ -6296,23 +6313,23 @@ Return JSON:
           requiredMatched++;
           const cvSkill = cvSkills.find((s) => {
             const name = (typeof s === 'string' ? s : s.name).toLowerCase();
-            return name.includes(skillName) || skillName.includes(name);
+            return name.includes(normalizedSkillName) || normalizedSkillName.includes(name);
           });
 
           matchedSkills.push({
-            skill: jobSkill.name,
+            skill: skillName,  // Use original name, not normalized
             required: true,
             candidateLevel:
               typeof cvSkill === 'object' ? cvSkill.level : 'intermediate',
-            requiredLevel: jobSkill.level || 'intermediate',
+            requiredLevel: typeof jobSkill === 'object' ? (jobSkill.level || 'intermediate') : 'intermediate',
             matchScore: 1,
           });
         } else {
           missingSkills.push({
-            skill: jobSkill.name,
+            skill: skillName,  // Use original name, not normalized
             required: true,
             importance: 0.9,
-            learnability: this._assessLearnability(jobSkill.name),
+            learnability: this._assessLearnability(skillName),
           });
         }
       }
@@ -6320,13 +6337,25 @@ Return JSON:
       // Check nice-to-have skills với semantic matching cải tiến
       let niceToHaveMatched = 0;
       for (const jobSkill of niceToHaveSkills) {
-        const skillName = await this._normalizeSkillName(jobSkill.name.toLowerCase().trim());
+        // Handle both string and object formats
+        const skillName = typeof jobSkill === 'string'
+          ? jobSkill
+          : (jobSkill?.name || '');
+        
+        if (!skillName || typeof skillName !== 'string') {
+          logger.warn('Invalid job skill in nice-to-have list:', jobSkill);
+          continue;
+        }
+        
+        const normalizedSkillName = await this._normalizeSkillName(skillName.toLowerCase().trim());
         // Improved matching: exact match, substring match, hoặc synonym match
         const isMatched = await Promise.all(
-          cvSkillNames.map(async (cvSkill) => {
+          validCvSkillNames.map(async (cvSkill) => {
+            if (!cvSkill) return false;
             const normalizedCvSkill = await this._normalizeSkillName(cvSkill);
-            if (normalizedCvSkill === skillName) return true;
-            if (normalizedCvSkill.includes(skillName) || skillName.includes(normalizedCvSkill)) return true;
+            if (!normalizedCvSkill) return false;
+            if (normalizedCvSkill === normalizedSkillName) return true;
+            if (normalizedCvSkill.includes(normalizedSkillName) || normalizedSkillName.includes(normalizedCvSkill)) return true;
           return false;
           })
         ).then(results => results.some(r => r === true));
@@ -6334,16 +6363,16 @@ Return JSON:
         if (isMatched) {
           niceToHaveMatched++;
           matchedSkills.push({
-            skill: jobSkill.name,
+            skill: skillName,  // Use original name
             required: false,
             matchScore: 0.7,
           });
         } else {
           missingSkills.push({
-            skill: jobSkill.name,
+            skill: skillName,  // Use original name
             required: false,
             importance: 0.5,
-            learnability: this._assessLearnability(jobSkill.name),
+            learnability: this._assessLearnability(skillName),
           });
         }
       }
@@ -6364,7 +6393,7 @@ Return JSON:
 
       return {
         score: Math.round(score),
-        weight: 0.45,
+        weight: 0.5, // Updated from 0.45 (skills most important)
         details: {
           requiredSkillsMatched: requiredMatched,
           requiredSkillsTotal: requiredSkills.length,
@@ -6380,7 +6409,7 @@ Return JSON:
       logger.error('Error calculating skills match:', error);
       return {
         score: 0,
-        weight: 0.45,
+        weight: 0.5,
         details: {},
       };
     }
@@ -6594,13 +6623,20 @@ Return JSON:
       tfidf.addDocument(jobWords.join(' '));
       const cosineSimilarity = this._calculateCosineSimilarity(tfidf, 0, 1);
 
-      // Find common keywords
-      const commonKeywords = cvWords.filter((word) => jobWords.includes(word));
+      // Find common keywords (remove duplicates to prevent keyword stuffing)
+      const commonKeywords = [...new Set(cvWords.filter((word) => jobWords.includes(word)))];
+
+      // Calculate keyword density penalty (prevent gaming by repeating keywords)
+      const cvWordCount = cvWords.length;
+      const uniqueKeywordCount = commonKeywords.length;
+      const keywordDensity = cvWordCount > 0 ? (cvWords.filter(w => commonKeywords.includes(w)).length / cvWordCount) : 0;
+      const stuffingPenalty = keywordDensity > 0.05 ? Math.max(0.5, 1 - (keywordDensity - 0.05) * 5) : 1;
 
       // Weighted combination: Jaccard (40%) + Cosine (60%)
       // Căn cứ: Manning et al. (2008) - Kết hợp hai phương pháp cho độ chính xác cao hơn
       // Jaccard tốt cho keyword overlap, Cosine tốt cho semantic similarity
-      const score = (jaccardSimilarity * 0.4 + cosineSimilarity * 0.6) * 100;
+      const rawScore = (jaccardSimilarity * 0.4 + cosineSimilarity * 0.6) * 100;
+      const score = rawScore * stuffingPenalty;
 
       return {
         score: Math.round(score),
@@ -6610,6 +6646,9 @@ Return JSON:
           cosineSimilarity: Math.round(cosineSimilarity * 100) / 100,
           semanticSimilarity: Math.round(score) / 100,
           commonKeywords: commonKeywords.slice(0, 20),
+          uniqueKeywordCount: uniqueKeywordCount,
+          keywordDensity: Math.round(keywordDensity * 1000) / 10,
+          stuffingPenalty: Math.round(stuffingPenalty * 100) / 100,
           topMatchingPhrases: this._extractMatchingPhrases(cvText, jobText),
         },
       };
@@ -6620,7 +6659,99 @@ Return JSON:
   }
 
   /**
-   * Calculate Soft Skills Score (10% weight)
+   * Calculate Semantic Similarity Score (15% weight) - IMPROVED VERSION
+   * Uses sentence embeddings instead of keyword matching to prevent gaming
+   * 
+   * CĂN CỨ KHOA HỌC:
+   * - Sentence-BERT (Reimers & Gurevych, 2019): SOTA cho semantic similarity
+   * - Cosine similarity trên embeddings không bị ảnh hưởng bởi keyword stuffing
+   * - Đo nghĩa tổng thể, không phải từ đơn lẻ
+   * 
+   * THUẬT TOÁN:
+   * 1. Generate embeddings cho CV và Job description bằng HuggingFace
+   * 2. Tính cosine similarity giữa 2 vectors
+   * 3. Normalize về scale 0-100
+   * 
+   * ƯU ĐIỂM:
+   * - Không thể gaming bằng cách lặp từ khóa
+   * - Hiểu context và nghĩa của câu
+   * - Robust với synonyms và paraphrases
+   */
+  async _calculateSemanticSimilarity(cvText, jobData) {
+    try {
+      // Safely extract job text, handle both array and string formats
+      const requirements = Array.isArray(jobData.requirements) 
+        ? jobData.requirements.join(' ') 
+        : (typeof jobData.requirements === 'string' ? jobData.requirements : '');
+      
+      const responsibilities = Array.isArray(jobData.responsibilities)
+        ? jobData.responsibilities.join(' ')
+        : (typeof jobData.responsibilities === 'string' ? jobData.responsibilities : '');
+
+      const jobText = `${jobData.title || ''} ${jobData.description || ''} ${requirements} ${responsibilities}`;
+
+      // Clean and normalize text
+      const cleanCvText = (cvText || '').toLowerCase().trim().substring(0, 5000); // Limit to prevent token overflow
+      const cleanJobText = jobText.toLowerCase().trim().substring(0, 5000);
+
+      if (!cleanCvText || !cleanJobText) {
+        return { score: 0, weight: 0.15, details: { error: 'Empty text' } };
+      }
+
+      // Generate embeddings using HuggingFace service
+      const embeddingService = require('./embeddingService');
+      const cvEmbedding = await embeddingService.generateEmbedding(cleanCvText);
+      const jobEmbedding = await embeddingService.generateEmbedding(cleanJobText);
+
+      // Calculate cosine similarity
+      const similarity = this._cosineSimilarity(cvEmbedding, jobEmbedding);
+      const score = Math.round(similarity * 100);
+
+      // Get actual model info (could be TF-IDF fallback or neural embeddings)
+      const modelInfo = embeddingService.getModelInfo();
+
+      return {
+        score: Math.min(100, Math.max(0, score)),
+        weight: 0.15,
+        details: {
+          cosineSimilarity: Math.round(similarity * 100) / 100,
+          method: modelInfo.method || 'embeddings',
+          model: modelInfo.name || 'unknown',
+          cvLength: cleanCvText.length,
+          jobLength: cleanJobText.length,
+        },
+      };
+    } catch (error) {
+      logger.error('Error calculating semantic similarity:', error);
+      // Fallback to old keyword matching if embedding service fails
+      return await this._calculateKeywordMatch(cvText, jobData);
+    }
+  }
+
+  /**
+   * Helper: Calculate cosine similarity between two vectors
+   */
+  _cosineSimilarity(vecA, vecB) {
+    if (!vecA || !vecB || vecA.length !== vecB.length) {
+      return 0;
+    }
+
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+
+    for (let i = 0; i < vecA.length; i++) {
+      dotProduct += vecA[i] * vecB[i];
+      normA += vecA[i] * vecA[i];
+      normB += vecB[i] * vecB[i];
+    }
+
+    const denominator = Math.sqrt(normA) * Math.sqrt(normB);
+    return denominator === 0 ? 0 : dotProduct / denominator;
+  }
+
+  /**
+   * Calculate Soft Skills Score (5% weight) - IMPROVED VERSION
    * 
    * CĂN CỨ NGHIÊN CỨU:
    * - Boyatzis (1982): Soft skills quan trọng nhưng khó đánh giá từ CV
@@ -6719,7 +6850,7 @@ Return JSON:
 
       return {
         score: Math.round(averageScore),
-        weight: 0.1,
+        weight: 0.05,
         details: {
           ...scores,
           detectedSoftSkills,
@@ -6727,7 +6858,7 @@ Return JSON:
       };
     } catch (error) {
       logger.error('Error calculating soft skills match:', error);
-      return { score: 0, weight: 0.1, details: {} };
+      return { score: 0, weight: 0.05, details: {} };
     }
   }
 
@@ -6745,13 +6876,16 @@ Return JSON:
         strengths.push('Excellent technical skills match');
       } else if (scoreBreakdown.skillsScore.score < 50) {
         weaknesses.push('Significant skill gaps identified');
-        recommendations.push(
-          'Consider upskilling in: ' +
-            scoreBreakdown.skillsScore.details.missingSkills
-              .slice(0, 3)
-              .map((s) => s.skill)
-              .join(', ')
-        );
+        const missingSkills = scoreBreakdown.skillsScore.details?.missingSkills || [];
+        if (missingSkills.length > 0) {
+          recommendations.push(
+            'Consider upskilling in: ' +
+              missingSkills
+                .slice(0, 3)
+                .map((s) => (typeof s === 'string' ? s : s.skill))
+                .join(', ')
+          );
+        }
       }
 
       // Analyze experience
@@ -7927,16 +8061,20 @@ Return ONLY valid JSON (no markdown):
     try {
       // Use AI-powered normalization service
       const normalized = await this.skillNormalizationService.normalizeSkill(skillName, useCache);
-      return normalized;
+      return normalized || skillName.toLowerCase().trim();
     } catch (error) {
-      logger.warn(`⚠️ Failed to normalize skill "${skillName}" with AI, using fallback:`, error.message);
+      logger.warn(`⚠️ Failed to normalize skill "${skillName}" with AI:`, {
+        error: error.message,
+        stack: error.stack?.split('\n')[0]
+      });
       // Fallback: basic normalization
-    const normalized = skillName.toLowerCase().trim();
+      const normalized = skillName.toLowerCase().trim();
       return normalized
         .replace(/^proficient\s+in\s+/i, '')
         .replace(/\s+experience$/i, '')
         .replace(/\s+skill$/i, '')
-        .trim();
+        .replace(/^kỹ năng\s+/i, '')
+        .trim() || skillName.toLowerCase().trim();
     }
   }
 

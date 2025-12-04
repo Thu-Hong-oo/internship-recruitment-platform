@@ -1,5 +1,6 @@
 const express = require('express');
 const { protect, authorize } = require('../middleware/auth');
+const { noCache, shortCache } = require('../middleware/cacheControl');
 const {
   getRoadmaps,
   getRoadmap,
@@ -19,19 +20,19 @@ const router = express.Router();
 router.use(protect);
 
 // Roadmap management
-router.get('/', getRoadmaps);
-router.get('/recommended', getRecommendedRoadmaps);
-router.get('/:id', getRoadmap);
-router.get('/:id/analytics', getRoadmapAnalytics);
-router.post('/', createRoadmap);
-router.put('/:id', updateRoadmap);
-router.delete('/:id', deleteRoadmap);
+router.get('/', shortCache(), getRoadmaps); // Cache 1 min
+router.get('/recommended', shortCache(), getRecommendedRoadmaps);
+router.get('/:id', shortCache(), getRoadmap);
+router.get('/:id/analytics', shortCache(), getRoadmapAnalytics);
+router.post('/', noCache(), createRoadmap); // No cache for creation
+router.put('/:id', noCache(), updateRoadmap);
+router.delete('/:id', noCache(), deleteRoadmap);
 
 // Progress tracking
-router.put('/:id/complete-week/:weekNumber', completeWeek);
-router.put('/:id/progress/:weekNumber', updateProgress);
+router.put('/:id/complete-week/:weekNumber', noCache(), completeWeek);
+router.put('/:id/progress/:weekNumber', noCache(), updateProgress);
 
-// AI-generated roadmaps
-router.post('/generate-from-job/:jobId', generateRoadmapFromJob);
+// AI-generated roadmaps (NO CACHE - algorithm improvements)
+router.post('/generate-from-job/:jobId', noCache(), generateRoadmapFromJob);
 
 module.exports = router;

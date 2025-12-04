@@ -64,25 +64,52 @@ export default function SkillGapAnalysisPage() {
   useEffect(() => {
     const jobId = searchParams.get("jobId");
     if (jobId) {
+      // Đi từ trang Job Detail: tự chọn luôn job đó và chạy phân tích
       setAnalysisMethod("job");
       setSelectedJobId(jobId);
+      loadJobById(jobId);
       handleAnalyzeByJobId(jobId);
     } else {
+      // Vào trực tiếp trang Skill Gap: load danh sách job mới nhất
       loadRecentJobs();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadRecentJobs = async () => {
     setIsLoadingJobs(true);
     try {
-      const response = await jobService.getJobs({
-        page: 1,
-        limit: 20,
+      const response = await jobService.getJobs(1, 20, {
         status: "active",
       });
       setJobs(response.data || []);
     } catch (error) {
       console.error("Failed to load jobs:", error);
+    } finally {
+      setIsLoadingJobs(false);
+    }
+  };
+
+  const loadJobById = async (jobId: string) => {
+    setIsLoadingJobs(true);
+    try {
+      const response = await jobService.getJobById(jobId);
+      if (response?.success && response.data) {
+        // Hiển thị đúng job đang xem trong danh sách và chọn sẵn
+        setJobs([
+          {
+            _id: response.data.id,
+            title: response.data.title,
+            employer: response.data.employer,
+            skills: response.data.skills,
+          },
+        ] as any[]);
+      } else {
+        await loadRecentJobs();
+      }
+    } catch (error) {
+      console.error("Failed to load job by id:", error);
+      await loadRecentJobs();
     } finally {
       setIsLoadingJobs(false);
     }
@@ -96,9 +123,7 @@ export default function SkillGapAnalysisPage() {
 
     setIsLoadingJobs(true);
     try {
-      const response = await jobService.getJobs({
-        page: 1,
-        limit: 20,
+      const response = await jobService.getJobs(1, 20, {
         q: searchQuery,
         status: "active",
       });

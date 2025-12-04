@@ -340,8 +340,13 @@ class RAGService {
 
       logger.info(`📚 Generating RAG-powered roadmap for ${skillGaps.length} skills`);
 
-      // Sort skill gaps by priority
-      const sortedSkills = skillGaps.sort((a, b) => b.priority - a.priority);
+      // Sort skill gaps by priority (enum string: critical > high > medium > low)
+      const priorityOrder = {'critical': 1, 'high': 2, 'medium': 3, 'low': 4};
+      const sortedSkills = skillGaps.sort((a, b) => {
+        const aPriority = priorityOrder[a.priority] || 3;
+        const bPriority = priorityOrder[b.priority] || 3;
+        return aPriority - bPriority; // Lower number = higher priority
+      });
 
       // Divide into phases (Foundation, Core Skills, Advanced)
       const phases = this.divideIntoPhases(sortedSkills, timeframe);
@@ -355,7 +360,7 @@ class RAGService {
 
         for (const skill of phase.skills) {
           const resources = await this.getResources(skill.skill, {
-            difficulty: skill.importance === 'critical' ? 'intermediate' : 'beginner',
+            difficulty: skill.importance >= 0.7 ? 'intermediate' : 'beginner', // importance is Number (0-1)
             resourceTypes: ['video', 'project', 'documentation'],
             maxResourcesPerType: 3,
             minCredibility: 0.65,
@@ -382,7 +387,7 @@ class RAGService {
         jobTitle: jobTitle,
         skillGaps: skillGaps,
         currentLevel: currentLevel,
-        targetLevel: 'job-ready',
+        targetLevel: 'advanced', // Must be enum: beginner/intermediate/advanced/expert
         estimatedDuration: timeframe,
         phases: roadmapPhases,
         totalResources: roadmapPhases.reduce((sum, p) => sum + p.totalResources, 0),
@@ -409,8 +414,10 @@ class RAGService {
   divideIntoPhases(skills, timeframe) {
     const phases = [];
 
-    // Phase 1: Foundation (first 25% of time)
-    const foundationSkills = skills.filter(s => s.importance === 'critical').slice(0, 3);
+    // Phase 1: Foundation (high importance/critical priority, first 25% of time)
+    const foundationSkills = skills.filter(s => 
+      (s.importance >= 0.7 || s.priority === 'critical' || s.priority === 'high')
+    ).slice(0, 3);
     if (foundationSkills.length > 0) {
       phases.push({
         name: 'Foundation Phase',
@@ -420,8 +427,10 @@ class RAGService {
       });
     }
 
-    // Phase 2: Core Skills (next 50% of time)
-    const coreSkills = skills.filter(s => s.importance === 'important').slice(0, 4);
+    // Phase 2: Core Skills (medium importance, next 50% of time)
+    const coreSkills = skills.filter(s => 
+      (s.importance >= 0.4 && s.importance < 0.7) || s.priority === 'medium'
+    ).slice(0, 4);
     if (coreSkills.length > 0) {
       phases.push({
         name: 'Core Skills Development',
@@ -431,8 +440,10 @@ class RAGService {
       });
     }
 
-    // Phase 3: Advanced & Integration (final 25% of time)
-    const advancedSkills = skills.filter(s => s.importance === 'nice-to-have').slice(0, 3);
+    // Phase 3: Advanced & Integration (low importance, final 25% of time)
+    const advancedSkills = skills.filter(s => 
+      s.importance < 0.4 || s.priority === 'low'
+    ).slice(0, 3);
     if (advancedSkills.length > 0) {
       phases.push({
         name: 'Advanced Topics & Integration',
@@ -440,6 +451,43 @@ class RAGService {
         skills: advancedSkills,
         objectives: advancedSkills.map(s => `Explore ${s.skill} and integrate knowledge`),
       });
+    }
+
+    // Fallback: If no phases created, distribute all skills evenly
+    if (phases.length === 0 && skills.length > 0) {
+      const skillsPerPhase = Math.ceil(skills.length / 3);
+      const phase1 = skills.slice(0, skillsPerPhase);
+      const phase2 = skills.slice(skillsPerPhase, skillsPerPhase * 2);
+      const phase3 = skills.slice(skillsPerPhase * 2);
+
+      if (phase1.length > 0) {
+        phases.push({
+          name: 'Foundation Phase',
+          duration: Math.floor(timeframe * 0.33),
+          skills: phase1,
+          objectives: phase1.map(s => `Learn ${s.skill}`),
+        });
+      }
+
+      if (phase2.length > 0) {
+        phases.push({
+          name: 'Core Skills Development',
+          duration: Math.floor(timeframe * 0.34),
+          skills: phase2,
+          objectives: phase2.map(s => `Master ${s.skill}`),
+        });
+      }
+
+      if (phase3.length > 0) {
+        phases.push({
+          name: 'Advanced & Integration',
+          duration: Math.floor(timeframe * 0.33),
+          skills: phase3,
+          objectives: phase3.map(s => `Apply ${s.skill}`),
+        });
+      }
+
+      logger.info(`⚠️ Used fallback phase distribution: ${phases.length} phases from ${skills.length} skills`);
     }
 
     return phases;
@@ -463,17 +511,53 @@ class RAGService {
       other: 0,
     };
 
+    logger.info(`🔍 Calculating credibility for ${phases?.length || 0} phases`);
+
+    if (!phases || !Array.isArray(phases)) {
+      logger.warn('⚠️ No phases provided to calculateRoadmapCredibility');
+      return {
+        totalResources: 0,
+        averageCredibility: 0,
+        verificationRate: 0,
+        trustedSourceRate: 0,
+        sourceBreakdown: sourceBreakdown,
+        academicValidity: 'No data available',
+      };
+    }
+
     for (const phase of phases) {
+      if (!phase || !phase.skills || !Array.isArray(phase.skills)) {
+        logger.warn(`⚠️ Phase ${phase?.phaseNumber || '?'} has no skills array`);
+        continue;
+      }
+      
+      logger.info(`  📦 Phase ${phase.phaseNumber}: ${phase.skills.length} skill groups`);
+      
       for (const skillGroup of phase.skills) {
+        if (!skillGroup || !skillGroup.resources || !Array.isArray(skillGroup.resources)) {
+          logger.warn(`    ⚠️ Skill "${skillGroup?.skill || '?'}" has no resources array`);
+          continue;
+        }
+        
+        logger.info(`    🎯 Skill "${skillGroup.skill}": ${skillGroup.resources.length} resources`);
+        
         for (const resource of skillGroup.resources) {
+          if (!resource) {
+            logger.warn(`      ⚠️ Null/undefined resource found`);
+            continue;
+          }
+          
           totalResources++;
-          totalCredibilityScore += resource.credibility;
+          totalCredibilityScore += (resource.credibility || 0);
+          
+          logger.info(`      ✅ Resource: ${resource.title?.substring(0, 40)} - credibility: ${resource.credibility}`);
+
 
           if (resource.url && resource.url.startsWith('http')) {
             resourcesWithUrls++;
           }
 
-          if (resource.credibility >= 0.8) {
+          if (resource.credibility && resource.credibility >= 0.8) {
             resourcesFromTrustedSources++;
           }
 
@@ -484,7 +568,7 @@ class RAGService {
       }
     }
 
-    return {
+    const metrics = {
       totalResources: totalResources,
       averageCredibility: totalResources > 0 ? (totalCredibilityScore / totalResources).toFixed(2) : 0,
       verificationRate: totalResources > 0 ? ((resourcesWithUrls / totalResources) * 100).toFixed(1) : 0,
@@ -492,6 +576,10 @@ class RAGService {
       sourceBreakdown: sourceBreakdown,
       academicValidity: 'All resources are verifiable with URLs and credibility scores',
     };
+
+    logger.info(`📊 Credibility Metrics: ${totalResources} resources, avg credibility: ${metrics.averageCredibility}`);
+
+    return metrics;
   }
 
   /**
