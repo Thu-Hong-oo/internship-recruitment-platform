@@ -119,8 +119,8 @@ export default function CompanyPage() {
   const [formData, setFormData] = useState<CompanyFormData>({
     company: {
       name: "",
-      industry: "technology",
-      size: "medium",
+      industry: "",
+      size: "",
       email: "",
       website: "",
       description: "",
@@ -244,11 +244,11 @@ export default function CompanyPage() {
         const result = await getCompanyInfo(token);
         if (!result.success || !result.data) return;
         const data = result.data;
-        
+
         // Check if data is placeholder
         const isPlaceholderData = isPlaceholderCompanyData(data);
         setIsPlaceholder(isPlaceholderData);
-        
+
         setCompanyView({
           ...data,
           logo: data?.logo || data?.company?.logo?.url || data?.company?.logo,
@@ -258,46 +258,73 @@ export default function CompanyPage() {
             data?.company?.coverImage,
         });
 
-        setFormData((prev) => ({
-          ...prev,
-          company: {
-            ...prev.company,
-            name: data.name || "",
-            industry: data.industry || prev.company.industry,
-            size: data.size || prev.company.size,
-            email: data.email || "",
-            website: data.website || "",
-            description: data.description || "",
-            foundedYear: data.foundedYear ?? "",
-            employeesCount: data.employeesCount ?? "",
-          },
-          businessInfo: {
-            ...prev.businessInfo,
-            registrationNumber: data.businessInfo?.registrationNumber || "",
-            taxId: data.businessInfo?.taxId || "",
-            issueDate: data.businessInfo?.issueDate
-              ? new Date(data.businessInfo.issueDate)
-                  .toISOString()
-                  .split("T")[0]
-              : "",
-            issuePlace: data.businessInfo?.issuePlace || "",
-            address: {
-              ...prev.businessInfo.address,
-              street: data.businessInfo?.address?.street || "",
-              ward: data.businessInfo?.address?.ward || "",
-              district: data.businessInfo?.address?.district || "",
-              city: data.businessInfo?.address?.city || "",
-              country: data.businessInfo?.address?.country || "Vietnam",
+        setFormData((prev) => {
+          const businessInfo = data.businessInfo || {};
+          const address = businessInfo.address || {};
+          const legalRep = data.legalRepresentative || {};
+
+          const normalizedIssueDate =
+            businessInfo.issueDate && !isPlaceholderData
+              ? new Date(businessInfo.issueDate).toISOString().split("T")[0]
+              : "";
+
+          return {
+            ...prev,
+            company: {
+              ...prev.company,
+              name: isPlaceholderText(data.name) ? "" : data.name || "",
+              industry: isPlaceholderData ? "" : data.industry || "",
+              size: isPlaceholderData ? "" : data.size || "",
+              email: isPlaceholderEmail(data.email) ? "" : data.email || "",
+              website: data.website || "",
+              description: data.description || "",
+              foundedYear: data.foundedYear ?? "",
+              employeesCount: data.employeesCount ?? "",
             },
-          },
-          legalRepresentative: {
-            ...prev.legalRepresentative,
-            fullName: data.legalRepresentative?.fullName || "",
-            position: data.legalRepresentative?.position || "",
-            phone: data.legalRepresentative?.phone || "",
-            email: data.legalRepresentative?.email || "",
-          },
-        }));
+            businessInfo: {
+              ...prev.businessInfo,
+              registrationNumber: isPlaceholderRegistrationNumber(
+                businessInfo.registrationNumber
+              )
+                ? ""
+                : businessInfo.registrationNumber || "",
+              taxId: isPlaceholderTaxId(businessInfo.taxId)
+                ? ""
+                : businessInfo.taxId || "",
+              issueDate: normalizedIssueDate,
+              issuePlace: isPlaceholderText(businessInfo.issuePlace)
+                ? ""
+                : businessInfo.issuePlace || "",
+              address: {
+                ...prev.businessInfo.address,
+                street: isPlaceholderText(address.street)
+                  ? ""
+                  : address.street || "",
+                ward: isPlaceholderText(address.ward) ? "" : address.ward || "",
+                district: isPlaceholderText(address.district)
+                  ? ""
+                  : address.district || "",
+                city: isPlaceholderText(address.city) ? "" : address.city || "",
+                country: address.country || "Vietnam",
+              },
+            },
+            legalRepresentative: {
+              ...prev.legalRepresentative,
+              fullName: isPlaceholderText(legalRep.fullName)
+                ? ""
+                : legalRep.fullName || "",
+              position: isPlaceholderText(legalRep.position)
+                ? ""
+                : legalRep.position || "",
+              phone: isPlaceholderPhone(legalRep.phone)
+                ? ""
+                : legalRep.phone || "",
+              email: isPlaceholderEmail(legalRep.email)
+                ? ""
+                : legalRep.email || "",
+            },
+          };
+        });
 
         // Sync dropdown selection by matching labels to options
         const syncAddressDropdowns = async () => {
@@ -404,6 +431,8 @@ export default function CompanyPage() {
 
       if (result.success) {
         setSuccess(result.message || "Cập nhật thông tin công ty thành công");
+        // Thoát chế độ chỉnh sửa sau khi lưu thành công
+        setIsEditing(false);
         // Refresh verification status after successful update
         refreshVerification();
         // Refresh company data to update placeholder status
@@ -485,9 +514,9 @@ export default function CompanyPage() {
               Dữ liệu mẫu được hiển thị
             </AlertTitle>
             <AlertDescription className="text-amber-700">
-              Thông tin công ty hiện tại là dữ liệu mẫu. Vui lòng cập nhật
-              thông tin thực tế của công ty để sử dụng đầy đủ các tính năng của
-              hệ thống.
+              Thông tin công ty hiện tại là dữ liệu mẫu. Vui lòng cập nhật thông
+              tin thực tế của công ty để sử dụng đầy đủ các tính năng của hệ
+              thống.
             </AlertDescription>
           </Alert>
         )}
@@ -605,13 +634,26 @@ export default function CompanyPage() {
                   </div>
                   <div>
                     <span className="text-slate-500">Ngành:</span>{" "}
-                    {industries.find((i) => i.code === formData.company.industry)?.name?.vi ||
-                      formData.company.industry ||
-                      "Chưa cập nhật"}
+                    {isPlaceholder
+                      ? "Chưa cập nhật"
+                      : industries.find(
+                          (i) => i.code === formData.company.industry
+                        )?.name?.vi ||
+                        industries.find(
+                          (i) => i.code === formData.company.industry
+                        )?.name?.en ||
+                        formData.company.industry ||
+                        "Chưa cập nhật"}
                   </div>
                   <div>
                     <span className="text-slate-500">Quy mô:</span>{" "}
-                    {formData.company.size}
+                    {isPlaceholder
+                      ? "Chưa cập nhật"
+                      : sizeOptions.find(
+                          (o) => o.value === formData.company.size
+                        )?.label ||
+                        formData.company.size ||
+                        "Chưa cập nhật"}
                   </div>
                   <div>
                     <span className="text-slate-500">Email:</span>{" "}
@@ -660,7 +702,8 @@ export default function CompanyPage() {
                     <span className="text-slate-500">Quận/Huyện:</span>{" "}
                     {isPlaceholderText(formData.businessInfo.address.district)
                       ? "Chưa cập nhật"
-                      : formData.businessInfo.address.district || "Chưa cập nhật"}
+                      : formData.businessInfo.address.district ||
+                        "Chưa cập nhật"}
                   </div>
                   <div>
                     <span className="text-slate-500">Tỉnh/Thành phố:</span>{" "}
@@ -676,37 +719,6 @@ export default function CompanyPage() {
               </Card>
             </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Thống kê</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                <div>
-                  <div className="text-2xl font-bold">
-                    {companyView?.stats?.totalJobs ?? 0}
-                  </div>
-                  <div className="text-slate-500">Tổng tin</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">
-                    {companyView?.stats?.activeJobs ?? 0}
-                  </div>
-                  <div className="text-slate-500">Đang hoạt động</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">
-                    {companyView?.stats?.totalApplications ?? 0}
-                  </div>
-                  <div className="text-slate-500">Ứng tuyển</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">
-                    {companyView?.stats?.successfulHires ?? 0}
-                  </div>
-                  <div className="text-slate-500">Tuyển thành công</div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         )}
         {isEditing ? (
@@ -738,12 +750,18 @@ export default function CompanyPage() {
                       disabled={loadingIndustries}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder={loadingIndustries ? "Đang tải..." : "Chọn ngành"} />
+                        <SelectValue
+                          placeholder={
+                            loadingIndustries ? "Đang tải..." : "Chọn ngành"
+                          }
+                        />
                       </SelectTrigger>
                       <SelectContent>
                         {industries.map((industry) => (
                           <SelectItem key={industry.code} value={industry.code}>
-                            {industry.name.vi || industry.name.en || industry.code}
+                            {industry.name.vi ||
+                              industry.name.en ||
+                              industry.code}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -805,15 +823,15 @@ export default function CompanyPage() {
                     <Label htmlFor="company.website">Website</Label>
                     <Input
                       id="company.website"
-                      type="url"
-                      placeholder="https://example.com hoặc example.com"
+                      // Chuyển thành type="text" để cho phép nhập các dạng như bluewaveagency.vn, example.com, v.v.
+                      type="text"
+                      placeholder="https://example.com, example.com"
                       value={formData.company.website}
-                      onChange={(e) =>
-                        setField("company.website", e.target.value)
-                      }
+                      onChange={(e) => setField("company.website", e.target.value)}
+                      pattern="^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(\/.*)?$"
                     />
                     <p className="text-xs text-slate-500 mt-1">
-                      Hệ thống sẽ tự động thêm https:// nếu bạn chưa nhập
+                      Bạn có thể nhập dạng https://example.com, example.com hoặc bluewaveagency.vn - hệ thống sẽ tự động thêm https:// nếu bạn chưa nhập.
                     </p>
                   </div>
                 </div>
@@ -1097,7 +1115,8 @@ export default function CompanyPage() {
                   <div>
                     <Label>Số ĐKKD</Label>
                     <div className="mt-1 text-slate-900">
-                      {isPlaceholderRegistrationNumber(
+                      {isPlaceholder ||
+                      isPlaceholderRegistrationNumber(
                         formData.businessInfo.registrationNumber
                       )
                         ? "Chưa cập nhật"
@@ -1108,7 +1127,8 @@ export default function CompanyPage() {
                   <div>
                     <Label>Mã số thuế</Label>
                     <div className="mt-1 text-slate-900">
-                      {isPlaceholderTaxId(formData.businessInfo.taxId)
+                      {isPlaceholder ||
+                      isPlaceholderTaxId(formData.businessInfo.taxId)
                         ? "Chưa cập nhật"
                         : formData.businessInfo.taxId || "Chưa cập nhật"}
                     </div>
@@ -1118,7 +1138,9 @@ export default function CompanyPage() {
                   <div>
                     <Label>Ngày cấp</Label>
                     <div className="mt-1 text-slate-900">
-                      {formData.businessInfo.issueDate || "Chưa cập nhật"}
+                      {!formData.businessInfo.issueDate || isPlaceholder
+                        ? "Chưa cập nhật"
+                        : formData.businessInfo.issueDate}
                     </div>
                   </div>
                   <div>
@@ -1145,7 +1167,10 @@ export default function CompanyPage() {
                         (part) => part && isPlaceholderText(part)
                       );
                       if (hasPlaceholder) return "Chưa cập nhật";
-                      return addressParts.filter(Boolean).join(", ") || "Chưa cập nhật";
+                      return (
+                        addressParts.filter(Boolean).join(", ") ||
+                        "Chưa cập nhật"
+                      );
                     })()}
                   </div>
                 </div>
@@ -1165,9 +1190,7 @@ export default function CompanyPage() {
                   <div>
                     <Label>Họ và tên</Label>
                     <div className="mt-1 text-slate-900">
-                      {isPlaceholderText(
-                        formData.legalRepresentative.fullName
-                      )
+                      {isPlaceholderText(formData.legalRepresentative.fullName)
                         ? "Chưa cập nhật"
                         : formData.legalRepresentative.fullName ||
                           "Chưa cập nhật"}
@@ -1176,9 +1199,7 @@ export default function CompanyPage() {
                   <div>
                     <Label>Chức vụ</Label>
                     <div className="mt-1 text-slate-900">
-                      {isPlaceholderText(
-                        formData.legalRepresentative.position
-                      )
+                      {isPlaceholderText(formData.legalRepresentative.position)
                         ? "Chưa cập nhật"
                         : formData.legalRepresentative.position ||
                           "Chưa cập nhật"}
@@ -1189,9 +1210,7 @@ export default function CompanyPage() {
                   <div>
                     <Label>Số điện thoại</Label>
                     <div className="mt-1 text-slate-900">
-                      {isPlaceholderPhone(
-                        formData.legalRepresentative.phone
-                      )
+                      {isPlaceholderPhone(formData.legalRepresentative.phone)
                         ? "Chưa cập nhật"
                         : formData.legalRepresentative.phone || "Chưa cập nhật"}
                     </div>
@@ -1199,9 +1218,7 @@ export default function CompanyPage() {
                   <div>
                     <Label>Email</Label>
                     <div className="mt-1 text-slate-900">
-                      {isPlaceholderEmail(
-                        formData.legalRepresentative.email
-                      )
+                      {isPlaceholderEmail(formData.legalRepresentative.email)
                         ? "Chưa cập nhật"
                         : formData.legalRepresentative.email || "Chưa cập nhật"}
                     </div>

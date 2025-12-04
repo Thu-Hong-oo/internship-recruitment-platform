@@ -748,6 +748,24 @@ class CVBuilderController {
 
       await newResume.save();
 
+      // Update builder template map for this candidate/profile
+      if (!profile.resume) {
+        profile.resume = {};
+      }
+      if (!profile.resume.builderTemplates) {
+        profile.resume.builderTemplates = new Map();
+      }
+      if (profile.resume.builderTemplates instanceof Map) {
+        profile.resume.builderTemplates.set(templateId, newResume._id);
+      } else {
+        profile.resume.builderTemplates = {
+          ...profile.resume.builderTemplates,
+          [templateId]: newResume._id,
+        };
+      }
+
+      await profile.save();
+
       // 7. Return response
       return ApiResponse.success(
         res,
@@ -1087,25 +1105,51 @@ class CVBuilderController {
         finalPDFOptions
       );
 
-      // Save PDF entry to profile
-      const pdfEntry = {
-        url: pdfResult.url,
-        filename: pdfResult.filename,
-        displayName: `PDF - ${candidateName} - ${targetJob}`,
-        format: 'pdf',
-        size: pdfResult.size,
-        uploadedAt: pdfResult.uploadedAt,
-        aiGenerated: false,
-        template: template,
-        targetJob: targetJob,
-        pdfOptions: finalPDFOptions,
-      };
-
-      // Add to profile documents
+      // Save or update PDF entry in profile.documents
       if (!profile.documents) {
         profile.documents = [];
       }
-      profile.documents.push(pdfEntry);
+
+      let pdfEntry = null;
+
+      // Nếu có cvId, thử ghi đè lên entry cũ thay vì tạo mới
+      if (cvId) {
+        const existingIndex = profile.documents.findIndex(
+          (doc) => doc._id && doc._id.toString() === cvId
+        );
+
+        if (existingIndex !== -1) {
+          pdfEntry = profile.documents[existingIndex];
+          pdfEntry.url = pdfResult.url;
+          pdfEntry.filename = pdfResult.filename;
+          pdfEntry.displayName =
+            pdfEntry.displayName || `PDF - ${candidateName} - ${targetJob}`;
+          pdfEntry.format = 'pdf';
+          pdfEntry.size = pdfResult.size;
+          pdfEntry.uploadedAt = pdfResult.uploadedAt;
+          pdfEntry.aiGenerated = false;
+          pdfEntry.template = template;
+          pdfEntry.targetJob = targetJob;
+          pdfEntry.pdfOptions = finalPDFOptions;
+        }
+      }
+
+      // Nếu không có cvId hoặc không tìm thấy entry cũ → tạo mới
+      if (!pdfEntry) {
+        pdfEntry = {
+          url: pdfResult.url,
+          filename: pdfResult.filename,
+          displayName: `PDF - ${candidateName} - ${targetJob}`,
+          format: 'pdf',
+          size: pdfResult.size,
+          uploadedAt: pdfResult.uploadedAt,
+          aiGenerated: false,
+          template: template,
+          targetJob: targetJob,
+          pdfOptions: finalPDFOptions,
+        };
+        profile.documents.push(pdfEntry);
+      }
 
       await profile.save();
 
@@ -1137,6 +1181,7 @@ class CVBuilderController {
         template = 'modern',
         pdfOptions = {},
         filename = null,
+        cvId = null,
       } = req.body;
 
       if (!htmlContent) {
@@ -1175,25 +1220,51 @@ class CVBuilderController {
         finalPDFOptions
       );
 
-      // Save PDF entry to profile
-      const pdfEntry = {
-        url: pdfResult.url,
-        filename: pdfResult.filename,
-        displayName: `PDF - ${candidateName} - ${targetJob}`,
-        format: 'pdf',
-        size: pdfResult.size,
-        uploadedAt: pdfResult.uploadedAt,
-        aiGenerated: false,
-        template: template,
-        targetJob: targetJob,
-        pdfOptions: finalPDFOptions,
-      };
-
-      // Add to profile documents
+      // Save or update PDF entry to profile.documents
       if (!profile.documents) {
         profile.documents = [];
       }
-      profile.documents.push(pdfEntry);
+
+      let pdfEntry = null;
+
+      // Nếu có cvId, thử ghi đè entry cũ
+      if (cvId) {
+        const existingIndex = profile.documents.findIndex(
+          (doc) => doc._id && doc._id.toString() === cvId
+        );
+
+        if (existingIndex !== -1) {
+          pdfEntry = profile.documents[existingIndex];
+          pdfEntry.url = pdfResult.url;
+          pdfEntry.filename = pdfResult.filename;
+          pdfEntry.displayName =
+            pdfEntry.displayName || `PDF - ${candidateName} - ${targetJob}`;
+          pdfEntry.format = 'pdf';
+          pdfEntry.size = pdfResult.size;
+          pdfEntry.uploadedAt = pdfResult.uploadedAt;
+          pdfEntry.aiGenerated = false;
+          pdfEntry.template = template;
+          pdfEntry.targetJob = targetJob;
+          pdfEntry.pdfOptions = finalPDFOptions;
+        }
+      }
+
+      // Nếu không có cvId hoặc không tìm thấy entry cũ → tạo mới
+      if (!pdfEntry) {
+        pdfEntry = {
+          url: pdfResult.url,
+          filename: pdfResult.filename,
+          displayName: `PDF - ${candidateName} - ${targetJob}`,
+          format: 'pdf',
+          size: pdfResult.size,
+          uploadedAt: pdfResult.uploadedAt,
+          aiGenerated: false,
+          template: template,
+          targetJob: targetJob,
+          pdfOptions: finalPDFOptions,
+        };
+        profile.documents.push(pdfEntry);
+      }
 
       await profile.save();
 
@@ -1778,6 +1849,142 @@ class CVBuilderController {
     if (profile.personalInfo?.bio) score += 5;
 
     return Math.round((score / total) * 100);
+  }
+
+  // ========================================
+  // RESUME BUILDER CONTENT UPDATE
+  // ========================================
+
+  /**
+   * PUT /api/candidates/me/cv-builder/resume/:resumeId
+   * Cập nhật nội dung CV builder (ResumeBuilder.content)
+   *
+   * Body gợi ý:
+   * {
+   *   content: { ... },          // dữ liệu CV từ FE builder
+   *   customization?: { ... },   // optional: targetRole, keywords,...
+   *   createVersion?: boolean,   // optional: lưu version trước khi overwrite (default: true)
+   *   status?: "draft"|"completed"
+   * }
+   */
+  async updateResumeBuilder(req, res, next) {
+    try {
+      const { resumeId } = req.params;
+      const {
+        content,
+        customization,
+        createVersion = true,
+        status,
+      } = req.body || {};
+
+      if (!resumeId) {
+        throw new AppError('resumeId is required', 400);
+      }
+
+      if (!content || typeof content !== 'object') {
+        throw new AppError('content object is required', 400);
+      }
+
+      const profile = await CandidateProfile.findOne({ userId: req.user.id });
+      if (!profile) {
+        throw new AppError('Candidate profile not found', 404);
+      }
+
+      const ResumeBuilder = require('../../models/ResumeBuilder');
+
+      const resume = await ResumeBuilder.findOne({
+        _id: resumeId,
+        candidateId: profile._id,
+        status: { $ne: 'archived' },
+      });
+
+      if (!resume) {
+        throw new AppError('ResumeBuilder entry not found', 404);
+      }
+
+      // Lưu version cũ trước khi overwrite (nếu cần)
+      if (createVersion) {
+        resume.versions.push({
+          content: resume.content,
+          createdAt: new Date(),
+          note: 'Auto version before update via builder',
+        });
+      }
+
+      // Cập nhật nội dung chính
+      resume.content = content;
+
+      // Optional: cập nhật customization nhẹ
+      if (customization && typeof customization === 'object') {
+        resume.customization = {
+          ...(resume.customization || {}),
+          ...customization,
+        };
+      }
+
+      // Optional: cập nhật status (chỉ cho phép một số giá trị hợp lệ)
+      if (status && ['draft', 'completed', 'archived'].includes(status)) {
+        resume.status = status;
+      }
+
+      await resume.save();
+
+      return ApiResponse.success(
+        res,
+        {
+          resumeId: resume._id,
+          templateId: resume.templateId,
+          content: resume.content,
+          customization: resume.customization,
+          status: resume.status,
+          updatedAt: resume.updatedAt,
+        },
+        'ResumeBuilder content updated successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/candidates/me/cv-builder/template-map
+   * Trả về map templateId -> resumeId (ResumeBuilder) cho candidate hiện tại
+   */
+  async getTemplateResumeMap(req, res, next) {
+    try {
+      const profile = await CandidateProfile.findOne({
+        userId: req.user.id,
+      }).select('resume.builderTemplates');
+
+      if (!profile) {
+        throw new AppError('Candidate profile not found', 404);
+      }
+
+      const map = {};
+      const builderMap = profile.resume?.builderTemplates;
+
+      if (builderMap) {
+        if (builderMap instanceof Map) {
+          builderMap.forEach((value, key) => {
+            if (value) map[key] = value.toString();
+          });
+        } else {
+          Object.entries(builderMap).forEach(([key, value]) => {
+            if (value) map[key] = value.toString();
+          });
+        }
+      }
+
+      return ApiResponse.success(
+        res,
+        {
+          map,
+        },
+        'Template resume map retrieved successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
   }
 }
 

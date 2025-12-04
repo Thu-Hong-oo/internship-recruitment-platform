@@ -633,16 +633,21 @@ export default function CreateJobPage() {
                 <Label htmlFor="salaryMin">Lương tối thiểu *</Label>
                 <Input
                   id="salaryMin"
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   min="0"
-                  value={formData.salaryMin || ""}
-                  onChange={(e) =>
-                    handleInputChange(
-                      "salaryMin",
-                      e.target.value ? parseInt(e.target.value) : undefined
-                    )
+                  value={
+                    formData.salaryMin !== undefined &&
+                    formData.salaryMin !== null
+                      ? formData.salaryMin.toLocaleString("vi-VN")
+                      : ""
                   }
-                  placeholder="30000000"
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, "");
+                    const numeric = raw ? parseInt(raw, 10) : undefined;
+                    handleInputChange("salaryMin", numeric);
+                  }}
+                  placeholder="30.000.000"
                   required
                 />
               </div>
@@ -651,16 +656,21 @@ export default function CreateJobPage() {
                 <Label htmlFor="salaryMax">Lương tối đa *</Label>
                 <Input
                   id="salaryMax"
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   min="0"
-                  value={formData.salaryMax || ""}
-                  onChange={(e) =>
-                    handleInputChange(
-                      "salaryMax",
-                      e.target.value ? parseInt(e.target.value) : undefined
-                    )
+                  value={
+                    formData.salaryMax !== undefined &&
+                    formData.salaryMax !== null
+                      ? formData.salaryMax.toLocaleString("vi-VN")
+                      : ""
                   }
-                  placeholder="50000000"
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, "");
+                    const numeric = raw ? parseInt(raw, 10) : undefined;
+                    handleInputChange("salaryMax", numeric);
+                  }}
+                  placeholder="50.000.000"
                   required
                 />
               </div>
@@ -694,10 +704,17 @@ export default function CreateJobPage() {
                 id="positions"
                 type="number"
                 min="1"
-                value={formData.positions}
-                onChange={(e) =>
-                  handleInputChange("positions", parseInt(e.target.value) || 1)
-                }
+                value={formData.positions === undefined || formData.positions === null ? "" : formData.positions}
+                onChange={(e) => {
+                  // Cho phép input là "" để user xóa số cũ và nhập số mới
+                  const val = e.target.value;
+                  if (val === "") {
+                    handleInputChange("positions", undefined);
+                  } else {
+                    const parsed = parseInt(val, 10);
+                    handleInputChange("positions", isNaN(parsed) || parsed < 1 ? 1 : parsed);
+                  }
+                }}
                 required
               />
             </div>
@@ -785,7 +802,7 @@ export default function CreateJobPage() {
               <Label htmlFor="deadline">Hạn nộp hồ sơ *</Label>
               <Input
                 id="deadline"
-                type="datetime-local"
+                type="date"
                 value={formData.deadline}
                 onChange={(e) => handleInputChange("deadline", e.target.value)}
                 required

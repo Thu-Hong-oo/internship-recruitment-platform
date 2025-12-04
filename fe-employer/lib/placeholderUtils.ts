@@ -50,7 +50,9 @@ export function isPlaceholderRegistrationNumber(regNumber?: string): boolean {
  */
 export function isPlaceholderTaxId(taxId?: string): boolean {
   if (!taxId) return false;
-  return taxId.startsWith("999999");
+  // Mã số thuế dữ liệu mẫu thường bắt đầu bằng nhiều số 9
+  // Ví dụ: 9999492797, 999999xxxx...
+  return /^9999/.test(taxId);
 }
 
 /**
