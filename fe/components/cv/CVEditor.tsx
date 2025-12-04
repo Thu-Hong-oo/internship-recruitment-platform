@@ -210,11 +210,14 @@ export default function CVEditor({
       }
 
       // Cập nhật nội dung ResumeBuilder (không ghi đè CandidateProfile nữa)
-      const response = await candidateService.updateResumeBuilder(resumeIdToUse, {
-        content: builderData,
-        createVersion: true,
-        status: "draft",
-      });
+      const response = await candidateService.updateResumeBuilder(
+        resumeIdToUse,
+        {
+          content: builderData,
+          createVersion: true,
+          status: "draft",
+        }
+      );
 
       if (response.success) {
         setHasUnsavedChanges(false);

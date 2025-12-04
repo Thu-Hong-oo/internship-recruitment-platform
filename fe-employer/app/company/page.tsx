@@ -719,37 +719,6 @@ export default function CompanyPage() {
               </Card>
             </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Thống kê</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                <div>
-                  <div className="text-2xl font-bold">
-                    {companyView?.stats?.totalJobs ?? 0}
-                  </div>
-                  <div className="text-slate-500">Tổng tin</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">
-                    {companyView?.stats?.activeJobs ?? 0}
-                  </div>
-                  <div className="text-slate-500">Đang hoạt động</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">
-                    {companyView?.stats?.totalApplications ?? 0}
-                  </div>
-                  <div className="text-slate-500">Ứng tuyển</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">
-                    {companyView?.stats?.successfulHires ?? 0}
-                  </div>
-                  <div className="text-slate-500">Tuyển thành công</div>
-                </div>
-              </CardContent>
-            </Card>
           </div>
         )}
         {isEditing ? (

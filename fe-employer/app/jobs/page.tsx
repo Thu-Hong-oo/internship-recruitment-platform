@@ -524,18 +524,36 @@ export default function JobsPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={!hasPrevPage && currentPage === 1}
+                    disabled={currentPage === 1}
                   >
                     Trước
                   </Button>
-                  <span className="text-sm">
-                    Trang {currentPage} / {totalPages}
-                  </span>
+
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, idx) => {
+                      const page = idx + 1;
+                      const isActive = page === currentPage;
+                      return (
+                        <Button
+                          key={page}
+                          variant={isActive ? "default" : "outline"}
+                          size="sm"
+                          className={
+                            isActive ? "bg-primary text-white" : "text-gray-700"
+                          }
+                          onClick={() => handlePageChange(page)}
+                        >
+                          {page}
+                        </Button>
+                      );
+                    })}
+                  </div>
+
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={!hasNextPage && currentPage >= totalPages}
+                    disabled={currentPage >= totalPages}
                   >
                     Sau
                   </Button>
