@@ -73,17 +73,18 @@ class JobService {
       setParam("industry", params.industry);
       setParam("industryCode", params.industryCode);
 
-      // Salary - support both naming conventions
-      if (params.minSalary !== undefined) {
-        setParam("minSalary", params.minSalary);
-      } else if (params.salaryMin !== undefined) {
-        setParam("minSalary", params.salaryMin);
+      // Salary - backend expects salaryMin / salaryMax
+      // Ưu tiên dùng salaryMin/salaryMax, vẫn hỗ trợ minSalary/maxSalary để tương thích cũ
+      if (params.salaryMin !== undefined) {
+        setParam("salaryMin", params.salaryMin);
+      } else if (params.minSalary !== undefined) {
+        setParam("salaryMin", params.minSalary);
       }
 
-      if (params.maxSalary !== undefined) {
-        setParam("maxSalary", params.maxSalary);
-      } else if (params.salaryMax !== undefined) {
-        setParam("maxSalary", params.salaryMax);
+      if (params.salaryMax !== undefined) {
+        setParam("salaryMax", params.salaryMax);
+      } else if (params.maxSalary !== undefined) {
+        setParam("salaryMax", params.maxSalary);
       }
 
       setParam("createdFrom", params.createdFrom);

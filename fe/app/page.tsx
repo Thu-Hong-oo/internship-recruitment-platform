@@ -119,9 +119,15 @@ export default function HomePage({ onSearch }: HomePageProps) {
     if (newFilters.skills && newFilters.skills.length > 0)
       qs.set("skills", newFilters.skills.join(","));
     if (newFilters.salaryMin || newFilters.minSalary)
-      qs.set("minSalary", String(newFilters.salaryMin || newFilters.minSalary));
+      qs.set(
+        "salaryMin",
+        String(newFilters.salaryMin || newFilters.minSalary)
+      );
     if (newFilters.salaryMax || newFilters.maxSalary)
-      qs.set("maxSalary", String(newFilters.salaryMax || newFilters.maxSalary));
+      qs.set(
+        "salaryMax",
+        String(newFilters.salaryMax || newFilters.maxSalary)
+      );
     if (newFilters.salaryRange) qs.set("salaryRange", newFilters.salaryRange);
     if (newFilters.createdFrom) qs.set("createdFrom", newFilters.createdFrom);
     if (newFilters.createdTo) qs.set("createdTo", newFilters.createdTo);

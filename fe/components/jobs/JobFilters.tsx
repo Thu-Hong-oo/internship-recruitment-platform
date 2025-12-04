@@ -75,6 +75,17 @@ const POPULAR_SEARCHES = [
   "Data Analyst",
 ];
 
+// Helper mapping for salary ranges -> salaryMin / salaryMax (VND)
+const SALARY_RANGE_BOUNDS: Record<
+  string,
+  { min?: number; max?: number }
+> = {
+  "below-10m": { max: 10_000_000 },
+  "10m-20m": { min: 10_000_000, max: 20_000_000 },
+  "20m-50m": { min: 20_000_000, max: 50_000_000 },
+  "above-50m": { min: 50_000_000 },
+};
+
 export interface JobFilters {
   q?: string;
   location?: string;
@@ -731,9 +742,26 @@ export default function JobFilters({
             </Label>
             <Select
               value={localFilters.salaryRange || "all"}
-              onValueChange={(v) =>
-                updateFilter("salaryRange", v === "all" ? undefined : v)
-              }
+              onValueChange={(v) => {
+                if (v === "all") {
+                  // Xóa toàn bộ filter lương khi chọn "Tất cả"
+                  updateFilter("salaryRange", undefined);
+                  updateFilter("salaryMin", undefined);
+                  updateFilter("salaryMax", undefined);
+                  updateFilter("minSalary", undefined);
+                  updateFilter("maxSalary", undefined);
+                  return;
+                }
+
+                const bounds = SALARY_RANGE_BOUNDS[v] || {};
+
+                // Lưu lại cả salaryMin/salaryMax và minSalary/maxSalary
+                updateFilter("salaryRange", v);
+                updateFilter("salaryMin", bounds.min);
+                updateFilter("minSalary", bounds.min);
+                updateFilter("salaryMax", bounds.max);
+                updateFilter("maxSalary", bounds.max);
+              }}
             >
               <SelectTrigger className="h-9 w-[140px] border border-white/40 bg-white/70 backdrop-blur-sm hover:border-teal-400 hover:bg-white transition-all text-sm text-gray-700 shadow-sm">
                 <SelectValue placeholder="Tất cả" />

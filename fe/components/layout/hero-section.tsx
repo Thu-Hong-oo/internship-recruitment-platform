@@ -20,7 +20,7 @@ export default function HeroSection({
     <>
       {/* Hero Section */}
       <section className="relative overflow-hidden text-white py-20">
-        <div
+        <div 
           className="absolute inset-0"
           style={{
             background: `linear-gradient(135deg, oklch(0.60 0.12 195) 0%, oklch(0.72 0.08 210) 55%, oklch(0.88 0.03 195) 100%)`,
