@@ -131,7 +131,8 @@ export const useGoogleAuth = () => {
           description: "Google Client ID chưa được cấu hình. Vui lòng xem console để biết thêm chi tiết.",
           variant: "destructive",
         });
-        throw new Error(errorMsg);
+        setLoading(false);
+        return;
       }
 
       // Wait for Google Identity Services to load
@@ -153,12 +154,78 @@ export const useGoogleAuth = () => {
         callback: handleGoogleResponse,
       });
 
-      // Trigger the One Tap prompt
+      // Try to show One Tap first
       window.google.accounts.id.prompt((notification: any) => {
+        // If One Tap is not displayed or skipped, create a popup button
         if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          // If One Tap is not available, show a popup
-          // We'll use a custom button click handler instead
-          setLoading(false);
+          // Create a hidden div and render Google button into it
+          const tempDiv = document.createElement('div');
+          tempDiv.id = 'temp-google-button';
+          tempDiv.style.position = 'fixed';
+          tempDiv.style.left = '-9999px';
+          tempDiv.style.top = '-9999px';
+          tempDiv.style.opacity = '0';
+          tempDiv.style.pointerEvents = 'none';
+          document.body.appendChild(tempDiv);
+
+          // Render Google button
+          try {
+            window.google.accounts.id.renderButton(tempDiv, {
+              type: 'standard',
+              theme: 'outline',
+              size: 'large',
+              text: 'signin_with',
+              width: 300,
+            });
+
+            // Wait for button to render, then try to click it
+            setTimeout(() => {
+              const googleButton = tempDiv.querySelector('div[role="button"]') as HTMLElement;
+              if (googleButton) {
+                // Create a mouse event to trigger the button
+                const clickEvent = new MouseEvent('click', {
+                  bubbles: true,
+                  cancelable: true,
+                  view: window,
+                });
+                googleButton.dispatchEvent(clickEvent);
+                
+                // Also try direct click
+                (googleButton as any).click?.();
+                
+                // Clean up after a delay
+                setTimeout(() => {
+                  if (document.body.contains(tempDiv)) {
+                    document.body.removeChild(tempDiv);
+                  }
+                }, 3000);
+              } else {
+                // If button didn't render, show error
+                setError("Không thể khởi tạo đăng nhập Google. Vui lòng tải lại trang và thử lại.");
+                toast({
+                  title: "Lỗi",
+                  description: "Không thể khởi tạo đăng nhập Google. Vui lòng tải lại trang và thử lại.",
+                  variant: "destructive",
+                });
+                setLoading(false);
+                if (document.body.contains(tempDiv)) {
+                  document.body.removeChild(tempDiv);
+                }
+              }
+            }, 500);
+          } catch (renderError) {
+            console.error("Error rendering Google button:", renderError);
+            setError("Không thể khởi tạo đăng nhập Google. Vui lòng tải lại trang và thử lại.");
+            toast({
+              title: "Lỗi",
+              description: "Không thể khởi tạo đăng nhập Google. Vui lòng tải lại trang và thử lại.",
+              variant: "destructive",
+            });
+            setLoading(false);
+            if (document.body.contains(tempDiv)) {
+              document.body.removeChild(tempDiv);
+            }
+          }
         }
       });
     } catch (err: any) {

@@ -16,10 +16,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
+import { useGoogleAuth } from "@/hooks/useGoogleAuth";
 
 export default function LoginPage() {
   const router = useRouter();
   const { login, user, loading } = useAuth();
+  const { handleGoogleSignIn, loading: googleLoading } = useGoogleAuth();
   const [mounted, setMounted] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
@@ -207,13 +209,20 @@ export default function LoginPage() {
                         <Button
                           variant="outline"
                           className="h-10 bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
-                          onClick={() => {
-                            // TODO: Implement Google OAuth with custom auth
-                            alert("Google OAuth chưa được implement");
-                          }}
+                          onClick={handleGoogleSignIn}
+                          disabled={googleLoading || loading || submitting}
                         >
-                          <span className="font-bold text-lg">G</span>
-                          <span className="ml-2">Đăng nhập bằng Google</span>
+                          {googleLoading ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                              <span>Đang xử lý...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="font-bold text-lg">G</span>
+                              <span className="ml-2">Đăng nhập bằng Google</span>
+                            </>
+                          )}
                         </Button>
                       </div>
                     )}
@@ -335,18 +344,25 @@ export default function LoginPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-12 w-full max-w-xs flex items-center justify-center gap-3 border border-border hover:bg-gray-100 bg-white text-foreground font-semibold rounded-lg shadow-sm transition-all"
-                onClick={() => {
-                  // TODO: Kết nối Google OAuth (NextAuth hoặc custom)
-                  alert("Đăng nhập bằng Google chưa khả dụng.");
-                }}
+                className="h-12 w-full max-w-xs flex items-center justify-center gap-3 border border-border hover:bg-gray-100 bg-white text-foreground font-semibold rounded-lg shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={handleGoogleSignIn}
+                disabled={googleLoading || loading || submitting}
               >
-                <img
-                  src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-                  alt="Google Icon"
-                  className="h-5 w-5"
-                />
-                <span className="ml-2">Đăng nhập với Google</span>
+                {googleLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                    <span className="ml-2">Đang xử lý...</span>
+                  </>
+                ) : (
+                  <>
+                    <img
+                      src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                      alt="Google Icon"
+                      className="h-5 w-5"
+                    />
+                    <span className="ml-2">Đăng nhập với Google</span>
+                  </>
+                )}
               </Button>
             </div>
           </div>
