@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
-import { getToken } from "@/lib/userStorage";
-import { getEmployerProfile } from "@/lib/api";
+import { useState, useEffect, useCallback } from "react";
+import { useEmployerProfile } from "@/contexts/EmployerProfileContext";
 
 export interface VerificationData {
   profileCompleted: boolean;
@@ -11,31 +10,31 @@ export interface VerificationData {
 }
 
 export function useVerificationStatus() {
-  const [loading, setLoading] = useState(true);
+  const { profile, loading: profileLoading, error: profileError } = useEmployerProfile();
   const [error, setError] = useState<string | null>(null);
   const [verificationData, setVerificationData] =
     useState<VerificationData | null>(null);
 
-  const fetchVerificationStatus = async () => {
+  const fetchVerificationStatus = useCallback(async () => {
     try {
-      setLoading(true);
       setError(null);
 
-      const token = getToken();
-      if (!token) {
-        setError("Vui lòng đăng nhập");
+      if (profileError) {
+        setError(profileError);
         return;
       }
 
-      const result = await getEmployerProfile(token);
+      if (!profile) {
+        setVerificationData({
+          profileCompleted: false,
+          companyCompleted: false,
+          documentsCompleted: false,
+          needsProfile: true,
+        });
+        return;
+      }
 
-      // Debug logging
-      console.log("Profile API Response:", result);
-
-      // Handle successful response from /employers/profile endpoint
-      if (result.success && result.data) {
-        const profile = result.data;
-        const completion = profile.completion;
+      const completion = profile.completion;
         
         // Debug logging
         console.log("Completion data:", completion);
@@ -91,23 +90,13 @@ export function useVerificationStatus() {
         } else {
           // Completion data not available, assume nothing is completed
           console.log("Completion data not available, assuming incomplete");
-        setVerificationData({
+          setVerificationData({
             profileCompleted: false,
             companyCompleted: false,
             documentsCompleted: false,
             needsProfile: false,
-        });
+          });
         }
-      } else {
-        // Handle case where profile is not set up or error
-        console.log("Profile not set up or error:", result);
-        setVerificationData({
-          profileCompleted: false,
-          companyCompleted: false,
-          documentsCompleted: false,
-          needsProfile: true,
-        });
-      }
     } catch (err: any) {
       setError(err.message || "Có lỗi xảy ra");
       // On error, assume profile needs to be set up
@@ -117,18 +106,18 @@ export function useVerificationStatus() {
         documentsCompleted: false,
         needsProfile: true,
       });
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [profile, profileError]);
 
   useEffect(() => {
-    fetchVerificationStatus();
-  }, []);
+    if (!profileLoading) {
+      fetchVerificationStatus();
+    }
+  }, [profileLoading, fetchVerificationStatus]);
 
-  const refreshVerificationStatus = () => {
+  const refreshVerificationStatus = useCallback(() => {
     fetchVerificationStatus();
-  };
+  }, [fetchVerificationStatus]);
 
   const isFullyVerified = verificationData
     ? verificationData.profileCompleted &&
@@ -148,8 +137,8 @@ export function useVerificationStatus() {
   const progressPercentage = (completedSteps / totalSteps) * 100;
 
   return {
-    loading,
-    error,
+    loading: profileLoading,
+    error: error || profileError,
     verificationData,
     isFullyVerified,
     completedSteps,

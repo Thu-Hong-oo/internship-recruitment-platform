@@ -34,14 +34,16 @@ import {
   Circle,
 } from "lucide-react";
 import { User, getUserData, getToken, clearUserData } from "@/lib/userStorage";
-import { logoutEmployer, getEmployerProfile } from "@/lib/api";
+import { logoutEmployer } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import VerificationProgress from "@/components/VerificationProgress";
 import { useVerificationContext } from "@/contexts/VerificationContext";
+import { useEmployerProfile } from "@/contexts/EmployerProfileContext";
 
 export default function DashboardPage() {
   const router = useRouter();
   const { refreshVerification } = useVerificationContext();
+  const { profile, loading: profileLoading } = useEmployerProfile();
   const [user, setUser] = useState<User | null>(null);
   const [employerStatus, setEmployerStatus] = useState<
     "draft" | "pending" | "verified" | "rejected" | "suspended" | null
@@ -62,49 +64,48 @@ export default function DashboardPage() {
     };
 
     loadUserData();
+  }, []);
 
-    // Fetch profile data from API to get latest avatar and name
-    const fetchProfile = async () => {
-      try {
-        const token = getToken();
-        if (!token) return;
+  // Update user and employer status when profile data is available
+  useEffect(() => {
+    if (profile && profile.user) {
+      const profileUser = profile.user;
 
-        const json = await getEmployerProfile(token);
-        const profile = json?.data || json?.profile || null;
-
-        if (profile && profile.user) {
-          // Update user state with latest avatar from API
-          setUser((prev) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              fullName: profile.user.fullName || prev.fullName,
-              avatar: profile.user.avatar || prev.avatar,
-            };
-          });
-
-          // Map backend employer status (data.status) to local status state
-          const status = profile.status as string | undefined;
-          if (
-            status === "draft" ||
-            status === "pending" ||
-            status === "verified" ||
-            status === "rejected" ||
-            status === "suspended"
-          ) {
-            setEmployerStatus(status);
-          } else {
-            setEmployerStatus(null);
-          }
+      // Update user state with latest avatar and name from profile
+      setUser((prev) => {
+        if (!prev) {
+          const userData = getUserData();
+          if (!userData) return null;
+          return {
+            ...userData,
+            fullName: profileUser.fullName || userData.fullName || "User",
+            avatar: profileUser.avatar || userData.avatar,
+          };
         }
-      } catch (err) {
-        // Silent fail - fallback to localStorage data
-        console.error("Failed to fetch profile:", err);
+        return {
+          ...prev,
+          fullName: profileUser.fullName || prev.fullName,
+          avatar: profileUser.avatar || prev.avatar,
+        };
+      });
+
+      // Map backend employer status (data.status) to local status state
+      const status = profile.status as string | undefined;
+      if (
+        status === "draft" ||
+        status === "pending" ||
+        status === "verified" ||
+        status === "rejected" ||
+        status === "suspended"
+      ) {
+        setEmployerStatus(status);
+      } else {
+        setEmployerStatus(null);
       }
-    };
+    }
+  }, [profile]);
 
-    fetchProfile();
-
+  useEffect(() => {
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev.minutes > 0) {

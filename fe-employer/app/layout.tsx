@@ -6,6 +6,7 @@ import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import AuthGate from "@/components/auth/AuthGate";
 import { VerificationProvider } from "@/contexts/VerificationContext";
+import { EmployerProfileProvider } from "@/contexts/EmployerProfileContext";
 import dynamic from "next/dynamic";
 const AppHeader = dynamic(() => import("@/components/layout/AppHeader"), {
   ssr: false,
@@ -30,12 +31,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`font-sans ${GeistSans.variable} ${GeistMono.variable}`}>
-        <VerificationProvider>
-          <AppHeader />
-          <AuthGate>{children}</AuthGate>
-          <Toaster />
-          <Analytics />
-        </VerificationProvider>
+        <EmployerProfileProvider>
+          <VerificationProvider>
+            <AppHeader />
+            <AuthGate>{children}</AuthGate>
+            <Toaster />
+            <Analytics />
+          </VerificationProvider>
+        </EmployerProfileProvider>
       </body>
     </html>
   );
