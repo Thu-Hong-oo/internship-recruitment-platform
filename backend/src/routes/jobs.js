@@ -21,6 +21,7 @@ const {
   submitJobForReview,
   getEmployerJobs,
   getDraftJobs,
+  getRelatedJobs,
 } = require('../controllers/jobController');
 
 const router = express.Router();
@@ -29,6 +30,7 @@ const router = express.Router();
 router.get('/', getAllJobs); // GET /api/jobs
 router.get('/recent', getRecentJobs); // GET /api/jobs/recent
 router.get('/slug/:slug', getJobBySlug); // GET /api/jobs/slug/:slug
+router.get('/:id/related', getRelatedJobs); // GET /api/jobs/:id/related
 
 // Protected routes - Employer only (require profile) - BEFORE parameterized routes
 router.get(

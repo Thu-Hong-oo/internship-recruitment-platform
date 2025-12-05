@@ -333,6 +333,115 @@ class JobService {
     };
   }
 
+  async incrementView(id: string): Promise<{ success: boolean }> {
+    return apiClient.post(`/jobs/${id}/view`);
+  }
+
+  async getRelatedJobs(
+    jobId: string,
+    params?: { limit?: number }
+  ): Promise<{
+    success: boolean;
+    data: JobItem[];
+    total?: number;
+  }> {
+    const query = new URLSearchParams();
+    if (params?.limit) query.append("limit", params.limit.toString());
+
+    const res = await apiClient.get<{
+      success: boolean;
+      data: BackendJob[];
+      total?: number;
+    }>(`/jobs/${jobId}/related${query.toString() ? `?${query}` : ""}`);
+
+    const mapped: JobItem[] = (res.data || []).map((job) => {
+      const companyName =
+        job.employer?.company?.name ||
+        (job as any).postedBy?.displayFullName ||
+        "Nhà tuyển dụng";
+
+      const rawLogo = job.employer?.company?.logo as any;
+      const logoUrl =
+        (rawLogo && typeof rawLogo === "object" ? rawLogo.url : rawLogo) ||
+        (job as any).postedBy?.avatar ||
+        "";
+
+      const office = (job as any).employer?.company?.officeAddress;
+      const fallbackCity = office?.city;
+
+      let salary: string =
+        (job as any).salary || (job as any).salaryRange || "";
+      if (!salary && ((job as any).salaryMin || (job as any).salaryMax)) {
+        const min = (job as any).salaryMin as number | undefined;
+        const max = (job as any).salaryMax as number | undefined;
+        const currency = (job as any).currency || "VND";
+
+        if (min && max) {
+          if (currency === "VND") {
+            salary = `${(min / 1_000_000).toFixed(0)}M - ${(max / 1_000_000).toFixed(
+              0
+            )}M VND`;
+          } else {
+            salary = `${min.toLocaleString()} - ${max.toLocaleString()} ${currency}`;
+          }
+        } else if (min) {
+          salary =
+            currency === "VND"
+              ? `Từ ${(min / 1_000_000).toFixed(0)}M VND`
+              : `Từ ${min.toLocaleString()} ${currency}`;
+        } else if (max) {
+          salary =
+            currency === "VND"
+              ? `Đến ${(max / 1_000_000).toFixed(0)}M VND`
+              : `Đến ${max.toLocaleString()} ${currency}`;
+        }
+      }
+
+      if (!salary) {
+        salary =
+          (job as any).currency
+            ? `${(job as any).currency} - Thỏa thuận`
+            : "Thỏa thuận";
+      }
+
+      let fullLocation: string =
+        (job as any).location || (job as any).fullLocation || "";
+      if (!fullLocation && (job as any).address) {
+        const addr = (job as any).address;
+        fullLocation =
+          addr.fullAddress ||
+          [addr.street, addr.ward, addr.district, addr.city, addr.country]
+            .filter(Boolean)
+            .join(", ");
+      }
+
+      if (!fullLocation) {
+        fullLocation = fallbackCity || "";
+      }
+
+      return {
+        id: job._id,
+        _id: job._id,
+        title: job.title,
+        companyId: {
+          name: companyName,
+          logo: { url: logoUrl },
+        },
+        fullLocation,
+        salaryRange: salary,
+        isUrgent: (job as any).isUrgent || false,
+        isFeatured: (job as any).isFeatured || false,
+        createdAt: job.createdAt || (job as any).createdAt,
+      };
+    });
+
+    return {
+      success: res.success,
+      data: mapped,
+      total: res.total,
+    };
+  }
+
   /**
    * Apply to a job
    * @param jobId - Job ID to apply for

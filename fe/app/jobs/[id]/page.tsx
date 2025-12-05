@@ -15,9 +15,10 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { PageLayout } from "@/components/layout";
-import { jobsAPI } from "@/lib/api";
+import { jobsAPI, nlpService } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { ApplyButton } from "@/components/jobs/ApplyButton";
+import { useToast } from "@/hooks/use-toast";
 
 interface JobDetailPageProps {
   params: Promise<{ id: string }>;
@@ -25,10 +26,14 @@ interface JobDetailPageProps {
 
 export default function JobDetailPage({ params }: JobDetailPageProps) {
   const router = useRouter();
+  const { toast } = useToast();
   const [id, setId] = useState<string | null>(null);
   const [job, setJob] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [bestMatches, setBestMatches] = useState<any[]>([]);
+  const [relatedJobs, setRelatedJobs] = useState<any[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
   // Get job ID from URL pathname (works in both dev and production)
   useEffect(() => {
@@ -76,6 +81,13 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
           return;
         }
         setJob(res.data);
+
+        // Increment view count (non-blocking)
+        try {
+          await jobsAPI.incrementView(id);
+        } catch (err) {
+          console.error('Failed to increment job view:', err);
+        }
       } catch (e) {
         console.error('Error fetching job:', e);
         setError(true);
@@ -86,6 +98,40 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
 
     fetchJob();
   }, [id]);
+
+  useEffect(() => {
+    if (!id || id === 'dummy') return;
+    const loadSuggestions = async () => {
+      setLoadingSuggestions(true);
+      try {
+        // Related jobs (public)
+        const relatedRes = await jobsAPI.getRelatedJobs(id, { limit: 6 });
+        setRelatedJobs(relatedRes.data || []);
+      } catch (e) {
+        console.error('Error fetching related jobs:', e);
+      }
+
+      try {
+        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+        if (token) {
+          const res = await nlpService.getBestMatches({ limit: 6, minScore: 30 });
+          setBestMatches(res.data || []);
+        } else {
+          setBestMatches([]);
+        }
+      } catch (e) {
+        console.error('Error fetching best matches:', e);
+        toast({
+          title: "Không tải được gợi ý việc làm",
+          description: "Vui lòng thử lại sau.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoadingSuggestions(false);
+      }
+    };
+    loadSuggestions();
+  }, [id, toast]);
 
   // Loading state
   if (loading || !id) {
@@ -477,6 +523,139 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
             </div>
           </div>
         </div>
+      <div className="max-w-6xl mx-auto px-4 pb-12 space-y-8">
+        <section className="bg-white border rounded-2xl shadow-sm p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">Việc làm gợi ý cho bạn</h2>
+            {!loadingSuggestions && !bestMatches.length && (
+              <span className="text-sm text-muted-foreground">
+                Đăng nhập để xem gợi ý cá nhân hóa
+              </span>
+            )}
+          </div>
+          {loadingSuggestions ? (
+            <p className="text-sm text-muted-foreground">Đang tải gợi ý...</p>
+          ) : bestMatches.length ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {bestMatches.map((item) => (
+                <Card key={item.job._id} className="h-full">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-semibold line-clamp-2">
+                          {item.job.title}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {item.job.company}
+                        </p>
+                      </div>
+                      <Badge variant="outline">{item.tier}</Badge>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <MapPin className="w-4 h-4" />
+                      <span>{item.job.location || "Đang cập nhật"}</span>
+                    </div>
+                    <div className="text-sm">
+                      <span className="font-semibold text-primary">
+                        {Math.round(item.overallScore)}%
+                      </span>{" "}
+                      phù hợp
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => router.push(`/jobs/${item.job._id}`)}
+                    >
+                      Xem chi tiết
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Chưa có gợi ý. Hãy đăng nhập và cập nhật hồ sơ để nhận đề xuất phù hợp.
+            </p>
+          )}
+        </section>
+
+        <section className="bg-white border rounded-2xl shadow-sm p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">Việc làm liên quan</h2>
+            {!loadingSuggestions && !relatedJobs.length && (
+              <span className="text-sm text-muted-foreground">
+                Chưa tìm thấy việc làm liên quan
+              </span>
+            )}
+          </div>
+          {loadingSuggestions ? (
+            <p className="text-sm text-muted-foreground">Đang tải...</p>
+          ) : relatedJobs.length ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {relatedJobs.map((item) => {
+                const city =
+                  item.fullLocation?.split(",").pop()?.trim() ||
+                  item.fullLocation ||
+                  "Đang cập nhật";
+                const logoUrl = item.companyId?.logo?.url;
+
+                return (
+                  <Card
+                    key={item.id}
+                    className="h-full border border-slate-100 shadow-sm hover:shadow-md transition-shadow"
+                  >
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200">
+                          {logoUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={logoUrl}
+                              alt={item.companyId?.name || "Logo"}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Briefcase className="w-5 h-5 text-slate-400" />
+                          )}
+                        </div>
+                        <div className="space-y-1 flex-1">
+                          <h3 className="font-semibold leading-tight line-clamp-2">
+                            {item.title}
+                          </h3>
+                          <p className="text-sm text-muted-foreground line-clamp-1">
+                            {item.companyId?.name}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <MapPin className="w-4 h-4" />
+                        <span className="line-clamp-1">{city}</span>
+                      </div>
+
+                      <p className="text-sm font-semibold text-slate-900">
+                        {item.salaryRange}
+                      </p>
+
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => router.push(`/jobs/${item.id}`)}
+                      >
+                        Xem chi tiết
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Chưa tìm thấy việc làm liên quan.
+            </p>
+          )}
+        </section>
+      </div>
       </PageLayout>
     );
 }
