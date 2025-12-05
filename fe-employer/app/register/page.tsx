@@ -291,26 +291,31 @@ export default function EmployerRegisterPage() {
         </div>
       </div>
 
-      {/* Right - Illustration */}
-      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-slate-800 to-slate-900 items-center justify-center relative overflow-hidden">
-        <div className="text-center z-10">
-          <h2 className="text-white text-3xl font-bold mb-4">
-            Track your funnel with <span className="text-primary">Report</span>
-          </h2>
-          <div className="relative w-96 h-96 mx-auto">
-            <div className="absolute inset-0 bg-primary/30 rounded-3xl transform rotate-12 opacity-20" />
-            <div className="absolute inset-4 bg-primary/40 rounded-2xl transform -rotate-6 opacity-30" />
-            <div className="absolute inset-8 bg-primary rounded-xl flex items-center justify-center">
-              <div className="text-white text-6xl">🧭</div>
-            </div>
-          </div>
-        </div>
+      <div className="hidden lg:flex flex-1 items-center justify-center relative overflow-hidden shadow-2xl rounded-xl mx-6 my-8 transition-all duration-700">
+        {/* Background Image */}
+        <img
+          src="/images/side.jpg"
+          alt="Background Side"
+          className="absolute inset-0 w-full h-full object-cover brightness-[0.85] scale-105 transition-transform duration-700"
+        />
+        {/* Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/80 via-slate-900/60 to-slate-800/50"></div>
+        {/* Decorative top left accent */}
+        <div className="absolute -top-10 -left-10 w-36 h-36 rounded-full bg-primary blur-2xl opacity-30 z-10"></div>
+        {/* Decorative bottom right accent */}
+        <div className="absolute -bottom-8 -right-8 w-28 h-28 rounded-full bg-sky-400 blur-2xl opacity-20 z-10"></div>
 
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-20 w-2 h-2 bg-primary rounded-full" />
-          <div className="absolute top-40 right-32 w-1 h-1 bg-primary/80 rounded-full" />
-          <div className="absolute bottom-32 left-16 w-3 h-3 bg-primary rounded-full" />
-          <div className="absolute bottom-20 right-20 w-2 h-2 bg-primary rounded-full" />
+        {/* Centered Caption */}
+        <div className="relative z-20 flex flex-col items-center justify-center text-center px-10 w-full">
+          <h2 className="text-white text-4xl font-extrabold drop-shadow-2xl mb-5 leading-tight tracking-tight">
+            Cùng <span className="text-primary">InternBridge</span> 
+            <br />
+            tìm ứng viên <span className="underline underline-offset-4 decoration-primary decoration-4">tiềm năng</span> cho bạn
+          </h2>
+          <p className="text-white/90 text-lg font-medium drop-shadow mb-4 max-w-lg">
+            Nền tảng tuyển dụng hiện đại, kết nối doanh nghiệp với sinh viên tài năng trên toàn quốc.<br />
+            Tăng hiệu quả tuyển dụng với công cụ quản lý ứng viên thông minh.
+          </p>
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@ import { useMemo, useRef } from "react";
 import { templateLayouts } from "../../lib/mocks/templateLayouts";
 import type { CVData } from "../../lib/mocks/cvSamples";
 import Template1Renderer from "./renderers/Template1";
-import Template2Renderer from "./renderers/Template2";
+import TemplateMinimalRenderer from "./renderers/TemplateMinimal";
 
 type LayoutType = {
   page: { width: number; height: number; padding: number; backgroundColor?: string };
@@ -20,36 +20,105 @@ type LayoutType = {
 type Props = {
   data: CVData;
   layout?: LayoutType; // Layout từ templateConfig, nếu không có thì dùng templateLayouts
+  templateId?: string; // Template ID từ backend (ví dụ: "modern") để map với renderer
   containerRef?: (el: HTMLDivElement | null) => void;
   editable?: boolean;
   onChangeText?: (path: Array<string | number>, value: string) => void;
   onFocusField?: (fieldPath: string) => void;
   onBlurField?: () => void;
   editingField?: string | null;
+  onAddItem?: (section: keyof CVData, index?: number) => void;
+  onDeleteItem?: (section: keyof CVData, index: number) => void;
+  onDuplicateItem?: (section: keyof CVData, index: number) => void;
+  onMoveItemUp?: (section: keyof CVData, index: number) => void;
+  onMoveItemDown?: (section: keyof CVData, index: number) => void;
+  onUpdateSectionTitle?: (section: string, newTitle: string) => void;
+  getSectionTitle?: (section: string, defaultTitle: string) => string;
+  onAvatarChange?: (file: File) => void;
 };
 
 export default function LivePreview({ 
   data, 
   layout: layoutProp, 
+  templateId, // Template ID từ backend (ví dụ: "modern")
   containerRef, 
   editable = false, 
   onChangeText, 
   onFocusField, 
   onBlurField, 
-  editingField 
+  editingField,
+  onAddItem,
+  onDeleteItem,
+  onDuplicateItem,
+  onMoveItemUp,
+  onMoveItemDown,
+  onUpdateSectionTitle,
+  getSectionTitle,
+  onAvatarChange,
 }: Props) {
   // Ưu tiên dùng layout từ props, fallback về templateLayouts
   const layout = useMemo(() => {
     if (layoutProp) return layoutProp;
-    return templateLayouts[data.templateId];
+    return templateLayouts[data.templateId] as LayoutType;
   }, [data.templateId, layoutProp]);
+  
+  // Map rõ ràng: "modern" → Template1Renderer, "minimal" → TemplateMinimalRenderer
+  // Hoặc nếu không có templateId từ backend, fallback về check data.templateId === 1
+  const shouldUseTemplate1 = templateId === "modern" || (!templateId && !layoutProp && data.templateId === 1);
+  const shouldUseTemplateMinimal = templateId === "minimal";
+
+  if (shouldUseTemplateMinimal) {
+    return (
+      <TemplateMinimalRenderer
+        data={data}
+        containerRef={containerRef}
+        editable={editable}
+        onChangeText={onChangeText}
+        onFocusField={onFocusField}
+        onBlurField={onBlurField}
+        onAddItem={onAddItem}
+        onDeleteItem={onDeleteItem}
+        onDuplicateItem={onDuplicateItem}
+        onMoveItemUp={onMoveItemUp}
+        onMoveItemDown={onMoveItemDown}
+        onUpdateSectionTitle={onUpdateSectionTitle}
+        getSectionTitle={getSectionTitle}
+        onAvatarChange={onAvatarChange}
+      />
+    );
+  }
+
+  if (shouldUseTemplate1) {
+    return (
+      <Template1Renderer
+        data={data}
+        containerRef={containerRef}
+        editable={editable}
+        onChangeText={onChangeText}
+        onFocusField={onFocusField}
+        onBlurField={onBlurField}
+        onAddItem={onAddItem}
+        onDeleteItem={onDeleteItem}
+        onDuplicateItem={onDuplicateItem}
+        onMoveItemUp={onMoveItemUp}
+        onMoveItemDown={onMoveItemDown}
+        onUpdateSectionTitle={onUpdateSectionTitle}
+        getSectionTitle={getSectionTitle}
+        onAvatarChange={onAvatarChange}
+      />
+    );
+  }
+
   // Local buffer for inline text while editing, to avoid React-controlled rerenders
   const bufferRef = useRef<Map<string, string>>(new Map());
+  const pageBgColor = "backgroundColor" in layout.page && layout.page.backgroundColor 
+    ? layout.page.backgroundColor 
+    : "#fff";
   const pageStyle = {
     width: layout.page.width,
     height: layout.page.height,
     position: "relative" as const,
-    background: layout.page.backgroundColor || "#fff",
+    background: pageBgColor,
     boxShadow: "0 0 0 1px rgba(0,0,0,0.05), 0 10px 30px rgba(0,0,0,0.08)",
     margin: "0 auto",
     fontFamily: layout.fonts.body,

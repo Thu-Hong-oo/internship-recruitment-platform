@@ -415,30 +415,22 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
+            <div className="flex justify-center">
               <Button
+                type="button"
                 variant="outline"
-                className="h-12 bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
-                disabled={loading}
+                className="h-12 w-full max-w-xs flex items-center justify-center gap-3 border border-border hover:bg-gray-100 bg-white text-foreground font-semibold rounded-lg shadow-sm transition-all"
+                onClick={() => {
+                  // TODO: Kết nối Google OAuth (NextAuth hoặc custom)
+                  alert("Đăng nhập bằng Google chưa khả dụng.");
+                }}
               >
-                <span className="font-bold text-lg">G</span>
-                <span className="ml-2">Google</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="h-12 bg-blue-600 hover:bg-blue-700 text-white border-blue-600 hover:border-blue-700"
-                disabled={loading}
-              >
-                <span className="font-bold text-lg">f</span>
-                <span className="ml-2">Facebook</span>
-              </Button>
-              <Button
-                variant="outline"
-                className="h-12 bg-blue-800 hover:bg-blue-900 text-white border-blue-800 hover:border-blue-900"
-                disabled={loading}
-              >
-                <span className="font-bold text-lg">in</span>
-                <span className="ml-2">LinkedIn</span>
+                <img
+                  src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                  alt="Google Icon"
+                  className="h-5 w-5"
+                />
+                <span className="ml-2">Đăng nhập với Google</span>
               </Button>
             </div>
           </div>
@@ -498,11 +490,7 @@ export default function RegisterPage() {
           </p>
         </div>
 
-        {/* Footer */}
-        <div className="absolute bottom-8 right-8 flex items-center space-x-2 text-white/80">
-          <CheckCircle className="w-4 h-4" />
-          <span className="text-sm">Bảo mật - Điều khoản</span>
-        </div>
+       
       </div>
     </div>
   );

@@ -1,10 +1,26 @@
 // cvBuilderRoutes.js - CV Builder Core Features Only
 const express = require('express');
+const multer = require('multer');
 const router = express.Router();
 const CVBuilderController = require('../../controllers/candidate/CVBuilderController');
 
 // Create controller instance
 const cvController = new CVBuilderController();
+
+// Configure multer for avatar uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Chỉ chấp nhận file hình ảnh'), false);
+    }
+  },
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+  },
+});
 
 // Test route
 router.get('/test', (req, res) => {
@@ -21,6 +37,9 @@ router.get('/', cvController.getBuilderData);
 // ✅ PUT - Cập nhật dữ liệu CV builder
 router.put('/', cvController.updateBuilderData);
 
+// ✅ POST - Upload avatar cho CV builder
+router.post('/avatar', upload.single('avatar'), cvController.uploadAvatar);
+
 // ✅ POST - Tạo CV thông minh với AI
 router.post('/generate', cvController.generateSmartCV);
 
@@ -30,7 +49,12 @@ router.post('/create-from-template', cvController.createCVFromTemplate);
 // ✅ GET - Lấy CV theo ID
 router.get('/resume/:resumeId', cvController.getResumeById);
 
-// ✅ GET - Lấy CV mặc định hoặc mới nhất
+router.put('/resume/:resumeId', cvController.updateResumeBuilder);
+
+// ✅ GET - Map templateId -> resumeId đã tạo trước đó
+router.get('/template-map', cvController.getTemplateResumeMap);
+
+
 router.get('/default', cvController.getDefaultResume);
 
 // ✅ GET - Lấy danh sách templates

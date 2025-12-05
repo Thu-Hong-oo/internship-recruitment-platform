@@ -304,6 +304,11 @@ const CandidateProfileSchema = new mongoose.Schema(
           uploadedAt: Date,
         },
       ],
+      builderTemplates: {
+        type: Map,
+        of: mongoose.Schema.Types.ObjectId,
+        default: {},
+      },
     },
 
     followedCompanies: [

@@ -124,19 +124,40 @@ export default function ProfilePage() {
 
         const apiContact = profile.contact || {};
         const apiPosition = profile.position || {};
-        setFormData((prev) => ({
-          ...prev,
-          contact: {
-            name: apiContact.name ?? prev.contact.name,
-            phone: apiContact.phone ?? prev.contact.phone,
-            email: apiContact.email ?? prev.contact.email,
-          },
-          position: {
-            title: apiPosition.title ?? prev.position.title,
-            level: apiPosition.level ?? prev.position.level,
-            department: apiPosition.department ?? prev.position.department,
-          },
-        }));
+
+        // Ưu tiên lấy Họ và tên từ profile.user.fullName (nếu có),
+        // sau đó đến contact.name, cuối cùng là giá trị hiện có trong form
+        const apiUser = profile.user || {};
+        setFormData((prev) => {
+          const resolvedContactName =
+            apiContact.name && !isPlaceholderText(apiContact.name)
+              ? apiContact.name
+              : apiUser.fullName && !isPlaceholderText(apiUser.fullName)
+              ? apiUser.fullName
+              : prev.contact.name;
+          const resolvedContactPhone =
+            apiContact.phone && !isPlaceholderPhone(apiContact.phone)
+              ? apiContact.phone
+              : prev.contact.phone;
+          const resolvedContactEmail =
+            apiContact.email && !isPlaceholderEmail(apiContact.email)
+              ? apiContact.email
+              : prev.contact.email;
+
+          return {
+            ...prev,
+            contact: {
+              name: resolvedContactName,
+              phone: resolvedContactPhone,
+              email: resolvedContactEmail,
+            },
+            position: {
+              title: apiPosition.title ?? prev.position.title,
+              level: apiPosition.level ?? prev.position.level,
+              department: apiPosition.department ?? prev.position.department,
+            },
+          };
+        });
 
         // Set avatar URL from profile
         if (profile.user?.avatar) {
@@ -318,6 +339,7 @@ export default function ProfilePage() {
         setSuccess("Cập nhật thông tin thành công!");
         // Refresh verification status
         refreshVerification();
+        setIsEditing(false);
         // Refresh profile data to update placeholder status
         const json = await getEmployerProfile(token);
         const profile = json?.data || json?.profile || null;
@@ -341,56 +363,61 @@ export default function ProfilePage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600">Đang tải thông tin người dùng...</p>
+      <div className="min-h-screen bg-gradient-to-b from-slate-100 via-white to-slate-50 flex items-center justify-center">
+        <div className="text-center space-y-2">
+          <p className="text-sm font-medium text-slate-600">
+            Đang tải thông tin người dùng...
+          </p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-100 via-white to-slate-50">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-4xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.back()}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Quay lại
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold text-slate-800">
-                  Cập nhật thông tin cá nhân
-                </h1>
-                <p className="text-slate-600">
-                  Quản lý thông tin liên hệ và vị trí công việc của bạn
-                </p>
+      <div className="border-b bg-white/80 backdrop-blur">
+        <div className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.back()}
+              className="flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 hover:bg-white"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Quay lại
+            </Button>
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-primary/5 px-3 py-1 text-xs font-medium text-primary mb-2">
+                <User className="w-3.5 h-3.5" />
+                Hồ sơ nhà tuyển dụng
               </div>
+              <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-slate-900">
+                Cập nhật thông tin cá nhân
+              </h1>
+              <p className="mt-1 text-sm text-slate-600">
+                Quản lý thông tin liên hệ, chức vụ và cấp bậc để ứng viên và
+                InternBridge dễ dàng nhận diện bạn.
+              </p>
             </div>
-            {!isEditing && (
-              <Button
-                type="button"
-                onClick={() => setIsEditing(true)}
-                className="bg-primary text-white hover:brightness-110 shadow-sm px-4"
-              >
-                <Edit3 className="w-4 h-4 mr-2" /> Chỉnh sửa
-              </Button>
-            )}
           </div>
+          {!isEditing && (
+            <Button
+              type="button"
+              onClick={() => setIsEditing(true)}
+              className="rounded-full bg-primary px-5 text-white shadow-sm hover:bg-primary/90"
+            >
+              <Edit3 className="w-4 h-4 mr-2" /> Chỉnh sửa
+            </Button>
+          )}
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-10">
+      <div className="max-w-6xl mx-auto px-6 py-10 space-y-6">
         {/* Placeholder Data Alert */}
         {isPlaceholder && !isEditing && (
-          <Alert className="mb-6 border-amber-200 bg-amber-50">
+          <Alert className="mb-2 border-amber-200 bg-amber-50/80">
             <AlertCircle className="h-4 w-4 text-amber-600" />
             <AlertTitle className="text-amber-800">
               Dữ liệu mẫu được hiển thị
@@ -403,10 +430,12 @@ export default function ProfilePage() {
         )}
 
         {/* Avatar Upload Section */}
-        <Card className="mb-6 border border-slate-200 shadow-sm">
+        <Card className="mb-6 border border-slate-200/80 shadow-lg shadow-slate-200/60">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Camera className="w-5 h-5 text-primary" />
+              <div className="rounded-full bg-primary/10 p-2">
+                <Camera className="w-4 h-4 text-primary" />
+              </div>
               Ảnh đại diện
             </CardTitle>
             <p className="text-sm text-slate-500">
@@ -417,7 +446,7 @@ export default function ProfilePage() {
             <div className="flex items-center gap-6">
               {/* Avatar Display */}
               <div className="relative">
-                <Avatar className="w-24 h-24 border-2 border-slate-200">
+                <Avatar className="w-24 h-24 border-2 border-slate-200 shadow-sm">
                   {avatarPreview || avatarUrl ? (
                     <AvatarImage
                       src={avatarPreview || avatarUrl || ""}
@@ -432,7 +461,7 @@ export default function ProfilePage() {
                   </AvatarFallback>
                 </Avatar>
                 {avatarPreview && (
-                  <div className="absolute -top-2 -right-2 bg-green-500 rounded-full p-1">
+                  <div className="absolute -top-2 -right-2 rounded-full bg-emerald-500 p-1 shadow">
                     <Camera className="w-3 h-3 text-white" />
                   </div>
                 )}
@@ -443,7 +472,7 @@ export default function ProfilePage() {
                 <div className="flex items-center gap-3">
                   <label
                     htmlFor="avatar-input"
-                    className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                    className="cursor-pointer inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90"
                   >
                     <Upload className="w-4 h-4" />
                     {avatarPreview ? "Chọn ảnh khác" : "Chọn ảnh"}
@@ -486,13 +515,15 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid gap-8 md:grid-cols-2">
+        <form onSubmit={handleSubmit} className="space-y-8">
+          <div className="grid gap-8 lg:grid-cols-2">
             {/* Contact Information */}
-            <Card className="border border-slate-200 shadow-sm hover:shadow transition-shadow h-full">
+            <Card className="h-full border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <User className="w-5 h-5 text-primary" />
+                  <div className="rounded-full bg-primary/10 p-2">
+                    <User className="w-4 h-4 text-primary" />
+                  </div>
                   Thông tin liên hệ
                 </CardTitle>
                 <p className="text-sm text-slate-500">
@@ -502,7 +533,12 @@ export default function ProfilePage() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="contact.name">Họ và tên *</Label>
+                    <Label
+                      htmlFor="contact.name"
+                      className="text-sm font-medium text-slate-700"
+                    >
+                      Họ và tên *
+                    </Label>
                     {isEditing ? (
                       <Input
                         id="contact.name"
@@ -522,7 +558,12 @@ export default function ProfilePage() {
                     )}
                   </div>
                   <div>
-                    <Label htmlFor="contact.phone">Số điện thoại *</Label>
+                    <Label
+                      htmlFor="contact.phone"
+                      className="text-sm font-medium text-slate-700"
+                    >
+                      Số điện thoại *
+                    </Label>
                     {isEditing ? (
                       <Input
                         id="contact.phone"
@@ -543,7 +584,12 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="contact.email">Email *</Label>
+                  <Label
+                    htmlFor="contact.email"
+                    className="text-sm font-medium text-slate-700"
+                  >
+                    Email *
+                  </Label>
                   {isEditing ? (
                     <Input
                       id="contact.email"
@@ -567,10 +613,12 @@ export default function ProfilePage() {
             </Card>
 
             {/* Position Information */}
-            <Card className="border border-slate-200 shadow-sm hover:shadow transition-shadow h-full">
+            <Card className="h-full border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Building className="w-5 h-5 text-primary" />
+                  <div className="rounded-full bg-primary/10 p-2">
+                    <Building className="w-4 h-4 text-primary" />
+                  </div>
                   Vị trí công việc
                 </CardTitle>
                 <p className="text-sm text-slate-500">
@@ -659,22 +707,22 @@ export default function ProfilePage() {
 
           {/* Error/Success Messages */}
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-red-800">{error}</p>
+            <div className="rounded-lg border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-800">
+              {error}
             </div>
           )}
 
           {/* Đã xóa cảnh báo địa chỉ */}
 
           {success && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <p className="text-green-800">{success}</p>
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 px-4 py-3 text-sm text-emerald-800">
+              {success}
             </div>
           )}
 
           {/* Floating action bar when editing */}
           {isEditing && (
-            <div className="fixed bottom-6 right-6 z-40 flex items-center gap-3 bg-white/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 border border-slate-200 shadow-lg rounded-full px-4 py-2">
+            <div className="fixed bottom-6 right-6 z-40 flex items-center gap-3 rounded-full border border-slate-200 bg-white/90 px-4 py-2 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-white/70">
               <Button
                 type="button"
                 variant="outline"

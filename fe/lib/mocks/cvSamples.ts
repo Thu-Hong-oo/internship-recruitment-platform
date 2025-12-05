@@ -4,6 +4,7 @@ export type CVPersonal = {
   phone?: string;
   address?: string;
   summary?: string;
+  avatar?: string;
 };
 
 export type CVExperience = {
@@ -53,6 +54,9 @@ export type CVData = {
   languages?: CVLanguage[];
   certifications?: CVCertification[];
   social?: CVSocial[];
+  sectionTitles?: {
+    [key: string]: string; // e.g., "education": "Kinh nghiệm học tập", "references": "Người tham khảo"
+  };
 };
 
 export const sampleCVs: CVData[] = [
@@ -91,8 +95,14 @@ export const sampleCVs: CVData[] = [
     ],
     skills: ["React", "TypeScript", "Tailwind", "Next.js"],
     projects: [
-      { title: "Tour Tuyến Phía Bắc", description: "Gói tour 5 ngày khám phá Sapa, Hạ Long." },
-      { title: "Ứng Dụng Đặt Tour", description: "Ứng dụng đặt tour, tăng khách hàng trực tuyến." },
+      {
+        title: "Tour Tuyến Phía Bắc",
+        description: "Gói tour 5 ngày khám phá Sapa, Hạ Long.",
+      },
+      {
+        title: "Ứng Dụng Đặt Tour",
+        description: "Ứng dụng đặt tour, tăng khách hàng trực tuyến.",
+      },
     ],
     languages: [
       { name: "Tiếng Việt", level: "Native", rating: 5 },
@@ -100,9 +110,17 @@ export const sampleCVs: CVData[] = [
       { name: "Tiếng Trung", level: "Cơ bản", rating: 2 },
     ],
     certifications: [
-      { name: "Hướng Dẫn Viên Cấp A", issuer: "Sở Du Lịch Hà Nội", year: "2020" },
+      {
+        name: "Hướng Dẫn Viên Cấp A",
+        issuer: "Sở Du Lịch Hà Nội",
+        year: "2020",
+      },
       { name: "Quản Lý Du Lịch Bền Vững", issuer: "UNWTO", year: "2021" },
-      { name: "Hỗ Trợ Khách Hàng", issuer: "Hotel Management Academy", year: "2019" },
+      {
+        name: "Hỗ Trợ Khách Hàng",
+        issuer: "Hotel Management Academy",
+        year: "2019",
+      },
     ],
     social: [
       { label: "LinkedIn", url: "#" },
@@ -112,5 +130,3 @@ export const sampleCVs: CVData[] = [
     ],
   },
 ];
-
-

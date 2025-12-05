@@ -12,7 +12,7 @@ export type TemplateLayout = {
   sections: LayoutSection[];
   colors: { primary: string; secondary: string };
   fonts: { heading: string; body: string };
-  page: { width: number; height: number; padding: number };
+  page: { width: number; height: number; padding: number; backgroundColor?: string };
 };
 
 export const templateLayouts: Record<number, TemplateLayout> = {

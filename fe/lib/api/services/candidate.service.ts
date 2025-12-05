@@ -297,6 +297,89 @@ class CandidateService {
     return apiClient.get("/candidates/me/cv-builder");
   }
 
+  /**
+   * Cập nhật dữ liệu CV builder
+   */
+  async updateBuilderData(data: {
+    personalInfo?: any;
+    targetJob?: any;
+    careerObjective?: string;
+    experience?: any[];
+    education?: any[];
+    skills?: any;
+    projects?: any[];
+    certifications?: any[];
+    awards?: any[];
+    languages?: any[];
+    hobbies?: any[];
+    references?: any[];
+  }): Promise<{
+    success: boolean;
+    data: {
+      message: string;
+      completeness: number;
+    };
+  }> {
+    return apiClient.put("/candidates/me/cv-builder", data);
+  }
+
+  /**
+   * Cập nhật nội dung một ResumeBuilder (state riêng cho từng CV/template)
+   * PUT /candidates/me/cv-builder/resume/:resumeId
+   */
+  async updateResumeBuilder(resumeId: string, payload: {
+    content: any;
+    customization?: any;
+    createVersion?: boolean;
+    status?: "draft" | "completed" | "archived";
+  }): Promise<{
+    success: boolean;
+    data: {
+      resumeId: string;
+      templateId: string | null;
+      content: any;
+      customization: any;
+      status: string;
+      updatedAt: string;
+    };
+  }> {
+    return apiClient.put(`/candidates/me/cv-builder/resume/${resumeId}`, payload);
+  }
+
+  /**
+   * Lấy map templateId -> resumeId đã tạo trước đó
+   */
+  async getTemplateResumeMap(): Promise<{
+    success: boolean;
+    data: {
+      map: Record<string, string>;
+    };
+  }> {
+    return apiClient.get("/candidates/me/cv-builder/template-map");
+  }
+
+  /**
+   * Upload avatar cho CV builder
+   */
+  async uploadAvatar(file: File): Promise<{
+    success: boolean;
+    data: {
+      avatar: {
+        publicId: string;
+        url: string;
+        size: number;
+        format: string;
+        dimensions: { width: number; height: number };
+      };
+    };
+    message?: string;
+  }> {
+    const formData = new FormData();
+    formData.append("avatar", file);
+    // Không set Content-Type header, để browser tự động set với boundary
+    return apiClient.post("/candidates/me/cv-builder/avatar", formData);
+  }
+
   async getTemplates(
     category?: string,
     style?: string

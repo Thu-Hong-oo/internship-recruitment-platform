@@ -86,11 +86,14 @@ export default function JobsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalJobs, setTotalJobs] = useState(0);
   const [pageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
   const [filters, setFilters] = useState({
     status: "all",
     sortBy: "createdAt",
     sortOrder: "desc" as "asc" | "desc",
   });
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPrevPage, setHasPrevPage] = useState(false);
 
   const loadJobs = async (page = currentPage, newFilters = filters) => {
     try {
@@ -113,8 +116,23 @@ export default function JobsPage() {
 
       if (result.success) {
         setJobs(result.data || []);
-        setTotalJobs(result.total || 0);
-        setCurrentPage(page);
+
+        // Ưu tiên lấy tổng số job từ pagination hoặc statistics nếu có
+        const totalFromResponse =
+          result.pagination?.total ??
+          result.statistics?.total ??
+          result.total ??
+          result.data?.length ??
+          0;
+
+        setTotalJobs(totalFromResponse);
+        setCurrentPage(result.pagination?.page || page);
+        setTotalPages(
+          result.pagination?.totalPages ||
+            Math.max(1, Math.ceil(totalFromResponse / pageSize))
+        );
+        setHasNextPage(!!result.pagination?.hasNextPage);
+        setHasPrevPage(!!result.pagination?.hasPrevPage);
       } else {
         setError(result.error || "Không thể tải danh sách công việc");
       }
@@ -366,11 +384,9 @@ export default function JobsPage() {
                 <TableRow>
                   <TableHead>Tiêu đề</TableHead>
                   <TableHead>Trạng thái</TableHead>
-                  <TableHead>Địa điểm</TableHead>
-                  <TableHead>Lương</TableHead>
+                  {/* <TableHead>Lương</TableHead> */}
                   <TableHead>Hạn nộp</TableHead>
-                  <TableHead>Ứng viên</TableHead>
-                  <TableHead>Ngày tạo</TableHead>
+                  <TableHead>Thao tác</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -402,32 +418,11 @@ export default function JobsPage() {
                       </div>
                     </TableCell>
                     <TableCell>{getStatusBadge(job.status)}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center text-sm">
-                        <MapPin className="h-3 w-3 mr-1" />
-                        {job.location}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center text-sm">
-                        <DollarSign className="h-3 w-3 mr-1" />
-                        {job.salary}
-                      </div>
-                    </TableCell>
+
                     <TableCell>
                       <div className="text-sm">{formatDate(job.deadline)}</div>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center text-sm">
-                        <Users className="h-3 w-3 mr-1" />
-                        {job.applicationsCount || 0}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm text-gray-500">
-                        {formatDate(job.createdAt)}
-                      </div>
-                    </TableCell>
+
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Button
@@ -533,14 +528,32 @@ export default function JobsPage() {
                   >
                     Trước
                   </Button>
-                  <span className="text-sm">
-                    Trang {currentPage} / {Math.ceil(totalJobs / pageSize)}
-                  </span>
+
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, idx) => {
+                      const page = idx + 1;
+                      const isActive = page === currentPage;
+                      return (
+                        <Button
+                          key={page}
+                          variant={isActive ? "default" : "outline"}
+                          size="sm"
+                          className={
+                            isActive ? "bg-primary text-white" : "text-gray-700"
+                          }
+                          onClick={() => handlePageChange(page)}
+                        >
+                          {page}
+                        </Button>
+                      );
+                    })}
+                  </div>
+
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage >= Math.ceil(totalJobs / pageSize)}
+                    disabled={currentPage >= totalPages}
                   >
                     Sau
                   </Button>

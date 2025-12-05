@@ -97,7 +97,7 @@ export default function Header() {
   const router = useRouter();
   const { user, loading, logout } = useAuth();
 
-  // Sử dụng custom hook cho 3 dropdowns
+  // Sử dụng custom hook cho 2 dropdowns
   const jobsDropdown = useDropdown(150);
   const aiDropdown = useDropdown(150);
   const cvDropdown = useDropdown(150);

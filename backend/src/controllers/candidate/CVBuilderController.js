@@ -5,6 +5,8 @@ const pdfGenerationService = require('../../services/resume/pdfGenerationService
 const resumeGeneratorService = require('../../services/resume/resumeGeneratorService');
 const { ApiResponse } = require('../../utils/responseHandler');
 const { AppError } = require('../../utils/errors');
+const { uploadImage } = require('../../services/upload/imageUploadService');
+const { logger } = require('../../utils/logger');
 
 /**
  * CVBuilderController
@@ -42,6 +44,9 @@ class CVBuilderController {
     this.getCVHistory = this.getCVHistory.bind(this);
     this.deleteCVFromHistory = this.deleteCVFromHistory.bind(this);
     this.setCurrentCV = this.setCurrentCV.bind(this);
+
+    // Avatar Upload
+    this.uploadAvatar = this.uploadAvatar.bind(this);
   }
 
   // ========================================
@@ -75,6 +80,7 @@ class CVBuilderController {
           website: profile.personalInfo?.website || '',
           linkedin: profile.personalInfo?.linkedin || '',
           github: profile.personalInfo?.github || '',
+          jobTitle: profile.personalInfo?.jobTitle || '',
         },
         targetJob: profile.targetJob || {
           title: '',
@@ -126,6 +132,19 @@ class CVBuilderController {
         references = [],
       } = req.body;
 
+      // Debug log để kiểm tra data nhận được
+      console.log('📥 Received updateBuilderData:', {
+        experienceCount: experience.length,
+        experienceSample: experience[0],
+        educationCount: education.length,
+        educationSample: education[0],
+        projectsCount: projects.length,
+        certificationsCount: certifications.length,
+        awardsCount: awards.length,
+        hobbiesCount: hobbies.length,
+        jobTitle: personalInfo?.jobTitle,
+      });
+
       let profile = await CandidateProfile.findOne({ userId: req.user.id });
 
       if (!profile) {
@@ -139,28 +158,91 @@ class CVBuilderController {
 
       // Update personal info
       if (personalInfo) {
-        profile.personalInfo = {
-          ...profile.personalInfo,
+        // Build personalInfo object, only including fields that are explicitly provided
+        // Start with existing personalInfo, but filter out undefined values
+        const existingPersonalInfo = profile.personalInfo || {};
+        const updatedPersonalInfo = {
           fullName:
-            personalInfo.fullName || profile.personalInfo?.fullName || '',
-          email: personalInfo.email || profile.personalInfo?.email || '',
-          phone: personalInfo.phone || profile.personalInfo?.phone || '',
-          // Only set address if provided and not an empty string; otherwise keep existing or null
-          address:
-            typeof personalInfo.address === 'string'
-              ? personalInfo.address.trim() || null
-              : personalInfo.address ?? profile.personalInfo?.address ?? null,
+            personalInfo.fullName !== undefined
+              ? personalInfo.fullName || ''
+              : existingPersonalInfo.fullName || '',
+          email:
+            personalInfo.email !== undefined
+              ? personalInfo.email || ''
+              : existingPersonalInfo.email || '',
+          phone:
+            personalInfo.phone !== undefined
+              ? personalInfo.phone || ''
+              : existingPersonalInfo.phone || '',
           dateOfBirth:
-            personalInfo.dateOfBirth ||
-            profile.personalInfo?.dateOfBirth ||
-            null,
-          avatar: personalInfo.avatar || profile.personalInfo?.avatar || null,
-          website: personalInfo.website || profile.personalInfo?.website || '',
+            personalInfo.dateOfBirth !== undefined
+              ? personalInfo.dateOfBirth || null
+              : existingPersonalInfo.dateOfBirth || null,
+          avatar:
+            personalInfo.avatar !== undefined
+              ? personalInfo.avatar || null
+              : existingPersonalInfo.avatar || null,
+          website:
+            personalInfo.website !== undefined
+              ? personalInfo.website || ''
+              : existingPersonalInfo.website || '',
           linkedin:
-            personalInfo.linkedin || profile.personalInfo?.linkedin || '',
-          github: personalInfo.github || profile.personalInfo?.github || '',
-          bio: careerObjective || profile.personalInfo?.bio || '',
+            personalInfo.linkedin !== undefined
+              ? personalInfo.linkedin || ''
+              : existingPersonalInfo.linkedin || '',
+          github:
+            personalInfo.github !== undefined
+              ? personalInfo.github || ''
+              : existingPersonalInfo.github || '',
+          jobTitle:
+            personalInfo.jobTitle !== undefined
+              ? personalInfo.jobTitle || ''
+              : existingPersonalInfo.jobTitle || '',
+          bio:
+            careerObjective !== undefined
+              ? careerObjective || ''
+              : existingPersonalInfo.bio || '',
         };
+
+        // Handle address field carefully to avoid undefined
+        // Only set address if it's explicitly provided in the request
+        if (personalInfo.address !== undefined) {
+          if (personalInfo.address === null || personalInfo.address === '') {
+            updatedPersonalInfo.address = null;
+          } else if (typeof personalInfo.address === 'string') {
+            // Convert string to object format
+            const addressString = personalInfo.address.trim();
+            if (addressString) {
+              updatedPersonalInfo.address = {
+                street: '',
+                ward: '',
+                district: '',
+                city: addressString,
+                country: 'Vietnam',
+              };
+            } else {
+              updatedPersonalInfo.address = null;
+            }
+          } else if (
+            typeof personalInfo.address === 'object' &&
+            personalInfo.address !== null
+          ) {
+            // Already an object, use it directly
+            updatedPersonalInfo.address = personalInfo.address;
+          } else {
+            // Invalid type, set to null
+            updatedPersonalInfo.address = null;
+          }
+        } else {
+          // address not provided in request, keep existing value (but ensure it's not undefined)
+          if (existingPersonalInfo.address !== undefined) {
+            updatedPersonalInfo.address = existingPersonalInfo.address;
+          } else {
+            updatedPersonalInfo.address = null;
+          }
+        }
+
+        profile.personalInfo = updatedPersonalInfo;
       }
 
       // Update target job
@@ -168,44 +250,102 @@ class CVBuilderController {
         profile.targetJob = targetJob;
       }
 
-      // Update experience
-      if (experience.length > 0) {
-        profile.experience = {
-          internships: this.filterExperienceByType(experience, 'internship'),
-          fulltime: this.filterExperienceByType(experience, 'fulltime'),
-          parttime: this.filterExperienceByType(experience, 'parttime'),
-          freelance: this.filterExperienceByType(experience, 'freelance'),
-        };
-      }
+      // Update experience (luôn update, kể cả khi array rỗng để cho phép xóa)
+      profile.experience = {
+        internships: this.filterExperienceByType(experience, 'internship'),
+        fulltime: this.filterExperienceByType(experience, 'fulltime'),
+        parttime: this.filterExperienceByType(experience, 'parttime'),
+        freelance: this.filterExperienceByType(experience, 'freelance'),
+      };
 
-      // Update education
+      // Update education - lưu tất cả education items (luôn update, kể cả khi array rỗng)
+      // Parse startYear và endYear từ string sang number nếu cần
+      const parseYear = yearStr => {
+        // Nếu là empty string hoặc falsy, return null
+        if (!yearStr || yearStr === '') return null;
+        if (typeof yearStr === 'number') return yearStr;
+        // Extract year from "YYYY" or "YYYY-MM" format
+        const yearMatch = String(yearStr)
+          .trim()
+          .match(/^(\d{4})/);
+        return yearMatch ? parseInt(yearMatch[1], 10) : null;
+      };
+
+      console.log(
+        '📚 Education data received:',
+        JSON.stringify(education, null, 2)
+      );
+
       if (education.length > 0) {
-        const university = education.find(edu => edu.type === 'university');
+        // Lưu university đầu tiên vào education.university (để tương thích)
+        const university =
+          education.find(edu => edu.type === 'university') || education[0];
         if (university) {
+          const uniStartYear = parseYear(university.startYear);
+          const uniEndYear = parseYear(university.endYear);
+          const uniStartDate = uniStartYear
+            ? new Date(uniStartYear, 0, 1)
+            : null;
+          const uniEndDate = uniEndYear ? new Date(uniEndYear, 11, 31) : null;
+
           profile.education.university = {
             _id: university._id || new mongoose.Types.ObjectId(),
-            institution: university.institution,
-            degree: university.degree,
-            field: university.field,
-            startYear: university.startYear,
-            endYear: university.endYear,
-            gpa: university.gpa,
+            institution: university.institution || '',
+            degree: university.degree || '',
+            field: university.field || '',
+            startDate: uniStartDate,
+            endDate: uniEndDate,
+            startYear: uniStartYear, // Lưu thêm để tương thích
+            endYear: uniEndYear, // Lưu thêm để tương thích
+            graduationYear: uniEndYear,
+            gpa: university.gpa || null,
             achievements: university.achievements || [],
             coursework: university.coursework || [],
           };
         }
 
+        // Lưu highSchool nếu có
         const highSchool = education.find(edu => edu.type === 'highschool');
         if (highSchool) {
           profile.education.highSchool = {
             _id: highSchool._id || new mongoose.Types.ObjectId(),
             school: highSchool.institution,
-            graduationYear: highSchool.endYear,
+            graduationYear: parseYear(highSchool.endYear),
             gpa: highSchool.gpa,
             achievements: highSchool.achievements || [],
           };
         }
+      } else {
+        // Nếu education array rỗng, xóa university và highSchool
+        profile.education.university = null;
+        profile.education.highSchool = null;
       }
+
+      // Lưu tất cả education items vào education.certifications array (luôn update)
+      // Note: Tên "certifications" không đúng mục đích, nhưng dùng tạm để lưu nhiều education items
+      // Schema có startDate/endDate (Date) và graduationYear (Number), không có startYear/endYear
+      profile.education.certifications = education.map(edu => {
+        const startYear = parseYear(edu.startYear);
+        const endYear = parseYear(edu.endYear);
+
+        // Convert year (number) sang Date object cho startDate/endDate
+        const startDate = startYear ? new Date(startYear, 0, 1) : null; // January 1st of the year
+        const endDate = endYear ? new Date(endYear, 11, 31) : null; // December 31st of the year
+
+        return {
+          _id: edu._id || new mongoose.Types.ObjectId(),
+          type: edu.type || 'university',
+          institution: edu.institution || '',
+          degree: edu.degree || '',
+          field: edu.field || '',
+          startDate: startDate,
+          endDate: endDate,
+          graduationYear: endYear, // Lưu number vào graduationYear
+          gpa: edu.gpa || null,
+          achievements: edu.achievements || [],
+          coursework: edu.coursework || [],
+        };
+      });
 
       // Update skills
       if (skills.technical) {
@@ -235,48 +375,82 @@ class CVBuilderController {
         }));
       }
 
-      // Update projects
-      if (projects.length > 0) {
-        profile.projects = projects.map(project => ({
-          _id: project._id || new mongoose.Types.ObjectId(),
-          title: project.title,
-          description: project.description,
-          technologies: project.technologies || [],
-          startDate: project.startDate,
-          endDate: project.endDate,
-          status: project.status || 'completed',
-          url: project.url || null,
-          github: project.github || null,
-          achievements: project.achievements || [],
-        }));
-      }
+      // Update projects (luôn update, kể cả khi array rỗng để cho phép xóa)
+      // Parse date từ string sang Date object nếu cần
+      const parseDate = (dateStr) => {
+        if (!dateStr || dateStr === '') return null;
+        if (dateStr instanceof Date) return dateStr;
+        // Nếu là string "YYYY-MM" hoặc "YYYY", parse thành Date
+        if (typeof dateStr === 'string') {
+          const dateMatch = dateStr.trim().match(/^(\d{4})(?:-(\d{2}))?/);
+          if (dateMatch) {
+            const year = parseInt(dateMatch[1], 10);
+            const month = dateMatch[2] ? parseInt(dateMatch[2], 10) - 1 : 0; // Month is 0-indexed
+            return new Date(year, month, 1);
+          }
+          // Try to parse as ISO date
+          const parsed = new Date(dateStr);
+          return isNaN(parsed.getTime()) ? null : parsed;
+        }
+        return null;
+      };
 
-      // Update certifications
-      if (certifications.length > 0) {
-        profile.certifications = certifications.map(cert => ({
-          _id: cert._id || new mongoose.Types.ObjectId(),
-          name: cert.name,
-          issuer: cert.issuer,
-          issueDate: cert.issueDate,
-          expiryDate: cert.expiryDate,
-          credentialId: cert.credentialId || null,
-          url: cert.url || null,
-        }));
-      }
+      profile.projects = projects.map(project => ({
+        _id: project._id || new mongoose.Types.ObjectId(),
+        title: project.title || '',
+        description: project.description || '',
+        technologies: project.technologies || [],
+        startDate: parseDate(project.startDate),
+        endDate: parseDate(project.endDate),
+        status: project.status || 'completed',
+        url: project.url || null,
+        github: project.github || null,
+        achievements: project.achievements || [],
+      }));
 
-      // Update awards
-      if (awards.length > 0) {
-        profile.awards = awards.map(award => ({
-          _id: award._id || new mongoose.Types.ObjectId(),
-          title: award.title,
-          issuer: award.issuer,
-          date: award.date,
-          description: award.description || '',
-        }));
-      }
+      // Update certifications (luôn update, kể cả khi array rỗng để cho phép xóa)
+      // Parse date từ string sang Date object nếu cần
+      const parseCertDate = (dateStr) => {
+        if (!dateStr || dateStr === '') return null;
+        if (dateStr instanceof Date) return dateStr;
+        // Nếu là string "YYYY-MM-DD" hoặc "YYYY-MM" hoặc "YYYY", parse thành Date
+        if (typeof dateStr === 'string') {
+          const dateMatch = dateStr.trim().match(/^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?/);
+          if (dateMatch) {
+            const year = parseInt(dateMatch[1], 10);
+            const month = dateMatch[2] ? parseInt(dateMatch[2], 10) - 1 : 0; // Month is 0-indexed
+            const day = dateMatch[3] ? parseInt(dateMatch[3], 10) : 1;
+            return new Date(year, month, day);
+          }
+          // Try to parse as ISO date
+          const parsed = new Date(dateStr);
+          return isNaN(parsed.getTime()) ? null : parsed;
+        }
+        return null;
+      };
 
-      // Update additional fields
-      profile.hobbies = hobbies;
+      profile.certifications = certifications.map(cert => ({
+        _id: cert._id || new mongoose.Types.ObjectId(),
+        name: cert.name || '',
+        issuer: cert.issuer || '',
+        issueDate: parseCertDate(cert.issueDate),
+        expiryDate: parseCertDate(cert.expiryDate),
+        credentialId: cert.credentialId || null,
+        url: cert.url || null,
+      }));
+
+      // Update awards (luôn update, kể cả khi array rỗng để cho phép xóa)
+      // Parse date từ string sang Date object nếu cần (dùng cùng logic với certifications)
+      profile.awards = awards.map(award => ({
+        _id: award._id || new mongoose.Types.ObjectId(),
+        title: award.title || '',
+        issuer: award.issuer || '',
+        date: parseCertDate(award.date),
+        description: award.description || '',
+      }));
+
+      // Update additional fields (luôn update, kể cả khi array rỗng để cho phép xóa)
+      profile.hobbies = hobbies || [];
       profile.references = references.map(ref => ({
         _id: ref._id || new mongoose.Types.ObjectId(),
         name: ref.name,
@@ -291,6 +465,45 @@ class CVBuilderController {
       profile.progress.profileCompleteness =
         this.calculateCompleteness(profile);
       profile.progress.lastUpdated = new Date();
+
+      // Debug log trước khi save
+      console.log('💾 Saving profile:', {
+        educationCertificationsCount:
+          profile.education?.certifications?.length || 0,
+        educationFirstItem: profile.education?.certifications?.[0]
+          ? {
+              institution: profile.education.certifications[0].institution,
+              startDate: profile.education.certifications[0].startDate,
+              endDate: profile.education.certifications[0].endDate,
+            }
+          : null,
+        experienceFulltimeCount: profile.experience?.fulltime?.length || 0,
+        experienceFulltimeSample: profile.experience?.fulltime?.[0]
+          ? {
+              company: profile.experience.fulltime[0].company,
+              position: profile.experience.fulltime[0].position,
+              startDate: profile.experience.fulltime[0].startDate,
+              endDate: profile.experience.fulltime[0].endDate,
+            }
+          : null,
+        projectsCount: profile.projects?.length || 0,
+        certificationsCount: profile.certifications?.length || 0,
+        certificationsSample: profile.certifications?.[0]
+          ? {
+              name: profile.certifications[0].name,
+              issueDate: profile.certifications[0].issueDate,
+            }
+          : null,
+        awardsCount: profile.awards?.length || 0,
+        awardsSample: profile.awards?.[0]
+          ? {
+              title: profile.awards[0].title,
+              date: profile.awards[0].date,
+            }
+          : null,
+        hobbiesCount: profile.hobbies?.length || 0,
+        jobTitle: profile.personalInfo?.jobTitle,
+      });
 
       await profile.save();
 
@@ -534,6 +747,24 @@ class CVBuilderController {
       }
 
       await newResume.save();
+
+      // Update builder template map for this candidate/profile
+      if (!profile.resume) {
+        profile.resume = {};
+      }
+      if (!profile.resume.builderTemplates) {
+        profile.resume.builderTemplates = new Map();
+      }
+      if (profile.resume.builderTemplates instanceof Map) {
+        profile.resume.builderTemplates.set(templateId, newResume._id);
+      } else {
+        profile.resume.builderTemplates = {
+          ...profile.resume.builderTemplates,
+          [templateId]: newResume._id,
+        };
+      }
+
+      await profile.save();
 
       // 7. Return response
       return ApiResponse.success(
@@ -874,25 +1105,51 @@ class CVBuilderController {
         finalPDFOptions
       );
 
-      // Save PDF entry to profile
-      const pdfEntry = {
-        url: pdfResult.url,
-        filename: pdfResult.filename,
-        displayName: `PDF - ${candidateName} - ${targetJob}`,
-        format: 'pdf',
-        size: pdfResult.size,
-        uploadedAt: pdfResult.uploadedAt,
-        aiGenerated: false,
-        template: template,
-        targetJob: targetJob,
-        pdfOptions: finalPDFOptions,
-      };
-
-      // Add to profile documents
+      // Save or update PDF entry in profile.documents
       if (!profile.documents) {
         profile.documents = [];
       }
-      profile.documents.push(pdfEntry);
+
+      let pdfEntry = null;
+
+      // Nếu có cvId, thử ghi đè lên entry cũ thay vì tạo mới
+      if (cvId) {
+        const existingIndex = profile.documents.findIndex(
+          (doc) => doc._id && doc._id.toString() === cvId
+        );
+
+        if (existingIndex !== -1) {
+          pdfEntry = profile.documents[existingIndex];
+          pdfEntry.url = pdfResult.url;
+          pdfEntry.filename = pdfResult.filename;
+          pdfEntry.displayName =
+            pdfEntry.displayName || `PDF - ${candidateName} - ${targetJob}`;
+          pdfEntry.format = 'pdf';
+          pdfEntry.size = pdfResult.size;
+          pdfEntry.uploadedAt = pdfResult.uploadedAt;
+          pdfEntry.aiGenerated = false;
+          pdfEntry.template = template;
+          pdfEntry.targetJob = targetJob;
+          pdfEntry.pdfOptions = finalPDFOptions;
+        }
+      }
+
+      // Nếu không có cvId hoặc không tìm thấy entry cũ → tạo mới
+      if (!pdfEntry) {
+        pdfEntry = {
+          url: pdfResult.url,
+          filename: pdfResult.filename,
+          displayName: `PDF - ${candidateName} - ${targetJob}`,
+          format: 'pdf',
+          size: pdfResult.size,
+          uploadedAt: pdfResult.uploadedAt,
+          aiGenerated: false,
+          template: template,
+          targetJob: targetJob,
+          pdfOptions: finalPDFOptions,
+        };
+        profile.documents.push(pdfEntry);
+      }
 
       await profile.save();
 
@@ -924,6 +1181,7 @@ class CVBuilderController {
         template = 'modern',
         pdfOptions = {},
         filename = null,
+        cvId = null,
       } = req.body;
 
       if (!htmlContent) {
@@ -962,25 +1220,51 @@ class CVBuilderController {
         finalPDFOptions
       );
 
-      // Save PDF entry to profile
-      const pdfEntry = {
-        url: pdfResult.url,
-        filename: pdfResult.filename,
-        displayName: `PDF - ${candidateName} - ${targetJob}`,
-        format: 'pdf',
-        size: pdfResult.size,
-        uploadedAt: pdfResult.uploadedAt,
-        aiGenerated: false,
-        template: template,
-        targetJob: targetJob,
-        pdfOptions: finalPDFOptions,
-      };
-
-      // Add to profile documents
+      // Save or update PDF entry to profile.documents
       if (!profile.documents) {
         profile.documents = [];
       }
-      profile.documents.push(pdfEntry);
+
+      let pdfEntry = null;
+
+      // Nếu có cvId, thử ghi đè entry cũ
+      if (cvId) {
+        const existingIndex = profile.documents.findIndex(
+          (doc) => doc._id && doc._id.toString() === cvId
+        );
+
+        if (existingIndex !== -1) {
+          pdfEntry = profile.documents[existingIndex];
+          pdfEntry.url = pdfResult.url;
+          pdfEntry.filename = pdfResult.filename;
+          pdfEntry.displayName =
+            pdfEntry.displayName || `PDF - ${candidateName} - ${targetJob}`;
+          pdfEntry.format = 'pdf';
+          pdfEntry.size = pdfResult.size;
+          pdfEntry.uploadedAt = pdfResult.uploadedAt;
+          pdfEntry.aiGenerated = false;
+          pdfEntry.template = template;
+          pdfEntry.targetJob = targetJob;
+          pdfEntry.pdfOptions = finalPDFOptions;
+        }
+      }
+
+      // Nếu không có cvId hoặc không tìm thấy entry cũ → tạo mới
+      if (!pdfEntry) {
+        pdfEntry = {
+          url: pdfResult.url,
+          filename: pdfResult.filename,
+          displayName: `PDF - ${candidateName} - ${targetJob}`,
+          format: 'pdf',
+          size: pdfResult.size,
+          uploadedAt: pdfResult.uploadedAt,
+          aiGenerated: false,
+          template: template,
+          targetJob: targetJob,
+          pdfOptions: finalPDFOptions,
+        };
+        profile.documents.push(pdfEntry);
+      }
 
       await profile.save();
 
@@ -1117,6 +1401,79 @@ class CVBuilderController {
   }
 
   // ========================================
+  // AVATAR UPLOAD
+  // ========================================
+
+  /**
+   * POST /api/candidates/me/cv-builder/avatar
+   * Upload avatar cho CV builder
+   * Avatar sẽ được lưu vào CandidateProfile.personalInfo.avatar
+   */
+  async uploadAvatar(req, res, next) {
+    try {
+      if (!req.file) {
+        return ApiResponse.error(
+          res,
+          'Vui lòng chọn file hình ảnh để upload',
+          400
+        );
+      }
+
+      // Upload avatar lên Cloudinary
+      const result = await uploadImage('avatar', req.file.buffer);
+
+      // Lấy hoặc tạo profile
+      let profile = await CandidateProfile.findOne({ userId: req.user.id });
+
+      if (!profile) {
+        profile = new CandidateProfile({
+          userId: req.user.id,
+          personalInfo: {
+            avatar: result.url,
+          },
+          progress: { profileCompleteness: 0, lastUpdated: new Date() },
+          status: 'active',
+        });
+      } else {
+        // Update avatar trong personalInfo
+        if (!profile.personalInfo) {
+          profile.personalInfo = {};
+        }
+        profile.personalInfo.avatar = result.url;
+        profile.progress.lastUpdated = new Date();
+      }
+
+      await profile.save();
+
+      logger.info(`CV Builder avatar uploaded for user: ${req.user.id}`, {
+        userId: req.user.id,
+        publicId: result.publicId,
+        url: result.url,
+      });
+
+      return ApiResponse.success(
+        res,
+        {
+          avatar: {
+            publicId: result.publicId,
+            url: result.url,
+            size: result.bytes,
+            format: result.format,
+            dimensions: { width: result.width, height: result.height },
+          },
+        },
+        'Upload avatar thành công'
+      );
+    } catch (error) {
+      logger.error('Failed to upload CV builder avatar', {
+        error: error.message,
+        userId: req.user.id,
+      });
+      next(error);
+    }
+  }
+
+  // ========================================
   // HELPER METHODS
   // ========================================
 
@@ -1157,8 +1514,9 @@ class CVBuilderController {
     if (!address) return '';
     if (typeof address === 'string') return address;
 
-    const { street, ward, district, city, country } = address;
-    return [street, ward, district, city, country].filter(Boolean).join(', ');
+    const { street, ward, district, city } = address;
+    // Bỏ country (Vietnam) khỏi chuỗi địa chỉ
+    return [street, ward, district, city].filter(Boolean).join(', ');
   }
 
   formatExperience(experience) {
@@ -1166,30 +1524,71 @@ class CVBuilderController {
 
     const allExp = [];
     ['internships', 'fulltime', 'parttime', 'freelance'].forEach(type => {
-      if (experience[type]) {
+      if (experience[type] && Array.isArray(experience[type])) {
         experience[type].forEach(exp => {
+          // Format date từ Date object sang string "YYYY-MM"
+          const formatDate = (date) => {
+            if (!date) return '';
+            if (date instanceof Date) {
+              const year = date.getFullYear();
+              const month = String(date.getMonth() + 1).padStart(2, '0');
+              return `${year}-${month}`;
+            }
+            if (typeof date === 'string') return date;
+            return String(date);
+          };
+
           allExp.push({
-            ...exp,
+            company: exp.company || '',
+            position: exp.position || '',
+            startDate: formatDate(exp.startDate),
+            endDate: formatDate(exp.endDate),
+            description: exp.description || '',
             type: type.replace('internships', 'internship'),
           });
         });
       }
     });
 
-    return allExp.sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
+    return allExp.sort((a, b) => {
+      const dateA = a.startDate ? new Date(a.startDate) : new Date(0);
+      const dateB = b.startDate ? new Date(b.startDate) : new Date(0);
+      return dateB - dateA; // Sort descending (newest first)
+    });
   }
 
   filterExperienceByType(experiences, type) {
+    if (!experiences || !Array.isArray(experiences)) return [];
+    
+    // Parse date từ string sang Date object
+    const parseDate = (dateStr) => {
+      if (!dateStr || dateStr === '') return null;
+      if (dateStr instanceof Date) return dateStr;
+      // Nếu là string "YYYY-MM" hoặc "YYYY", parse thành Date
+      if (typeof dateStr === 'string') {
+        const dateMatch = dateStr.trim().match(/^(\d{4})(?:-(\d{2}))?/);
+        if (dateMatch) {
+          const year = parseInt(dateMatch[1], 10);
+          const month = dateMatch[2] ? parseInt(dateMatch[2], 10) - 1 : 0; // Month is 0-indexed
+          return new Date(year, month, 1);
+        }
+        // Try to parse as ISO date
+        const parsed = new Date(dateStr);
+        return isNaN(parsed.getTime()) ? null : parsed;
+      }
+      return null;
+    };
+    
     return experiences
       .filter(exp => exp.type === type)
       .map(exp => ({
         _id: exp._id || new mongoose.Types.ObjectId(),
-        company: exp.company,
-        position: exp.position,
-        location: exp.location,
-        startDate: exp.startDate,
-        endDate: exp.endDate,
-        description: exp.description,
+        company: exp.company || '',
+        position: exp.position || '',
+        location: exp.location || null,
+        startDate: parseDate(exp.startDate),
+        endDate: parseDate(exp.endDate),
+        description: exp.description || '',
         achievements: exp.achievements || [],
         skills: exp.skills || [],
         current: exp.current || false,
@@ -1200,11 +1599,101 @@ class CVBuilderController {
     if (!education) return [];
 
     const allEdu = [];
-    if (education.university) {
-      allEdu.push({ ...education.university, type: 'university' });
+
+    // Lấy tất cả education items từ certifications array (nơi lưu nhiều items)
+    if (education.certifications && Array.isArray(education.certifications)) {
+      education.certifications.forEach(edu => {
+        // Chỉ lấy các items có type là education (không phải certification thật)
+        if (
+          edu.type === 'university' ||
+          edu.type === 'highschool' ||
+          !edu.type ||
+          edu.institution
+        ) {
+          // Convert startDate/endDate (Date) hoặc startYear/endYear (Number) hoặc graduationYear (Number) sang string "YYYY"
+          const formatYear = dateOrYear => {
+            if (!dateOrYear) return '';
+            // Nếu là Date object
+            if (dateOrYear instanceof Date) {
+              return String(dateOrYear.getFullYear());
+            }
+            // Nếu là number (year)
+            if (typeof dateOrYear === 'number') {
+              return String(dateOrYear);
+            }
+            // Nếu là string
+            if (typeof dateOrYear === 'string') {
+              const yearMatch = dateOrYear.match(/^(\d{4})/);
+              return yearMatch ? yearMatch[1] : dateOrYear;
+            }
+            return String(dateOrYear);
+          };
+
+          // Ưu tiên lấy từ startDate/endDate, sau đó startYear/endYear, cuối cùng graduationYear
+          const startYear = formatYear(
+            edu.startDate || edu.startYear || edu.graduationYear
+          );
+          const endYear = formatYear(
+            edu.endDate || edu.endYear || edu.graduationYear
+          );
+
+          allEdu.push({
+            institution: edu.institution || '',
+            degree: edu.degree || '',
+            field: edu.field || '',
+            startYear: startYear,
+            endYear: endYear,
+            type: edu.type || 'university',
+            gpa: edu.gpa,
+            achievements: edu.achievements || [],
+            coursework: edu.coursework || [],
+          });
+        }
+      });
     }
-    if (education.highSchool) {
-      allEdu.push({ ...education.highSchool, type: 'highschool' });
+
+    // Fallback: nếu không có trong certifications, lấy từ university và highSchool
+    if (allEdu.length === 0) {
+      if (education.university) {
+        const formatYear = year => {
+          if (!year) return '';
+          if (typeof year === 'number') return String(year);
+          if (typeof year === 'string') {
+            const yearMatch = year.match(/^(\d{4})/);
+            return yearMatch ? yearMatch[1] : year;
+          }
+          return String(year);
+        };
+
+        allEdu.push({
+          institution: education.university.institution || '',
+          degree: education.university.degree || '',
+          field: education.university.field || '',
+          startYear: formatYear(
+            education.university.startYear ||
+              education.university.graduationYear
+          ),
+          endYear: formatYear(
+            education.university.endYear || education.university.graduationYear
+          ),
+          type: 'university',
+          gpa: education.university.gpa,
+          achievements: education.university.achievements || [],
+          coursework: education.university.coursework || [],
+        });
+      }
+      if (education.highSchool) {
+        allEdu.push({
+          institution: education.highSchool.school || '',
+          degree: '',
+          field: '',
+          startYear: '',
+          endYear: education.highSchool.graduationYear || '',
+          type: 'highschool',
+          gpa: education.highSchool.gpa,
+          achievements: education.highSchool.achievements || [],
+        });
+      }
     }
 
     return allEdu;
@@ -1219,15 +1708,87 @@ class CVBuilderController {
   }
 
   formatProjects(projects) {
-    return projects || [];
+    if (!projects || !Array.isArray(projects)) return [];
+    
+    // Format date từ Date object sang string "YYYY-MM"
+    const formatDate = (date) => {
+      if (!date) return '';
+      if (date instanceof Date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        return `${year}-${month}`;
+      }
+      if (typeof date === 'string') return date;
+      return String(date);
+    };
+
+    return projects.map(project => ({
+      title: project.title || '',
+      description: project.description || '',
+      technologies: project.technologies || [],
+      startDate: formatDate(project.startDate),
+      endDate: formatDate(project.endDate),
+      status: project.status || 'completed',
+      url: project.url || null,
+      github: project.github || null,
+      achievements: project.achievements || [],
+    }));
   }
 
   formatCertifications(certifications) {
-    return certifications || [];
+    if (!certifications || !Array.isArray(certifications)) return [];
+    
+    // Format date từ Date object sang string "YYYY-MM-DD" hoặc "YYYY"
+    const formatDate = (date) => {
+      if (!date) return null;
+      if (date instanceof Date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+      if (typeof date === 'string') return date;
+      return String(date);
+    };
+
+    return certifications.map(cert => ({
+      name: cert.name || '',
+      issuer: cert.issuer || '',
+      issueDate: formatDate(cert.issueDate),
+      expiryDate: formatDate(cert.expiryDate),
+      credentialId: cert.credentialId || null,
+      url: cert.url || null,
+      year: cert.issueDate
+        ? String(new Date(cert.issueDate).getFullYear())
+        : cert.year || '',
+    }));
   }
 
   formatAwards(awards) {
-    return awards || [];
+    if (!awards || !Array.isArray(awards)) return [];
+    
+    // Format date từ Date object sang string "YYYY-MM-DD" hoặc "YYYY"
+    const formatDate = (date) => {
+      if (!date) return null;
+      if (date instanceof Date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+      if (typeof date === 'string') return date;
+      return String(date);
+    };
+
+    return awards.map(award => ({
+      title: award.title || '',
+      issuer: award.issuer || '',
+      date: formatDate(award.date),
+      year: award.date
+        ? String(new Date(award.date).getFullYear())
+        : award.year || '',
+      description: award.description || '',
+    }));
   }
 
   formatLanguages(languages) {
@@ -1288,6 +1849,142 @@ class CVBuilderController {
     if (profile.personalInfo?.bio) score += 5;
 
     return Math.round((score / total) * 100);
+  }
+
+  // ========================================
+  // RESUME BUILDER CONTENT UPDATE
+  // ========================================
+
+  /**
+   * PUT /api/candidates/me/cv-builder/resume/:resumeId
+   * Cập nhật nội dung CV builder (ResumeBuilder.content)
+   *
+   * Body gợi ý:
+   * {
+   *   content: { ... },          // dữ liệu CV từ FE builder
+   *   customization?: { ... },   // optional: targetRole, keywords,...
+   *   createVersion?: boolean,   // optional: lưu version trước khi overwrite (default: true)
+   *   status?: "draft"|"completed"
+   * }
+   */
+  async updateResumeBuilder(req, res, next) {
+    try {
+      const { resumeId } = req.params;
+      const {
+        content,
+        customization,
+        createVersion = true,
+        status,
+      } = req.body || {};
+
+      if (!resumeId) {
+        throw new AppError('resumeId is required', 400);
+      }
+
+      if (!content || typeof content !== 'object') {
+        throw new AppError('content object is required', 400);
+      }
+
+      const profile = await CandidateProfile.findOne({ userId: req.user.id });
+      if (!profile) {
+        throw new AppError('Candidate profile not found', 404);
+      }
+
+      const ResumeBuilder = require('../../models/ResumeBuilder');
+
+      const resume = await ResumeBuilder.findOne({
+        _id: resumeId,
+        candidateId: profile._id,
+        status: { $ne: 'archived' },
+      });
+
+      if (!resume) {
+        throw new AppError('ResumeBuilder entry not found', 404);
+      }
+
+      // Lưu version cũ trước khi overwrite (nếu cần)
+      if (createVersion) {
+        resume.versions.push({
+          content: resume.content,
+          createdAt: new Date(),
+          note: 'Auto version before update via builder',
+        });
+      }
+
+      // Cập nhật nội dung chính
+      resume.content = content;
+
+      // Optional: cập nhật customization nhẹ
+      if (customization && typeof customization === 'object') {
+        resume.customization = {
+          ...(resume.customization || {}),
+          ...customization,
+        };
+      }
+
+      // Optional: cập nhật status (chỉ cho phép một số giá trị hợp lệ)
+      if (status && ['draft', 'completed', 'archived'].includes(status)) {
+        resume.status = status;
+      }
+
+      await resume.save();
+
+      return ApiResponse.success(
+        res,
+        {
+          resumeId: resume._id,
+          templateId: resume.templateId,
+          content: resume.content,
+          customization: resume.customization,
+          status: resume.status,
+          updatedAt: resume.updatedAt,
+        },
+        'ResumeBuilder content updated successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/candidates/me/cv-builder/template-map
+   * Trả về map templateId -> resumeId (ResumeBuilder) cho candidate hiện tại
+   */
+  async getTemplateResumeMap(req, res, next) {
+    try {
+      const profile = await CandidateProfile.findOne({
+        userId: req.user.id,
+      }).select('resume.builderTemplates');
+
+      if (!profile) {
+        throw new AppError('Candidate profile not found', 404);
+      }
+
+      const map = {};
+      const builderMap = profile.resume?.builderTemplates;
+
+      if (builderMap) {
+        if (builderMap instanceof Map) {
+          builderMap.forEach((value, key) => {
+            if (value) map[key] = value.toString();
+          });
+        } else {
+          Object.entries(builderMap).forEach(([key, value]) => {
+            if (value) map[key] = value.toString();
+          });
+        }
+      }
+
+      return ApiResponse.success(
+        res,
+        {
+          map,
+        },
+        'Template resume map retrieved successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
   }
 }
 

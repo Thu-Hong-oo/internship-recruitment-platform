@@ -1,25 +1,16 @@
 "use client";
 
-import {
-  MapPin,
-  Filter,
-  Heart,
-  Bookmark,
-  MessageCircle,
-  ChevronRight,
-  X,
-  Search,
-} from "lucide-react";
+import { MapPin, Heart, MessageCircle, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { PageLayout } from "@/components/layout";
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { jobsAPI, JobItem, industriesAPI, Industry, skillsAPI } from "@/lib/api";
-import type { Skill } from "@/lib/api/services/skill.service";
+import { jobsAPI, JobItem } from "@/lib/api";
+import JobFilters, {
+  JobFilters as JobFiltersType,
+} from "@/components/jobs/JobFilters";
 
 export default function JobSearchResults() {
   const router = useRouter();
@@ -31,24 +22,7 @@ export default function JobSearchResults() {
   const [pageSize, setPageSize] = useState(10);
   const [totalJobs, setTotalJobs] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
-
-  // Filter states
-  const [employmentType, setEmploymentType] = useState<string>("");
-  const [experienceLevel, setExperienceLevel] = useState<string>("");
-  const [selectedIndustryCode, setSelectedIndustryCode] = useState<string>("");
-  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [minSalary, setMinSalary] = useState<string>("");
-  const [maxSalary, setMaxSalary] = useState<string>("");
-  const [location, setLocation] = useState<string>("");
-
-  // Skills data
-  const [skills, setSkills] = useState<Skill[]>([]);
-  const [loadingSkills, setLoadingSkills] = useState(false);
-  const [skillSearchQuery, setSkillSearchQuery] = useState("");
-
-  // Industries data
-  const [industries, setIndustries] = useState<Industry[]>([]);
-  const [loadingIndustries, setLoadingIndustries] = useState(false);
+  const [filters, setFilters] = useState<JobFiltersType>({});
 
   // Location options
   const locations = [
@@ -127,116 +101,69 @@ export default function JobSearchResults() {
     { value: "contract", label: "Hợp đồng" },
   ];
 
-  const experienceLevels = [
-    { value: "", label: "Tất cả kinh nghiệm" },
-    { value: "fresh", label: "Mới tốt nghiệp" },
-    { value: "junior", label: "Junior (0-2 năm)" },
-    { value: "mid", label: "Mid (2-5 năm)" },
-    { value: "senior", label: "Senior (5+ năm)" },
-  ];
-
-  // Load filters from URL params
-  useEffect(() => {
-    const get = (k: string) => searchParams?.get(k) || "";
+  // Build filters from URL params (source of truth) -> JobFilters state
+  const buildFiltersFromSearchParams = (): JobFiltersType => {
+    const get = (k: string) => searchParams?.get(k) || undefined;
     const getList = (k: string) => {
       const v = searchParams?.get(k);
-      return v ? v.split(",").map((s) => s.trim()).filter(Boolean) : [];
+      return v
+        ? v
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined;
+    };
+    const getNumber = (k: string) => {
+      const v = get(k);
+      return v ? Number(v) : undefined;
     };
 
-    setEmploymentType(get("employmentType"));
-    setExperienceLevel(get("experienceLevel"));
-    setSelectedIndustryCode(get("industryCode"));
-    setSelectedSkills(getList("skills"));
-    setMinSalary(get("minSalary"));
-    setMaxSalary(get("maxSalary"));
-    const loc = get("location");
-    setLocation(loc || "Tất cả địa điểm");
-  }, [searchParams]);
+    const current: JobFiltersType = {
+      q: get("q"),
+      location: get("location"),
+      city: get("city"),
+      skills: getList("skills"),
+      jobType: get("jobType"),
+      level: get("level"),
+      workingMode: get("workingMode"),
+      industryCode: get("industryCode"),
+      subIndustryCode: get("subIndustryCode"),
+      salaryMin: getNumber("salaryMin"),
+      salaryMax: getNumber("salaryMax"),
+      salaryRange: get("salaryRange"),
+      createdFrom: get("createdFrom"),
+      createdTo: get("createdTo"),
+      deadlineFrom: get("deadlineFrom"),
+      deadlineTo: get("deadlineTo"),
+      isUrgent: get("isUrgent") === "true",
+      sortBy: get("sortBy") || "createdAt",
+      sortOrder: (get("sortOrder") as "asc" | "desc") || "desc",
+    };
 
-  // Fetch industries
-  useEffect(() => {
-    const fetchIndustries = async () => {
-      try {
-        setLoadingIndustries(true);
-        const data = await industriesAPI.getRootIndustries();
-        setIndustries(data);
-      } catch (error) {
-        console.error("Failed to fetch industries:", error);
-        setIndustries([]);
-      } finally {
-        setLoadingIndustries(false);
+    Object.keys(current).forEach((key) => {
+      if (current[key as keyof JobFiltersType] === undefined) {
+        delete current[key as keyof JobFiltersType];
       }
-    };
-    fetchIndustries();
-  }, []);
-
-  // Fetch skills
-  useEffect(() => {
-    const fetchSkills = async () => {
-      try {
-        setLoadingSkills(true);
-        const data = await skillsAPI.getAllSkills();
-        setSkills(data);
-      } catch (error) {
-        console.error("Failed to fetch skills:", error);
-        setSkills([]);
-      } finally {
-        setLoadingSkills(false);
-      }
-    };
-    fetchSkills();
-  }, []);
-
-  // Search skills
-  useEffect(() => {
-    if (!skillSearchQuery.trim()) {
-      return;
-    }
-
-    const timeoutId = setTimeout(async () => {
-      try {
-        setLoadingSkills(true);
-        const data = await skillsAPI.searchSkills(skillSearchQuery.trim());
-        setSkills(data);
-      } catch (error) {
-        console.error("Failed to search skills:", error);
-      } finally {
-        setLoadingSkills(false);
-      }
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [skillSearchQuery]);
-
-  // Build filters from state
-  const buildFilters = () => {
-    const filters: any = {
-      status: "active",
-    };
-
-    const q = searchParams?.get("q");
-    if (q) filters.q = q;
-
-    if (location && location !== "Tất cả địa điểm") {
-      filters.location = location;
-    }
-    if (employmentType) filters.employmentType = employmentType;
-    if (experienceLevel) filters.experienceLevel = experienceLevel;
-    if (selectedIndustryCode) filters.industryCode = selectedIndustryCode;
-    if (selectedSkills.length > 0) filters.skills = selectedSkills;
-    if (minSalary) filters.minSalary = Number(minSalary);
-    if (maxSalary) filters.maxSalary = Number(maxSalary);
-
-    return filters;
+    });
+    return current;
   };
+
+  // Sync filters state from URL
+  useEffect(() => {
+    const urlFilters = buildFiltersFromSearchParams();
+    setFilters(urlFilters);
+  }, [searchParams]);
 
   // Fetch jobs
   const fetchJobs = async (page = currentPage, limit = pageSize) => {
     try {
       setLoading(true);
       setError(null);
-      const filters = buildFilters();
-      const res = await jobsAPI.getJobs(page, limit, filters);
+      const apiFilters = {
+        ...buildFiltersFromSearchParams(),
+        status: "active",
+      };
+      const res = await jobsAPI.getJobs(page, limit, apiFilters);
       if (res.success) {
         setJobs(res.data || []);
         setTotalJobs(res.pagination?.total || 0);
@@ -255,55 +182,42 @@ export default function JobSearchResults() {
   useEffect(() => {
     setCurrentPage(1);
     fetchJobs(1, pageSize);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, employmentType, experienceLevel, selectedIndustryCode, selectedSkills, minSalary, maxSalary, location]);
+  }, [searchParams]);
 
-  // Apply filters - update URL
-  const applyFilters = () => {
-    const params = new URLSearchParams();
-    
-    const q = searchParams?.get("q");
-    if (q) params.set("q", q);
+  const handleFiltersChange = (newFilters: JobFiltersType) => {
+    setFilters(newFilters);
+    const qs = new URLSearchParams();
+    if (newFilters.q) qs.set("q", newFilters.q);
+    if (newFilters.location) qs.set("location", newFilters.location);
+    if (newFilters.city) qs.set("city", newFilters.city);
+    if (newFilters.jobType) qs.set("jobType", newFilters.jobType);
+    if (newFilters.level) qs.set("level", newFilters.level);
+    if (newFilters.workingMode) qs.set("workingMode", newFilters.workingMode);
+    if (newFilters.industryCode)
+      qs.set("industryCode", newFilters.industryCode);
+    if (newFilters.subIndustryCode)
+      qs.set("subIndustryCode", newFilters.subIndustryCode);
+    if (newFilters.skills && newFilters.skills.length > 0)
+      qs.set("skills", newFilters.skills.join(","));
+    if (newFilters.salaryMin) qs.set("salaryMin", String(newFilters.salaryMin));
+    if (newFilters.salaryMax) qs.set("salaryMax", String(newFilters.salaryMax));
+    if (newFilters.salaryRange) qs.set("salaryRange", newFilters.salaryRange);
+    if (newFilters.createdFrom) qs.set("createdFrom", newFilters.createdFrom);
+    if (newFilters.createdTo) qs.set("createdTo", newFilters.createdTo);
+    if (newFilters.deadlineFrom)
+      qs.set("deadlineFrom", newFilters.deadlineFrom);
+    if (newFilters.deadlineTo) qs.set("deadlineTo", newFilters.deadlineTo);
+    if (newFilters.isUrgent) qs.set("isUrgent", "true");
+    if (newFilters.sortBy) qs.set("sortBy", newFilters.sortBy);
+    if (newFilters.sortOrder) qs.set("sortOrder", newFilters.sortOrder);
 
-    if (location && location !== "Tất cả địa điểm") {
-      params.set("location", location);
-    }
-    if (employmentType) params.set("employmentType", employmentType);
-    if (experienceLevel) params.set("experienceLevel", experienceLevel);
-    if (selectedIndustryCode) params.set("industryCode", selectedIndustryCode);
-    if (selectedSkills.length > 0) params.set("skills", selectedSkills.join(","));
-    if (minSalary) params.set("minSalary", minSalary);
-    if (maxSalary) params.set("maxSalary", maxSalary);
-
-    router.push(`/search?${params.toString()}`);
+    const newUrl = qs.toString() ? `/search?${qs.toString()}` : "/search";
+    router.push(newUrl);
   };
 
-  // Reset filters
-  const resetFilters = () => {
-    setEmploymentType("");
-    setExperienceLevel("");
-    setSelectedIndustryCode("");
-    setSelectedSkills([]);
-    setMinSalary("");
-    setMaxSalary("");
-    setLocation("Tất cả địa điểm");
-    setSkillSearchQuery("");
-
-    const params = new URLSearchParams();
-    const q = searchParams?.get("q");
-    if (q) params.set("q", q);
-    router.push(`/search?${params.toString()}`);
-  };
-
-  // Toggle skill selection
-  const toggleSkill = (skillName: string) => {
-    setSelectedSkills((prev) => {
-      if (prev.includes(skillName)) {
-        return prev.filter((s) => s !== skillName);
-      } else {
-        return [...prev, skillName];
-      }
-    });
+  const handleFiltersReset = () => {
+    setFilters({});
+    router.push("/search");
   };
 
   const handlePageChange = (page: number) => {
@@ -351,343 +265,162 @@ export default function JobSearchResults() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Left Sidebar - Filters */}
-          <div className="lg:col-span-1">
-            <Card className="border-border sticky top-4">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-2 mb-6">
-                  <Filter className="w-5 h-5 text-primary" />
-                  <span className="font-semibold text-primary">
-                    Lọc nâng cao
-                  </span>
-                </div>
+        {/* Job Filters */}
+        <div className="mb-6">
+          <JobFilters
+            filters={filters}
+            onChange={handleFiltersChange}
+            onReset={handleFiltersReset}
+          />
+        </div>
 
-                {/* Location Filter */}
-                <div className="mb-6">
-                  <h3 className="font-semibold mb-3 text-foreground">
-                    Địa điểm
-                  </h3>
-                  <select
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                  >
-                    {locations.map((loc) => (
-                      <option key={loc} value={loc === "Tất cả địa điểm" ? "" : loc}>
-                        {loc}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Employment Type */}
-                <div className="mb-6">
-                  <h3 className="font-semibold mb-3 text-foreground">
-                    Loại hình công việc
-                  </h3>
-                  <select
-                    value={employmentType}
-                    onChange={(e) => setEmploymentType(e.target.value)}
-                    className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                  >
-                    {employmentTypes.map((type) => (
-                      <option key={type.value} value={type.value}>
-                        {type.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Experience Level */}
-                <div className="mb-6">
-                  <h3 className="font-semibold mb-3 text-foreground">
-                    Kinh nghiệm
-                  </h3>
-                  <select
-                    value={experienceLevel}
-                    onChange={(e) => setExperienceLevel(e.target.value)}
-                    className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                  >
-                    {experienceLevels.map((level) => (
-                      <option key={level.value} value={level.value}>
-                        {level.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Industry Code */}
-                <div className="mb-6">
-                  <h3 className="font-semibold mb-3 text-foreground">
-                    Ngành nghề
-                  </h3>
-                  {loadingIndustries ? (
-                    <div className="text-sm text-muted-foreground py-2">
-                      Đang tải...
-                    </div>
-                  ) : (
-                    <select
-                      value={selectedIndustryCode}
-                      onChange={(e) => setSelectedIndustryCode(e.target.value)}
-                      className="w-full px-3 py-2 rounded-md border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm"
-                    >
-                      <option value="">Tất cả ngành nghề</option>
-                      {industries.map((industry) => (
-                        <option key={industry.code} value={industry.code}>
-                          {industry.name.vi}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-
-                {/* Salary Range */}
-                <div className="mb-6">
-                  <h3 className="font-semibold mb-3 text-foreground">
-                    Mức lương (VND)
-                  </h3>
-                  <div className="flex gap-2">
-                    <Input
-                      type="number"
-                      placeholder="Từ"
-                      value={minSalary}
-                      onChange={(e) => setMinSalary(e.target.value)}
-                      className="text-sm"
-                    />
-                    <Input
-                      type="number"
-                      placeholder="Đến"
-                      value={maxSalary}
-                      onChange={(e) => setMaxSalary(e.target.value)}
-                      className="text-sm"
-                    />
-                  </div>
-                </div>
-
-                {/* Skills Multi-select */}
-                <div className="mb-6">
-                  <h3 className="font-semibold mb-3 text-foreground">Kỹ năng</h3>
-                  <div className="relative">
-                    <Input
-                      placeholder="Tìm kiếm kỹ năng..."
-                      value={skillSearchQuery}
-                      onChange={(e) => setSkillSearchQuery(e.target.value)}
-                      className="mb-2 text-sm"
-                    />
-                    <div className="max-h-40 overflow-y-auto rounded-md border border-border p-2 bg-background">
-                      {loadingSkills ? (
-                        <div className="text-sm text-muted-foreground py-2">
-                          Đang tải...
-                        </div>
-                      ) : skills.length > 0 ? (
-                        <div className="space-y-1">
-                          {skills.slice(0, 15).map((skill) => (
-                            <label
-                              key={skill._id}
-                              className="flex items-center gap-2 px-2 py-1 rounded hover:bg-muted cursor-pointer"
-                            >
-                              <Checkbox
-                                checked={selectedSkills.includes(skill.name)}
-                                onCheckedChange={() => toggleSkill(skill.name)}
-                              />
-                              <span className="text-sm text-foreground">
-                                {skill.name}
-                              </span>
-                            </label>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-sm text-muted-foreground py-2">
-                          Không tìm thấy kỹ năng
-                        </div>
-                      )}
-                    </div>
-                    {selectedSkills.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {selectedSkills.map((skill) => (
-                          <span
-                            key={skill}
-                            className="inline-flex items-center gap-1 px-2 py-1 bg-primary/20 text-primary rounded-full text-xs"
-                          >
-                            {skill}
-                            <button
-                              onClick={() => toggleSkill(skill)}
-                              className="hover:text-primary/80"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Apply/Reset Buttons */}
-                <div className="flex gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={resetFilters}
-                    className="flex-1"
-                  >
-                    Đặt lại
-                  </Button>
-                  <Button onClick={applyFilters} className="flex-1">
-                    Áp dụng
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Main Content */}
-          <div className="lg:col-span-3">
-            <div className="space-y-4">
-              {loading && (
-                <Card className="border-border">
-                  <CardContent className="p-6 text-sm text-muted-foreground">
-                    Đang tải việc làm...
-                  </CardContent>
-                </Card>
-              )}
-              {error && !loading && (
-                <Card className="border-destructive">
-                  <CardContent className="p-6 text-sm text-destructive">
-                    {error}
-                  </CardContent>
-                </Card>
-              )}
-              {!loading && !error && jobs.length === 0 && (
-                <Card className="border-border">
-                  <CardContent className="p-6 text-sm text-muted-foreground">
-                    Không có việc làm phù hợp.
-                  </CardContent>
-                </Card>
-              )}
-              {!loading &&
-                !error &&
-                jobs.map((job) => {
-                  const companyName = job.companyId?.name || "Nhà tuyển dụng";
-                  const logoUrl = (job.companyId as any)?.logo?.url;
-                  const jobLocation =
-                    (job as any)?.fullLocation ||
-                    (job as any)?.location?.city ||
-                    "Đang cập nhật";
-
-                  // Safe salary extraction
-                  let salary = "Thỏa thuận";
-                  if ((job as any)?.salaryRange) {
-                    salary = (job as any).salaryRange;
-                  } else if ((job as any)?.internship?.salary?.amount) {
-                    const internship = (job as any).internship;
-                    const amount = internship.salary.amount.toLocaleString();
-                    const period = internship.salary.period || "";
-                    salary = `${amount} ${period}`.trim();
-                  }
-                  return (
-                    <Card
-                      key={job.id}
-                      className="card-hover border-border cursor-pointer"
-                      onClick={() => router.push(`/jobs/${job.id}`)}
-                    >
-                      <CardContent className="p-6">
-                        <div className="flex gap-4">
-                          <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center overflow-hidden border flex-shrink-0">
-                            {logoUrl ? (
-                              <img
-                                src={logoUrl}
-                                alt={companyName}
-                                className="w-full h-full object-contain"
-                              />
-                            ) : (
-                              <div className="text-xs text-muted-foreground px-1 text-center">
-                                {companyName.slice(0, 8)}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-start justify-between mb-2">
-                              <h3 className="font-semibold text-lg text-primary hover:text-primary/80 cursor-pointer">
-                                {job.title}
-                              </h3>
-                              <div className="flex items-center gap-2">
-                                <Badge className="bg-primary/10 text-primary border-primary/20">
-                                  {salary}
-                                </Badge>
-                                <Heart className="w-5 h-5 text-muted-foreground cursor-pointer hover:text-destructive transition-colors duration-200" />
-                              </div>
-                            </div>
-                            <p className="text-muted-foreground mb-2 font-medium">
-                              {companyName}
-                            </p>
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                              <div className="flex items-center">
-                                <MapPin className="w-4 h-4 mr-1" />
-                                {jobLocation}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-            </div>
-
-            {/* Pagination */}
-            {!loading && !error && totalPages > 1 && (
-              <div className="mt-8 flex justify-center items-center gap-4">
-                <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <svg
-                    className="w-4 h-4 text-gray-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15 19l-7-7 7-7"
-                    />
-                  </svg>
-                </button>
-
-                <span className="text-sm text-gray-600">
-                  {currentPage} / {totalPages} trang
-                </span>
-
-                <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage >= totalPages}
-                  className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <svg
-                    className="w-4 h-4 text-gray-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                </button>
-              </div>
+        {/* Main Content */}
+        <div>
+          <div className="space-y-4">
+            {loading && (
+              <Card className="border-border">
+                <CardContent className="p-6 text-sm text-muted-foreground">
+                  Đang tải việc làm...
+                </CardContent>
+              </Card>
             )}
+            {error && !loading && (
+              <Card className="border-destructive">
+                <CardContent className="p-6 text-sm text-destructive">
+                  {error}
+                </CardContent>
+              </Card>
+            )}
+            {!loading && !error && jobs.length === 0 && (
+              <Card className="border-border">
+                <CardContent className="p-6 text-sm text-muted-foreground">
+                  Không có việc làm phù hợp.
+                </CardContent>
+              </Card>
+            )}
+            {!loading &&
+              !error &&
+              jobs.map((job) => {
+                const companyName = job.companyId?.name || "Nhà tuyển dụng";
+                const logoUrl = (job.companyId as any)?.logo?.url;
+                const jobLocation =
+                  (job as any)?.fullLocation ||
+                  (job as any)?.location?.city ||
+                  "Đang cập nhật";
+
+                // Safe salary extraction
+                let salary = "Thỏa thuận";
+                if ((job as any)?.salaryRange) {
+                  salary = (job as any).salaryRange;
+                } else if ((job as any)?.internship?.salary?.amount) {
+                  const internship = (job as any).internship;
+                  const amount = internship.salary.amount.toLocaleString();
+                  const period = internship.salary.period || "";
+                  salary = `${amount} ${period}`.trim();
+                }
+                return (
+                  <Card
+                    key={job.id}
+                    className="card-hover border-border cursor-pointer"
+                    onClick={() => router.push(`/jobs/${job.id}`)}
+                  >
+                    <CardContent className="p-6">
+                      <div className="flex gap-4">
+                        <div className="w-16 h-16 rounded-lg bg-muted flex items-center justify-center overflow-hidden border flex-shrink-0">
+                          {logoUrl ? (
+                            <img
+                              src={logoUrl}
+                              alt={companyName}
+                              className="w-full h-full object-contain"
+                            />
+                          ) : (
+                            <div className="text-xs text-muted-foreground px-1 text-center">
+                              {companyName.slice(0, 8)}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-start justify-between mb-2">
+                            <h3 className="font-semibold text-lg text-primary hover:text-primary/80 cursor-pointer">
+                              {job.title}
+                            </h3>
+                            <div className="flex items-center gap-2">
+                              <Badge className="bg-primary/10 text-primary border-primary/20">
+                                {salary}
+                              </Badge>
+                              <Heart className="w-5 h-5 text-muted-foreground cursor-pointer hover:text-destructive transition-colors duration-200" />
+                            </div>
+                          </div>
+                          <p className="text-muted-foreground mb-2 font-medium">
+                            {companyName}
+                          </p>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
+                            <div className="flex items-center">
+                              <MapPin className="w-4 h-4 mr-1" />
+                              {jobLocation}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
           </div>
+
+          {/* Pagination */}
+          {!loading && !error && totalPages > 1 && (
+            <div className="mt-8 flex justify-center items-center gap-4">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg
+                  className="w-4 h-4 text-gray-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
+              </button>
+
+              <span className="text-sm text-gray-600">
+                {currentPage} / {totalPages} trang
+              </span>
+
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage >= totalPages}
+                className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg
+                  className="w-4 h-4 text-gray-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="fixed right-6 bottom-6 flex flex-col gap-3">
+      {/* Floating actions */}
+      {/* <div className="fixed right-6 bottom-6 flex flex-col gap-3">
         <Button className="w-12 h-12 rounded-full button-primary shadow-lg">
           <MessageCircle className="w-5 h-5" />
         </Button>
@@ -697,7 +430,7 @@ export default function JobSearchResults() {
         <Button className="w-12 h-12 rounded-full button-primary shadow-lg">
           <span className="text-xs font-semibold">Hỗ trợ</span>
         </Button>
-      </div>
+      </div> */}
     </PageLayout>
   );
 }

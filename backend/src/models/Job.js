@@ -125,7 +125,9 @@ const JobSchema = new mongoose.Schema({
     needsReanalysis: { type: Boolean, default: false },
   },
 
-  // Soft delete fields
+}, {
+  timestamps: true,
+  // Soft delete fields 
   deletedAt: { type: Date, default: null },
   deletedBy: {
     type: mongoose.Schema.Types.ObjectId,

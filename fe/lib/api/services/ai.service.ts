@@ -94,11 +94,7 @@ export const aiService = {
     const formData = new FormData();
     formData.append("cv", file);
 
-    return apiClient.post("/ai/analyze-cv", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+    return apiClient.post("/ai/analyze-cv", formData);
   },
 
   /**

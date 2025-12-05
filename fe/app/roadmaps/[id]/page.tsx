@@ -95,17 +95,15 @@ export default function RoadmapDetailPage() {
     if (!roadmap) return;
 
     try {
-      const isCompleted = roadmap.progress.completedWeeks >= weekNumber;
       await nlpService.updateRoadmapProgress(roadmapId, {
         weekNumber,
-        completed: !isCompleted,
       });
       
       await fetchRoadmap();
       
       toast({
         title: "Cập nhật tiến độ",
-        description: `Tuần ${weekNumber} đã được đánh dấu là ${!isCompleted ? "hoàn thành" : "chưa hoàn thành"}.`,
+        description: `Tiến độ tuần ${weekNumber} đã được cập nhật.`,
       });
     } catch (error) {
       console.error("Failed to update progress:", error);
@@ -121,14 +119,13 @@ export default function RoadmapDetailPage() {
     try {
       await nlpService.updateRoadmapProgress(roadmapId, {
         resourceId,
-        completed: !completed,
       });
       
       await fetchRoadmap();
       
       toast({
         title: "Cập nhật tài nguyên",
-        description: `Tài nguyên đã được đánh dấu là ${!completed ? "hoàn thành" : "chưa hoàn thành"}.`,
+        description: `Trạng thái tài nguyên đã được cập nhật.`,
       });
     } catch (error) {
       console.error("Failed to update resource:", error);
@@ -155,6 +152,7 @@ export default function RoadmapDetailPage() {
       await nlpService.submitRoadmapFeedback(roadmapId, {
         rating: feedbackRating,
         comment: feedbackComment,
+        isHelpful: feedbackRating >= 4,
       });
       
       await fetchRoadmap();
@@ -275,7 +273,7 @@ export default function RoadmapDetailPage() {
               </div>
               <p className="text-muted-foreground">
                 {roadmap.timeframe} tuần • {roadmap.phases.length} giai đoạn •{" "}
-                {roadmap.phases.reduce((acc, phase) => acc + phase.resources.length, 0)} tài nguyên
+                {roadmap.phases.reduce((acc, phase) => acc + phase.weeks.reduce((wAcc, week) => wAcc + week.resources.length, 0), 0)} tài nguyên
               </p>
             </div>
 
@@ -353,13 +351,10 @@ export default function RoadmapDetailPage() {
               completedResources={roadmap.progress.completedResources}
               currentPhase={roadmap.progress.currentPhase}
               phases={roadmap.phases.map((phase) => ({
-                name: phase.name,
-                status:
-                  phase.phaseNumber < roadmap.progress.currentPhase
-                    ? "completed"
-                    : phase.phaseNumber === roadmap.progress.currentPhase
-                    ? "current"
-                    : "pending",
+                phaseNumber: phase.phaseNumber,
+                title: phase.title,
+                duration: phase.duration,
+                completed: phase.phaseNumber < roadmap.progress.currentPhase,
               }))}
             />
 
@@ -386,99 +381,86 @@ export default function RoadmapDetailPage() {
                           )}
                           <div>
                             <div className="font-semibold">
-                              Giai đoạn {phase.phaseNumber}: {phase.name}
+                              Giai đoạn {phase.phaseNumber}: {phase.title}
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              Tuần {phase.weekRange.start} - {phase.weekRange.end} •{" "}
-                              {phase.resources.length} tài nguyên
+                              {phase.duration} • {phase.weeks.reduce((acc, week) => acc + week.resources.length, 0)} tài nguyên
                             </div>
                           </div>
                         </div>
                       </AccordionTrigger>
                       <AccordionContent>
                         <div className="space-y-4 pt-4">
-                          <p className="text-sm text-muted-foreground">{phase.description}</p>
-
-                          {/* Milestones */}
-                          <div>
-                            <h4 className="text-sm font-semibold mb-2">Mốc quan trọng</h4>
-                            <ul className="space-y-2">
-                              {phase.milestones.map((milestone, idx) => (
-                                <li key={idx} className="flex items-start gap-2 text-sm">
-                                  <Target className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                                  <span>{milestone}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-
-                          {/* Resources */}
-                          <div>
-                            <h4 className="text-sm font-semibold mb-2">Tài nguyên học tập</h4>
-                            <div className="space-y-2">
-                              {phase.resources.map((resource) => (
-                                <div
-                                  key={resource._id}
-                                  className="flex items-center gap-3 p-3 border rounded-lg hover:bg-accent transition-colors"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={resource.completed}
-                                    onChange={() =>
-                                      handleToggleResource(resource._id, resource.completed)
-                                    }
-                                    className="w-4 h-4 rounded"
-                                  />
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-2">
-                                      {getResourceIcon(resource.type)}
-                                      <span className="font-medium text-sm">{resource.title}</span>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                      {resource.description}
-                                    </p>
-                                    {resource.estimatedTime && (
-                                      <p className="text-xs text-muted-foreground mt-1">
-                                        <Clock className="w-3 h-3 inline mr-1" />
-                                        {resource.estimatedTime}
-                                      </p>
-                                    )}
-                                  </div>
-                                  {resource.url && (
-                                    <a
-                                      href={resource.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="text-blue-600 hover:text-blue-700"
-                                    >
-                                      <ExternalLink className="w-4 h-4" />
-                                    </a>
-                                  )}
-                                </div>
-                              ))}
+                          {/* Objectives */}
+                          {phase.objectives && phase.objectives.length > 0 && (
+                            <div>
+                              <h4 className="text-sm font-semibold mb-2">Mục tiêu học tập</h4>
+                              <ul className="space-y-2">
+                                {phase.objectives.map((objective: string, idx: number) => (
+                                  <li key={idx} className="flex items-start gap-2 text-sm">
+                                    <Target className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                                    <span>{objective}</span>
+                                  </li>
+                                ))}
+                              </ul>
                             </div>
-                          </div>
+                          )}
 
-                          {/* Week Tracker */}
+                          {/* Weeks and Resources */}
                           <div>
-                            <h4 className="text-sm font-semibold mb-2">Tiến độ theo tuần</h4>
-                            <div className="flex flex-wrap gap-2">
-                              {Array.from(
-                                { length: phase.weekRange.end - phase.weekRange.start + 1 },
-                                (_, i) => phase.weekRange.start + i
-                              ).map((week) => (
-                                <button
-                                  key={week}
-                                  onClick={() => handleToggleWeek(week)}
-                                  className={`w-10 h-10 rounded-lg border-2 font-semibold text-sm transition-colors ${
-                                    week <= roadmap.progress.completedWeeks
-                                      ? "bg-green-100 border-green-600 text-green-700"
-                                      : "border-gray-300 hover:border-gray-400"
-                                  }`}
-                                >
-                                  {week}
-                                </button>
+                            <h4 className="text-sm font-semibold mb-2">Tài nguyên học tập theo tuần</h4>
+                            <div className="space-y-4">
+                              {phase.weeks.map((week) => (
+                                <div key={week.weekNumber} className="border rounded-lg p-4">
+                                  <div className="font-medium text-sm mb-3">
+                                    Tuần {week.weekNumber}: {week.topic}
+                                  </div>
+                                  <div className="space-y-2">
+                                    {week.resources.map((resource) => (
+                                      <div
+                                        key={resource._id}
+                                        className="flex items-center gap-3 p-3 border rounded-lg hover:bg-accent transition-colors"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={resource.completed || false}
+                                          onChange={() =>
+                                            handleToggleResource(resource._id || "", resource.completed || false)
+                                          }
+                                          className="w-4 h-4 rounded"
+                                        />
+                                        <div className="flex-1">
+                                          <div className="flex items-center gap-2">
+                                            {getResourceIcon(resource.type)}
+                                            <span className="font-medium text-sm">{resource.title}</span>
+                                          </div>
+                                          {resource.provider && (
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                              {resource.provider}
+                                            </p>
+                                          )}
+                                          {resource.duration && (
+                                            <p className="text-xs text-muted-foreground mt-1">
+                                              <Clock className="w-3 h-3 inline mr-1" />
+                                              {resource.duration}
+                                            </p>
+                                          )}
+                                        </div>
+                                        {resource.url && (
+                                          <a
+                                            href={resource.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="text-blue-600 hover:text-blue-700"
+                                          >
+                                            <ExternalLink className="w-4 h-4" />
+                                          </a>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
                               ))}
                             </div>
                           </div>
@@ -547,13 +529,15 @@ export default function RoadmapDetailPage() {
                           {getResourceIcon(resource.type)}
                           <div className="flex-1">
                             <div className="font-medium text-sm">{resource.title}</div>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {resource.description}
-                            </p>
-                            {resource.estimatedTime && (
+                            {resource.provider && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {resource.provider}
+                              </p>
+                            )}
+                            {resource.duration && (
                               <p className="text-xs text-muted-foreground mt-1">
                                 <Clock className="w-3 h-3 inline mr-1" />
-                                {resource.estimatedTime}
+                                {resource.duration}
                               </p>
                             )}
                           </div>
