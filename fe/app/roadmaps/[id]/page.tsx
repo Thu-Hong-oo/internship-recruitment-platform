@@ -44,13 +44,6 @@ import { nlpService } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import type { LearningRoadmap, LearningResource } from "@/lib/api/services/nlp.service";
 
-// Required for static export with dynamic routes
-export async function generateStaticParams() {
-  // Return empty array - pages will be generated on-demand at runtime
-  // This satisfies Next.js static export requirements
-  return [];
-}
-
 export default function RoadmapDetailPage() {
   const params = useParams();
   const router = useRouter();
