@@ -1,6 +1,7 @@
 const { OAuth2Client } = require('google-auth-library');
 const User = require('../../models/User');
 const { logger } = require('../../utils/logger');
+const { USER_ROLES } = require('../../constants/common.constants');
 
 // Initialize Google OAuth client
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -47,9 +48,10 @@ const verifyIdToken = async idToken => {
 /**
  * Process Google authentication (login or register)
  * @param {string} idToken - Google ID token
+ * @param {string} requestedRole - Optional role for new user registration (employer/candidate)
  * @returns {Object} Authentication result
  */
-const processGoogleAuth = async idToken => {
+const processGoogleAuth = async (idToken, requestedRole = null) => {
   try {
     // Verify the Google ID token
     const googleUser = await verifyIdToken(idToken);
@@ -106,13 +108,15 @@ const processGoogleAuth = async idToken => {
     }
 
     // Create new user with Google OAuth
+    // Use requestedRole if provided, otherwise default to CANDIDATE
+    const userRole = requestedRole && Object.values(USER_ROLES).includes(requestedRole)
+      ? requestedRole
+      : USER_ROLES.CANDIDATE;
+
     const newUser = await User.create({
       email: googleUser.email,
-      profile: {
-        firstName: googleUser.firstName,
-        lastName: googleUser.lastName,
-        avatar: googleUser.avatar,
-      },
+      fullName: googleUser.fullName || `${googleUser.firstName || ''} ${googleUser.lastName || ''}`.trim() || googleUser.email.split('@')[0],
+      avatar: googleUser.avatar || 'default-avatar',
       googleId: googleUser.googleId,
       googleEmail: googleUser.email,
       googleProfile: {
@@ -120,7 +124,7 @@ const processGoogleAuth = async idToken => {
         locale: googleUser.locale,
         verified_email: googleUser.emailVerified,
       },
-      role: 'student',
+      role: userRole,
       authMethod: 'google',
       isEmailVerified: true,
     });
