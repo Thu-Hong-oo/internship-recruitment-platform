@@ -496,7 +496,7 @@ const resetPassword = asyncHandler(async (req, res) => {
 // @route   POST /api/auth/login/google
 // @access  Public
 const loginWithGoogle = asyncHandler(async (req, res) => {
-  const { idToken } = req.body;
+  const { idToken, role } = req.body;
 
   if (!idToken) {
     return res
@@ -505,12 +505,38 @@ const loginWithGoogle = asyncHandler(async (req, res) => {
   }
 
   try {
-    const result = await googleAuthService.processGoogleAuth(idToken);
+    // Pass role to processGoogleAuth if provided (for new user registration)
+    const result = await googleAuthService.processGoogleAuth(idToken, role);
+    
+    // Check role mismatch for existing users
+    if (role && result.user.role !== role) {
+      return res.status(403).json({
+        success: false,
+        error: `Tài khoản này có role "${result.user.role}", không thể đăng nhập với role "${role}". Vui lòng đăng nhập tại trang phù hợp.`,
+        errorType: 'ROLE_MISMATCH',
+      });
+    }
+    
+    // Update last login
+    result.user.lastLogin = new Date();
+    await result.user.save({ validateBeforeSave: false });
+    
+    // Generate JWT token
+    const token = result.user.getSignedJwtToken();
+    
     logger.info(`Google OAuth successful: ${result.user.email}`, {
-      userId: result.user.id,
+      userId: result.user._id,
       isNew: result.isNew,
+      role: result.user.role,
     });
-    res.status(200).json(result);
+    
+    res.status(200).json({
+      success: true,
+      token,
+      user: baseUserResponse(result.user),
+      isNew: result.isNew,
+      message: result.message,
+    });
   } catch (error) {
     logger.error('Google OAuth failed', { error: error.message });
     res.status(400).json({
@@ -1206,3 +1232,4 @@ module.exports = {
   getMe, // GET /me
   getUnverifiedAccount, // GET /unverified-account
 };
+

@@ -526,45 +526,56 @@ export default function AppHeader() {
               </div>
             </DropdownMenuContent>
           </DropdownMenu>
-          <DropdownMenu>
-            <DropdownMenuTrigger className="flex items-center focus:outline-none">
-              <Avatar className="w-8 h-8 cursor-pointer">
-                {user?.avatar ? (
-                  <AvatarImage src={user.avatar} alt={user.fullName} />
-                ) : null}
-                <AvatarFallback className="bg-white text-slate-800 text-sm">
-                  {user?.fullName ? user.fullName.charAt(0).toUpperCase() : "U"}
-                </AvatarFallback>
-              </Avatar>
-              <ChevronDown className="w-4 h-4 text-white ml-1" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel className="truncate">
-                {user?.fullName || "Tài khoản"}
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => router.push("/profile")}>
-                Hồ sơ cá nhân
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => router.push("/company")}>
-                Công ty của tôi
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-red-600 focus:text-red-700"
-                onClick={async () => {
-                  const token = getToken();
-                  try {
-                    if (token) await logoutEmployer(token);
-                  } catch {}
-                  clearUserData();
-                  window.location.href = "/";
-                }}
-              >
-                Đăng xuất
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {user && getToken() ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger className="flex items-center focus:outline-none">
+                <Avatar className="w-8 h-8 cursor-pointer">
+                  {user?.avatar ? (
+                    <AvatarImage src={user.avatar} alt={user.fullName} />
+                  ) : null}
+                  <AvatarFallback className="bg-white text-slate-800 text-sm">
+                    {user?.fullName ? user.fullName.charAt(0).toUpperCase() : "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <ChevronDown className="w-4 h-4 text-white ml-1" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="truncate">
+                  {user?.fullName || "Tài khoản"}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => router.push("/profile")}>
+                  Hồ sơ cá nhân
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => router.push("/company")}>
+                  Công ty của tôi
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-red-600 focus:text-red-700"
+                  onClick={async () => {
+                    const token = getToken();
+                    try {
+                      if (token) await logoutEmployer(token);
+                    } catch {}
+                    clearUserData();
+                    window.location.href = "/";
+                  }}
+                >
+                  Đăng xuất
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white hover:text-primary"
+              onClick={() => router.push("/")}
+            >
+              Đăng nhập
+            </Button>
+          )}
         </div>
       </div>
     </header>
