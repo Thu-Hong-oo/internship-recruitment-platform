@@ -34,11 +34,20 @@ class PhoBERTService {
       return [];
     }
 
+    // Truncate text aggressively to avoid timeout
+    const maxLength = 300; // characters - minimal for fast processing
+    const truncatedText = text.substring(0, maxLength);
+
     return new Promise((resolve, reject) => {
-      const pythonProcess = spawn('python', [this.pythonScript, text]);
+      // Pass text via stdin instead of command line argument
+      const pythonProcess = spawn('python', [this.pythonScript]);
 
       let stdout = '';
       let stderr = '';
+
+      // Write text to stdin
+      pythonProcess.stdin.write(truncatedText);
+      pythonProcess.stdin.end();
 
       pythonProcess.stdout.on('data', (data) => {
         stdout += data.toString();
@@ -76,12 +85,17 @@ class PhoBERTService {
         resolve([]);
       });
 
-      // Timeout after 30 seconds
-      setTimeout(() => {
-        pythonProcess.kill();
-        logger.error('PhoBERT inference timeout');
+      // Optimized timeout: 10 seconds max (allow model loading time)
+      const timeoutId = setTimeout(() => {
+        pythonProcess.kill('SIGKILL'); // Force kill immediately
+        logger.warn('⏱️ PhoBERT inference timeout (10s)');
         resolve([]);
-      }, 30000);
+      }, 10000);
+      
+      // Clear timeout if process completes
+      pythonProcess.on('close', () => {
+        clearTimeout(timeoutId);
+      });
     });
   }
 

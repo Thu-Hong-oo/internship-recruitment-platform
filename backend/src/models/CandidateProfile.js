@@ -54,7 +54,6 @@ const CandidateProfileSchema = new mongoose.Schema(
       website: String,
       linkedin: String,
       github: String,
-      jobTitle: String,
     },
 
     // Target job information for CV optimization
@@ -180,48 +179,6 @@ const CandidateProfileSchema = new mongoose.Schema(
           ],
         },
       ],
-      fulltime: [
-        {
-          _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
-          company: String,
-          position: String,
-          location: String,
-          startDate: Date,
-          endDate: Date,
-          description: String,
-          achievements: [String],
-          skills: [String],
-          current: { type: Boolean, default: false },
-        },
-      ],
-      parttime: [
-        {
-          _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
-          company: String,
-          position: String,
-          location: String,
-          startDate: Date,
-          endDate: Date,
-          description: String,
-          achievements: [String],
-          skills: [String],
-          current: { type: Boolean, default: false },
-        },
-      ],
-      freelance: [
-        {
-          _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
-          company: String,
-          position: String,
-          location: String,
-          startDate: Date,
-          endDate: Date,
-          description: String,
-          achievements: [String],
-          skills: [String],
-          current: { type: Boolean, default: false },
-        },
-      ],
       projects: [
         {
           _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
@@ -236,60 +193,6 @@ const CandidateProfileSchema = new mongoose.Schema(
         },
       ],
     },
-
-    // Projects (top level, separate from experience.projects)
-    projects: [
-      {
-        _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
-        title: String,
-        description: String,
-        technologies: [String],
-        startDate: Date,
-        endDate: Date,
-        status: String,
-        url: String,
-        github: String,
-        achievements: [String],
-      },
-    ],
-
-    // Certifications (top level, separate from education.certifications)
-    certifications: [
-      {
-        _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
-        name: String,
-        issuer: String,
-        issueDate: Date,
-        expiryDate: Date,
-        credentialId: String,
-        url: String,
-      },
-    ],
-
-    // Awards
-    awards: [
-      {
-        _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
-        title: String,
-        issuer: String,
-        date: Date,
-        description: String,
-      },
-    ],
-
-    // Hobbies
-    hobbies: [String],
-
-    // References
-    references: [
-      {
-        _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
-        name: String,
-        position: String,
-        company: String,
-        contact: String,
-      },
-    ],
 
     preferences: {
       locations: [String],

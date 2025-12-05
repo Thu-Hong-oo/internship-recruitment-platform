@@ -36,7 +36,37 @@ bower_components
 
 # node-waf configuration
 .lock-wscript
+# === AI MODELS & LARGE FILES - BẮT BUỘC PHẢI CÓ ===
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.onnx
+*.pickle
+*.h5
 
+# Thư mục model cụ thể của bạn
+backend/models/
+backend/model/
+models/
+model/
+
+# File cụ thể đang làm repo béo nhất
+backend/models/multilingual-ner/
+
+# Các file lớn khác không nên commit
+*.rar
+*.zip
+public/*.rar
+public/*.png
+public/*.jpg
+public/*.jpeg
+public/*.gif
+
+# Cache & lock (nếu muốn repo sạch hơn nữa)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
 # Compiled binary addons
 build/Release
 

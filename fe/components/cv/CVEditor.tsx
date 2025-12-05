@@ -139,12 +139,12 @@ export default function CVEditor({
           name: skill.name || skill || "",
           level: skill.level || "intermediate",
         })),
-        languages: cvData.languages.map((lang) => ({
+        languages: (cvData.languages || []).map((lang) => ({
           language: lang.name || "",
           level: lang.level || "",
         })),
       },
-      projects: cvData.projects.map((proj) => ({
+      projects: (cvData.projects || []).map((proj) => ({
         title: proj.title || "",
         description: proj.description || "",
         technologies: (proj as any).technologies || [],
@@ -154,7 +154,7 @@ export default function CVEditor({
         url: (proj as any).url || null,
         github: (proj as any).github || null,
       })),
-      certifications: cvData.certifications.map((cert) => ({
+      certifications: (cvData.certifications || []).map((cert) => ({
         name: cert.name || "",
         issuer: cert.issuer || "",
         issueDate: cert.year || "",

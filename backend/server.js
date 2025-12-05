@@ -117,6 +117,9 @@ async function connectDB() {
     await mongoose.connect(mongoUri);
 
     logger.info('Database Connected Successfully');
+    
+    // Pre-warm PhoBERT model disabled (using fallback fuzzy matching instead)
+    // PhoBERT timeout issues resolved by disabling - enhanced fuzzy matching is sufficient
   } catch (error) {
     logger.error('Database connection error:', error.message);
 

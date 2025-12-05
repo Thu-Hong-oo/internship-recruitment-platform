@@ -123,8 +123,11 @@ class AIController {
         );
       }
 
-      // Analyze CV content
-      const analysis = await aiService.analyzeCV(extractedText);
+      // Analyze CV content using self-sufficient AI
+      const { getSelfSufficientAIService } = require('../services/ai/selfSufficientAIService');
+      const selfSufficientAI = getSelfSufficientAIService();
+      const analysis = await selfSufficientAI.analyzeCV(extractedText);
+      logger.info('🔬 CV analyzed (self-sufficient mode)');
 
       // Update user profile with extracted information
       const updateData = {
@@ -202,7 +205,10 @@ class AIController {
         return ApiResponse.error(res, 'Missing or invalid rawCVText', 400);
       }
 
-      const analysis = await aiService.analyzeCV(rawCVText);
+      const { getSelfSufficientAIService } = require('../services/ai/selfSufficientAIService');
+      const selfSufficientAI = getSelfSufficientAIService();
+      const analysis = await selfSufficientAI.analyzeCV(rawCVText);
+      logger.info('🔬 CV analyzed from text (self-sufficient mode)');
 
       let profile = await CandidateProfile.findOne({ userId: req.user.id });
       if (!profile) {
@@ -460,7 +466,10 @@ class AIController {
         );
       }
 
-      const analysis = await aiService.analyzeJobPosting(job);
+      const { getSelfSufficientAIService } = require('../services/ai/selfSufficientAIService');
+      const selfSufficientAI = getSelfSufficientAIService();
+      const analysis = await selfSufficientAI.analyzeJobPosting(job);
+      logger.info('📝 Job posting analyzed (self-sufficient mode)');
 
       if (jobId && job._id) {
         job.aiAnalysis = {
@@ -503,12 +512,14 @@ class AIController {
         return ApiResponse.error(res, 'Profile not found', 404);
       }
 
-      const analysis = await aiService.analyzeJobDescription(
+      const { getSelfSufficientAIService } = require('../services/ai/selfSufficientAIService');
+      const selfSufficientAI = getSelfSufficientAIService();
+      const analysis = await selfSufficientAI.analyzeJobDescription(
         jobDescription,
         targetJob,
-        profile,
         companyInfo
       );
+      logger.info('🔬 Job description analyzed (self-sufficient mode)');
 
       return ApiResponse.success(
         res,
@@ -565,7 +576,10 @@ class AIController {
         }
       }
 
-      const analysis = await aiService.analyzeJobMatch(cvData, jobData);
+      const { getSelfSufficientAIService } = require('../services/ai/selfSufficientAIService');
+      const selfSufficientAI = getSelfSufficientAIService();
+      const analysis = await selfSufficientAI.analyzeJobMatch(cvData, jobData);
+      logger.info('🎯 Job match analyzed (self-sufficient mode)');
 
       return ApiResponse.success(
         res, 
@@ -745,6 +759,8 @@ class AIController {
   /**
    * POST /api/ai/skill-gap-analysis
    * Phân tích khoảng cách kỹ năng
+   * 
+   * ✅ SELF-SUFFICIENT: Uses PhoBERT + Sentence-BERT (NO Gemini)
    */
   async getSkillGapAnalysis(req, res, next) {
     try {
@@ -777,13 +793,17 @@ class AIController {
         }
       }
 
-      logger.info('Analyzing skill gaps', {
+      logger.info('🔬 Analyzing skill gaps (self-sufficient mode)', {
         userId: req.user.id,
         jobTitle: jobData.title,
         hasSkills: !!cvData.skills,
       });
 
-      const skillGapAnalysis = await aiService.analyzeSkillGaps(
+      // ✅ Use self-sufficient AI service (PhoBERT + Sentence-BERT)
+      const { getSelfSufficientAIService } = require('../services/ai/selfSufficientAIService');
+      const selfSufficientAI = getSelfSufficientAIService();
+      
+      const skillGapAnalysis = await selfSufficientAI.analyzeSkillGaps(
         cvData,
         jobData
       );
@@ -851,19 +871,24 @@ class AIController {
 
       // Case 1: Generate from target role/skills (legacy)
       if (targetRole || targetSkills) {
-        roadmap = await aiService.generateSkillRoadmap({
+        const { getSelfSufficientAIService } = require('../services/ai/selfSufficientAIService');
+        const selfSufficientAI = getSelfSufficientAIService();
+        roadmap = await selfSufficientAI.generateSkillRoadmap({
           user,
           targetRole,
           targetSkills,
           timeframe: parseInt(timeframe),
           currentLevel,
         });
+        logger.info('🗺️ Skill roadmap generated (self-sufficient mode - deprecated)');
       }
       // Case 2: Generate from job description và skill gaps (advanced)
       else if (targetJobTitle || targetJobDescription) {
         const cvData = this.extractCVData(profile);
 
-        roadmap = await aiService.generateLearningRoadmap({
+        const { getSelfSufficientAIService } = require('../services/ai/selfSufficientAIService');
+        const selfSufficientAI = getSelfSufficientAIService();
+        roadmap = await selfSufficientAI.generateLearningRoadmap({
           currentSkills: cvData.skills,
           targetJob: {
             title: targetJobTitle,
@@ -873,6 +898,7 @@ class AIController {
           timeframe: timeframe ? `${timeframe} weeks` : '12 weeks',
           preferences: learningPreferences || {},
         });
+        logger.info('📚 Learning roadmap generated (self-sufficient mode - deprecated)');
 
         // Save roadmap to profile
         if (profile) {
@@ -925,25 +951,33 @@ class AIController {
 
       switch (stepType) {
         case 'targetJob':
-          suggestions = await aiService.getJobSuggestions(currentData.title);
+          const { getSelfSufficientAIService } = require('../services/ai/selfSufficientAIService');
+          const selfSufficientAI = getSelfSufficientAIService();
+          suggestions = await selfSufficientAI.getJobSuggestions(currentData.title);
           break;
 
         case 'careerObjective':
-          suggestions = await aiService.generateCareerObjective(
+          const { getSelfSufficientAIService: getSelfSufficientAIService2 } = require('../services/ai/selfSufficientAIService');
+          const selfSufficientAI2 = getSelfSufficientAIService2();
+          suggestions = await selfSufficientAI2.generateCareerObjective(
             currentData,
             context
           );
           break;
 
         case 'skills':
-          suggestions = await aiService.suggestSkills(
+          const { getSelfSufficientAIService: getSelfSufficientAIService3 } = require('../services/ai/selfSufficientAIService');
+          const selfSufficientAI3 = getSelfSufficientAIService3();
+          suggestions = await selfSufficientAI3.suggestSkills(
             context.targetJob,
             context.experience
           );
           break;
 
         case 'experience':
-          suggestions = await aiService.enhanceExperienceDescription(
+          const { getSelfSufficientAIService: getSelfSufficientAIService4 } = require('../services/ai/selfSufficientAIService');
+          const selfSufficientAI4 = getSelfSufficientAIService4();
+          suggestions = await selfSufficientAI4.enhanceExperienceDescription(
             currentData
           );
           break;

@@ -39,7 +39,7 @@ const normalizeContentToCVData = (
           : personalInfo.address?.street || "",
       summary: content?.summary || personalInfo.bio || "",
       avatar: personalInfo.avatar || undefined,
-      jobTitle: personalInfo.jobTitle || "",
+      // jobTitle: personalInfo.jobTitle || "",
     },
     experience: (content?.experience || []).map((exp: any) => ({
       company: exp.company || "",

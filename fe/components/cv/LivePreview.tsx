@@ -2,7 +2,6 @@ import { useMemo, useRef } from "react";
 import { templateLayouts } from "../../lib/mocks/templateLayouts";
 import type { CVData } from "../../lib/mocks/cvSamples";
 import Template1Renderer from "./renderers/Template1";
-import Template2Renderer from "./renderers/Template2";
 import TemplateMinimalRenderer from "./renderers/TemplateMinimal";
 
 type LayoutType = {
@@ -60,7 +59,7 @@ export default function LivePreview({
   // Ưu tiên dùng layout từ props, fallback về templateLayouts
   const layout = useMemo(() => {
     if (layoutProp) return layoutProp;
-    return templateLayouts[data.templateId];
+    return templateLayouts[data.templateId] as LayoutType;
   }, [data.templateId, layoutProp]);
   
   // Map rõ ràng: "modern" → Template1Renderer, "minimal" → TemplateMinimalRenderer
@@ -112,11 +111,14 @@ export default function LivePreview({
 
   // Local buffer for inline text while editing, to avoid React-controlled rerenders
   const bufferRef = useRef<Map<string, string>>(new Map());
+  const pageBgColor = "backgroundColor" in layout.page && layout.page.backgroundColor 
+    ? layout.page.backgroundColor 
+    : "#fff";
   const pageStyle = {
     width: layout.page.width,
     height: layout.page.height,
     position: "relative" as const,
-    background: layout.page.backgroundColor || "#fff",
+    background: pageBgColor,
     boxShadow: "0 0 0 1px rgba(0,0,0,0.05), 0 10px 30px rgba(0,0,0,0.08)",
     margin: "0 auto",
     fontFamily: layout.fonts.body,

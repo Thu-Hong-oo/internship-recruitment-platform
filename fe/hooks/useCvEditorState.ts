@@ -41,17 +41,17 @@ export function useCvEditorState(initial: CVData) {
   }, []);
 
   // Add item to a section array
-  const addItem = useCallback((section: keyof CVData, index?: number) => {
+  const addItem = useCallback((section: keyof CVData | string, index?: number) => {
     setCvData((prev) => {
       const clone: any = structuredClone ? structuredClone(prev) : JSON.parse(JSON.stringify(prev));
       let array = clone[section] as any[];
       
       // Handle special sections that might not exist yet
       if (!array) {
-        if (section === 'references' || (section as string) === 'references') {
+        if (section === 'references') {
           clone.references = [];
           array = clone.references;
-        } else if (section === 'awards' || (section as string) === 'awards') {
+        } else if (section === 'awards') {
           clone.awards = [];
           array = clone.awards;
         } else {
@@ -79,9 +79,9 @@ export function useCvEditorState(initial: CVData) {
         newItem = { label: '', url: '' };
       } else if (section === 'languages') {
         newItem = { name: '', level: '', rating: 0 };
-      } else if (section === 'references' || (section as string) === 'references') {
+      } else if (section === 'references') {
         newItem = { name: '', position: '', contact: '' };
-      } else if (section === 'awards' || (section as string) === 'awards') {
+      } else if (section === 'awards') {
         newItem = { title: '', issuer: '', year: '', description: '' };
       }
       
@@ -98,7 +98,7 @@ export function useCvEditorState(initial: CVData) {
   }, []);
 
   // Delete item from a section array
-  const deleteItem = useCallback((section: keyof CVData, index: number) => {
+  const deleteItem = useCallback((section: keyof CVData | string, index: number) => {
     setCvData((prev) => {
       const clone: any = structuredClone ? structuredClone(prev) : JSON.parse(JSON.stringify(prev));
       const array = clone[section] as any[];
@@ -112,7 +112,7 @@ export function useCvEditorState(initial: CVData) {
   }, []);
 
   // Duplicate item in a section array
-  const duplicateItem = useCallback((section: keyof CVData, index: number) => {
+  const duplicateItem = useCallback((section: keyof CVData | string, index: number) => {
     setCvData((prev) => {
       const clone: any = structuredClone ? structuredClone(prev) : JSON.parse(JSON.stringify(prev));
       const array = clone[section] as any[];
@@ -127,7 +127,7 @@ export function useCvEditorState(initial: CVData) {
   }, []);
 
   // Move item up in a section array
-  const moveItemUp = useCallback((section: keyof CVData, index: number) => {
+  const moveItemUp = useCallback((section: keyof CVData | string, index: number) => {
     setCvData((prev) => {
       const clone: any = structuredClone ? structuredClone(prev) : JSON.parse(JSON.stringify(prev));
       const array = clone[section] as any[];
@@ -142,7 +142,7 @@ export function useCvEditorState(initial: CVData) {
   }, []);
 
   // Move item down in a section array
-  const moveItemDown = useCallback((section: keyof CVData, index: number) => {
+  const moveItemDown = useCallback((section: keyof CVData | string, index: number) => {
     setCvData((prev) => {
       const clone: any = structuredClone ? structuredClone(prev) : JSON.parse(JSON.stringify(prev));
       const array = clone[section] as any[];

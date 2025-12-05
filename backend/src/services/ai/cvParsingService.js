@@ -77,32 +77,74 @@ class CVParsingService {
             console.log(`✅ Using full text (${text.length} characters)`);
           }
           
-          // TỐI ƯU: Prompt với hướng dẫn xử lý encoding issues
-          const prompt = `Trích xuất CV thành JSON. QUAN TRỌNG: Loại bỏ các ký tự "Đỗ", "Ngô", "Đặng" xen kẽ (lỗi encoding PDF).
+          // CRITICAL: Clean text trước khi gửi cho Gemini (loại bỏ corruption)
+          const textForGemini = this.cleanExtractedText(truncatedText);
+          
+          // SEMANTIC AI PARSING: Hiểu ngữ nghĩa, không dựa vào format cứng nhắc
+          const prompt = `Bạn là chuyên gia phân tích CV. Hãy HIỂU NGỮ NGHĨA và trích xuất thông tin từ CV, bất kể format hay encoding.
 
-CV: ${truncatedText}
+**NGUYÊN TẮC QUAN TRỌNG:**
+1. ĐỌC HIỂU ngữ nghĩa, KHÔNG dựa vào vị trí hay format
+2. Tên người: Chỉ lấy họ tên thật (2-5 từ), BỎ QUA chức danh/công việc
+3. Học vấn: Tên trường + ngành học, BỎ QUA mô tả dài dòng
+4. Kinh nghiệm: Vị trí + công ty + thời gian, BỎ QUA mục tiêu nghề nghiệp
+5. Kỹ năng: CHỈ kỹ năng kỹ thuật/công cụ (Java, Excel, Giao tiếp...), BỎ QUA câu mô tả
+6. Ngày tháng: Chuẩn hóa về DD/MM/YYYY
+7. Text đã được làm sạch encoding errors
 
-HƯỚNG DẪN:
-- Loại bỏ "Đỗ", "Ngô", "Đặng" đứng giữa các từ (ví dụ: "TrịnhĐỗHà" → "Trịnh Hà")
-- Giữ nguyên "Đỗ", "Ngô", "Đặng" nếu là tên riêng (ví dụ: "Đỗ Văn A", "Ngô Thị B")
-- Làm sạch text trước khi trích xuất
+**CV CẦN PHÂN TÍCH:**
+${textForGemini}
 
-JSON:
+**OUTPUT JSON (THUẦN TÚY, KHÔNG MARKDOWN):**
 {
   "extractedData": {
-    "personalInfo": {"fullName": "", "email": "", "phone": "", "address": "", "dateOfBirth": ""},
-    "education": {"type": "university", "institution": "", "degree": "", "field": "", "graduationYear": null, "gpa": null, "gradeText": ""},
-    "experience": [{"type": "", "company": "", "position": "", "location": "", "startDate": "", "endDate": "", "description": ""}],
-    "skills": [{"name": "", "type": "technical|soft|language", "level": ""}],
-    "certificates": [{"name": "", "issuer": "", "year": null, "description": ""}],
-    "awards": [{"name": "", "year": null, "description": ""}],
-    "activities": []
+    "personalInfo": {
+      "fullName": "[Chỉ họ tên - VD: Nguyễn Văn A]",
+      "email": "[Email nếu có]",
+      "phone": "[Số điện thoại]",
+      "address": "[Địa chỉ ngắn gọn]",
+      "dateOfBirth": "[DD/MM/YYYY hoặc null]"
+    },
+    "education": {
+      "type": "university|college|highschool",
+      "institution": "[Tên trường - ngắn gọn]",
+      "degree": "[Bằng cấp]",
+      "field": "[Ngành học]",
+      "graduationYear": [Năm tốt nghiệp - số hoặc null],
+      "gpa": [GPA - số hoặc null],
+      "gradeText": "[Xếp loại: Giỏi/Khá... hoặc null]"
+    },
+    "experience": [
+      {
+        "type": "fulltime|parttime|internship|freelance",
+        "company": "[Tên công ty]",
+        "position": "[Vị trí]",
+        "location": "[Địa điểm]",
+        "startDate": "[MM/YYYY]",
+        "endDate": "[MM/YYYY hoặc 'present']",
+        "description": "[Mô tả ngắn gọn]"
+      }
+    ],
+    "skills": [
+      {"name": "[Tên kỹ năng]", "type": "technical|soft|language", "level": "beginner|intermediate|advanced"}
+    ],
+    "certificates": [
+      {"name": "[Tên chứng chỉ]", "issuer": "[Tổ chức cấp]", "year": [Năm], "description": "[Mô tả]"}
+    ],
+    "awards": [
+      {"name": "[Tên giải thưởng]", "year": [Năm], "description": "[Mô tả]"}
+    ]
   },
-  "skills": [],
-  "suggestions": []
+  "skills": ["[Danh sách tên kỹ năng]"],
+  "suggestions": ["[3 gợi ý cải thiện CV]"]
 }
 
-Lưu ý: JSON thuần túy, không markdown. Trích xuất chính xác, giữ dấu tiếng Việt, null nếu không có. LOẠI BỎ các ký tự "Đỗ", "Ngô", "Đặng" xen kẽ.
+**LƯU Ý:**
+- HIỂU NGỮ NGHĨA, không theo format cứng nhắc
+- Tên người: TỐI ĐA 5 từ, bỏ chức danh
+- Học vấn: Ngắn gọn, bỏ mô tả dài
+- JSON thuần túy, null nếu không tìm thấy
+- Giữ dấu tiếng Việt chính xác
 `;
 
           // Double-check API key before calling API
@@ -344,29 +386,75 @@ Lưu ý: JSON thuần túy, không markdown. Trích xuất chính xác, giữ d�
    * Clean extracted text - fix Vietnamese encoding and formatting
    */
   cleanExtractedText(text) {
-    // TỐI ƯU: Xử lý toàn diện các ký tự "Đỗ", "Ngô", "Đặng" xen kẽ (PDF encoding issue)
-    const vietnameseChars = 'a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđA-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ';
+    // DEBUG: Log text BEFORE cleaning
+    const originalPreview = text.substring(0, 100);
+    console.log('🧹 BEFORE clean:', originalPreview);
     
-    // Step 1: Loại bỏ "Đỗ", "Ngô", "Đặng" đứng đơn lẻ
-    text = text.replace(new RegExp(`([${vietnameseChars}])Đỗ(?=[${vietnameseChars}])`, 'g'), '$1 ');
-    text = text.replace(new RegExp(`([${vietnameseChars}])Ngô(?=[${vietnameseChars}])`, 'g'), '$1 ');
-    text = text.replace(new RegExp(`([${vietnameseChars}])Đặng(?=[${vietnameseChars}])`, 'g'), '$1 ');
+    // CRITICAL: Remove replacement characters (�) and corrupt encoding
+    text = text.replace(/�/g, ' ');
+    text = text.replace(/\uFFFD/g, ' ');
     
-    // Step 2: Xử lý text dính liền
-    text = text.replace(new RegExp(`([${vietnameseChars.toLowerCase()}])Đỗ([${vietnameseChars.toUpperCase()}])`, 'g'), '$1 $2');
-    text = text.replace(new RegExp(`([${vietnameseChars.toLowerCase()}])Ngô([${vietnameseChars.toUpperCase()}])`, 'g'), '$1 $2');
+    // Remove bullet points that cause parsing issues
+    text = text.replace(/•/g, ' ');
+    text = text.replace(/[\u2022\u2023\u25E6\u2043\u2219]/g, ' ');
+
+    // EXTRA: Remove 'Đỗ' xen kẽ bất thường (không phải họ tên thật)
+    // Chỉ giữ 'Đỗ' nếu nó đứng đầu dòng hoặc sau dấu xuống dòng (tức là họ thật)
+    text = text.replace(/(?<!^|\n)\s*Đỗ\s*/g, ' ');
+    // Nếu vẫn còn nhiều 'Đỗ' liền nhau, chỉ giữ 1
+    text = text.replace(/(Đỗ\s+){2,}/g, 'Đỗ ');
     
-    // Step 3: Loại bỏ "Đỗ", "Ngô" đứng đầu dòng
-    text = text.replace(/^Đỗ(?=[a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])/gm, '');
-    text = text.replace(/^Ngô(?=[a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])/gm, '');
+    // STEP 1: Add spaces around "Đỗ", "Ngô", "Đặng" stuck to letters (CRITICAL FOR PDF CORRUPTION)
+    // Example: "NguyễnĐỗThịĐỗThu" → "Nguyễn Đỗ Thị Đỗ Thu"
+    // Pattern: Match ANY letter (Latin or Vietnamese, upper or lower) + "Đỗ"
+    text = text.replace(/([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])Đỗ/g, '$1 Đỗ ');
+    text = text.replace(/Đỗ([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, ' Đỗ $1');
+    text = text.replace(/([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])Ngô/g, '$1 Ngô ');
+    text = text.replace(/Ngô([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, ' Ngô $1');
+    text = text.replace(/([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])Đặng/g, '$1 Đặng ');
+    text = text.replace(/Đặng([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, ' Đặng $1');
     
-    // Step 4: Xử lý "Đỗ", "Ngô" giữa số và chữ
-    text = text.replace(/(\d)Đỗ([a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđA-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '$1 $2');
-    text = text.replace(/(\d)Ngô([a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđA-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '$1 $2');
-    text = text.replace(/([a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđA-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])Đỗ(\d)/g, '$1 $2');
-    text = text.replace(/([a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđA-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])Ngô(\d)/g, '$1 $2');
+    // STEP 1.5: Add spaces around "Đỗ", "Ngô", "Đặng" stuck to NUMBERS (e.g., "Đỗ0397970553Đỗ")
+    text = text.replace(/(\d)Đỗ/g, '$1 Đỗ ');
+    text = text.replace(/Đỗ(\d)/g, ' Đỗ $1');
+    text = text.replace(/(\d)Ngô/g, '$1 Ngô ');
+    text = text.replace(/Ngô(\d)/g, ' Ngô $1');
+    text = text.replace(/(\d)Đặng/g, '$1 Đặng ');
+    text = text.replace(/Đặng(\d)/g, ' Đặng $1');
     
-    // Insert spaces between Vietnamese words
+    // DEBUG: Log AFTER adding spaces
+    const afterSpaces = text.substring(0, 100);
+    console.log('🧹 AFTER add spaces:', afterSpaces);
+    
+    // STEP 2: SUPER AGGRESSIVE - Remove ALL "Đỗ", "Ngô", "Đặng" that are NOT part of real names
+    // Now that we have spaces, we can safely remove them
+    for (let i = 0; i < 10; i++) {
+      // Remove "Đỗ Đỗ Đỗ" patterns (multiple consecutive)
+      text = text.replace(/\s+Đỗ\s+Đỗ/g, ' ');
+      text = text.replace(/\s+Ngô\s+Ngô/g, ' ');
+      text = text.replace(/\s+Đặng\s+Đặng/g, ' ');
+      
+      // Remove single "Đỗ", "Ngô", "Đặng" between capital letters (name context)
+      text = text.replace(/([A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ][a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ]*)\s+Đỗ\s+([A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '$1 $2');
+      text = text.replace(/([A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ][a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ]*)\s+Ngô\s+([A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '$1 $2');
+      text = text.replace(/([A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ][a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ]*)\s+Đặng\s+([A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '$1 $2');
+      
+      // Remove at start of line
+      text = text.replace(/^Đỗ\s+/gm, '');
+      text = text.replace(/^Ngô\s+/gm, '');
+      text = text.replace(/^Đặng\s+/gm, '');
+      
+      // Remove after space at word boundaries
+      text = text.replace(/\s+Đỗ\s+/g, ' ');
+      text = text.replace(/\s+Ngô\s+/g, ' ');
+      text = text.replace(/\s+Đặng\s+/g, ' ');
+    }
+    
+    // DEBUG: Log AFTER removing
+    const afterRemove = text.substring(0, 100);
+    console.log('🧹 AFTER remove loop:', afterRemove);
+    
+    // Insert spaces between Vietnamese words (camelCase)
     text = text.replace(
       /([a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])([A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g,
       '$1 $2'
@@ -376,11 +464,9 @@ Lưu ý: JSON thuần túy, không markdown. Trích xuất chính xác, giữ d�
     text = text.replace(/([a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])(\d)/gi, '$1 $2');
     text = text.replace(/(\d)([a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])/gi, '$1 $2');
     
-    // Remove excessive whitespace
-    text = text.replace(
-      /([a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])\s+(?=[a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])/gi,
-      '$1 '
-    );
+    // Remove excessive whitespace (final cleanup)
+    text = text.replace(/\s+/g, ' ');
+    text = text.replace(/^\s+|\s+$/gm, '');  // Trim each line
 
     // Fix common Vietnamese name patterns
     const namePatterns = {
@@ -445,17 +531,7 @@ Lưu ý: JSON thuần túy, không markdown. Trích xuất chính xác, giữ d�
     text = text.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
     text = text.replace(/[\u200B-\u200D\uFEFF]/g, ''); // Zero-width characters
     
-    // Step 5: Loại bỏ các từ đơn lẻ "Đỗ", "Ngô"
-    text = text.replace(/\bĐỗ\b(?![A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '');
-    text = text.replace(/\bNgô\b(?![A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '');
-    
-    // Step 6: Thêm space giữa các từ dính liền
-    text = text.replace(
-      new RegExp(`([${vietnameseChars.toLowerCase()}])([${vietnameseChars.toUpperCase()}])`, 'g'),
-      '$1 $2'
-    );
-    
-    // Step 7: Normalize whitespace
+    // Final whitespace normalization
     text = text.replace(/\s+/g, ' ').trim();
 
     return text;
@@ -490,7 +566,30 @@ Lưu ý: JSON thuần túy, không markdown. Trích xuất chính xác, giữ d�
     // Clean personalInfo
     if (parsedData.extractedData.personalInfo) {
       const pi = parsedData.extractedData.personalInfo;
-      if (pi.fullName) pi.fullName = cleanText(pi.fullName);
+      if (pi.fullName) {
+        pi.fullName = cleanText(pi.fullName);
+        // Nếu tên có nhiều 'Đỗ' lặp lại bất thường, chỉ giữ 1 từ 'Đỗ' đầu tiên (nếu có), loại bỏ các từ 'Đỗ' dư thừa
+        // VD: 'Nguyễn Đỗ Thị Đỗ Thu Đỗ Hậu' => 'Nguyễn Thị Thu Hậu' hoặc 'Nguyễn Đỗ Thị Thu Hậu'
+        let parts = pi.fullName.split(' ').filter(Boolean);
+        let result = [];
+        let doFound = false;
+        for (let i = 0; i < parts.length; i++) {
+          if (parts[i] === 'Đỗ') {
+            if (!doFound && i <= 2) { // Chỉ giữ 'Đỗ' nếu xuất hiện ở vị trí <=2 (thường là họ)
+              result.push('Đỗ');
+              doFound = true;
+            }
+            // Nếu đã có 'Đỗ' rồi hoặc vị trí không hợp lý thì bỏ qua
+          } else {
+            result.push(parts[i]);
+          }
+        }
+        pi.fullName = result.join(' ');
+        // Nếu text gốc không có 'Đỗ', loại bỏ hoàn toàn 'Đỗ' khỏi tên
+        // (Chỉ giữ lại các từ khác, không bao giờ thêm 'Đỗ' nếu CV gốc không có)
+        let fullNameNoDo = pi.fullName.split(' ').filter(word => word !== 'Đỗ').join(' ');
+        pi.fullName = fullNameNoDo;
+      }
       if (pi.address) pi.address = cleanText(pi.address);
     }
 
@@ -580,8 +679,9 @@ Lưu ý: JSON thuần túy, không markdown. Trích xuất chính xác, giữ d�
       return this.getEmptyTemplate();
     }
 
-    const text = this.lastExtractedText;
-    console.log('📝 Parsing with rules from extracted text');
+    // CRITICAL: Clean text BEFORE extracting data
+    const text = this.cleanExtractedText(this.lastExtractedText);
+    console.log('📝 Parsing with rules from cleaned text');
     console.log('📝 Using AI-powered skill extraction service');
 
     const result = {
@@ -630,10 +730,34 @@ Lưu ý: JSON thuần túy, không markdown. Trích xuất chính xác, giữ d�
         name = name.replace(/([a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])([A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '$1 $2');
         name = name.replace(/([a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])Đỗ([A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '$1 $2');
         name = name.replace(/([a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ])Ngô([A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '$1 $2');
+        
+        // Validate: Name should be max 50 chars and max 5 words
+        const words = name.trim().split(/\s+/);
+        if (words.length > 5 || name.length > 50) {
+          // Truncate to first 5 words or 50 chars (likely has job title or garbage appended)
+          name = words.slice(0, Math.min(5, words.length)).join(' ');
+          if (name.length > 50) {
+            name = name.substring(0, 50);
+          }
+          console.warn(`⚠️ Name truncated (too long): ${name}`);
+        }
+        
         info.fullName = name.trim();
       }
     } else {
-      info.fullName = nameMatch[1].trim();
+      let name = nameMatch[1].trim();
+      
+      // Validate: Name should be max 50 chars and max 5 words
+      const words = name.split(/\s+/);
+      if (words.length > 5 || name.length > 50) {
+        name = words.slice(0, Math.min(5, words.length)).join(' ');
+        if (name.length > 50) {
+          name = name.substring(0, 50);
+        }
+        console.warn(`⚠️ Name truncated (too long): ${name}`);
+      }
+      
+      info.fullName = name;
     }
 
     // Email
@@ -696,6 +820,47 @@ Lưu ý: JSON thuần túy, không markdown. Trích xuất chính xác, giữ d�
     } else {
       education.institution = uniMatch[0].trim();
     }
+    
+    // Validate and clean institution field
+    if (education.institution) {
+      // Final cleanup - remove any remaining corruption patterns
+      education.institution = education.institution
+        .replace(/Đỗ(?=[a-zà-ỹ])/g, ' ')
+        .replace(/Ngô(?=[a-zà-ỹ])/g, ' ')
+        .replace(/Đặng(?=[a-zà-ỹ])/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      // Remove excessive repeating patterns (garbage data)
+      const repeatingPattern = /(.{3,})\1{3,}/;
+      if (repeatingPattern.test(education.institution)) {
+        console.warn('⚠️ Detected repeating pattern in institution, clearing field');
+        education.institution = null;
+      }
+      
+      // Check for too many special characters (indicates corrupted data)
+      const specialCharCount = (education.institution.match(/[•�\uFFFD]/g) || []).length;
+      if (specialCharCount > 3) {
+        console.warn('⚠️ Too many special characters in institution, clearing field');
+        education.institution = null;
+      }
+      
+      // Check if text contains too many mixed case patterns (indicates corruption)
+      if (education.institution) {
+        const mixedCasePattern = /([a-zà-ỹ])([A-ZÀ-Ỹ])/g;
+        const mixedCount = (education.institution.match(mixedCasePattern) || []).length;
+        if (mixedCount > 5) {
+          console.warn('⚠️ Too many mixed case patterns in institution (corrupted), clearing field');
+          education.institution = null;
+        }
+      }
+      
+      // Check if text is too short or too long
+      if (education.institution && (education.institution.length < 5 || education.institution.length > 100)) {
+        console.warn('⚠️ Institution name length invalid, clearing field');
+        education.institution = null;
+      }
+    }
 
     // Degree
     const degreeMatch = text.match(
@@ -707,7 +872,28 @@ Lưu ý: JSON thuần túy, không markdown. Trích xuất chính xác, giữ d�
     const fieldMatch = text.match(
       /(?:Ngành|Major|Field)\s*:?\s*([^\n]{5,50})/i
     );
-    if (fieldMatch) education.field = fieldMatch[1].trim();
+    if (fieldMatch) {
+      let field = fieldMatch[1].trim();
+      
+      // Aggressive cleanup for field
+      field = field
+        .replace(/Đỗ(?=[a-zà-ỹ])/g, ' ')
+        .replace(/Ngô(?=[a-zà-ỹ])/g, ' ')
+        .replace(/Đặng(?=[a-zà-ỹ])/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      // Clean and validate field
+      const specialCharCount = (field.match(/[•�\uFFFD]/g) || []).length;
+      const mixedCaseCount = (field.match(/([a-zà-ỹ])([A-ZÀ-Ỹ])/g) || []).length;
+      
+      if (specialCharCount > 2 || mixedCaseCount > 4 || field.length < 5 || field.length > 80) {
+        console.warn('⚠️ Field of study contains corrupted data, clearing field');
+        education.field = null;
+      } else {
+        education.field = field;
+      }
+    }
 
     // Graduation year
     const yearMatch = text.match(

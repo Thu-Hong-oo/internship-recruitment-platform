@@ -114,11 +114,11 @@ export function usePdfExport() {
     });
 
     // Bật nén PDF để giảm dung lượng
+    // jsPDF tự động nén khi dùng JPEG format
     const pdf = new jsPDF({
       orientation: "p",
       unit: "pt",
       format: "a4",
-      compressPdf: true,
     });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();

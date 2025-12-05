@@ -36,10 +36,27 @@ export default function JobRecommendationsPage() {
   const [filteredJobs, setFilteredJobs] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [tierFilter, setTierFilter] = useState<string>("all");
-  const [minScore, setMinScore] = useState(60);
+  const [minScore, setMinScore] = useState(30);
+  const [isUpdatingMatches, setIsUpdatingMatches] = useState(false);
 
   useEffect(() => {
-    fetchJobRecommendations();
+    const init = async () => {
+      // Yêu cầu đăng nhập candidate trước khi xem gợi ý việc làm
+      if (typeof window !== "undefined") {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          const redirectUrl = "/job-recommendations";
+          router.push(`/login?redirect=${encodeURIComponent(redirectUrl)}`);
+          return;
+        }
+      }
+
+      // Tự động tính điểm phù hợp cho tất cả job, sau đó tải danh sách gợi ý
+      await refreshJobMatchesAndRecommendations();
+    };
+
+    void init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -93,76 +110,156 @@ export default function JobRecommendationsPage() {
     router.push(`/roadmaps?targetJobId=${jobId}`);
   };
 
+  // Tính lại toàn bộ điểm phù hợp rồi reload danh sách gợi ý
+  const refreshJobMatchesAndRecommendations = async () => {
+    try {
+      setIsUpdatingMatches(true);
+      // Gọi API tính lại toàn bộ matching score cho candidate hiện tại
+      const result = await nlpService.calculateAllMatches();
+
+      if (!result.success) {
+        toast({
+          title: "Không thể cập nhật điểm phù hợp",
+          description: result.message || "Vui lòng thử lại sau.",
+          variant: "destructive",
+        });
+      } else if (result.message) {
+        toast({
+          title: "Đã cập nhật điểm phù hợp",
+          description: result.message,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to calculate all matches:", error);
+      toast({
+        title: "Lỗi khi cập nhật điểm phù hợp",
+        description: "Vui lòng thử lại sau.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingMatches(false);
+      // Luôn reload danh sách gợi ý sau khi tính điểm xong
+      await fetchJobRecommendations();
+    }
+  };
+
   return (
     <PageLayout>
       <div className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* Header */}
+        {/* Header + Filters */}
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <TrendingUp className="w-8 h-8 text-blue-600" />
-            <h1 className="text-3xl font-bold">Job Recommendations</h1>
-          </div>
-          <p className="text-muted-foreground">
-            Personalized job matches based on your skills and experience
-          </p>
+          <Card className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-none shadow-sm">
+            <CardContent className="pt-6 pb-4">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <TrendingUp className="w-8 h-8 text-blue-600" />
+                    <h1 className="text-3xl font-bold">
+                      Gợi ý việc làm phù hợp
+                    </h1>
+                  </div>
+                  <p className="text-muted-foreground max-w-2xl">
+                    Danh sách việc làm được xếp hạng theo mức độ phù hợp với hồ sơ
+                    và kỹ năng hiện tại của bạn. Bạn có thể lọc theo tier và điểm
+                    tối thiểu để tinh chỉnh kết quả.
+                  </p>
+                </div>
+
+                <div className="w-full md:w-[420px]">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Search */}
+                    <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 shadow-xs border">
+                      <Search className="w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Tìm theo tên việc làm hoặc công ty..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="border-none shadow-none h-8 px-0 focus-visible:ring-0 text-sm"
+                      />
+                    </div>
+
+                    {/* Min score */}
+                    <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 shadow-xs border">
+                      <Filter className="w-4 h-4 text-muted-foreground" />
+                      <Select
+                        value={minScore.toString()}
+                        onValueChange={(value) => setMinScore(parseInt(value))}
+                      >
+                        <SelectTrigger className="border-none shadow-none h-8 px-0 text-sm">
+                          <SelectValue placeholder="Điểm tối thiểu" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="30">Điểm ≥ 30%</SelectItem>
+                          <SelectItem value="40">Điểm ≥ 40%</SelectItem>
+                          <SelectItem value="50">Điểm ≥ 50%</SelectItem>
+                          <SelectItem value="60">Điểm ≥ 60%</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Tier filter + summary */}
+                  <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant={tierFilter === "all" ? "default" : "outline"}
+                        onClick={() => setTierFilter("all")}
+                      >
+                        Tất cả tier
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={tierFilter === "A" ? "default" : "outline"}
+                        onClick={() => setTierFilter("A")}
+                      >
+                        Tier A
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={tierFilter === "B" ? "default" : "outline"}
+                        onClick={() => setTierFilter("B")}
+                      >
+                        Tier B
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={tierFilter === "C" ? "default" : "outline"}
+                        onClick={() => setTierFilter("C")}
+                      >
+                        Tier C
+                      </Button>
+                    </div>
+                    <div className="flex items-center gap-3 justify-between sm:justify-end">
+                      <p className="text-xs text-muted-foreground">
+                        Đang hiển thị{" "}
+                        <span className="font-semibold">
+                          {filteredJobs.length} việc làm
+                        </span>{" "}
+                        với điểm ≥ {minScore}%.
+                      </p>
+                      <Button
+                        onClick={refreshJobMatchesAndRecommendations}
+                        variant="outline"
+                        size="sm"
+                        disabled={isUpdatingMatches || isLoading}
+                      >
+                        {isUpdatingMatches ? (
+                          <span className="flex items-center gap-1">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Đang cập nhật gợi ý...
+                          </span>
+                        ) : (
+                          "Cập nhật gợi ý"
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-
-        {/* Filters */}
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex items-center gap-2">
-                <Search className="w-5 h-5 text-muted-foreground" />
-                <Input
-                  placeholder="Search jobs or companies..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-
-              <Select value={tierFilter} onValueChange={setTierFilter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by tier" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Tiers</SelectItem>
-                  <SelectItem value="A">Tier A (Excellent)</SelectItem>
-                  <SelectItem value="B">Tier B (Good)</SelectItem>
-                  <SelectItem value="C">Tier C (Fair)</SelectItem>
-                  <SelectItem value="D">Tier D (Low)</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <div className="flex items-center gap-2">
-                <Filter className="w-5 h-5 text-muted-foreground" />
-                <Select
-                  value={minScore.toString()}
-                  onValueChange={(value) => setMinScore(parseInt(value))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Min score" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="50">Min Score: 50%</SelectItem>
-                    <SelectItem value="60">Min Score: 60%</SelectItem>
-                    <SelectItem value="70">Min Score: 70%</SelectItem>
-                    <SelectItem value="80">Min Score: 80%</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="mt-4 flex justify-between items-center">
-              <p className="text-sm text-muted-foreground">
-                {filteredJobs.length} job{filteredJobs.length !== 1 ? "s" : ""}{" "}
-                found
-              </p>
-              <Button onClick={fetchJobRecommendations} variant="outline" size="sm">
-                Refresh
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Loading State */}
         {isLoading && (
@@ -191,13 +288,14 @@ export default function JobRecommendationsPage() {
               <div className="text-center py-12">
                 <Briefcase className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
                 <h3 className="text-lg font-semibold mb-2">
-                  No Jobs Found
+                  Chưa tìm thấy việc làm phù hợp
                 </h3>
                 <p className="text-muted-foreground mb-4">
-                  Try adjusting your filters or update your profile
+                  Hãy thử nới lỏng bộ lọc hoặc cập nhật thêm kỹ năng trong hồ sơ
+                  để hệ thống gợi ý chính xác hơn.
                 </p>
                 <Button onClick={() => router.push("/profile")}>
-                  Update Profile
+                  Cập nhật hồ sơ ngay
                 </Button>
               </div>
             </CardContent>
@@ -208,93 +306,138 @@ export default function JobRecommendationsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Jobs List */}
             <div className="lg:col-span-2 space-y-4">
-              {filteredJobs.map((item) => (
-                <Card key={item.jobId} className="hover:shadow-lg transition-shadow">
-                  <CardContent className="pt-6">
-                    <div className="flex gap-6">
-                      {/* Job Info */}
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <h3 className="text-xl font-semibold mb-1">
-                              {item.job.title}
-                            </h3>
-                            <p className="text-muted-foreground">
-                              {item.job.company}
-                            </p>
+              {filteredJobs.map((item) => {
+                const companyName = item.job.company || "Nhà tuyển dụng";
+                const companyInitial =
+                  typeof companyName === "string" && companyName.length > 0
+                    ? companyName.charAt(0).toUpperCase()
+                    : "C";
+
+                const deadline = item.job.deadline
+                  ? new Date(item.job.deadline)
+                  : null;
+
+                return (
+                  <Card
+                    key={item.jobId}
+                    className="hover:shadow-md transition-shadow border border-slate-100 rounded-xl"
+                  >
+                    <CardContent className="pt-5 pb-5">
+                      <div className="flex gap-4">
+                        {/* Logo / Initial */}
+                        <div className="hidden sm:flex items-start">
+                          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+                            {companyInitial}
                           </div>
-                          <Badge
-                            className={
-                              item.tier === "A"
-                                ? "bg-green-100 text-green-700"
-                                : item.tier === "B"
-                                ? "bg-blue-100 text-blue-700"
-                                : item.tier === "C"
-                                ? "bg-yellow-100 text-yellow-700"
-                                : "bg-red-100 text-red-700"
-                            }
-                          >
-                            {item.overallScore}% Match
-                          </Badge>
                         </div>
 
-                        <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-4">
-                          <span className="flex items-center gap-1">
-                            <MapPin className="w-4 h-4" />
-                            {item.job.location}
-                          </span>
-                          {item.job.salary && (
-                            <span className="flex items-center gap-1">
-                              <DollarSign className="w-4 h-4" />
-                              {item.job.salary.min.toLocaleString()} -{" "}
-                              {item.job.salary.max.toLocaleString()}{" "}
-                              {item.job.salary.currency}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Matched Skills */}
-                        {item.matchedSkills && item.matchedSkills.length > 0 && (
-                          <div className="mb-4">
-                            <p className="text-sm font-medium mb-2">
-                              Matched Skills:
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                              {item.matchedSkills.slice(0, 5).map((skill: string, idx: number) => (
-                                <Badge key={idx} variant="secondary">
-                                  {skill}
-                                </Badge>
-                              ))}
-                              {item.matchedSkills.length > 5 && (
-                                <Badge variant="outline">
-                                  +{item.matchedSkills.length - 5} more
-                                </Badge>
+                        {/* Job Info */}
+                        <div className="flex-1 space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h3 className="text-base sm:text-lg font-semibold mb-1 hover:text-blue-700 cursor-pointer">
+                                {item.job.title}
+                              </h3>
+                              <p className="text-xs sm:text-sm text-muted-foreground">
+                                {companyName}
+                              </p>
+                            </div>
+                            <div className="flex flex-col items-end gap-2">
+                              <Badge
+                                className={
+                                  item.tier === "A"
+                                    ? "bg-green-100 text-green-700"
+                                    : item.tier === "B"
+                                    ? "bg-blue-100 text-blue-700"
+                                    : item.tier === "C"
+                                    ? "bg-yellow-100 text-yellow-700"
+                                    : "bg-red-100 text-red-700"
+                                }
+                              >
+                                Tier {item.tier} • {item.overallScore}%
+                              </Badge>
+                              {deadline && (
+                                <span className="text-[11px] text-muted-foreground">
+                                  Hạn nộp:{" "}
+                                  {deadline.toLocaleDateString("vi-VN")}
+                                </span>
                               )}
                             </div>
                           </div>
-                        )}
 
-                        {/* Actions */}
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={() => handleViewJob(item.job._id)}
-                            size="sm"
-                          >
-                            View Details
-                          </Button>
-                          <Button
-                            onClick={() => handleGenerateRoadmap(item.job._id)}
-                            variant="outline"
-                            size="sm"
-                          >
-                            Generate Roadmap
-                          </Button>
+                          <div className="flex flex-wrap gap-3 text-xs sm:text-sm text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <MapPin className="w-4 h-4" />
+                              {item.job.location || "Đang cập nhật"}
+                            </span>
+                            {item.job.salary && (
+                              <span className="flex items-center gap-1">
+                                <DollarSign className="w-4 h-4" />
+                                {item.job.salary.min.toLocaleString()} -{" "}
+                                {item.job.salary.max.toLocaleString()}{" "}
+                                {item.job.salary.currency}
+                              </span>
+                            )}
+                            {item.job.level && (
+                              <span className="flex items-center gap-1">
+                                <Briefcase className="w-4 h-4" />
+                                {item.job.level}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Matched Skills */}
+                          {item.matchedSkills &&
+                            item.matchedSkills.length > 0 && (
+                              <div className="mb-1">
+                                <p className="text-xs font-medium mb-1 text-slate-700">
+                                  Kỹ năng trùng khớp:
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {item.matchedSkills
+                                    .slice(0, 5)
+                                    .map((skill: string, idx: number) => (
+                                      <Badge
+                                        key={idx}
+                                        variant="secondary"
+                                        className="text-xs"
+                                      >
+                                        {skill}
+                                      </Badge>
+                                    ))}
+                                  {item.matchedSkills.length > 5 && (
+                                    <Badge variant="outline" className="text-xs">
+                                      +{item.matchedSkills.length - 5} nữa
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                          {/* Actions */}
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            <Button
+                              onClick={() => handleViewJob(item.job._id)}
+                              size="sm"
+                            >
+                              Xem chi tiết
+                            </Button>
+                            <Button
+                              onClick={() =>
+                                handleGenerateRoadmap(item.job._id)
+                              }
+                              variant="outline"
+                              size="sm"
+                            >
+                              Tạo lộ trình học tập
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
 
             {/* Match Score Summary */}

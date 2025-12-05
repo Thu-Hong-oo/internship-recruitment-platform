@@ -7,62 +7,198 @@ class ResumeHelpers {
    */
   static async autoFillProfileFromParsedData(profile, extractedData) {
     try {
-      // Update personal info if provided
+      // Update personal info if provided - ALWAYS UPDATE from new CV
       if (extractedData.personalInfo) {
-        const { fullName, email, phone, address } = extractedData.personalInfo;
+        const { fullName, email, phone, address, dateOfBirth } = extractedData.personalInfo;
 
-        if (fullName && !profile.personalInfo.fullName) {
+        // Always update from CV parse (user uploaded new CV = wants to update)
+        if (fullName) {
           profile.personalInfo.fullName = fullName;
         }
-        if (email && !profile.personalInfo.email) {
+        if (email) {
           profile.personalInfo.email = email;
         }
-        if (phone && !profile.personalInfo.phone) {
+        if (phone) {
           profile.personalInfo.phone = phone;
         }
-        if (address && !profile.personalInfo.address) {
-          // Validate address is not empty string before setting
+        if (dateOfBirth) {
+          // Parse Vietnamese date format (DD/MM/YYYY) to ISO Date
+          try {
+            if (typeof dateOfBirth === 'string') {
+              const dateMatch = dateOfBirth.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+              if (dateMatch) {
+                const [_, day, month, year] = dateMatch;
+                // MongoDB expects ISO format: YYYY-MM-DD
+                const isoDate = new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`);
+                if (!isNaN(isoDate.getTime())) {
+                  profile.personalInfo.dateOfBirth = isoDate;
+                } else {
+                  console.warn(`⚠️ Invalid date value: ${dateOfBirth}`);
+                }
+              } else {
+                // Try direct Date parse for other formats
+                const parsedDate = new Date(dateOfBirth);
+                if (!isNaN(parsedDate.getTime())) {
+                  profile.personalInfo.dateOfBirth = parsedDate;
+                }
+              }
+            } else if (dateOfBirth instanceof Date) {
+              profile.personalInfo.dateOfBirth = dateOfBirth;
+            }
+          } catch (error) {
+            console.warn(`⚠️ Failed to parse dateOfBirth: ${dateOfBirth}`, error.message);
+          }
+        }
+        if (address) {
+          // Parse address string to object format
           if (typeof address === 'string' && address.trim() !== '') {
-            profile.personalInfo.address = address;
+            // Simple parsing: split by commas and extract city
+            const parts = address.split(',').map(s => s.trim());
+            profile.personalInfo.address = {
+              street: parts[0] || '',
+              ward: parts.length > 1 ? parts[1] : '',
+              district: '',
+              city: parts.length > 1 ? parts[parts.length - 1] : '',
+              country: 'Vietnam'
+            };
           } else if (typeof address === 'object' && address !== null) {
             profile.personalInfo.address = address;
           }
-          // Skip if address is empty string to prevent MongoDB error
         }
       }
 
-      // Update education if provided and not exists
-      if (
-        extractedData.education &&
-        !profile.education.university?.institution
-      ) {
+      // Update education if provided - ALWAYS UPDATE from new CV
+      if (extractedData.education) {
         profile.education.university = extractedData.education;
+        console.log(`📚 Updated education: ${extractedData.education.institution}`);
       }
 
-      // Update skills if provided
+      // Update skills if provided - CLEAR OLD and ADD NEW from CV
       if (extractedData.skills && extractedData.skills.length > 0) {
-        if (!profile.skills.technical) profile.skills.technical = [];
+        // CLEAR all old auto-parsed skills (keep only manually verified ones)
+        profile.skills.technical = (profile.skills.technical || []).filter(s => s.verified === true);
+        profile.skills.soft = (profile.skills.soft || []).filter(s => s.verified === true);
+        profile.skills.languages = (profile.skills.languages || []).filter(s => s.verified === true);
 
-        // Add only new skills that don't already exist
-        const existingSkills = profile.skills.technical.map(s =>
-          s.name?.toLowerCase()
-        );
-        const newSkills = extractedData.skills
-          .filter(skill => !existingSkills.includes(skill.toLowerCase()))
-          .map(skill => ({
-            name: skill,
-            level: 'intermediate', // Default level
+        console.log(`🗑️  Cleared old auto-parsed skills (kept ${profile.skills.technical.length + profile.skills.soft.length + profile.skills.languages.length} verified)`);
+
+        // Build set of existing verified skills to avoid duplicates
+        const verifiedSkills = new Set();
+        ['technical', 'soft', 'languages'].forEach(category => {
+          (profile.skills[category] || []).forEach(skill => {
+            verifiedSkills.add(skill.name.toLowerCase().trim());
+          });
+        });
+
+        // Add new skills from CV parse
+        const addedCounts = { technical: 0, soft: 0, languages: 0 };
+        
+        extractedData.skills.forEach(skill => {
+          const skillName = typeof skill === 'string' ? skill : (skill.name || skill);
+          const skillType = typeof skill === 'object' ? (skill.type || 'technical') : 'technical';
+          const skillLevel = typeof skill === 'object' ? (skill.level || 'intermediate') : 'intermediate';
+          const skillLower = skillName.toLowerCase().trim();
+
+          // Skip if already exists in verified skills
+          if (verifiedSkills.has(skillLower)) {
+            return;
+          }
+
+          // Determine target category
+          let targetCategory;
+          if (skillType === 'soft') {
+            targetCategory = 'soft';
+          } else if (skillType === 'language') {
+            targetCategory = 'languages';
+          } else {
+            targetCategory = 'technical';
+          }
+
+          // Create new skill object
+          const newSkill = {
+            name: skillName,
+            level: skillLevel,
             verified: false,
-          }));
+            endorsements: 0
+          };
 
-        profile.skills.technical.push(...newSkills);
+          if (targetCategory === 'technical') {
+            newSkill.projects = [];
+          }
+
+          // Add to appropriate category
+          if (!profile.skills[targetCategory]) {
+            profile.skills[targetCategory] = [];
+          }
+          profile.skills[targetCategory].push(newSkill);
+          addedCounts[targetCategory]++;
+          verifiedSkills.add(skillLower); // Track to avoid duplicates
+        });
+
+        console.log(`➕ Added ${addedCounts.technical} technical, ${addedCounts.soft} soft, ${addedCounts.languages} language skills`);
       }
 
-      // Update experience if provided
-      if (extractedData.experience) {
-        if (!profile.experience.internships)
-          profile.experience.internships = [];
-        profile.experience.internships.push(extractedData.experience);
+      // Update experience if provided - CLEAR OLD and ADD NEW from CV
+      if (extractedData.experience && Array.isArray(extractedData.experience)) {
+        // CLEAR all old experiences (no way to distinguish manual vs auto-parsed in old data)
+        const oldCount = (profile.experience.internships || []).length;
+        profile.experience.internships = [];
+        
+        if (oldCount > 0) {
+          console.log(`🗑️  Cleared ${oldCount} old experience entries`);
+        }
+        
+        // Helper: Parse date string "MM/YYYY" or "DD/MM/YYYY" to Date object
+        const parseDate = (dateStr) => {
+          if (!dateStr || typeof dateStr !== 'string') return null;
+          
+          // Remove extra spaces
+          dateStr = dateStr.trim();
+          
+          // Format: "MM/YYYY" → new Date(YYYY, MM-1, 1)
+          const mmyyyyMatch = dateStr.match(/^(\d{1,2})\/(\d{4})$/);
+          if (mmyyyyMatch) {
+            const [, month, year] = mmyyyyMatch;
+            return new Date(parseInt(year), parseInt(month) - 1, 1);
+          }
+          
+          // Format: "DD/MM/YYYY" → new Date(YYYY, MM-1, DD)
+          const ddmmyyyyMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+          if (ddmmyyyyMatch) {
+            const [, day, month, year] = ddmmyyyyMatch;
+            return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+          }
+          
+          // Format: "YYYY" → new Date(YYYY, 0, 1)
+          const yyyyMatch = dateStr.match(/^(\d{4})$/);
+          if (yyyyMatch) {
+            return new Date(parseInt(dateStr), 0, 1);
+          }
+          
+          // Fallback: Try native Date parsing
+          const parsed = new Date(dateStr);
+          return isNaN(parsed.getTime()) ? null : parsed;
+        };
+        
+        // Add new parsed experiences with proper date conversion
+        extractedData.experience.forEach(exp => {
+          const newExp = {
+            ...exp,
+            manuallyAdded: false // Mark as auto-parsed for future updates
+          };
+          
+          // Convert date strings to Date objects
+          if (exp.startDate) {
+            newExp.startDate = parseDate(exp.startDate);
+          }
+          if (exp.endDate) {
+            newExp.endDate = parseDate(exp.endDate);
+          }
+          
+          profile.experience.internships.push(newExp);
+        });
+        
+        console.log(`➕ Added ${extractedData.experience.length} new experience entries from CV`);
       }
 
       console.log('✅ Profile auto-filled from parsed resume data');

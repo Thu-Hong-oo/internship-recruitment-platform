@@ -972,6 +972,7 @@ class ResumeController {
       await profileController.mapParsedCVToProfile(profile);
       console.log('✅ Profile auto-fill process completed.');
           } catch (error) {
+            console.error('❌ Profile auto-fill FAILED:', error);
             console.warn('⚠️ Profile auto-fill failed (non-blocking):', error.message);
           }
         }

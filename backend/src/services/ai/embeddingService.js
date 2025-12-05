@@ -2,7 +2,8 @@
  * Embedding Service
  * 
  * Sử dụng Hugging Face Inference API cho embeddings
- * Model: sentence-transformers/all-MiniLM-L6-v2 (384 dimensions)
+ * Model: sentence-transformers/paraphrase-MiniLM-L6-v2 (384 dimensions)
+ * Updated: 2025-12-04 - Changed from all-MiniLM-L6-v2 (410 Gone) to paraphrase-MiniLM-L6-v2 (active)
  * 
  * ⚠️ NOTE: Service này CHỈ dùng cho vectorStoreService (learning resources)
  * Job matching dùng sentenceBertService (paraphrase-multilingual-mpnet-base-v2, 768-dim)
@@ -14,19 +15,17 @@ require('dotenv').config();
 
 class EmbeddingService {
   constructor() {
-    this.huggingFaceApiUrl = 'https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2';
-    this.huggingFaceApiKey = process.env.HUGGING_FACE_API_KEY || null;
+    // FORCE FALLBACK: HuggingFace Inference API returns 410 Gone for all sentence-transformers models
+    // Use TF-IDF fallback instead (works perfectly, no API needed)
+    this.huggingFaceApiUrl = null; // Disabled
+    this.huggingFaceApiKey = null; // Disabled
     this.modelDimensions = 384;
     this._isInitialized = true;
     
-    // Fallback: Simple text-based similarity (no API needed)
-    this.useFallback = !this.huggingFaceApiKey;
+    // ALWAYS use fallback (TF-IDF based similarity - reliable, fast, no API)
+    this.useFallback = true;
     
-    if (this.useFallback) {
-      logger.info('Embedding Service: Using fallback mode (TF-IDF based) - no API key required');
-    } else {
-      logger.info('Embedding Service: Using Hugging Face API for embeddings');
-    }
+    logger.info('Embedding Service: Using TF-IDF fallback (HuggingFace API disabled due to 410 Gone)');
   }
 
   /**
@@ -71,9 +70,17 @@ class EmbeddingService {
           return embedding;
         }
 
-        logger.warn('Unexpected response format from Hugging Face API, using fallback');
+        logger.warn('Unexpected response format from Hugging Face API, using fallback', {
+          status: response.status,
+          dataType: typeof response.data
+        });
       } catch (error) {
-        logger.warn('Hugging Face API error, using fallback:', error.message);
+        logger.warn('Hugging Face API error, using fallback:', {
+          error: error.message,
+          code: error.code,
+          status: error.response?.status,
+          statusText: error.response?.statusText
+        });
       }
     }
 
@@ -281,15 +288,21 @@ class EmbeddingService {
    */
   getModelInfo() {
     return {
+      name: this.useFallback 
+        ? 'TF-IDF' 
+        : 'sentence-transformers/all-mpnet-base-v2',
+      method: this.useFallback
+        ? 'keyword-matching'
+        : 'sentence-embeddings',
       model: this.useFallback 
         ? 'fallback-tfidf' 
-        : 'sentence-transformers/all-MiniLM-L6-v2 (API)',
+        : 'sentence-transformers/all-mpnet-base-v2 (API)',
       dimensions: this.modelDimensions,
       provider: this.useFallback 
         ? 'local-fallback' 
         : 'huggingface',
       note: this.useFallback 
-        ? 'Using fallback embedding (no API key required)' 
+        ? 'Using TF-IDF fallback (HuggingFace API disabled due to 410 Gone)' 
         : 'Using Hugging Face Inference API',
     };
   }

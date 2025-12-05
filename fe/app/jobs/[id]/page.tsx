@@ -32,28 +32,35 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
 
   // Get job ID from URL pathname (works in both dev and production)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const pathname = window.location.pathname;
-      const match = pathname.match(/^\/jobs\/([^\/]+)/);
-      if (match && match[1]) {
-        const jobId = match[1];
-        // Skip placeholder/dummy IDs
-        if (jobId !== 'placeholder' && jobId !== 'dummy') {
-          setId(jobId);
-          return;
+    async function getJobId() {
+      if (typeof window !== 'undefined') {
+        const pathname = window.location.pathname;
+        const match = pathname.match(/^\/jobs\/([^\/]+)/);
+        if (match && match[1]) {
+          const jobId = match[1];
+          // Skip placeholder/dummy IDs
+          if (jobId !== 'placeholder' && jobId !== 'dummy') {
+            setId(jobId);
+            return;
+          }
         }
       }
-    }
-    
-    // Fallback to params if URL parsing fails
-    params.then((resolvedParams) => {
-      const jobId = resolvedParams.id;
-      if (jobId === 'dummy' || jobId === 'placeholder') {
+      
+      // Fallback to params if URL parsing fails
+      try {
+        const resolvedParams = await params;
+        const jobId = resolvedParams.id;
+        if (jobId === 'dummy' || jobId === 'placeholder') {
+          setLoading(false);
+          return;
+        }
+        setId(jobId);
+      } catch (error) {
+        console.error('Error resolving params:', error);
         setLoading(false);
-        return;
       }
-      setId(jobId);
-    });
+    }
+    getJobId();
   }, [params]);
 
   // Fetch job data
@@ -214,11 +221,13 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <ApplyButton
-                jobId={id}
-                jobTitle={job.title}
-                className="font-medium"
-              />
+              {id && (
+                <ApplyButton
+                  jobId={id}
+                  jobTitle={job.title}
+                  className="font-medium"
+                />
+              )}
               <Button variant="outline">Lưu việc làm</Button>
             </div>
           </div>
@@ -345,11 +354,13 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
                     </div>
                   )}
                   <div className="flex gap-3">
-                    <ApplyButton
-                      jobId={id}
-                      jobTitle={job.title}
-                      className="font-medium"
-                    />
+                    {id && (
+                      <ApplyButton
+                        jobId={id}
+                        jobTitle={job.title}
+                        className="font-medium"
+                      />
+                    )}
                     <Button variant="outline">Lưu việc làm</Button>
                   </div>
                 </CardContent>

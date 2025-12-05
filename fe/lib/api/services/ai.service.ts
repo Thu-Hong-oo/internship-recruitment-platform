@@ -94,18 +94,14 @@ export const aiService = {
     const formData = new FormData();
     formData.append("cv", file);
 
-    return apiClient.post("/api/ai/analyze-cv", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    });
+    return apiClient.post("/ai/analyze-cv", formData);
   },
 
   /**
    * Analyze CV from raw text
    */
   async analyzeCVFromText(rawCVText: string): Promise<CVAnalysisResult> {
-    return apiClient.post("/api/ai/analyze-cv-text", {
+    return apiClient.post("/ai/analyze-cv-text", {
       rawCVText,
     });
   },
@@ -120,7 +116,7 @@ export const aiService = {
     success: boolean;
     data: JobRecommendation[];
   }> {
-    return apiClient.post("/api/ai/job-recommendations", {
+    return apiClient.post("/ai/job-recommendations", {
       limit: params?.limit || 10,
       minScore: params?.minScore || 60,
     });
@@ -153,7 +149,7 @@ export const aiService = {
       skillGaps: SkillGap;
     }>;
   }> {
-    return apiClient.post("/api/ai/candidate-recommendations", {
+    return apiClient.post("/ai/candidate-recommendations", {
       jobId,
       limit: params?.limit || 10,
       minScore: params?.minScore || 60,
@@ -180,7 +176,7 @@ export const aiService = {
       suggestions: string[];
     };
   }> {
-    return apiClient.post("/api/ai/analyze-job-description", params);
+    return apiClient.post("/ai/analyze-job-description", params);
   },
 
   /**
@@ -192,7 +188,7 @@ export const aiService = {
     jobId?: string;
     industry?: string;
   }): Promise<SkillGapAnalysisResult> {
-    return apiClient.post("/api/ai/skill-gap-analysis", params);
+    return apiClient.post("/ai/skill-gap-analysis", params);
   },
 
   /**
@@ -213,7 +209,7 @@ export const aiService = {
       suggestions: string[];
     };
   }> {
-    return apiClient.post("/api/ai/suggestions", params);
+    return apiClient.post("/ai/suggestions", params);
   },
 
   /**
@@ -223,6 +219,6 @@ export const aiService = {
     success: boolean;
     data: CandidateInsights;
   }> {
-    return apiClient.get("/api/ai/insights");
+    return apiClient.get("/ai/insights");
   },
 };

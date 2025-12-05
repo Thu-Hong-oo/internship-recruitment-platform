@@ -339,7 +339,7 @@ class GitHubDataService {
         url: repo.html_url,
         type: 'documentation',
         skill: skill,
-        difficulty: 'all',
+        difficulty: 'beginner', // Fixed: 'all' is invalid, use 'beginner' for awesome lists
         duration: 60, // Reading time
         source: 'github',
         provider: repo.owner.login,

@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "Advanced NLP - Matching Score & Learning Roadmap",
-    "description": "API collection for advanced NLP features: Matching Score calculation and Personalized Learning Roadmap generation\n\n✨ **SELF-SUFFICIENT NLP STACK**:\n- PhoBERT NER (F1 96%) for skill extraction\n- Sentence-BERT (768-dim, paraphrase-multilingual-mpnet-base-v2) for semantic embeddings\n- TF-IDF + cosine similarity for text matching\n- Multi-dimensional scoring: skills (40%), experience (30%), education (15%), projects (15%)\n- Reverse matching for candidate recommendations\n- NO mandatory Gemini dependency (optional for enhancement)\n\n📊 **Matching Score Features**:\n- Calculate detailed CV-Job match scores with tier system (A/B/C/D)\n- Get top candidates for jobs (employer view)\n- Get best matching jobs for candidates\n- Recalculate scores when job/CV changes\n\n🎓 **Learning Roadmap Features**:\n- Generate personalized learning paths with prerequisites\n- Track progress by week/phase\n- Get AI-recommended resources (courses, articles, videos)\n- Submit feedback and ratings",
+    "name": "Advanced NLP APIs (Matching Score & Learning Roadmap)",
+    "description": "🎯 **OFFICIAL API COLLECTION** - Advanced NLP features for CV-Job matching and Learning Roadmap generation\n\n✨ **SELF-SUFFICIENT NLP STACK**:\n- PhoBERT NER (F1 96%) for Vietnamese skill extraction\n- Sentence-BERT (768-dim, paraphrase-multilingual-mpnet-base-v2) for semantic embeddings\n- TF-IDF + cosine similarity for text matching\n- Multi-dimensional scoring: skills (40%), experience (30%), education (15%), projects (15%)\n- NO mandatory Gemini dependency (optional enhancement only)\n\n📊 **MATCHING SCORE APIs** (5 endpoints):\n- Calculate detailed CV-Job match scores with tier system (A/B/C/D)\n- Get top candidates for jobs (employer view)\n- Get best matching jobs for candidates\n- Recalculate scores when job/CV changes\n\n🎓 **LEARNING ROADMAP APIs** (8 endpoints):\n- Generate personalized learning paths (2 methods: Standard + RAG-powered)\n- Track progress by week/phase\n- Get AI-recommended resources from YouTube, GitHub, ChromaDB\n- Submit feedback and ratings\n- Browse popular public roadmaps\n\n⭐ **RECOMMENDED**: Use RAG-powered roadmap (/learning-roadmap-rag) for real, verifiable resources with credibility metrics",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -139,9 +139,37 @@
     },
     {
       "name": "🎓 Learning Roadmap",
+      "description": "APIs for generating and managing personalized learning roadmaps. Two methods available: Standard (faster) and RAG-powered (more accurate with real resources).",
       "item": [
         {
-          "name": "Generate Learning Roadmap",
+          "name": "Generate RAG-Powered Roadmap ⭐ RECOMMENDED",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"candidateId\": \"{{candidateId}}\",\n  \"jobId\": \"{{jobId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/nlp/learning-roadmap-rag",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nlp", "learning-roadmap-rag"]
+            },
+            "description": "⭐ **RECOMMENDED** - Generate RAG-powered learning roadmap with REAL resources from YouTube, GitHub, and ChromaDB.\n\n**Features:**\n- ✅ Real YouTube videos with view counts and ratings\n- ✅ Real GitHub projects with stars and language info\n- ✅ Credibility metrics (totalResources, averageCredibility, verificationRate)\n- ✅ Verifiable URLs for all resources\n- ✅ 3-phase learning plan (Foundation → Core → Advanced)\n- ✅ 12-week timeline with weekly breakdown\n- ✅ AUTO-CALCULATES skill gaps if not already done\n\n**Request Body - SIMPLE (RECOMMENDED):**\n```json\n{\n  \"candidateId\": \"candidate_id_here\",\n  \"jobId\": \"job_id_here\"\n}\n```\n⚠️ **IMPORTANT**: API sẽ TỰ ĐỘNG phân tích skill gaps nếu chưa có. Chỉ cần:\n1. Candidate đã có profile đầy đủ (skills, experience, education)\n2. Cung cấp candidateId + jobId\n\n**Request Body - FULL (Optional fields):**\n```json\n{\n  \"candidateId\": \"candidate_id_here\",\n  \"jobId\": \"job_id_here\",\n  \"targetRole\": \"Full Stack Developer\",\n  \"timeframe\": 12,\n  \"cvData\": {\n    \"skills\": [...],\n    \"experience\": [...],\n    \"currentLevel\": \"beginner\"\n  },\n  \"useRag\": true\n}\n```\n\n**Response includes:**\n- phases[]: 3 learning phases with real resources\n- credibilityMetrics: { totalResources, averageCredibility, verificationRate }\n- estimatedDuration: 12 weeks\n- generatedBy: \"RAG-powered AI\"\n\n**Performance:** 20-30 seconds (fetches real data + auto skill gap analysis)"
+          },
+          "response": []
+        },
+        {
+          "name": "Generate Standard Roadmap (Backup)",
           "request": {
             "method": "POST",
             "header": [
@@ -163,7 +191,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "nlp", "learning-roadmap"]
             },
-            "description": "Generate personalized learning roadmap with detailed resources and milestones.\n\n**Request Body - TỐI THIỂU:**\n```json\n{\n  \"targetJobId\": \"job_id_here\"\n}\n```\nHoặc:\n```json\n{\n  \"targetRole\": \"Frontend Developer\"\n}\n```\n\n**Request Body - ĐẦY ĐỦ (Optional):**\n```json\n{\n  \"targetJobId\": \"job_id_here\",\n  \"targetRole\": \"Full Stack Developer\", // Optional if targetJobId provided\n  \"timeframe\": 12, // Optional, default: 12 weeks\n  \"cvData\": { // Optional - sẽ TỰ ĐỘNG lấy từ profile\n    \"skills\": [...],\n    \"experience\": [...],\n    \"education\": [...],\n    \"currentLevel\": \"beginner\"\n  }\n}\n```\n\n**Lưu ý:**\n- ✅ Chỉ cần `targetJobId` HOẶC `targetRole` (bắt buộc một trong hai)\n- ✅ `cvData` là optional - Hệ thống tự động lấy từ CandidateProfile\n- ✅ `timeframe` là optional - Default: 12 weeks"
+            "description": "⚠️ **BACKUP METHOD** - Generate standard learning roadmap (faster but less accurate).\n\n**Use this when:**\n- RAG service is unavailable\n- Need faster response (5-10 seconds)\n- Don't need real resource verification\n\n**Request Body - MINIMUM:**\n```json\n{\n  \"targetJobId\": \"job_id_here\"\n}\n```\nOR\n```json\n{\n  \"targetRole\": \"Frontend Developer\"\n}\n```\n\n**Request Body - FULL (Optional):**\n```json\n{\n  \"targetJobId\": \"job_id_here\",\n  \"targetRole\": \"Full Stack Developer\",\n  \"timeframe\": 12,\n  \"cvData\": {\n    \"skills\": [...],\n    \"experience\": [...],\n    \"education\": [...],\n    \"currentLevel\": \"beginner\"\n  }\n}\n```\n\n**Notes:**\n- ✅ Only need `targetJobId` OR `targetRole` (one required)\n- ✅ `cvData` is optional - Auto-fetched from CandidateProfile\n- ✅ `timeframe` is optional - Default: 12 weeks\n- ⚠️ Resources may not be verified\n- ⚠️ No credibilityMetrics"
           },
           "response": []
         },
@@ -295,7 +323,7 @@
           "response": []
         },
         {
-          "name": "Get Popular Roadmaps",
+          "name": "Get Popular Roadmaps (Public)",
           "request": {
             "method": "GET",
             "header": [],
@@ -306,11 +334,31 @@
               "query": [
                 {
                   "key": "limit",
-                  "value": "10"
+                  "value": "10",
+                  "description": "Number of roadmaps to return (default: 10)"
                 }
               ]
             },
-            "description": "Get popular public roadmaps (no auth required)"
+            "description": "Get popular public roadmaps - NO authentication required.\n\n**Perfect for:**\n- Landing pages\n- Public browse features\n- Sample roadmaps showcase\n\n**Query Parameters:**\n- limit (optional): Number of results (default: 10)"
+          },
+          "response": []
+        },
+        {
+          "name": "Check RAG Service Health",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{candidateToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/nlp/rag-health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "nlp", "rag-health"]
+            },
+            "description": "Check RAG service health and statistics.\n\n**Returns:**\n- initialized: true/false\n- services: { vectorStore, youtube, github, coursera }\n- statistics: Resource counts and availability\n- uptime and performance metrics"
           },
           "response": []
         }

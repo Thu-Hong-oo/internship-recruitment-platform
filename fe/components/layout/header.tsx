@@ -22,6 +22,12 @@ import {
   Clock,
   ExternalLink,
   CheckCircle2,
+  Sparkles,
+  TrendingUp,
+  Target,
+  Map,
+  BarChart3,
+  FileText,
 } from "lucide-react"; //icon
 import { Badge } from "@/components/ui/badge"; // bo tròn như badge
 import { Switch } from "@/components/ui/switch";
@@ -93,6 +99,7 @@ export default function Header() {
 
   // Sử dụng custom hook cho 2 dropdowns
   const jobsDropdown = useDropdown(150);
+  const aiDropdown = useDropdown(150);
   const cvDropdown = useDropdown(150);
 
   // Đăng nhập khi có user trong context
@@ -440,6 +447,83 @@ export default function Header() {
                           )}
                         </div>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* AI & Kỹ năng Dropdown */}
+            <div className="relative">
+              <button
+                className="flex items-center text-foreground hover:text-primary transition-colors duration-200"
+                onMouseEnter={aiDropdown.openDropdown}
+                onMouseLeave={aiDropdown.closeDropdown}
+              >
+                AI & Kỹ năng
+                <ChevronDown className="w-4 h-4 ml-1" />
+              </button>
+              {aiDropdown.isOpen && (
+                <div
+                  className="absolute top-full left-0 mt-2 w-80 bg-card border border-border rounded-lg shadow-xl z-50"
+                  onMouseEnter={aiDropdown.openDropdown}
+                  onMouseLeave={aiDropdown.closeDropdown}
+                >
+                  <div className="p-6">
+                    <h3 className="font-semibold text-gray-800 mb-4">
+                      TÍNH NĂNG AI
+                    </h3>
+                    <div className="space-y-3">
+                      <Link
+                        href="/cv-analysis"
+                        className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
+                      >
+                        <FileText className="w-4 h-4 mr-3" />
+                        Phân tích CV bằng AI
+                        <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                          →
+                        </span>
+                      </Link>
+                      <Link
+                        href="/job-recommendations"
+                        className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
+                      >
+                        <TrendingUp className="w-4 h-4 mr-3" />
+                        Gợi ý việc làm AI
+                        <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                          →
+                        </span>
+                      </Link>
+                      <Link
+                        href="/skill-gap-analysis"
+                        className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
+                      >
+                        <Target className="w-4 h-4 mr-3" />
+                        Phân tích khoảng cách kỹ năng
+                        <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                          →
+                        </span>
+                      </Link>
+                      <Link
+                        href="/roadmaps"
+                        className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
+                      >
+                        <Map className="w-4 h-4 mr-3" />
+                        Lộ trình học tập
+                        <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                          →
+                        </span>
+                      </Link>
+                      <Link
+                        href="/insights"
+                        className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
+                      >
+                        <BarChart3 className="w-4 h-4 mr-3" />
+                        Thông tin ứng viên
+                        <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+                          →
+                        </span>
+                      </Link>
                     </div>
                   </div>
                 </div>

@@ -20,14 +20,63 @@ class AdvancedNLPController {
    */
   async calculateMatchingScore(req, res) {
     try {
-      const { cvData, jobId, candidateId } = req.body;
+      const { cvData, jobId, candidateId, forceRecalculate } = req.body;
       const userId = req.user._id;
 
       // Validate input
-      if (!cvData || !jobId) {
+      if (!jobId) {
         return res.status(400).json({
           success: false,
-          message: 'CV data and Job ID are required',
+          message: 'Job ID is required',
+        });
+      }
+
+      const finalCandidateId = candidateId || userId;
+
+      // If cvData not provided, fetch from candidate profile
+      let finalCvData = cvData;
+      if (!cvData && finalCandidateId) {
+        const candidateProfile = await CandidateProfile.findOne({ userId: finalCandidateId })
+          .populate('userId', 'fullName email')
+          .lean();
+
+        if (!candidateProfile || !candidateProfile.resume?.current) {
+          return res.status(400).json({
+            success: false,
+            message: 'CV data is required. Please provide cvData or ensure candidate has uploaded a CV',
+          });
+        }
+
+        // Build cvData from candidate profile
+        // Transform profile format to match AI service expectations
+        const profileSkills = candidateProfile.skills || {};
+        const allSkills = [
+          ...(profileSkills.technical || []),
+          ...(profileSkills.soft || []),
+          ...(profileSkills.languages || [])
+        ];
+
+        const profileExperience = candidateProfile.experience || {};
+        const allExperience = [
+          ...(profileExperience.internships || []),
+          ...(profileExperience.fullTime || []),
+          ...(profileExperience.projects || [])
+        ];
+
+        finalCvData = {
+          personalInfo: candidateProfile.personalInfo || {},
+          education: candidateProfile.education || {},
+          experience: allExperience,
+          skills: allSkills,
+          resume: candidateProfile.resume?.current,
+          extractedText: candidateProfile.resume?.current?.aiAnalysis?.extractedData || {},
+        };
+      }
+
+      if (!finalCvData) {
+        return res.status(400).json({
+          success: false,
+          message: 'CV data is required',
         });
       }
 
@@ -40,33 +89,20 @@ class AdvancedNLPController {
         });
       }
 
-      const finalCandidateId = candidateId || userId;
-
-      // Try to get from cache first
-      const cacheService = getCacheService();
-      let matchingResult = null;
+      // CACHE DISABLED: Always calculate fresh matching score
+      // Reason: CV data changes frequently, weights updated, algorithm improvements
+      // Old cached results become stale and misleading
+      logger.info(`🔄 Calculating new matching score for candidate ${finalCandidateId} and job ${jobId}`);
       
-      if (cacheService) {
-        matchingResult = await cacheService.getCachedMatchingScore(finalCandidateId, jobId);
-      }
-
-      // If not in cache, calculate matching score
-      if (!matchingResult) {
-        matchingResult = await aiService.calculateAdvancedMatchScore(
-          cvData,
-          job,
-          {
-            candidateId: finalCandidateId,
-            jobId,
-            saveToDatabase: true,
-          }
-        );
-
-        // Cache the result
-        if (cacheService) {
-          await cacheService.cacheMatchingScore(finalCandidateId, jobId, matchingResult);
+      const matchingResult = await aiService.calculateAdvancedMatchScore(
+        finalCvData,
+        job,
+        {
+          candidateId: finalCandidateId,
+          jobId,
+          saveToDatabase: true,
         }
-      }
+      );
 
       res.status(200).json({
         success: true,
@@ -777,47 +813,293 @@ class AdvancedNLPController {
 
       logger.info(`🚀 Generating RAG-powered roadmap for candidate: ${candidateId}`);
 
+      // Get candidate profile first (needed for cvData)
+      const candidateProfile = await CandidateProfile.findOne({
+        userId: candidateId,
+      });
+      
+      if (!candidateProfile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Candidate profile not found. Please complete your profile first.',
+        });
+      }
+
+      // Extract cvData from profile if not provided
+      let candidateCvData = cvData;
+      if (!candidateCvData && candidateProfile.resume?.current?.aiAnalysis?.extractedData) {
+        candidateCvData = candidateProfile.resume.current.aiAnalysis.extractedData;
+        logger.info(`✅ Loaded CV data from profile`);
+      }
+
+      // Convert candidateProfile to cvData format for selfSufficientAI
+      const convertedCvData = {
+        skills: {
+          technical: candidateProfile.skills?.technical || [],
+          soft: candidateProfile.skills?.soft || [],
+          languages: candidateProfile.skills?.languages || []
+        },
+        experience: candidateProfile.experience?.internships || candidateProfile.experience?.projects || [],
+        education: candidateProfile.education?.university ? [candidateProfile.education.university] : []
+      };
+
       // Get matching score to identify skill gaps
       let skillGaps = [];
+      let jobData = null;
+      let extractedTargetRole = targetRole; // Use provided or extract from job
       
       if (targetJobId) {
-        const matchingScore = await CVMatchingScore.findOne({
+        // Try to get existing matching score
+        let matchingScore = await CVMatchingScore.findOne({
           candidateId,
           jobId: targetJobId,
         }).lean();
 
-        if (matchingScore && matchingScore.skillGapAnalysis?.missingSkills) {
-          skillGaps = matchingScore.skillGapAnalysis.missingSkills.map(skill => ({
-            skill: skill.skill || skill,
-            importance: skill.importance || 'important',
-            priority: skill.priority || 5,
-          }));
+        // If no matching score exists, calculate it automatically
+        if (!matchingScore) {
+          logger.info(`⚠️ No matching score found, calculating automatically...`);
+          
+          // Get job data
+          jobData = await Job.findById(targetJobId);
+          if (!jobData) {
+            return res.status(404).json({
+              success: false,
+              message: 'Job not found',
+            });
+          }
+          
+          // Extract target role from job if not provided
+          if (!extractedTargetRole) {
+            extractedTargetRole = jobData.title || 'Target Position';
+            logger.info(`✅ Extracted target role from job: ${extractedTargetRole}`);
+          }
+
+          // Use selfSufficientAIService to analyze skill gaps
+          const { getSelfSufficientAIService } = require('../services/ai/selfSufficientAIService');
+          const selfSufficientAI = getSelfSufficientAIService();
+          
+          const skillGapResult = await selfSufficientAI.analyzeSkillGaps(
+            convertedCvData,
+            jobData
+          );
+
+          if (skillGapResult && skillGapResult.missingSkills && skillGapResult.missingSkills.length > 0) {
+            skillGaps = skillGapResult.missingSkills.map(skill => {
+              // Map importance: string → Number (0-1)
+              let importanceValue = 0.5;
+              if (typeof skill.importance === 'number') {
+                importanceValue = Math.min(Math.max(skill.importance, 0), 1);
+              } else if (typeof skill.importance === 'string') {
+                const importanceMap = {'critical': 0.9, 'high': 0.8, 'important': 0.7, 'medium': 0.5, 'low': 0.3};
+                importanceValue = importanceMap[skill.importance.toLowerCase()] || 0.5;
+              }
+              
+              // Map priority: number → enum string
+              let priorityValue = 'medium';
+              if (typeof skill.priority === 'number') {
+                if (skill.priority <= 2) priorityValue = 'critical';
+                else if (skill.priority <= 4) priorityValue = 'high';
+                else if (skill.priority <= 6) priorityValue = 'medium';
+                else priorityValue = 'low';
+              } else if (typeof skill.priority === 'string') {
+                priorityValue = ['critical', 'high', 'medium', 'low'].includes(skill.priority.toLowerCase()) 
+                  ? skill.priority.toLowerCase() : 'medium';
+              }
+              
+              return {
+                skill: skill.name || skill.skill || skill,
+                currentLevel: skill.currentLevel || 'none',
+                targetLevel: skill.targetLevel || 'intermediate',
+                importance: importanceValue,
+                priority: priorityValue,
+              };
+            });
+            logger.info(`✅ Auto-calculated ${skillGaps.length} skill gaps:`, skillGaps.map(s => s.skill).join(', '));
+          } else {
+            logger.warn(`⚠️ No missing skills found in skill gap analysis`);
+          }
+        } else if (matchingScore.skillGapAnalysis?.missingSkills) {
+          skillGaps = matchingScore.skillGapAnalysis.missingSkills.map(skill => {
+            let importanceValue = 0.5;
+            if (typeof skill.importance === 'number') {
+              importanceValue = Math.min(Math.max(skill.importance, 0), 1);
+            } else if (typeof skill.importance === 'string') {
+              const importanceMap = {'critical': 0.9, 'high': 0.8, 'important': 0.7, 'medium': 0.5, 'low': 0.3};
+              importanceValue = importanceMap[skill.importance.toLowerCase()] || 0.5;
+            }
+            
+            let priorityValue = 'medium';
+            if (typeof skill.priority === 'number') {
+              if (skill.priority <= 2) priorityValue = 'critical';
+              else if (skill.priority <= 4) priorityValue = 'high';
+              else if (skill.priority <= 6) priorityValue = 'medium';
+              else priorityValue = 'low';
+            } else if (typeof skill.priority === 'string') {
+              priorityValue = ['critical', 'high', 'medium', 'low'].includes(skill.priority.toLowerCase()) 
+                ? skill.priority.toLowerCase() : 'medium';
+            }
+            
+            return {
+              skill: skill.name || skill.skill || skill,
+              currentLevel: skill.currentLevel || 'none',
+              targetLevel: skill.targetLevel || 'intermediate',
+              importance: importanceValue,
+              priority: priorityValue,
+            };
+          });
+          logger.info(`✅ Using existing matching score with ${skillGaps.length} skill gaps`);
+        }
+      }
+
+      // If still no skill gaps and targetRole provided, try to extract from profile
+      if (skillGaps.length === 0 && extractedTargetRole) {
+        logger.info(`⚠️ No skill gaps from job, trying to generate from targetRole: ${extractedTargetRole}`);
+        
+        // Use already loaded candidateProfile (no need to fetch again)
+        if (candidateProfile) {
+            // Use AI to suggest skills for target role
+            const { getSelfSufficientAIService } = require('../services/ai/selfSufficientAIService');
+            const selfSufficientAI = getSelfSufficientAIService();
+            
+            // Create a mock job data for target role
+            const mockJobData = {
+              title: extractedTargetRole,
+              skills: [], // Empty, let AI suggest
+              description: `Position: ${extractedTargetRole}`,
+            };
+            
+            const skillGapResult = await selfSufficientAI.analyzeSkillGaps(
+              convertedCvData,
+              mockJobData
+            );
+            
+            if (skillGapResult && skillGapResult.missingSkills && skillGapResult.missingSkills.length > 0) {
+              skillGaps = skillGapResult.missingSkills.map(skill => {
+                let importanceValue = 0.5;
+                if (typeof skill.importance === 'number') {
+                  importanceValue = Math.min(Math.max(skill.importance, 0), 1);
+                } else if (typeof skill.importance === 'string') {
+                  const importanceMap = {'critical': 0.9, 'high': 0.8, 'important': 0.7, 'medium': 0.5, 'low': 0.3};
+                  importanceValue = importanceMap[skill.importance.toLowerCase()] || 0.5;
+                }
+                
+                let priorityValue = 'medium';
+                if (typeof skill.priority === 'number') {
+                  if (skill.priority <= 2) priorityValue = 'critical';
+                  else if (skill.priority <= 4) priorityValue = 'high';
+                  else if (skill.priority <= 6) priorityValue = 'medium';
+                  else priorityValue = 'low';
+                } else if (typeof skill.priority === 'string') {
+                  priorityValue = ['critical', 'high', 'medium', 'low'].includes(skill.priority.toLowerCase()) 
+                    ? skill.priority.toLowerCase() : 'medium';
+                }
+                
+                return {
+                  skill: skill.name || skill.skill || skill,
+                  currentLevel: skill.currentLevel || 'none',
+                  targetLevel: skill.targetLevel || 'intermediate',
+                  importance: importanceValue,
+                  priority: priorityValue,
+                };
+              });
+              logger.info(`✅ Generated ${skillGaps.length} skill gaps from targetRole`);
+            }
         }
       }
 
       // If no skill gaps from matching, extract from CVData
-      if (skillGaps.length === 0 && cvData) {
-        // Use AI to extract skill gaps
-        const extractedGaps = await aiService.extractSkillGapsFromCV(cvData, targetRole);
-        skillGaps = extractedGaps || [];
+      if (skillGaps.length === 0 && candidateCvData) {
+        logger.info(`⚠️ No skill gaps from job, using cvData...`);
+        
+        // Use selfSufficientAI to analyze skill gaps based on CV data
+        const { getSelfSufficientAIService } = require('../services/ai/selfSufficientAIService');
+        const selfSufficientAI = getSelfSufficientAIService();
+        
+        // Create a mock job data if targetRole provided
+        if (extractedTargetRole) {
+          const mockJobData = {
+            title: extractedTargetRole,
+            skills: [],
+            description: `Position: ${extractedTargetRole}`,
+          };
+          
+          const skillGapResult = await selfSufficientAI.analyzeSkillGaps(
+            convertedCvData,
+            mockJobData
+          );
+          
+          if (skillGapResult && skillGapResult.missingSkills && skillGapResult.missingSkills.length > 0) {
+            skillGaps = skillGapResult.missingSkills.map(skill => {
+              // Map importance: string → Number (0-1)
+              let importanceValue = 0.5; // default medium
+              if (typeof skill.importance === 'number') {
+                importanceValue = Math.min(Math.max(skill.importance, 0), 1);
+              } else if (typeof skill.importance === 'string') {
+                const importanceMap = {
+                  'critical': 0.9,
+                  'high': 0.8,
+                  'important': 0.7,
+                  'medium': 0.5,
+                  'low': 0.3,
+                };
+                importanceValue = importanceMap[skill.importance.toLowerCase()] || 0.5;
+              }
+              
+              // Map priority: number → enum string
+              let priorityValue = 'medium';
+              if (typeof skill.priority === 'number') {
+                if (skill.priority <= 2) priorityValue = 'critical';
+                else if (skill.priority <= 4) priorityValue = 'high';
+                else if (skill.priority <= 6) priorityValue = 'medium';
+                else priorityValue = 'low';
+              } else if (typeof skill.priority === 'string') {
+                priorityValue = ['critical', 'high', 'medium', 'low'].includes(skill.priority.toLowerCase()) 
+                  ? skill.priority.toLowerCase() 
+                  : 'medium';
+              }
+              
+              return {
+                skill: skill.name || skill.skill || skill,
+                currentLevel: skill.currentLevel || 'none',
+                targetLevel: skill.targetLevel || 'intermediate',
+                importance: importanceValue,
+                priority: priorityValue,
+              };
+            });
+            logger.info(`✅ Extracted ${skillGaps.length} skill gaps from CV data`);
+          }
+        }
       }
 
       if (skillGaps.length === 0) {
+        logger.error('❌ No skill gaps identified', {
+          candidateId,
+          targetJobId,
+          targetRole,
+          hasCvData: !!candidateCvData,
+        });
+        
         return res.status(400).json({
           success: false,
-          message: 'Unable to identify skill gaps. Please provide CVData or calculate matching score first.',
+          message: 'Unable to identify skill gaps. Please ensure you have a complete profile with skills, experience, and education.',
+          details: {
+            candidateId: candidateId,
+            jobId: targetJobId,
+            targetRole: targetRole,
+            suggestion: 'Please complete your profile at /api/candidate-profile or provide targetRole in request body',
+          },
         });
       }
 
-      logger.info(`📊 Identified ${skillGaps.length} skill gaps`);
+      logger.info(`📊 Identified ${skillGaps.length} skill gaps:`, skillGaps.map(s => s.skill).join(', '));
 
       // Initialize RAG service
       await ragService.initialize();
 
       // Generate RAG-powered roadmap with real resources
       const ragRoadmap = await ragService.generateRoadmap(skillGaps, {
-        jobTitle: targetRole || 'Target Position',
-        currentLevel: cvData?.currentLevel || 'beginner',
+        jobTitle: extractedTargetRole || 'Target Position',
+        currentLevel: candidateCvData?.currentLevel || 'beginner',
         timeframe: timeframe,
       });
 
@@ -825,17 +1107,17 @@ class AdvancedNLPController {
       const learningRoadmap = new LearningRoadmap({
         candidateId: candidateId,
         targetJobId: targetJobId || null,
-        targetRole: targetRole || 'Target Position',
+        targetRole: extractedTargetRole || 'Target Position',
         skillGaps: skillGaps,
         currentLevel: ragRoadmap.currentLevel,
-        targetLevel: ragRoadmap.targetLevel,
         estimatedDuration: timeframe,
+        totalDuration: `${timeframe} weeks`, // Required field
         phases: ragRoadmap.phases.map(phase => ({
           phaseNumber: phase.phaseNumber,
-          name: phase.phaseName,
-          duration: phase.duration,
-          learningObjectives: phase.learningObjectives,
-          weeks: this.convertPhaseToWeeks(phase),
+          title: phase.phaseName, // Schema requires 'title', not 'name'
+          duration: `${phase.duration} weeks`, // Convert Number to String
+          objectives: phase.learningObjectives || [],
+          weeks: AdvancedNLPController.convertPhaseToWeeks(phase),
         })),
         progress: {
           currentPhase: 1,
@@ -883,38 +1165,50 @@ class AdvancedNLPController {
    * @param {Object} phase - RAG phase
    * @returns {Array} Weekly breakdown
    */
-  convertPhaseToWeeks(phase) {
+  static convertPhaseToWeeks(phase) {
     const weeks = [];
-    const weeksInPhase = phase.duration;
-    const skillsPerWeek = Math.ceil(phase.skills.length / weeksInPhase);
+    const weeksInPhase = typeof phase.duration === 'number' ? phase.duration : parseInt(phase.duration) || 1;
+    
+    // Fix: Only create weeks that have skills assigned
+    const actualWeeks = Math.min(weeksInPhase, phase.skills.length);
+    const skillsPerWeek = Math.ceil(phase.skills.length / actualWeeks);
 
-    for (let weekNum = 1; weekNum <= weeksInPhase; weekNum++) {
+    for (let weekNum = 1; weekNum <= actualWeeks; weekNum++) {
       const startIdx = (weekNum - 1) * skillsPerWeek;
       const endIdx = Math.min(startIdx + skillsPerWeek, phase.skills.length);
       const weekSkills = phase.skills.slice(startIdx, endIdx);
 
       const weekResources = weekSkills.flatMap(skillGroup => 
-        skillGroup.resources.map(resource => ({
-          type: resource.type,
-          title: resource.title,
-          url: resource.url,
-          provider: resource.provider,
-          duration: resource.duration,
-          difficulty: resource.difficulty,
-          rating: resource.rating,
-          credibility: resource.credibility,
-          source: resource.source,
-          metadata: resource.metadata,
-        }))
+        skillGroup.resources.map(resource => {
+          // Fix difficulty: ensure it's valid enum (beginner, intermediate, advanced)
+          let validDifficulty = resource.difficulty;
+          if (!validDifficulty || !['beginner', 'intermediate', 'advanced'].includes(validDifficulty)) {
+            validDifficulty = 'beginner'; // Default to beginner if invalid
+          }
+          
+          return {
+            type: resource.type,
+            title: resource.title,
+            url: resource.url,
+            provider: resource.provider,
+            duration: resource.duration,
+            difficulty: validDifficulty,
+            rating: resource.rating,
+            credibility: resource.credibility,
+            source: resource.source,
+            metadata: resource.metadata,
+            isFree: resource.isFree !== undefined ? resource.isFree : true,
+            language: resource.language || 'en',
+          };
+        })
       );
 
       weeks.push({
         weekNumber: weekNum,
-        focusSkills: weekSkills.map(s => s.skill),
+        focus: weekSkills.map(s => s.skill).join(', ') || `Week ${weekNum} Learning`, // Required string field
         learningObjectives: weekSkills.map(s => `Master ${s.skill} fundamentals`),
         resources: weekResources,
-        estimatedHours: weekResources.reduce((sum, r) => sum + (r.duration || 0) / 60, 0),
-        completed: false,
+        timeCommitment: `${Math.ceil(weekResources.length * 2)} hours/week`, // Estimate 2 hours per resource
       });
     }
 
@@ -940,6 +1234,200 @@ class AdvancedNLPController {
       res.status(500).json({
         success: false,
         message: 'Error checking RAG service health',
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * @route   POST /api/nlp/calculate-all-matches
+   * @desc    Calculate matching scores for all active jobs for current candidate
+   * @access  Private (Candidate/Intern)
+   */
+  async calculateAllJobMatches(req, res) {
+    try {
+      const candidateUserId = req.user._id;
+      
+      logger.info(`Calculating all job matches for candidate: ${candidateUserId}`);
+
+      // 1. Fetch candidate profile
+      const candidateProfile = await CandidateProfile.findOne({ 
+        userId: candidateUserId 
+      }).populate('userId', 'fullName email');
+
+      if (!candidateProfile) {
+        return res.status(404).json({
+          success: false,
+          message: 'Candidate profile not found',
+        });
+      }
+
+      // 2. Build cvData from candidate profile
+      const profileSkills = candidateProfile.skills || {};
+      const allSkills = [
+        ...(profileSkills.technical || []),
+        ...(profileSkills.soft || []),
+        ...(profileSkills.languages || [])
+      ];
+
+      const profileExperience = candidateProfile.experience || {};
+      const allExperience = [
+        ...(profileExperience.internships || []),
+        ...(profileExperience.fullTime || []),
+        ...(profileExperience.projects || [])
+      ];
+
+      const cvData = {
+        personalInfo: candidateProfile.personalInfo || {},
+        education: candidateProfile.education || {},
+        experience: allExperience,
+        skills: allSkills,
+        resume: candidateProfile.resume?.current,
+        extractedText: candidateProfile.resume?.current?.aiAnalysis?.extractedData || {},
+      };
+
+      // 3. Fetch all active jobs
+      const activeJobs = await Job.find({ status: 'active' })
+        .populate('skills')
+        .populate('employer', 'companyName')
+        .lean();
+
+      if (activeJobs.length === 0) {
+        return res.status(200).json({
+          success: true,
+          message: 'No active jobs available',
+          data: {
+            calculated: 0,
+            total: 0,
+          },
+        });
+      }
+
+      // 4. Calculate matching scores for each job (PARALLEL PROCESSING)
+      let successCount = 0;
+      let errorCount = 0;
+      const topMatches = [];
+
+      logger.info(`📊 Starting calculation for ${activeJobs.length} jobs...`);
+
+      // Process jobs in parallel batches for better performance
+      const BATCH_SIZE = 5; // Process 5 jobs at a time
+      const batches = [];
+      
+      for (let i = 0; i < activeJobs.length; i += BATCH_SIZE) {
+        batches.push(activeJobs.slice(i, i + BATCH_SIZE));
+      }
+
+      logger.info(`⚡ Processing in ${batches.length} batches of ${BATCH_SIZE} jobs each`);
+
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batch = batches[batchIndex];
+        const batchStartIndex = batchIndex * BATCH_SIZE;
+
+        logger.info(`📦 Batch ${batchIndex + 1}/${batches.length}: Processing ${batch.length} jobs in parallel...`);
+
+        // Process batch in parallel
+        const batchResults = await Promise.allSettled(
+          batch.map(async (job, indexInBatch) => {
+            const jobIndex = batchStartIndex + indexInBatch + 1;
+            
+            try {
+              logger.info(`🔄 [${jobIndex}/${activeJobs.length}] Processing: ${job.title}`);
+
+              // Prepare job data
+              const jobData = {
+                _id: job._id,
+                title: job.title,
+                description: job.description,
+                requirements: job.requirements,
+                skills: job.skills,
+                industryCode: job.industryCode,
+                location: job.location,
+                salaryRange: job.salaryRange,
+                employmentType: job.employmentType,
+              };
+
+              // Calculate matching score
+              const matchingResult = await aiService.calculateAdvancedMatchScore(
+                cvData,
+                jobData,
+                {
+                  candidateId: candidateUserId,
+                  jobId: job._id,
+                  forceRecalculate: false,
+                }
+              );
+
+              logger.info(`✅ [${jobIndex}/${activeJobs.length}] Score: ${matchingResult.overallScore}% - ${job.title}`);
+
+              // Delete existing score if any
+              await CVMatchingScore.deleteMany({
+                candidateId: candidateUserId,
+                jobId: job._id,
+              });
+
+              // Save new score
+              await CVMatchingScore.create(matchingResult);
+
+              return {
+                success: true,
+                job,
+                matchingResult,
+              };
+
+            } catch (error) {
+              logger.error(`❌ [${jobIndex}/${activeJobs.length}] Error for ${job.title}:`, error.message);
+              return {
+                success: false,
+                job,
+                error,
+              };
+            }
+          })
+        );
+
+        // Process batch results
+        for (const result of batchResults) {
+          if (result.status === 'fulfilled' && result.value.success) {
+            successCount++;
+            const { matchingResult, job } = result.value;
+
+            // Keep track of top matches for response (threshold: 30%)
+            if (matchingResult.overallScore >= 30) {
+              topMatches.push({
+                jobId: job._id,
+                title: job.title,
+                company: job.employer?.companyName,
+                score: matchingResult.overallScore,
+              });
+            }
+          } else {
+            errorCount++;
+          }
+        }
+
+        logger.info(`✅ Batch ${batchIndex + 1}/${batches.length} completed: ${successCount} successful, ${errorCount} failed`);
+      }
+
+      // Sort top matches by score
+      topMatches.sort((a, b) => b.score - a.score);
+
+      res.status(200).json({
+        success: true,
+        message: 'Job matching scores calculated successfully',
+        data: {
+          calculated: successCount,
+          failed: errorCount,
+          total: activeJobs.length,
+          topMatches: topMatches.slice(0, 10), // Return top 10
+        },
+      });
+
+    } catch (error) {
+      logger.error('Error calculating all job matches:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error calculating job matches',
         error: error.message,
       });
     }
