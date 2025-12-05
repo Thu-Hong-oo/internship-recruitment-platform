@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback } from "react";
 import { useVerificationStatus } from "@/hooks/useVerificationStatus";
+import { useEmployerProfile } from "@/contexts/EmployerProfileContext";
 
 interface VerificationContextType {
   refreshVerification: () => void;
@@ -19,15 +20,18 @@ export function VerificationProvider({
 }) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { refreshVerificationStatus } = useVerificationStatus();
+  const { refreshProfile } = useEmployerProfile();
 
   const refreshVerification = useCallback(async () => {
     setIsRefreshing(true);
     try {
+      // Refresh profile first, then verification status will update automatically
+      await refreshProfile();
       await refreshVerificationStatus();
     } finally {
       setIsRefreshing(false);
     }
-  }, [refreshVerificationStatus]);
+  }, [refreshVerificationStatus, refreshProfile]);
 
   return (
     <VerificationContext.Provider value={{ refreshVerification, isRefreshing }}>

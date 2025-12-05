@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageLayout } from "@/components/layout";
 import { useEffect, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { jobsAPI, JobItem } from "@/lib/api";
 import JobFilters, {
   JobFilters as JobFiltersType,
@@ -22,7 +22,62 @@ export default function JobSearchResults() {
   const [pageSize, setPageSize] = useState(10);
   const [totalJobs, setTotalJobs] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
-  const [filters, setFilters] = useState<JobFiltersType>({});
+  const [filters, setFilters] = useState<JobFiltersType>({
+    sortBy: "createdAt",
+    sortOrder: "desc",
+  });
+
+  const buildFiltersFromSearchParams = (): JobFiltersType => {
+    const get = (k: string) => searchParams?.get(k) || undefined;
+    const getList = (k: string) => {
+      const v = searchParams?.get(k);
+      return v
+        ? v
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : undefined;
+    };
+    const getNumber = (k: string) => {
+      const v = get(k);
+      return v ? Number(v) : undefined;
+    };
+
+    const current: JobFiltersType = {
+      q: get("q"),
+      location: get("location"),
+      city: get("city"),
+      skills: getList("skills"),
+      jobType: get("jobType"),
+      level: get("level"),
+      workingMode: get("workingMode"),
+      industryCode: get("industryCode"),
+      subIndustryCode: get("subIndustryCode"),
+      salaryMin: getNumber("salaryMin"),
+      salaryMax: getNumber("salaryMax"),
+      salaryRange: get("salaryRange"),
+      createdFrom: get("createdFrom"),
+      createdTo: get("createdTo"),
+      deadlineFrom: get("deadlineFrom"),
+      deadlineTo: get("deadlineTo"),
+      isUrgent: get("isUrgent") === "true",
+      sortBy: get("sortBy") || "createdAt",
+      sortOrder: (get("sortOrder") as "asc" | "desc") || "desc",
+    };
+
+    Object.keys(current).forEach((key) => {
+      if (current[key as keyof JobFiltersType] === undefined) {
+        delete current[key as keyof JobFiltersType];
+      }
+    });
+    return current;
+  };
+
+  // Sync filters from URL (for navigation from hero/home)
+  useEffect(() => {
+    const urlFilters = buildFiltersFromSearchParams();
+    setFilters((prev) => ({ ...prev, ...urlFilters }));
+  }, [searchParams]);
 
   // Location options
   const locations = [
@@ -101,66 +156,17 @@ export default function JobSearchResults() {
     { value: "contract", label: "Hợp đồng" },
   ];
 
-  // Build filters from URL params (source of truth) -> JobFilters state
-  const buildFiltersFromSearchParams = (): JobFiltersType => {
-    const get = (k: string) => searchParams?.get(k) || undefined;
-    const getList = (k: string) => {
-      const v = searchParams?.get(k);
-      return v
-        ? v
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : undefined;
-    };
-    const getNumber = (k: string) => {
-      const v = get(k);
-      return v ? Number(v) : undefined;
-    };
-
-    const current: JobFiltersType = {
-      q: get("q"),
-      location: get("location"),
-      city: get("city"),
-      skills: getList("skills"),
-      jobType: get("jobType"),
-      level: get("level"),
-      workingMode: get("workingMode"),
-      industryCode: get("industryCode"),
-      subIndustryCode: get("subIndustryCode"),
-      salaryMin: getNumber("salaryMin"),
-      salaryMax: getNumber("salaryMax"),
-      salaryRange: get("salaryRange"),
-      createdFrom: get("createdFrom"),
-      createdTo: get("createdTo"),
-      deadlineFrom: get("deadlineFrom"),
-      deadlineTo: get("deadlineTo"),
-      isUrgent: get("isUrgent") === "true",
-      sortBy: get("sortBy") || "createdAt",
-      sortOrder: (get("sortOrder") as "asc" | "desc") || "desc",
-    };
-
-    Object.keys(current).forEach((key) => {
-      if (current[key as keyof JobFiltersType] === undefined) {
-        delete current[key as keyof JobFiltersType];
-      }
-    });
-    return current;
-  };
-
-  // Sync filters state from URL
-  useEffect(() => {
-    const urlFilters = buildFiltersFromSearchParams();
-    setFilters(urlFilters);
-  }, [searchParams]);
-
   // Fetch jobs
-  const fetchJobs = async (page = currentPage, limit = pageSize) => {
+  const fetchJobs = async (
+    page = currentPage,
+    limit = pageSize,
+    appliedFilters: JobFiltersType = filters
+  ) => {
     try {
       setLoading(true);
       setError(null);
       const apiFilters = {
-        ...buildFiltersFromSearchParams(),
+        ...appliedFilters,
         status: "active",
       };
       const res = await jobsAPI.getJobs(page, limit, apiFilters);
@@ -178,54 +184,26 @@ export default function JobSearchResults() {
     }
   };
 
-  // Load jobs when filters or page change
+  // Load jobs when filters change
   useEffect(() => {
     setCurrentPage(1);
-    fetchJobs(1, pageSize);
-  }, [searchParams]);
+    fetchJobs(1, pageSize, filters);
+  }, [filters]);
 
   const handleFiltersChange = (newFilters: JobFiltersType) => {
     setFilters(newFilters);
-    const qs = new URLSearchParams();
-    if (newFilters.q) qs.set("q", newFilters.q);
-    if (newFilters.location) qs.set("location", newFilters.location);
-    if (newFilters.city) qs.set("city", newFilters.city);
-    if (newFilters.jobType) qs.set("jobType", newFilters.jobType);
-    if (newFilters.level) qs.set("level", newFilters.level);
-    if (newFilters.workingMode) qs.set("workingMode", newFilters.workingMode);
-    if (newFilters.industryCode)
-      qs.set("industryCode", newFilters.industryCode);
-    if (newFilters.subIndustryCode)
-      qs.set("subIndustryCode", newFilters.subIndustryCode);
-    if (newFilters.skills && newFilters.skills.length > 0)
-      qs.set("skills", newFilters.skills.join(","));
-    if (newFilters.salaryMin) qs.set("salaryMin", String(newFilters.salaryMin));
-    if (newFilters.salaryMax) qs.set("salaryMax", String(newFilters.salaryMax));
-    if (newFilters.salaryRange) qs.set("salaryRange", newFilters.salaryRange);
-    if (newFilters.createdFrom) qs.set("createdFrom", newFilters.createdFrom);
-    if (newFilters.createdTo) qs.set("createdTo", newFilters.createdTo);
-    if (newFilters.deadlineFrom)
-      qs.set("deadlineFrom", newFilters.deadlineFrom);
-    if (newFilters.deadlineTo) qs.set("deadlineTo", newFilters.deadlineTo);
-    if (newFilters.isUrgent) qs.set("isUrgent", "true");
-    if (newFilters.sortBy) qs.set("sortBy", newFilters.sortBy);
-    if (newFilters.sortOrder) qs.set("sortOrder", newFilters.sortOrder);
-
-    const newUrl = qs.toString() ? `/search?${qs.toString()}` : "/search";
-    router.push(newUrl);
   };
 
   const handleFiltersReset = () => {
     setFilters({});
-    router.push("/search");
   };
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
-    fetchJobs(page, pageSize);
+    fetchJobs(page, pageSize, filters);
   };
 
-  const q = searchParams?.get("q") || "";
+  const q = filters.q || "";
 
   return (
     <PageLayout>

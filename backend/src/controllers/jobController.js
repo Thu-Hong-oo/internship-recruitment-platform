@@ -4,7 +4,10 @@ const Industry = require('../models/Industry');
 const Application = require('../models/Application');
 const CandidateProfile = require('../models/CandidateProfile');
 const { logger } = require('../utils/logger');
-const { createFlexibleRegex } = require('../utils/textUtils');
+const {
+  createFlexibleRegex,
+  removeVietnameseTones,
+} = require('../utils/textUtils');
 const {
   formatJobResponse,
   formatJobsResponse,
@@ -63,27 +66,27 @@ const getAllJobs = async (req, res) => {
     const view = req.query.view || 'summary';
 
     const query = {};
-    
+
     // Text search
     if (q) {
       query.$text = { $search: q };
     }
-    
+
     // Location filters (search in both legacy location and new address fields)
     // Supports accent-insensitive search: "Da Nang" matches "Đà Nẵng" and vice versa
     if (city || district || location) {
       const locationConditions = [];
-      
+
       if (city) {
         const cityRegex = createFlexibleRegex(city);
         locationConditions.push({ 'address.city': cityRegex });
       }
-      
+
       if (district) {
         const districtRegex = createFlexibleRegex(district);
         locationConditions.push({ 'address.district': districtRegex });
       }
-      
+
       if (location) {
         // General location search in multiple fields
         const locationRegex = createFlexibleRegex(location);
@@ -94,7 +97,7 @@ const getAllJobs = async (req, res) => {
           { 'address.fullAddress': locationRegex }
         );
       }
-      
+
       // Combine location conditions with AND logic if multiple specific filters
       // or OR logic if general location search
       if (city && district) {
@@ -108,15 +111,33 @@ const getAllJobs = async (req, res) => {
       } else if (location) {
         // General location search - use OR
         query.$or = locationConditions;
+
+        // Special handling: if location is Hồ Chí Minh, force city match to limit results to HCM
+        const normalizedLocation =
+          removeVietnameseTones(location).toLowerCase();
+        const hcmKeywords = [
+          'ho chi minh',
+          'tp ho chi minh',
+          'tphcm',
+          'tp.hcm',
+          'tp. ho chi minh',
+          'hcm',
+          'sai gon',
+          'saigon',
+          'tp hcm',
+        ];
+        if (hcmKeywords.some(keyword => normalizedLocation.includes(keyword))) {
+          query['address.city'] = createFlexibleRegex('Hồ Chí Minh');
+        }
       }
     }
-    
+
     // Skills filter
     if (skills) {
       const skillArray = skills.split(',').map(skill => skill.trim());
       query['skills'] = { $in: skillArray };
     }
-    
+
     // Employer filter
     if (employer) {
       query['employer'] = employer;
@@ -135,34 +156,34 @@ const getAllJobs = async (req, res) => {
     if (jobType) {
       query['jobType'] = jobType;
     }
-    
+
     // Job level filter (Intern, Fresher, Junior, Senior, Manager, Director)
     if (level) {
       const levelArray = level.split(',').map(l => l.trim());
       query['level'] = { $in: levelArray };
     }
-    
+
     // Working mode filter (Onsite, Remote, Hybrid)
     if (workingMode) {
       const modeArray = workingMode.split(',').map(m => m.trim());
       query['workingMode'] = { $in: modeArray };
     }
-    
+
     // Experience filter
     if (experience) {
       query['experience'] = { $regex: experience, $options: 'i' };
     }
-    
+
     // Education filter
     if (education) {
       query['education'] = { $regex: education, $options: 'i' };
     }
-    
+
     // Positions filter (number of open positions)
     if (positions) {
       query['positions'] = { $gte: Number(positions) };
     }
-    
+
     // New normalized industry filters
     if (subIndustryCode) {
       query['subIndustryCode'] = subIndustryCode;
@@ -182,7 +203,7 @@ const getAllJobs = async (req, res) => {
     if (category) {
       query['category'] = { $regex: category, $options: 'i' };
     }
-    
+
     // Salary filters
     if (salaryRange) {
       // Handle common salary range patterns
@@ -190,9 +211,9 @@ const getAllJobs = async (req, res) => {
         'below-10m': { max: 10000000 },
         '10m-20m': { min: 10000000, max: 20000000 },
         '20m-50m': { min: 20000000, max: 50000000 },
-        'above-50m': { min: 50000000 }
+        'above-50m': { min: 50000000 },
       };
-      
+
       // Check if it's a predefined range pattern
       if (rangeMap[salaryRange]) {
         const range = rangeMap[salaryRange];
@@ -204,7 +225,9 @@ const getAllJobs = async (req, res) => {
         }
       } else {
         // Handle numeric range (e.g., "5000000-10000000")
-        const [minSalary, maxSalary] = salaryRange.split('-').map(s => Number(s.trim()));
+        const [minSalary, maxSalary] = salaryRange
+          .split('-')
+          .map(s => Number(s.trim()));
         if (minSalary && !isNaN(minSalary)) {
           query['salaryMin'] = { $gte: minSalary };
         }
@@ -231,7 +254,7 @@ const getAllJobs = async (req, res) => {
       if (deadlineFrom) query['deadline'].$gte = new Date(deadlineFrom);
       if (deadlineTo) query['deadline'].$lte = new Date(deadlineTo);
     }
-    
+
     // Urgent jobs filter (deadline within 7 days)
     if (isUrgent === 'true') {
       const now = new Date();
@@ -241,7 +264,7 @@ const getAllJobs = async (req, res) => {
         $lte: sevenDaysLater,
       };
     }
-    
+
     // Tags filter
     if (tags) {
       const tagArray = tags.split(',').map(tag => tag.trim());
@@ -280,7 +303,7 @@ const getAllJobs = async (req, res) => {
     const safeSortBy = validSortFields.includes(sortBy) ? sortBy : 'createdAt'; // Fallback to createdAt if invalid
     const sortObj = {};
     sortObj[safeSortBy] = sortOrder === 'desc' ? -1 : 1;
-    
+
     // Add secondary sort by createdAt desc if primary sort is not createdAt
     if (safeSortBy !== 'createdAt') {
       sortObj['createdAt'] = -1; // Always sort by newest as secondary
@@ -322,15 +345,15 @@ const getAllJobs = async (req, res) => {
     let jobs;
     if (view === 'full') {
       jobs = await Job.find(query)
-      .populate(
-        'employer',
-        'company.name company.logo company.industry company.description company.website company.size company.officeAddress contact.phone contact.email'
-      )
-      .populate('postedBy', 'fullName name email avatar')
-      .populate('skillIds', 'name category')
+        .populate(
+          'employer',
+          'company.name company.logo company.industry company.description company.website company.size company.officeAddress contact.phone contact.email'
+        )
+        .populate('postedBy', 'fullName name email avatar')
+        .populate('skillIds', 'name category')
         .sort(sortObj)
-      .skip(skip)
-      .limit(parseInt(limit));
+        .skip(skip)
+        .limit(parseInt(limit));
     } else {
       jobs = await Job.find(query)
         .select(projection)
@@ -343,13 +366,13 @@ const getAllJobs = async (req, res) => {
     }
 
     const total = await Job.countDocuments(query);
-    
+
     console.log(`📊 Total matching jobs: ${total}`);
 
     // Try to get from cache first
     const cacheService = getCacheService();
     let formattedJobs = null;
-    
+
     if (cacheService) {
       formattedJobs = await cacheService.getCachedJobList({
         ...req.query,
@@ -364,61 +387,75 @@ const getAllJobs = async (req, res) => {
     if (!formattedJobs) {
       console.log('🔄 Cache miss, fetching from DB...');
       console.log(`📦 Query returned ${jobs.length} jobs from MongoDB`);
-      
+
       if (view === 'full') {
-      // Process jobs to populate skillIds and industryPath for old jobs
-      const { processJobData } = require('../utils/jobHelpers');
-      const jobsToUpdate = [];
-      
-      // Process jobs that need skillIds or industryPath populated
-      for (const job of jobs) {
-        const jobObj = job.toObject ? job.toObject() : job;
-        const needsProcessing = 
-          (Array.isArray(jobObj.skills) && jobObj.skills.length > 0 && (!jobObj.skillIds || jobObj.skillIds.length === 0)) ||
-          ((jobObj.industryCode || jobObj.subIndustryCode) && (!jobObj.industryPath || jobObj.industryPath.length === 0));
-        
-        if (needsProcessing) {
-          try {
-            const processedData = await processJobData(jobObj);
-            
-            // Update job document in memory for response
-            if (processedData.skillIds && processedData.skillIds.length > 0) {
-              job.skillIds = processedData.skillIds;
-              // Re-populate skillIds for response
-              await job.populate('skillIds', 'name category');
-            }
-            if (processedData.industryPath && processedData.industryPath.length > 0) {
-              job.industryPath = processedData.industryPath;
-            }
-            
-            // Mark for database update (async, don't wait)
-            jobsToUpdate.push({
-              jobId: job._id,
-              updates: {
-                ...(processedData.skillIds && processedData.skillIds.length > 0 ? { skillIds: processedData.skillIds } : {}),
-                ...(processedData.industryPath && processedData.industryPath.length > 0 ? { industryPath: processedData.industryPath } : {}),
+        // Process jobs to populate skillIds and industryPath for old jobs
+        const { processJobData } = require('../utils/jobHelpers');
+        const jobsToUpdate = [];
+
+        // Process jobs that need skillIds or industryPath populated
+        for (const job of jobs) {
+          const jobObj = job.toObject ? job.toObject() : job;
+          const needsProcessing =
+            (Array.isArray(jobObj.skills) &&
+              jobObj.skills.length > 0 &&
+              (!jobObj.skillIds || jobObj.skillIds.length === 0)) ||
+            ((jobObj.industryCode || jobObj.subIndustryCode) &&
+              (!jobObj.industryPath || jobObj.industryPath.length === 0));
+
+          if (needsProcessing) {
+            try {
+              const processedData = await processJobData(jobObj);
+
+              // Update job document in memory for response
+              if (processedData.skillIds && processedData.skillIds.length > 0) {
+                job.skillIds = processedData.skillIds;
+                // Re-populate skillIds for response
+                await job.populate('skillIds', 'name category');
               }
-            });
-          } catch (error) {
-            logger.error(`Error processing job ${job._id}:`, error);
+              if (
+                processedData.industryPath &&
+                processedData.industryPath.length > 0
+              ) {
+                job.industryPath = processedData.industryPath;
+              }
+
+              // Mark for database update (async, don't wait)
+              jobsToUpdate.push({
+                jobId: job._id,
+                updates: {
+                  ...(processedData.skillIds &&
+                  processedData.skillIds.length > 0
+                    ? { skillIds: processedData.skillIds }
+                    : {}),
+                  ...(processedData.industryPath &&
+                  processedData.industryPath.length > 0
+                    ? { industryPath: processedData.industryPath }
+                    : {}),
+                },
+              });
+            } catch (error) {
+              logger.error(`Error processing job ${job._id}:`, error);
+            }
           }
         }
-      }
 
-      // Update database in background (don't block response)
-      if (jobsToUpdate.length > 0) {
-        Promise.all(jobsToUpdate.map(async ({ jobId, updates }) => {
-          try {
-            if (Object.keys(updates).length > 0) {
-              await Job.findByIdAndUpdate(jobId, updates, { new: false });
-            }
-          } catch (error) {
-            logger.error(`Error updating job ${jobId} in database:`, error);
-          }
-        })).catch(error => {
-          logger.error('Error updating jobs in background:', error);
-        });
-      }
+        // Update database in background (don't block response)
+        if (jobsToUpdate.length > 0) {
+          Promise.all(
+            jobsToUpdate.map(async ({ jobId, updates }) => {
+              try {
+                if (Object.keys(updates).length > 0) {
+                  await Job.findByIdAndUpdate(jobId, updates, { new: false });
+                }
+              } catch (error) {
+                logger.error(`Error updating job ${jobId} in database:`, error);
+              }
+            })
+          ).catch(error => {
+            logger.error('Error updating jobs in background:', error);
+          });
+        }
 
         formattedJobs = formatJobsResponse(jobs, {
           employerFields: 'full',
@@ -426,7 +463,7 @@ const getAllJobs = async (req, res) => {
       } else {
         formattedJobs = formatMinimalJobsResponse(jobs);
       }
-      
+
       // Cache the results
       if (cacheService) {
         await cacheService.cacheJobList(
@@ -520,7 +557,7 @@ const getJob = async (req, res) => {
     const cacheService = getCacheService();
     let jobObj = null;
     let jobDocument = null;
-    
+
     if (cacheService) {
       jobObj = await cacheService.getCachedJobDetail(req.params.id);
     }
@@ -547,13 +584,13 @@ const getJob = async (req, res) => {
       // Format job using shared formatter
       jobObj = formatJobResponse(job);
       jobDocument = job;
-      
+
       // Cache the result
       if (cacheService) {
         await cacheService.cacheJobDetail(req.params.id, jobObj);
       }
     }
-    
+
     if (jobObj.postedBy) {
       const pb = jobObj.postedBy;
       const computedFullName =
@@ -585,7 +622,7 @@ const getJob = async (req, res) => {
         const [application, savedEntry] = await Promise.all([
           Application.findOne({
             jobId: jobIdToCheck,
-          candidateId: candidateProfile._id,
+            candidateId: candidateProfile._id,
           }),
           SavedJob.findOne({
             jobId: jobIdToCheck,
@@ -654,7 +691,7 @@ const createJob = async (req, res) => {
         addr.ward,
         addr.district,
         addr.city,
-        addr.country || 'Vietnam'
+        addr.country || 'Vietnam',
       ].filter(Boolean);
       jobData.address.fullAddress = addressParts.join(', ');
       // Set default country if not provided
@@ -737,7 +774,7 @@ const updateJob = async (req, res) => {
         addr.ward,
         addr.district,
         addr.city,
-        addr.country || 'Vietnam'
+        addr.country || 'Vietnam',
       ].filter(Boolean);
       updateData.address.fullAddress = addressParts.join(', ');
       // Set default country if not provided
@@ -757,13 +794,13 @@ const updateJob = async (req, res) => {
       .populate('employer', 'name logo industry description')
       .populate('postedBy', 'fullName name email avatar')
       .populate('skillIds', 'name category');
-    
+
     // Invalidate job caches when job is updated
     const cacheService = getCacheService();
     if (cacheService) {
       await cacheService.invalidateJobCache(req.params.id);
     }
-    
+
     res.status(200).json({ success: true, data: updatedJob });
   } catch (error) {
     logger.error('Error updating job:', error);
@@ -827,13 +864,13 @@ const deleteJob = async (req, res) => {
     job.deletedAt = new Date();
     job.deletedBy = req.user.id;
     await job.save();
-    
+
     // Invalidate job caches when job is deleted
     const cacheService = getCacheService();
     if (cacheService) {
       await cacheService.invalidateJobCache(req.params.id);
     }
-    
+
     res
       .status(200)
       .json({ success: true, message: 'Đã xóa công việc thành công' });
@@ -912,13 +949,13 @@ const applyForJob = async (req, res) => {
     });
     // Update job stats
     await Job.findByIdAndUpdate(id, { $inc: { 'stats.applications': 1 } });
-    
+
     // Notify employer về application mới
     try {
       const NotificationService = require('../services/notification/notificationService');
       const EmployerProfile = require('../models/EmployerProfile');
       const User = require('../models/User');
-      
+
       const employerProfile = await EmployerProfile.findById(job.employer);
       if (employerProfile && employerProfile.owner) {
         const employerUser = await User.findById(employerProfile.owner);
@@ -942,7 +979,7 @@ const applyForJob = async (req, res) => {
         applicationId: application._id,
       });
     }
-    
+
     // Notify candidate về application thành công
     try {
       const NotificationService = require('../services/notification/notificationService');
@@ -963,7 +1000,7 @@ const applyForJob = async (req, res) => {
         candidateId: req.user.id,
       });
     }
-    
+
     res.status(201).json({ success: true, data: application });
   } catch (error) {
     logger.error('Error applying for job:', error);
@@ -1143,18 +1180,18 @@ const getRecentJobs = async (req, res) => {
     // Try to get from cache first
     const cacheService = getCacheService();
     let formattedJobs = null;
-    
+
     if (cacheService) {
       formattedJobs = await cacheService.getCachedJobList({
         ...req.query,
-        sortBy: sortField
+        sortBy: sortField,
       });
     }
 
     // If not in cache, fetch and format
     if (!formattedJobs) {
       formattedJobs = formatMinimalJobsResponse(jobs);
-      
+
       // Cache the results
       if (cacheService) {
         await cacheService.cacheJobList(
@@ -1507,12 +1544,18 @@ const bulkCreateJobs = async (req, res) => {
         };
 
         // Process deadline: convert string to Date if needed
-        if (processedJobData.deadline && typeof processedJobData.deadline === 'string') {
+        if (
+          processedJobData.deadline &&
+          typeof processedJobData.deadline === 'string'
+        ) {
           processedJobData.deadline = new Date(processedJobData.deadline);
         }
 
         // Process address: build fullAddress if address is structured object
-        if (processedJobData.address && typeof processedJobData.address === 'object') {
+        if (
+          processedJobData.address &&
+          typeof processedJobData.address === 'object'
+        ) {
           const addr = processedJobData.address;
           const addressParts = [
             addr.street,
@@ -1562,10 +1605,13 @@ const bulkCreateJobs = async (req, res) => {
     }
 
     // Log result
-    logger.info(`Bulk create jobs: ${results.created.length} created, ${results.failed.length} failed`, {
-      userId: req.user.id,
-      employerId: employerProfile._id,
-    });
+    logger.info(
+      `Bulk create jobs: ${results.created.length} created, ${results.failed.length} failed`,
+      {
+        userId: req.user.id,
+        employerId: employerProfile._id,
+      }
+    );
 
     // Return response
     const allSucceeded = results.failed.length === 0;
@@ -1574,12 +1620,11 @@ const bulkCreateJobs = async (req, res) => {
     res.status(allSucceeded ? 201 : allFailed ? 400 : 207).json({
       success: !allFailed,
       data: results,
-      message:
-        allSucceeded
-          ? `Đã tạo thành công ${results.created.length} jobs`
-          : allFailed
-            ? `Không thể tạo job nào (${results.failed.length} lỗi)`
-            : `Đã tạo ${results.created.length}/${results.total} jobs thành công`,
+      message: allSucceeded
+        ? `Đã tạo thành công ${results.created.length} jobs`
+        : allFailed
+        ? `Không thể tạo job nào (${results.failed.length} lỗi)`
+        : `Đã tạo ${results.created.length}/${results.total} jobs thành công`,
     });
   } catch (error) {
     logger.error('Error in bulk create jobs:', error);

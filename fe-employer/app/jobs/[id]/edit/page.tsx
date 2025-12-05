@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { CreateJobPayload } from "@/lib/jobAPI";
+import { CreateJobPayload, updateJob } from "@/lib/jobAPI";
 import { industryService, Industry } from "@/lib/industryAPI";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,18 +25,20 @@ import { getToken } from "@/lib/userStorage";
 
 const JOB_LEVELS = [
   { value: "Intern", label: "Thực tập sinh" },
+  { value: "Fresher", label: "Fresher" },
   { value: "Junior", label: "Junior" },
-  { value: "Middle", label: "Middle" },
   { value: "Senior", label: "Senior" },
-  { value: "Lead", label: "Lead" },
-  { value: "Manager", label: "Quản lý" },
+  { value: "Manager", label: "Manager" },
+  { value: "Director", label: "Director" },
 ];
 
 const JOB_TYPES = [
   { value: "Fulltime", label: "Toàn thời gian" },
   { value: "Parttime", label: "Bán thời gian" },
-  { value: "Contract", label: "Hợp đồng" },
-  { value: "Internship", label: "Thực tập" },
+  { value: "Intern", label: "Thực tập" },
+  { value: "Freelance", label: "Freelance" },
+  { value: "Remote", label: "Làm việc từ xa" },
+  { value: "Hybrid", label: "Kết hợp" },
 ];
 
 const WORKING_MODES = [
@@ -165,7 +167,7 @@ export default function EditJobPage() {
           subIndustryCode: job.subIndustryCode || "",
           positions: job.positions || 1,
           deadline: job.deadline
-            ? new Date(job.deadline).toISOString().slice(0, 16)
+            ? new Date(job.deadline).toISOString().slice(0, 10)
             : "",
         };
 
@@ -434,7 +436,7 @@ export default function EditJobPage() {
     setError(null);
 
     try {
-      // Format deadline to ISO string
+      // Format deadline to ISO string (date-only input)
       let deadline = formData.deadline;
       if (deadline) {
         const date = new Date(deadline);
@@ -463,32 +465,20 @@ export default function EditJobPage() {
         subIndustryCode: formData.subIndustryCode || undefined,
       };
 
-      // TODO: Replace with actual API call
-      // const token = localStorage.getItem("token") || sessionStorage.getItem("token");
-      // if (!token) {
-      //   setError("Vui lòng đăng nhập để cập nhật bài tuyển dụng");
-      //   setSaving(false);
-      //   return;
-      // }
-      // const result = await updateJob(jobId, payload, token);
+      const token = getToken();
+      if (!token) {
+        setError("Vui lòng đăng nhập để cập nhật bài tuyển dụng");
+        setSaving(false);
+        return;
+      }
 
-      // For now, just log the payload
-      console.log("Update Job Payload:", {
-        jobId,
-        payload,
-      });
+      const result = await updateJob(jobId, payload, token);
 
-      // Simulate success
-      alert(
-        "Chức năng cập nhật chưa được kết nối với endpoint. Payload đã được log ra console."
-      );
-
-      // Uncomment when endpoint is ready:
-      // if (result.success) {
-      //   router.push("/jobs");
-      // } else {
-      //   setError(result.error || "Có lỗi xảy ra khi cập nhật bài tuyển dụng");
-      // }
+      if (result.success) {
+        router.push("/jobs");
+      } else {
+        setError(result.error || "Có lỗi xảy ra khi cập nhật bài tuyển dụng");
+      }
     } catch (err) {
       setError("Có lỗi xảy ra khi cập nhật bài tuyển dụng");
     } finally {
@@ -953,7 +943,7 @@ export default function EditJobPage() {
               <Label htmlFor="deadline">Hạn nộp hồ sơ *</Label>
               <Input
                 id="deadline"
-                type="datetime-local"
+                type="date"
                 value={formData.deadline}
                 onChange={(e) => handleInputChange("deadline", e.target.value)}
                 required

@@ -76,10 +76,7 @@ const POPULAR_SEARCHES = [
 ];
 
 // Helper mapping for salary ranges -> salaryMin / salaryMax (VND)
-const SALARY_RANGE_BOUNDS: Record<
-  string,
-  { min?: number; max?: number }
-> = {
+const SALARY_RANGE_BOUNDS: Record<string, { min?: number; max?: number }> = {
   "below-10m": { max: 10_000_000 },
   "10m-20m": { min: 10_000_000, max: 20_000_000 },
   "20m-50m": { min: 20_000_000, max: 50_000_000 },
@@ -659,9 +656,9 @@ export default function JobFilters({
           {/* City Dropdown - Teal with glass effect */}
           <Select
             value={
-              localFilters.city
-                ? cities.find((c) => c.label === localFilters.city)?.value ||
-                  "all"
+              localFilters.location
+                ? cities.find((c) => c.label === localFilters.location)
+                    ?.value || "all"
                 : "all"
             }
             onValueChange={(v) => {
@@ -673,9 +670,9 @@ export default function JobFilters({
               } else {
                 const selectedCity = cities.find((c) => c.value === v);
                 if (selectedCity) {
-                  // Store city name (label) for backend matching
+                  // Only pass city via legacy location param for backend search
                   applyFilterChanges({
-                    city: selectedCity.label,
+                    city: undefined,
                     location: selectedCity.label,
                   });
                 }
@@ -875,12 +872,12 @@ export default function JobFilters({
                 Tìm kiếm: {appliedFilters.q}
               </Badge>
             )}
-            {appliedFilters.city && (
+            {appliedFilters.location && (
               <Badge
                 variant="outline"
                 className="text-xs bg-white/80 backdrop-blur-sm border-teal-300 text-teal-700 font-medium shadow-sm"
               >
-                Tỉnh/TP: {appliedFilters.city}
+                Tỉnh/TP: {appliedFilters.location}
               </Badge>
             )}
             {appliedFilters.jobType && (

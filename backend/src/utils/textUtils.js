@@ -10,18 +10,20 @@
  */
 function removeVietnameseTones(text) {
   if (!text) return '';
-  
+
   // Normalize and remove combining diacritics
   let result = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  
+
   // Replace Vietnamese special characters
   const vietnameseMap = {
-    'đ': 'd', 'Đ': 'D',
-    'ð': 'd', 'Ð': 'D'
+    đ: 'd',
+    Đ: 'D',
+    ð: 'd',
+    Ð: 'D',
   };
-  
+
   result = result.replace(/[đĐðÐ]/g, char => vietnameseMap[char] || char);
-  
+
   return result;
 }
 
@@ -33,38 +35,38 @@ function removeVietnameseTones(text) {
  */
 function createFlexibleRegex(searchText) {
   if (!searchText) return new RegExp('', 'i');
-  
+
   // First, normalize the search text to remove accents
   // This ensures "Hồ Chí Minh" becomes "Ho Chi Minh"
   const normalized = removeVietnameseTones(searchText);
-  
+
   // Escape special regex characters
   const escaped = normalized.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  
+
   // Create character class for Vietnamese characters
   const charMap = {
-    'a': '[aàáảãạăằắẳẵặâầấẩẫậ]',
-    'A': '[AÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬ]',
-    'd': '[dđ]',
-    'D': '[DĐ]',
-    'e': '[eèéẻẽẹêềếểễệ]',
-    'E': '[EÈÉẺẼẸÊỀẾỂỄỆ]',
-    'i': '[iìíỉĩị]',
-    'I': '[IÌÍỈĨỊ]',
-    'o': '[oòóỏõọôồốổỗộơờớởỡợ]',
-    'O': '[OÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢ]',
-    'u': '[uùúủũụưừứửữự]',
-    'U': '[UÙÚỦŨỤƯỪỨỬỮỰ]',
-    'y': '[yỳýỷỹỵ]',
-    'Y': '[YỲÝỶỸỴ]'
+    a: '[aàáảãạăằắẳẵặâầấẩẫậ]',
+    A: '[AÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬ]',
+    d: '[dđ]',
+    D: '[DĐ]',
+    e: '[eèéẻẽẹêềếểễệ]',
+    E: '[EÈÉẺẼẸÊỀẾỂỄỆ]',
+    i: '[iìíỉĩị]',
+    I: '[IÌÍỈĨỊ]',
+    o: '[oòóỏõọôồốổỗộơờớởỡợ]',
+    O: '[OÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢ]',
+    u: '[uùúủũụưừứửữự]',
+    U: '[UÙÚỦŨỤƯỪỨỬỮỰ]',
+    y: '[yỳýỷỹỵ]',
+    Y: '[YỲÝỶỸỴ]',
   };
-  
+
   // Replace each character with its character class
   let pattern = escaped;
   for (const [base, charClass] of Object.entries(charMap)) {
     pattern = pattern.replace(new RegExp(base, 'g'), charClass);
   }
-  
+
   return new RegExp(pattern, 'i');
 }
 
@@ -81,5 +83,5 @@ function normalizeVietnameseText(text) {
 module.exports = {
   removeVietnameseTones,
   createFlexibleRegex,
-  normalizeVietnameseText
+  normalizeVietnameseText,
 };
