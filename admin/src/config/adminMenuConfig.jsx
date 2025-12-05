@@ -45,75 +45,75 @@ const adminMenuConfig = [
     element: <Accounts />,
   },
 
-  {
-    key: "job-management",
-    label: "Quản lý công việc",
-    path: "/admin/job-management",
-    icon: Icons.WorkIcon,
-    children: [
-      {
-        key: "job-types",
-        label: "Loại công việc",
-        path: "/admin/job-types",
-        element: <JobTypes />,
-      },
-      {
-        key: "skills",
-        label: "Kỹ năng",
-        path: "/admin/skills",
-        element: <Skills />,
-      },
-      {
-        key: "levels",
-        label: "Cấp bậc",
-        path: "/admin/levels",
-        element: <Levels />,
-      },
-      {
-        key: "work-types",
-        label: "Hình thức làm việc",
-        path: "/admin/work-types",
-        element: <WorkTypes />,
-      },
-      {
-        key: "salary-ranges",
-        label: "Khoảng lương",
-        path: "/admin/salary-ranges",
-        element: <SalaryRanges />,
-      },
-      {
-        key: "experience",
-        label: "Kinh nghiệm",
-        path: "/admin/experience",
-        element: <Experience />,
-      },
-    ],
-  },
+  // {
+  //   key: "job-management",
+  //   label: "Quản lý công việc",
+  //   path: "/admin/job-management",
+  //   icon: Icons.WorkIcon,
+  //   children: [
+  //     {
+  //       key: "job-types",
+  //       label: "Loại công việc",
+  //       path: "/admin/job-types",
+  //       element: <JobTypes />,
+  //     },
+  //     {
+  //       key: "skills",
+  //       label: "Kỹ năng",
+  //       path: "/admin/skills",
+  //       element: <Skills />,
+  //     },
+  //     {
+  //       key: "levels",
+  //       label: "Cấp bậc",
+  //       path: "/admin/levels",
+  //       element: <Levels />,
+  //     },
+  //     {
+  //       key: "work-types",
+  //       label: "Hình thức làm việc",
+  //       path: "/admin/work-types",
+  //       element: <WorkTypes />,
+  //     },
+  //     {
+  //       key: "salary-ranges",
+  //       label: "Khoảng lương",
+  //       path: "/admin/salary-ranges",
+  //       element: <SalaryRanges />,
+  //     },
+  //     {
+  //       key: "experience",
+  //       label: "Kinh nghiệm",
+  //       path: "/admin/experience",
+  //       element: <Experience />,
+  //     },
+  //   ],
+  // },
 
-  {
-    key: "packages",
-    label: "Quản lý gói dịch vụ",
-    path: "/admin/packages",
-    icon: Icons.PackageIcon,
-    children: [
-      {
-        key: "post-packages",
-        label: "Gói bài đăng",
-        path: "/admin/post-packages",
-        element: <PostPackages />,
-      },
-      {
-        key: "view-packages",
-        label: "Gói xem ứng viên",
-        path: "/admin/view-packages",
-        element: <ViewPackages />,
-      },
-    ],
-  },
+  // {
+  //   key: "packages",
+  //   label: "Quản lý gói dịch vụ",
+  //   path: "/admin/packages",
+  //   icon: Icons.PackageIcon,
+  //   children: [
+  //     {
+  //       key: "post-packages",
+  //       label: "Gói bài đăng",
+  //       path: "/admin/post-packages",
+  //       element: <PostPackages />,
+  //     },
+  //     {
+  //       key: "view-packages",
+  //       label: "Gói xem ứng viên",
+  //       path: "/admin/view-packages",
+  //       element: <ViewPackages />,
+  //     },
+  //   ],
+  // },
 
   {
     key: "employers",
-    label: "Nhà tuyển dụng",
+    label: "Quản lý các nhà tuyển dụng",
     path: "/admin/employers",
     icon: Icons.CompanyIcon,
     element: <Employers />,
@@ -135,7 +135,7 @@ const adminMenuConfig = [
   },
   {
     key: "industries",
-    label: "Danh mục nghề",
+    label: "Quản lý danh mục nghề",
     path: "/admin/industries",
     icon: Icons.CategoryIcon,
     element: <Industries />,
