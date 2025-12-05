@@ -9,7 +9,8 @@ COPY ${APP_PATH}/package*.json ./
 
 # Install dependencies
 # Use npm install if package-lock.json doesn't exist
-RUN if [ -f package-lock.json ]; then npm ci --only=production; else npm install --only=production; fi
+# Use --legacy-peer-deps to resolve peer dependency conflicts (e.g., dotenv version mismatch)
+RUN if [ -f package-lock.json ]; then npm ci --only=production --legacy-peer-deps; else npm install --only=production --legacy-peer-deps; fi
 
 # Copy application files
 # Copy application files
