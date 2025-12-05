@@ -67,13 +67,6 @@ interface CandidateRecommendation extends MatchingScore {
   };
 }
 
-// Required for static export with dynamic routes
-export async function generateStaticParams() {
-  // Return empty array - pages will be generated on-demand at runtime
-  // This satisfies Next.js static export requirements
-  return [];
-}
-
 export default function CandidateRecommendationsPage() {
   const params = useParams();
   const router = useRouter();
