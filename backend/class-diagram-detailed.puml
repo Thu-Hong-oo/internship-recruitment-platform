@@ -1,0 +1,95 @@
+@startuml
+!theme plain
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 14
+skinparam linetype ortho
+skinparam componentStyle uml2
+
+title Sơ đồ Lớp Chi tiết - Hệ thống Tuyển dụng
+
+package "User & Profile Management" {
+  class UserController <<Controller>>
+  class EmployerProfileController <<Controller>>
+  class CandidateProfileController <<Controller>>
+
+  class UserService <<Service>>
+  class EmployerProfileService <<Service>>
+  class CandidateProfileService <<Service>>
+
+  class User <<Model>>
+  class EmployerProfile <<Model>>
+  class CandidateProfile <<Model>>
+
+  UserController ..> UserService
+  UserService ..> User
+
+  EmployerProfileController ..> EmployerProfileService
+  EmployerProfileService ..> EmployerProfile
+  EmployerProfileService ..> User
+
+  CandidateProfileController ..> CandidateProfileService
+  CandidateProfileService ..> CandidateProfile
+  CandidateProfileService ..> User
+}
+
+package "Job & Application Management" {
+  class JobController <<Controller>>
+  class ApplicationController <<Controller>>
+
+  class JobService <<Service>>
+  class ApplicationService <<Service>>
+
+  class Job <<Model>>
+  class Application <<Model>>
+
+  JobController ..> JobService
+  JobService ..> Job
+  
+  ApplicationController ..> ApplicationService
+  ApplicationService ..> Application
+}
+
+package "AI & NLP Services" {
+  class AIController <<Controller>>
+  class AdvancedNLPController <<Controller>>
+
+  class RoadmapService <<Service>>
+  class CVAnalysisService <<Service>>
+  class PhoBERTService <<External>>
+}
+
+package "Core Data Management (Admin)" {
+  class SkillController <<Controller>>
+  class IndustryController <<Controller>>
+  class Skill <<Model>>
+  class Industry <<Model>>
+  
+  SkillController ..> Skill
+  IndustryController ..> Industry
+}
+
+package "Notifications" {
+    class NotificationController <<Controller>>
+    class NotificationService <<Service>>
+    class Notification <<Model>>
+    class SocketService <<Service>>
+
+    NotificationController ..> NotificationService
+    NotificationService ..> Notification
+    NotificationService ..> SocketService : "emits"
+}
+
+
+' Cross-package dependencies
+ApplicationService ..> Job : "uses"
+ApplicationService ..> CandidateProfile : "uses"
+ApplicationService ..> NotificationService : "notifies"
+
+RoadmapService ..> CVAnalysisService
+RoadmapService ..> Job
+CVAnalysisService ..> PhoBERTService
+
+JobService ..> EmployerProfile
+JobService ..> Skill
+
+@enduml

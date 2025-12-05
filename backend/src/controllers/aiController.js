@@ -240,6 +240,115 @@ class AIController {
     }
   }
 
+  /**
+   * POST /api/ai/analyze-cv-improvements
+   * Phân tích CV và đưa ra gợi ý cải thiện để viết CV hay hơn
+   */
+  async analyzeCVImprovements(req, res, next) {
+    try {
+      const { cvData, cvText, cvId } = req.body;
+      const userId = req.user.id;
+
+      // Get CV data from profile if not provided
+      let finalCvData = cvData;
+      let finalCvText = cvText;
+
+      if (!finalCvData || !finalCvText) {
+        // Try to get from candidate profile
+        const profile = await CandidateProfile.findOne({ userId });
+        if (profile) {
+          if (!finalCvData) {
+            finalCvData = {
+              personalInfo: profile.personalInfo,
+              education: profile.education,
+              experience: profile.experience,
+              skills: profile.skills,
+            };
+          }
+
+          // Try to get CV text from resume if cvId provided
+          if (!finalCvText && cvId) {
+            try {
+              const aiService = require('../services/ai/aiService');
+              const resume = profile.resume?.current || 
+                            (profile.resume?.history && profile.resume.history.find(h => h._id?.toString() === cvId));
+              
+              if (resume?.url) {
+                const extractedText = await aiService.extractTextFromCV(resume.url);
+                if (extractedText) {
+                  finalCvText = extractedText;
+                }
+              }
+            } catch (extractError) {
+              logger.warn('Could not extract text from CV file:', extractError.message);
+            }
+          }
+
+          // Build CV text from profile data if still not available
+          if (!finalCvText && finalCvData) {
+            const parts = [];
+            if (finalCvData.personalInfo?.bio) parts.push(finalCvData.personalInfo.bio);
+            if (finalCvData.experience) {
+              finalCvData.experience.forEach(exp => {
+                parts.push(`${exp.position} at ${exp.company}: ${exp.description || ''}`);
+              });
+            }
+            if (finalCvData.education) {
+              finalCvData.education.forEach(edu => {
+                parts.push(`${edu.degree} in ${edu.major} from ${edu.school || edu.institution}`);
+              });
+            }
+            if (finalCvData.skills) {
+              const techSkills = finalCvData.skills.technical?.map(s => s.name || s).join(', ') || '';
+              const softSkills = finalCvData.skills.soft?.map(s => s.name || s).join(', ') || '';
+              if (techSkills) parts.push(`Technical skills: ${techSkills}`);
+              if (softSkills) parts.push(`Soft skills: ${softSkills}`);
+            }
+            finalCvText = parts.join('\n');
+          }
+        }
+      }
+
+      if (!finalCvData && !finalCvText) {
+        return ApiResponse.error(
+          res,
+          'Please provide cvData and cvText, or ensure you have a CV uploaded',
+          400
+        );
+      }
+
+      if (!finalCvText || finalCvText.trim().length < 50) {
+        return ApiResponse.error(
+          res,
+          'CV text is too short or missing. Please upload a CV or provide cvText.',
+          400
+        );
+      }
+
+      const { getSelfSufficientAIService } = require('../services/ai/selfSufficientAIService');
+      const selfSufficientAI = getSelfSufficientAIService();
+      const improvements = await selfSufficientAI.analyzeCVImprovements(
+        finalCvData || {},
+        finalCvText
+      );
+      
+      logger.info('📝 CV improvements analyzed', {
+        userId,
+        overallScore: improvements.overallScore,
+        suggestionsCount: Object.values(improvements.suggestions).flat().length
+      });
+
+      return ApiResponse.success(
+        res,
+        improvements,
+        'CV improvements analysis completed successfully'
+      );
+    } catch (error) {
+      logger.error('CV improvements analysis error:', error);
+      next(error);
+    }
+  }
+
   // ========================================
   // JOB & CAREER AI ENDPOINTS
   // ========================================

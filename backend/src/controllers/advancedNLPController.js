@@ -276,6 +276,72 @@ class AdvancedNLPController {
       const candidateId = req.user._id;
       const { limit = 10, minScore = 60 } = req.query;
 
+      // Validate candidate profile before returning matches
+      const candidateProfile = await CandidateProfile.findOne({ 
+        userId: candidateId 
+      }).lean();
+
+      if (!candidateProfile) {
+        return res.status(400).json({
+          success: false,
+          message: 'Bạn chưa có hồ sơ. Vui lòng cập nhật thông tin profile hoặc tải CV trước khi sử dụng tính năng này.',
+        });
+      }
+
+      // Check if profile has any meaningful data
+      const profileSkills = candidateProfile.skills || {};
+      const allSkills = [
+        ...(profileSkills.technical || []),
+        ...(profileSkills.soft || []),
+        ...(profileSkills.languages || [])
+      ];
+
+      const profileExperience = candidateProfile.experience || {};
+      const allExperience = [
+        ...(profileExperience.internships || []),
+        ...(profileExperience.fullTime || []),
+        ...(profileExperience.projects || [])
+      ];
+
+      const hasSkills = Array.isArray(allSkills) && allSkills.length > 0;
+      const hasExperience = Array.isArray(allExperience) && allExperience.length > 0;
+      
+      // Check education more strictly
+      let hasEducation = false;
+      if (candidateProfile.education) {
+        const edu = candidateProfile.education;
+        // Check university
+        if (edu.university && (edu.university.name || edu.university.institution || edu.university.degree || edu.university.major || edu.university.field)) {
+          hasEducation = true;
+        }
+        // Check certifications
+        if (edu.certifications && Array.isArray(edu.certifications) && edu.certifications.length > 0) {
+          hasEducation = true;
+        }
+        // Check other education fields
+        if (edu.school || edu.degree || edu.major || edu.field) {
+          hasEducation = true;
+        }
+      }
+      
+      // Check resume more strictly
+      const hasResume =
+        (candidateProfile.resume?.current?.url && candidateProfile.resume.current.url.trim() !== '') ||
+        (candidateProfile.resume?.current?.fileName && candidateProfile.resume.current.fileName.trim() !== '') ||
+        (candidateProfile.resume?.current?.aiAnalysis?.extractedData?.textContent && 
+         candidateProfile.resume.current.aiAnalysis.extractedData.textContent.trim() !== '');
+
+      if (!hasSkills && !hasExperience && !hasEducation && !hasResume) {
+        // Delete any existing matching scores for this candidate since profile is empty
+        await CVMatchingScore.deleteMany({ candidateId });
+        logger.warn(`Profile validation failed for candidate ${candidateId}: Profile is empty. Deleted existing scores.`);
+        
+        return res.status(400).json({
+          success: false,
+          message: 'Bạn chưa cập nhật hồ sơ hoặc tải CV. Vui lòng upload CV hoặc cập nhật thông tin (kỹ năng, kinh nghiệm, học vấn) trước khi sử dụng tính năng gợi ý việc làm.',
+        });
+      }
+
       const bestMatches = await CVMatchingScore.find({
         candidateId,
         overallScore: { $gte: parseInt(minScore) },
@@ -1285,6 +1351,63 @@ class AdvancedNLPController {
         resume: candidateProfile.resume?.current,
         extractedText: candidateProfile.resume?.current?.aiAnalysis?.extractedData || {},
       };
+
+    // Validate profile data - check if profile is essentially empty
+    const hasSkills = Array.isArray(allSkills) && allSkills.length > 0;
+    const hasExperience = Array.isArray(allExperience) && allExperience.length > 0;
+    
+    // Check education more strictly
+    let hasEducation = false;
+    if (candidateProfile.education) {
+      const edu = candidateProfile.education;
+      // Check university
+      if (edu.university && (edu.university.name || edu.university.institution || edu.university.degree || edu.university.major || edu.university.field)) {
+        hasEducation = true;
+      }
+      // Check certifications
+      if (edu.certifications && Array.isArray(edu.certifications) && edu.certifications.length > 0) {
+        hasEducation = true;
+      }
+      // Check other education fields
+      if (edu.school || edu.degree || edu.major || edu.field) {
+        hasEducation = true;
+      }
+    }
+    
+    // Check resume more strictly
+    const hasResume =
+      (candidateProfile.resume?.current?.url && candidateProfile.resume.current.url.trim() !== '') ||
+      (candidateProfile.resume?.current?.fileName && candidateProfile.resume.current.fileName.trim() !== '') ||
+      (candidateProfile.resume?.current?.aiAnalysis?.extractedData?.textContent && 
+       candidateProfile.resume.current.aiAnalysis.extractedData.textContent.trim() !== '');
+
+    // Log validation details for debugging
+    logger.info('Profile validation check:', {
+      candidateId: candidateUserId,
+      hasSkills,
+      hasExperience,
+      hasEducation,
+      hasResume,
+      skillsCount: allSkills.length,
+      experienceCount: allExperience.length,
+      hasResumeUrl: !!candidateProfile.resume?.current?.url,
+      hasResumeFileName: !!candidateProfile.resume?.current?.fileName,
+      hasExtractedText: !!candidateProfile.resume?.current?.aiAnalysis?.extractedData?.textContent,
+    });
+
+    if (!hasSkills && !hasExperience && !hasEducation && !hasResume) {
+      logger.warn(`Profile validation failed for candidate ${candidateUserId}: Profile is empty`);
+      
+      // Delete any existing matching scores for this candidate since profile is empty
+      await CVMatchingScore.deleteMany({ candidateId: candidateUserId });
+      logger.info(`Deleted existing matching scores for candidate ${candidateUserId} due to empty profile`);
+      
+      return res.status(400).json({
+        success: false,
+        message:
+          'Bạn chưa cập nhật hồ sơ hoặc tải CV. Vui lòng upload CV hoặc cập nhật thông tin (kỹ năng, kinh nghiệm, học vấn) trước khi sử dụng tính năng gợi ý việc làm.',
+      });
+    }
 
       // 3. Fetch all active jobs
       const activeJobs = await Job.find({ status: 'active' })
