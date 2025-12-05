@@ -156,27 +156,37 @@ export const nlpService = {
 
   /**
    * Get best matching jobs for current candidate
+   * Maps backend structure (CVMatchingScore + populated jobId) to UI-friendly format
    */
   async getBestMatches(params?: {
     limit?: number;
     minScore?: number;
   }): Promise<{
     success: boolean;
-    data: Array<
-      MatchingScore & {
-        job: {
-          _id: string;
-          title: string;
-          company: string;
-          location: string;
-          salary?: {
-            min: number;
-            max: number;
-            currency: string;
-          };
+    data: Array<{
+      overallScore: number;
+      tier: "A" | "B" | "C" | "D";
+      job: {
+        _id: string;
+        title: string;
+        company: string;
+        location: string;
+        salary?: {
+          min: number;
+          max: number;
+          currency: string;
         };
-      }
-    >;
+      };
+      matchedSkills: string[];
+      breakdown: {
+        skillsScore: number;
+        experienceScore: number;
+        educationScore: number;
+        projectsScore?: number;
+      };
+      strengths: string[];
+      concerns: string[];
+    }>;
   }> {
     const queryParams = new URLSearchParams();
     if (params?.limit) queryParams.append("limit", params.limit.toString());
@@ -184,7 +194,66 @@ export const nlpService = {
       queryParams.append("minScore", params.minScore.toString());
 
     const query = queryParams.toString();
-    return apiClient.get(`/nlp/best-matches${query ? `?${query}` : ""}`);
+
+    const raw = await apiClient.get<{
+      success: boolean;
+      data: any[];
+    }>(`/nlp/best-matches${query ? `?${query}` : ""}`);
+
+    const mapped = (raw.data || []).map((item) => {
+      const job = item.job || item.jobId || {};
+      const scoreBreakdown = item.scoreBreakdown || {};
+      const insights = item.insights || {};
+
+      const overallScore: number = item.overallScore || 0;
+
+      // Derive tier from overallScore if backend doesn't provide it
+      let tier: "A" | "B" | "C" | "D";
+      if (overallScore >= 80) tier = "A";
+      else if (overallScore >= 70) tier = "B";
+      else if (overallScore >= 60) tier = "C";
+      else tier = "D";
+
+      return {
+        overallScore,
+        tier,
+        job: {
+          _id: job._id,
+          title: job.title,
+          company:
+            job.company ||
+            job.companyName ||
+            job.employer?.company?.name ||
+            "Nhà tuyển dụng",
+          location: job.location || "",
+          salary:
+            job.salaryMin && job.salaryMax
+              ? {
+                  min: job.salaryMin,
+                  max: job.salaryMax,
+                  currency: job.currency || "VND",
+                }
+              : undefined,
+        },
+        matchedSkills:
+          scoreBreakdown.skillsScore?.details?.matchedSkills?.map(
+            (s: any) => s.skill
+          ) || [],
+        breakdown: {
+          skillsScore: scoreBreakdown.skillsScore?.score || 0,
+          experienceScore: scoreBreakdown.experienceScore?.score || 0,
+          educationScore: scoreBreakdown.educationScore?.score || 0,
+          projectsScore: scoreBreakdown.keywordScore?.score || 0,
+        },
+        strengths: insights.strengths || [],
+        concerns: insights.weaknesses || [],
+      };
+    });
+
+    return {
+      success: raw.success,
+      data: mapped,
+    };
   },
 
   /**
@@ -321,5 +390,21 @@ export const nlpService = {
   }> {
     const query = limit ? `?limit=${limit}` : "";
     return apiClient.get(`/nlp/popular-roadmaps${query}`);
+  },
+
+  // ============================================
+  // Utilities
+  // ============================================
+
+  /**
+   * Calculate matching scores for all active jobs for current candidate
+   * (wraps POST /api/nlp/calculate-all-matches)
+   */
+  async calculateAllMatches(): Promise<{
+    success: boolean;
+    message?: string;
+    data?: unknown;
+  }> {
+    return apiClient.post("/nlp/calculate-all-matches", {});
   },
 };

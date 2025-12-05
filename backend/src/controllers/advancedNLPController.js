@@ -1303,58 +1303,110 @@ class AdvancedNLPController {
         });
       }
 
-      // 4. Calculate matching scores for each job
+      // 4. Calculate matching scores for each job (PARALLEL PROCESSING)
       let successCount = 0;
       let errorCount = 0;
       const topMatches = [];
 
-      for (const job of activeJobs) {
-        try {
-          // Prepare job data
-          const jobData = {
-            _id: job._id,
-            title: job.title,
-            description: job.description,
-            requirements: job.requirements,
-            skills: job.skills,
-            industryCode: job.industryCode,
-            location: job.location,
-            salaryRange: job.salaryRange,
-            employmentType: job.employmentType,
-          };
+      logger.info(`📊 Starting calculation for ${activeJobs.length} jobs...`);
 
-          // Calculate matching score
-          const matchingResult = await aiService.calculateCVJobMatch({
-            cvData,
-            jobData,
-            candidateId: candidateUserId,
-          });
+      // Process jobs in parallel batches for better performance
+      const BATCH_SIZE = 5; // Process 5 jobs at a time
+      const batches = [];
+      
+      for (let i = 0; i < activeJobs.length; i += BATCH_SIZE) {
+        batches.push(activeJobs.slice(i, i + BATCH_SIZE));
+      }
 
-          // Delete existing score if any
-          await CVMatchingScore.deleteMany({
-            candidateId: candidateUserId,
-            jobId: job._id,
-          });
+      logger.info(`⚡ Processing in ${batches.length} batches of ${BATCH_SIZE} jobs each`);
 
-          // Save new score
-          const savedScore = await CVMatchingScore.create(matchingResult);
+      for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batch = batches[batchIndex];
+        const batchStartIndex = batchIndex * BATCH_SIZE;
 
-          successCount++;
+        logger.info(`📦 Batch ${batchIndex + 1}/${batches.length}: Processing ${batch.length} jobs in parallel...`);
 
-          // Keep track of top matches for response
-          if (matchingResult.overallScore >= 60) {
-            topMatches.push({
-              jobId: job._id,
-              title: job.title,
-              company: job.employer?.companyName,
-              score: matchingResult.overallScore,
-            });
+        // Process batch in parallel
+        const batchResults = await Promise.allSettled(
+          batch.map(async (job, indexInBatch) => {
+            const jobIndex = batchStartIndex + indexInBatch + 1;
+            
+            try {
+              logger.info(`🔄 [${jobIndex}/${activeJobs.length}] Processing: ${job.title}`);
+
+              // Prepare job data
+              const jobData = {
+                _id: job._id,
+                title: job.title,
+                description: job.description,
+                requirements: job.requirements,
+                skills: job.skills,
+                industryCode: job.industryCode,
+                location: job.location,
+                salaryRange: job.salaryRange,
+                employmentType: job.employmentType,
+              };
+
+              // Calculate matching score
+              const matchingResult = await aiService.calculateAdvancedMatchScore(
+                cvData,
+                jobData,
+                {
+                  candidateId: candidateUserId,
+                  jobId: job._id,
+                  forceRecalculate: false,
+                }
+              );
+
+              logger.info(`✅ [${jobIndex}/${activeJobs.length}] Score: ${matchingResult.overallScore}% - ${job.title}`);
+
+              // Delete existing score if any
+              await CVMatchingScore.deleteMany({
+                candidateId: candidateUserId,
+                jobId: job._id,
+              });
+
+              // Save new score
+              await CVMatchingScore.create(matchingResult);
+
+              return {
+                success: true,
+                job,
+                matchingResult,
+              };
+
+            } catch (error) {
+              logger.error(`❌ [${jobIndex}/${activeJobs.length}] Error for ${job.title}:`, error.message);
+              return {
+                success: false,
+                job,
+                error,
+              };
+            }
+          })
+        );
+
+        // Process batch results
+        for (const result of batchResults) {
+          if (result.status === 'fulfilled' && result.value.success) {
+            successCount++;
+            const { matchingResult, job } = result.value;
+
+            // Keep track of top matches for response (threshold: 30%)
+            if (matchingResult.overallScore >= 30) {
+              topMatches.push({
+                jobId: job._id,
+                title: job.title,
+                company: job.employer?.companyName,
+                score: matchingResult.overallScore,
+              });
+            }
+          } else {
+            errorCount++;
           }
-
-        } catch (error) {
-          logger.error(`Error calculating match for job ${job._id}:`, error);
-          errorCount++;
         }
+
+        logger.info(`✅ Batch ${batchIndex + 1}/${batches.length} completed: ${successCount} successful, ${errorCount} failed`);
       }
 
       // Sort top matches by score

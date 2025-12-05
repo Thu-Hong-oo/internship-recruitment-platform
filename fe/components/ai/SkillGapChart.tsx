@@ -72,37 +72,60 @@ export function SkillGapChart({
   ];
 
   return (
-    <Card className={className}>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>Phân tích khoảng cách kỹ năng</span>
+    <Card className={`border border-slate-100 shadow-sm ${className}`}>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold tracking-wide text-blue-600 uppercase">
+              Phân tích khoảng cách kỹ năng
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              So sánh kỹ năng hiện tại với yêu cầu từ tin tuyển dụng.
+            </p>
+          </div>
           {matchScore !== undefined && (
-            <Badge variant="secondary" className="text-lg font-bold">
-              {matchScore}% phù hợp
-            </Badge>
+            <div className="flex items-center gap-3">
+              <div className="relative flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-50 to-emerald-50 border border-blue-100">
+                <span className="text-xl font-bold text-blue-700">
+                  {matchScore}
+                </span>
+                <span className="text-[10px] text-muted-foreground absolute bottom-1">
+                  % phù hợp
+                </span>
+              </div>
+              <Badge variant="secondary" className="text-xs font-semibold">
+                Mức phù hợp tổng thể
+              </Badge>
+            </div>
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 pt-0">
         {/* Overview */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="text-center p-4 bg-green-50 rounded-lg">
-            <div className="text-3xl font-bold text-green-700">
+          <div className="text-center p-4 rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100/60 border border-emerald-100">
+            <div className="text-3xl font-extrabold text-emerald-700">
               {currentSkills.length}
             </div>
-            <div className="text-sm text-gray-600">Kỹ năng hiện tại</div>
+            <div className="text-xs mt-1 text-emerald-900 font-medium">
+              Kỹ năng hiện tại
+            </div>
           </div>
-          <div className="text-center p-4 bg-blue-50 rounded-lg">
-            <div className="text-3xl font-bold text-blue-700">
+          <div className="text-center p-4 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100/60 border border-blue-100">
+            <div className="text-3xl font-extrabold text-blue-700">
               {requiredSkills.length}
             </div>
-            <div className="text-sm text-gray-600">Kỹ năng yêu cầu</div>
+            <div className="text-xs mt-1 text-blue-900 font-medium">
+              Kỹ năng yêu cầu
+            </div>
           </div>
         </div>
 
         {/* Skill Gaps by Category */}
         <div className="space-y-3">
-          <h4 className="font-semibold text-sm">Kỹ năng cần phát triển</h4>
+          <h4 className="font-semibold text-sm text-slate-800">
+            Kỹ năng cần phát triển
+          </h4>
           {gapSections.map((section) => {
             if (section.skills.length === 0) return null;
             const isExpanded = expandedSection === section.key;
