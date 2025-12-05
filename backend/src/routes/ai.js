@@ -73,6 +73,38 @@ router.post('/analyze-cv', aiController.analyzeCV);
  */
 router.post('/analyze-cv-text', aiController.analyzeCVText);
 
+/**
+ * @swagger
+ * /api/ai/analyze-cv-improvements:
+ *   post:
+ *     summary: Analyze CV and provide improvement suggestions to write better CV
+ *     tags: [AI - CV Analysis]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               cvData:
+ *                 type: object
+ *                 description: CV data object (optional, will fetch from profile if not provided)
+ *               cvText:
+ *                 type: string
+ *                 description: CV text content (optional, will extract from uploaded CV if not provided)
+ *               cvId:
+ *                 type: string
+ *                 description: CV ID to analyze (optional, will use current CV if not provided)
+ *     responses:
+ *       200:
+ *         description: CV improvements analysis with suggestions for structure, content, writing style, and keywords
+ *       400:
+ *         description: Missing CV data or text
+ */
+router.post('/analyze-cv-improvements', protect, aiController.analyzeCVImprovements);
+
 // ============================================
 // JOB & CAREER AI ROUTES
 // ============================================

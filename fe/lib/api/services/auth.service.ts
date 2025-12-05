@@ -153,7 +153,7 @@ class AuthService {
       isNew?: boolean;
       message?: string;
       error?: string;
-    }>("/auth/google", { idToken });
+    }>("/auth/login/google", { idToken });
 
     // Store token if Google auth is successful
     if (response.success && response.token) {

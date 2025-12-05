@@ -1,0 +1,422 @@
+@startuml MongoDB Database Schema Diagram
+
+skinparam pageSize A4
+skinparam pageOrientation landscape
+skinparam dpi 300
+left to right direction
+skinparam nodesep 40
+skinparam ranksep 35
+skinparam pageMargin 5
+skinparam defaultTextAlignment left
+skinparam maxMessageSize 300
+skinparam linetype ortho
+
+
+skinparam backgroundColor #FEFEFE
+skinparam class {
+    BackgroundColor #E8F4FD
+    BorderColor #1E88E5
+    BorderThickness 2
+    HeaderBackgroundColor #1E88E5
+    HeaderFontColor #FFFFFF
+    FontColor #333333
+    FontSize 9
+}
+hide stereotype
+hide circle
+hide empty members
+
+
+skinparam classAttributeFontSize 8
+skinparam classHeaderFontSize 10
+skinparam minClassWidth 80
+
+' Relationship style - orthogonal lines
+skinparam linetype ortho
+
+' Layout settings for rectangular arrangement
+left to right direction
+skinparam nodesep 30
+skinparam ranksep 25
+skinparam pageMargin 10
+skinparam pageOrientation landscape
+
+' Group entities for better layout
+together {
+  entity "users" as users {
+    _id: ObjectId
+    email: string
+    passwordHash: string
+    fullName: string
+    phone: string
+    userStatus: enum
+    userRole: enum
+    lastLogin: datetime
+    createdAt: datetime
+    updatedAt: datetime
+  }
+
+  entity "candidates" as candidates {
+    _id: ObjectId
+    userId: ObjectId
+    bio: string
+    jobSeekingStatus: enum
+    profileCompleteness: int
+    address: object
+    skills: ObjectId[]
+    targetJob: object
+    preferences: object
+    resume: object
+    createdAt: datetime
+    updatedAt: datetime
+  }
+
+  entity "employers" as employers {
+    _id: ObjectId
+    userId: ObjectId
+    companyId: ObjectId
+    memberStatus: enum
+    position: object
+    legalRepresentative: object
+    contact: object
+    members: array
+    verification: object
+    joinedAt: datetime
+    createdAt: datetime
+    updatedAt: datetime
+  }
+}
+
+together {
+  entity "companies" as companies {
+    _id: ObjectId
+    name: string
+    description: string
+    companySize: enum
+    taxCode: string
+    verificationStatus: enum
+    website: string
+    businessEmail: string
+    businessPhone: string
+    businessLogoUrl: string
+    registrationDate: date
+    address: object
+    employeesCount: number
+    foundedYear: number
+    logo: object
+    coverImage: object
+    media: object
+    createdAt: datetime
+    updatedAt: datetime
+  }
+
+  entity "job_postings" as job_postings {
+    _id: ObjectId
+    companyId: ObjectId
+    postedBy: ObjectId
+    title: string
+    description: string
+    requirements: string
+    benefits: string
+    jobType: enum
+    jobStatus: enum
+    level: enum
+    workingMode: enum
+    address: object
+    salaryRange: object
+    skillIds: ObjectId[]
+    industryCodes: string[]
+    jobRequirements: object
+    postedAt: datetime
+    expiresAt: datetime
+    deadline: datetime
+    positions: int
+    applicationCount: int
+    views: int
+    aiTags: array
+    ai: object
+    createdAt: datetime
+    updatedAt: datetime
+  }
+}
+
+together {
+  entity "job_applications" as job_applications {
+    _id: ObjectId
+    candidateId: ObjectId
+    jobId: ObjectId
+    cvId: ObjectId
+    coverLetter: string
+    status: enum
+    matchResult: object
+    matchingScore: object
+    interviews: array
+    timeline: array
+    feedback: object
+    aiAnalysis: object
+    submittedAt: datetime
+    reviewedAt: datetime
+    createdAt: datetime
+    updatedAt: datetime
+  }
+
+  entity "job_savings" as job_savings {
+    _id: ObjectId
+    candidateId: ObjectId
+    jobId: ObjectId
+    savedAt: datetime
+    createdAt: datetime
+  }
+
+  entity "job_followings" as job_followings {
+    _id: ObjectId
+    userId: ObjectId
+    targetType: enum
+    targetId: ObjectId
+    followedAt: datetime
+    createdAt: datetime
+  }
+}
+
+together {
+  entity "skills" as skills {
+    _id: ObjectId
+    code: string
+    name: string
+    description: string
+    aliases: string[]
+    category: enum
+    popularity: int
+    demandLevel: enum
+    trend: enum
+    isActive: boolean
+    embedding: array
+    createdAt: datetime
+    updatedAt: datetime
+  }
+
+  entity "industries" as industries {
+    _id: ObjectId
+    code: string
+    name: string
+    description: string
+    parentCode: string
+    color: string
+    icon: string
+    keywords: array
+    suggestions: object
+    visible: boolean
+    sortOrder: number
+    stats: object
+    isActive: boolean
+    createdAt: datetime
+    updatedAt: datetime
+  }
+}
+
+together {
+  entity "cvs" as cvs {
+    _id: ObjectId
+    candidateId: ObjectId
+    content: string
+    fileName: string
+    fileUrl: string
+    uploadDate: datetime
+    isDefault: boolean
+    aiAnalysis: object
+    createdAt: datetime
+    updatedAt: datetime
+  }
+
+  entity "educations" as educations {
+    _id: ObjectId
+    candidateId: ObjectId
+    degree: string
+    major: string
+    school: string
+    startDate: date
+    endDate: date
+    gpa: float
+    courses: array
+    achievements: array
+    createdAt: datetime
+    updatedAt: datetime
+  }
+
+  entity "notifications" as notifications {
+    _id: ObjectId
+    userId: ObjectId
+    sender: ObjectId
+    type: enum
+    title: string
+    message: string
+    data: object
+    isRead: boolean
+    isSent: boolean
+    priority: enum
+    channel: enum
+    sentAt: datetime
+    deliveredAt: datetime
+    readAt: datetime
+    archivedAt: datetime
+    dedupeKey: string
+    templateKey: string
+    locale: string
+    createdAt: datetime
+  }
+}
+
+together {
+  entity "skill_graph_analyses" as skill_graph_analyses {
+    _id: ObjectId
+    candidateId: ObjectId
+    jobId: ObjectId
+    skillGaps: array
+    recommendedCourses: string[]
+    analysisLevel: enum
+    generatedAt: datetime
+    nextUpdate: datetime
+    createdAt: datetime
+    updatedAt: datetime
+  }
+
+  entity "skill_maps" as skill_maps {
+    _id: ObjectId
+    candidateId: ObjectId
+    targetSkillTitle: string
+    currentSkillLevel: enum
+    estimatedMonths: int
+    status: enum
+    completionDate: date
+    steps: array
+    progress: object
+    preferences: object
+    createdAt: datetime
+    updatedAt: datetime
+  }
+
+  entity "skill_gaps" as skill_gaps {
+    _id: ObjectId
+    analysisId: ObjectId
+    skill: string
+    currentLevel: enum
+    targetLevel: enum
+    priority: enum
+    importance: number
+    createdAt: datetime
+  }
+
+  entity "development_steps" as development_steps {
+    _id: ObjectId
+    skillMapId: ObjectId
+    title: string
+    description: string
+    difficulty: enum
+    technologies: array
+    repository: string
+    estimatedTime: string
+    status: enum
+    completedAt: datetime
+    createdAt: datetime
+  }
+}
+
+together {
+  entity "learning_roadmaps" as learning_roadmaps {
+    _id: ObjectId
+    candidateId: ObjectId
+    targetJobId: ObjectId
+    targetRole: string
+    currentLevel: enum
+    skillGaps: array
+    phases: array
+    milestones: array
+    successMetrics: array
+    totalDuration: string
+    estimatedTotalHours: number
+    difficulty: enum
+    progress: object
+    generatedBy: enum
+    aiModelVersion: string
+    credibilityMetrics: object
+    metadata: object
+    feedback: object
+    status: enum
+    isPersonalized: boolean
+    isPublic: boolean
+    createdAt: datetime
+    updatedAt: datetime
+  }
+
+  entity "resources" as resources {
+    _id: ObjectId
+    roadmapId: ObjectId
+    type: enum
+    title: string
+    url: string
+    provider: string
+    duration: string
+    difficulty: enum
+    isFree: boolean
+    rating: number
+    credibility: number
+    language: string
+    estimatedCost: number
+    certificateOffered: boolean
+    source: enum
+    popularity: number
+    similarity: number
+    metadata: object
+    createdAt: datetime
+  }
+
+  entity "skill_learning_paths" as skill_learning_paths {
+    _id: ObjectId
+    skillId: ObjectId
+    levels: array
+    prerequisites: array
+    resources: array
+    milestones: array
+    careerPaths: array
+    relatedSkills: array
+    createdAt: datetime
+    updatedAt: datetime
+  }
+}
+
+' Relationships
+users ||--o{ candidates
+users ||--o{ employers
+users ||--o{ notifications
+users ||--o{ job_followings
+
+candidates ||--o{ educations
+candidates ||--o{ cvs
+candidates ||--o{ job_applications
+candidates ||--o{ job_savings
+candidates ||--o{ skill_graph_analyses
+candidates ||--o{ skill_maps
+candidates ||--o{ learning_roadmaps
+candidates }o--o{ skills
+
+employers }o--o{ companies
+
+companies ||--o{ job_postings
+companies }o--o{ industries
+
+job_postings ||--o{ job_applications
+job_postings ||--o{ job_savings
+job_postings }o--o{ skills
+job_postings }o--o{ industries
+
+job_applications ||--|| cvs
+
+skill_graph_analyses ||--o{ skill_gaps
+skill_maps ||--o{ development_steps
+
+learning_roadmaps ||--o{ resources
+learning_roadmaps }o--o{ job_postings
+
+skill_learning_paths }o--|| skills
+
+@enduml

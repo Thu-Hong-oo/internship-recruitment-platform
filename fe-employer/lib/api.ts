@@ -125,3 +125,28 @@ export async function logoutEmployer(token: string): Promise<{
     return { success: false, error: "Không thể kết nối máy chủ" } as any;
   }
 }
+
+export async function googleAuth(idToken: string): Promise<{
+  success: boolean;
+  token?: string;
+  user?: any;
+  isNew?: boolean;
+  message?: string;
+  error?: string;
+  errorType?: string;
+}> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/login/google`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idToken, role: "employer" }), // Specify role for employer frontend
+    });
+    const data = await res.json().catch(() => ({}));
+    return data;
+  } catch (e) {
+    return {
+      success: false,
+      error: "Không thể kết nối máy chủ",
+    };
+  }
+}

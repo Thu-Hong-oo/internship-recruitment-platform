@@ -1,17 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { authAPI } from "@/lib/api";
-import { useAuth } from "./useAuth";
 import { useRouter } from "next/navigation";
-import { useToast } from "@/hooks/use-toast";
+import { saveToken, saveUserData } from "@/lib/userStorage";
+import { googleAuth } from "@/lib/api";
 
 export const useGoogleAuth = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { setUser } = useAuth();
+  const [showRoleMismatchModal, setShowRoleMismatchModal] = useState(false);
+  const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
   const router = useRouter();
-  const { toast } = useToast();
 
   // Load Google Identity Services script
   useEffect(() => {
@@ -39,79 +38,105 @@ export const useGoogleAuth = () => {
       setError(null);
 
       // Send ID token to backend
-      const result = await authAPI.googleAuth(response.credential);
+      const result = await googleAuth(response.credential) as {
+        success: boolean;
+        token?: string;
+        user?: any;
+        isNew?: boolean;
+        message?: string;
+        error?: string;
+        errorType?: string;
+      };
 
       console.log("Google Auth Result:", result);
 
-      if (result.success && result.user) {
-        // Check if user role is candidate
-        if (result.user.role !== 'candidate') {
-          const errorMsg = "Tài khoản này là tài khoản employer. Đang chuyển hướng...";
+      // Handle ROLE_MISMATCH error from backend (403 response)
+      if (result.errorType === 'ROLE_MISMATCH' || (!result.success && result.error && result.error.includes('role'))) {
+        const isLocalhost = typeof window !== "undefined" && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+        const candidateUrl = isLocalhost 
+          ? 'http://localhost:3001' 
+          : 'https://internbridge.web.app';
+        console.error("Role mismatch:", result);
+        
+        // Clear any saved data
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          sessionStorage.removeItem("token");
+          sessionStorage.removeItem("user");
+        }
+        
+        // Set modal state
+        setRedirectUrl(candidateUrl);
+        setShowRoleMismatchModal(true);
+        
+        // Auto redirect after 3 seconds
+        setTimeout(() => {
+          if (typeof window !== "undefined") {
+            window.location.href = candidateUrl;
+          }
+        }, 3000);
+        return;
+      }
+
+      // Check if we have user data (even if success field is missing)
+      if (result.user) {
+        // Check if user role is employer
+        if (result.user.role !== 'employer') {
+          const isLocalhost = typeof window !== "undefined" && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+          const candidateUrl = isLocalhost 
+            ? 'http://localhost:3001' 
+            : 'https://internbridge.web.app';
           console.error("Role mismatch:", result.user.role);
           
           // Clear any saved data
           if (typeof window !== "undefined") {
             localStorage.removeItem("token");
+            localStorage.removeItem("user");
             sessionStorage.removeItem("token");
-            
-            // Redirect to employer frontend
-            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-            const employerUrl = isLocalhost 
-              ? 'http://localhost:3002' 
-              : 'https://internbridge-employer.web.app';
-            
-            toast({
-              title: "Đang chuyển hướng",
-              description: "Tài khoản này là tài khoản employer. Đang chuyển đến trang employer...",
-            });
-            
-            setTimeout(() => {
-              window.location.href = employerUrl;
-            }, 2000);
+            sessionStorage.removeItem("user");
           }
+          
+          // Set modal state
+          setRedirectUrl(candidateUrl);
+          setShowRoleMismatchModal(true);
+          
+          // Auto redirect after 3 seconds
+          setTimeout(() => {
+            if (typeof window !== "undefined") {
+              window.location.href = candidateUrl;
+            }
+          }, 3000);
           return;
         }
 
-        // Set user in auth context
-        setUser(result.user);
+        // User is employer - proceed with login
+        // Save token and user data
+        if (result.token) {
+          saveToken(result.token, true);
+        }
+        if (result.user) {
+          saveUserData(result.user, true);
+        }
 
-        // Token is already stored by apiClient.setToken in authService
-        // No need to check for token here
-
-        toast({
-          title: "Đăng nhập thành công",
-          description: result.isNew
-            ? "Chào mừng bạn đến với InternBridge!"
-            : "Đăng nhập thành công",
-        });
-
-        // Redirect based on user status
+        // Redirect to dashboard
         setTimeout(() => {
-          if (result.isNew) {
-            router.push("/profile");
-          } else {
-            router.push("/");
-          }
+          router.push("/dashboard");
         }, 500);
-      } else {
+      } else if (result.success === false || result.error) {
+        // Handle actual errors (not role mismatch)
         const errorMsg = result.error || result.message || "Đăng nhập Google thất bại";
         console.error("Google Auth Error:", errorMsg, result);
         setError(errorMsg);
-        toast({
-          title: "Đăng nhập thất bại",
-          description: errorMsg,
-          variant: "destructive",
-        });
+      } else {
+        // Unexpected response format
+        console.error("Unexpected Google Auth response:", result);
+        setError("Phản hồi không hợp lệ từ server. Vui lòng thử lại.");
       }
     } catch (err: any) {
       console.error("Google Auth Response Error:", err);
       const errorMsg = err.message || "Lỗi khi xử lý phản hồi từ Google";
       setError(errorMsg);
-      toast({
-        title: "Lỗi",
-        description: errorMsg,
-        variant: "destructive",
-      });
     } finally {
       setLoading(false);
     }
@@ -124,13 +149,9 @@ export const useGoogleAuth = () => {
     try {
       const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
       if (!clientId || clientId === 'your-google-client-id-here') {
-        const errorMsg = "Google Client ID chưa được cấu hình. Vui lòng:\n1. Tạo file .env.local trong thư mục fe/\n2. Thêm NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-client-id\n3. Lấy Google Client ID từ: https://console.cloud.google.com/apis/credentials";
+        const errorMsg = "Google Client ID chưa được cấu hình. Vui lòng:\n1. Tạo file .env.local trong thư mục fe-employer/\n2. Thêm NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-client-id\n3. Lấy Google Client ID từ: https://console.cloud.google.com/apis/credentials";
         console.error(errorMsg);
-        toast({
-          title: "Cấu hình thiếu",
-          description: "Google Client ID chưa được cấu hình. Vui lòng xem console để biết thêm chi tiết.",
-          variant: "destructive",
-        });
+        setError(errorMsg);
         throw new Error(errorMsg);
       }
 
@@ -164,11 +185,6 @@ export const useGoogleAuth = () => {
     } catch (err: any) {
       console.error("Google Auth Error:", err);
       setError(err.message || "Lỗi khi đăng nhập với Google");
-      toast({
-        title: "Lỗi",
-        description: err.message || "Lỗi khi đăng nhập với Google",
-        variant: "destructive",
-      });
       setLoading(false);
     }
   };
@@ -218,6 +234,9 @@ export const useGoogleAuth = () => {
     renderGoogleButton,
     loading,
     error,
+    showRoleMismatchModal,
+    setShowRoleMismatchModal,
+    redirectUrl,
   };
 };
 
@@ -244,3 +263,4 @@ declare global {
     };
   }
 }
+

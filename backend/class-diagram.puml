@@ -1,0 +1,49 @@
+@startuml
+!theme plain
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 14
+skinparam componentStyle uml2
+
+title Sơ đồ Lớp - Luồng "Ứng viên Nộp hồ sơ"
+
+package "1. Routes" <<Rectangle>> {
+  component [jobs.js] as JobRoutes <<Route>>
+}
+
+package "2. Middleware" <<Rectangle>> {
+  component [auth.js] as AuthMiddleware <<Middleware>>
+  note right: protect(), authorize('candidate')
+}
+
+package "3. Controllers" <<Rectangle>> {
+  component [jobController.js] as JobController <<Controller>> {
+    + applyToJob()
+  }
+}
+
+package "4. Services" <<Rectangle>> {
+  component [applicationService.js] as ApplicationService <<Service>> {
+    + createApplication(candidateId, jobId, data)
+  }
+  component [notificationService.js] as NotificationService <<Service>> {
+    + notifyNewApplication(employerId, ...)
+  }
+}
+
+package "5. Models" <<Database>> {
+  component [Application.js] as ApplicationModel <<Model>>
+  component [Job.js] as JobModel <<Model>>
+  component [Notification.js] as NotificationModel <<Model>>
+}
+
+
+' Relationships
+JobRoutes ..> AuthMiddleware : "uses"
+AuthMiddleware ..> JobController : "forwards to"
+JobController ..> ApplicationService : "calls"
+ApplicationService ..> ApplicationModel : "uses"
+ApplicationService ..> JobModel : "uses"
+ApplicationService ..> NotificationService : "calls"
+NotificationService ..> NotificationModel : "uses"
+
+@enduml

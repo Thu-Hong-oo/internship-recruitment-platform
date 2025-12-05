@@ -118,16 +118,8 @@ export default function HomePage({ onSearch }: HomePageProps) {
       qs.set("subIndustryCode", newFilters.subIndustryCode);
     if (newFilters.skills && newFilters.skills.length > 0)
       qs.set("skills", newFilters.skills.join(","));
-    if (newFilters.salaryMin || newFilters.minSalary)
-      qs.set(
-        "salaryMin",
-        String(newFilters.salaryMin || newFilters.minSalary)
-      );
-    if (newFilters.salaryMax || newFilters.maxSalary)
-      qs.set(
-        "salaryMax",
-        String(newFilters.salaryMax || newFilters.maxSalary)
-      );
+    if (newFilters.salaryMin) qs.set("salaryMin", String(newFilters.salaryMin));
+    if (newFilters.salaryMax) qs.set("salaryMax", String(newFilters.salaryMax));
     if (newFilters.salaryRange) qs.set("salaryRange", newFilters.salaryRange);
     if (newFilters.createdFrom) qs.set("createdFrom", newFilters.createdFrom);
     if (newFilters.createdTo) qs.set("createdTo", newFilters.createdTo);
@@ -340,7 +332,7 @@ export default function HomePage({ onSearch }: HomePageProps) {
                                     </span>
                                     <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200/60 backdrop-blur-sm transition-all duration-300 group-hover:bg-[oklch(0.60_0.12_195/.08)] group-hover:border-[oklch(0.60_0.12_195/.2)] group-hover:text-[oklch(0.50_0.12_195)]">
                                       <MapPin className="w-3.5 h-3.5" />
-                                      {job.fullLocation || "Đang cập nhật"}
+                                      {job.city || "Đang cập nhật"}
                                     </span>
                                   </div>
 

@@ -6,6 +6,7 @@ import { User, authAPI, AuthResponse } from "@/lib/api";
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  setUser: (user: User | null) => void;
   register: (data: {
     email: string;
     password: string;
@@ -130,17 +131,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return React.createElement(
       AuthContext.Provider,
       {
-        value: {
-          user: null,
-          loading: true,
-          register,
-          login,
-          logout,
-          verifyEmail,
-          getStoredEmail,
-          needsEmailVerification,
-          uploadAvatar,
-        },
+      value: {
+        user: null,
+        loading: true,
+        setUser,
+        register,
+        login,
+        logout,
+        verifyEmail,
+        getStoredEmail,
+        needsEmailVerification,
+        uploadAvatar,
+      },
       },
       children
     );
@@ -152,6 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value: {
         user,
         loading,
+        setUser,
         register,
         login,
         logout,

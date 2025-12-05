@@ -43,6 +43,7 @@ import { api, type CandidateProfile } from "@/lib/api";
 import { apiClient } from "@/lib/api/client";
 import PageLayout from "@/components/layout/page-layout";
 import UploadCVModal from "@/components/cv/UploadCVModal";
+import CVAnalysisModal from "@/components/cv/CVAnalysisModal";
 
 const folderPalettes = {
   current: {
@@ -157,6 +158,8 @@ export default function CVManagementPage() {
   const [renameValue, setRenameValue] = useState("");
   const [confirmSetId, setConfirmSetId] = useState<string | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+  const [analysisCvId, setAnalysisCvId] = useState<string | undefined>(undefined);
 
   const primaryColor = "oklch(0.65 0.18 195)";
   const primaryGradient = `linear-gradient(135deg, ${primaryColor} 0%, oklch(0.78 0.09 210) 55%, oklch(0.9 0.04 195) 100%)`;
@@ -446,14 +449,28 @@ export default function CVManagementPage() {
                 </Button>
 
                 {hasCurrentCV && (
-                  <Button
-                    onClick={handleViewCurrentCV}
-                    variant="outline"
-                    className="rounded-2xl border-slate-200 bg-white/70 px-6 py-3 font-semibold text-slate-700 backdrop-blur-lg transition-colors duration-300 hover:border-[oklch(0.65_0.18_195)] hover:text-[oklch(0.65_0.18_195)]"
-                  >
-                    <Eye className="mr-2 h-5 w-5" />
-                    Xem CV hiện tại
-                  </Button>
+                  <>
+                    <Button
+                      onClick={handleViewCurrentCV}
+                      variant="outline"
+                      className="rounded-2xl border-slate-200 bg-white/70 px-6 py-3 font-semibold text-slate-700 backdrop-blur-lg transition-colors duration-300 hover:border-[oklch(0.65_0.18_195)] hover:text-[oklch(0.65_0.18_195)]"
+                    >
+                      <Eye className="mr-2 h-5 w-5" />
+                      Xem CV hiện tại
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setAnalysisCvId((profile?.resume?.current as any)?._id);
+                        setShowAnalysisModal(true);
+                      }}
+                      className="group relative overflow-hidden rounded-2xl px-6 py-3 font-semibold text-white shadow-[0_18px_45px_rgba(16,60,120,0.35)] transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_24px_60px_rgba(16,60,120,0.45)]"
+                      style={{ background: primaryGradient }}
+                    >
+                      <span className="absolute inset-0 bg-white/10 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+                      <Sparkles className="mr-2 h-5 w-5" />
+                      Phân tích CV
+                    </Button>
+                  </>
                 )}
               </div>
             </div>
@@ -883,6 +900,13 @@ export default function CVManagementPage() {
               duration: 3000,
             });
           }}
+        />
+
+        {/* CV Analysis Modal */}
+        <CVAnalysisModal
+          open={showAnalysisModal}
+          onOpenChange={setShowAnalysisModal}
+          cvId={analysisCvId}
         />
       </div>
     </PageLayout>

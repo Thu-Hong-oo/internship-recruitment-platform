@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getEmployerApplications } from "@/lib/jobAPI";
+import { getEmployerApplications, viewApplicationResume } from "@/lib/jobAPI";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -21,11 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   AlertCircle,
   FileText,
@@ -121,9 +117,7 @@ export default function EmployerApplicationsPage() {
         });
       } else {
         setError(
-          result.error ||
-            result.message ||
-            "Không thể tải danh sách ứng viên"
+          result.error || result.message || "Không thể tải danh sách ứng viên"
         );
       }
     } catch (err) {
@@ -167,33 +161,18 @@ export default function EmployerApplicationsPage() {
         return;
       }
 
-      // Try to get CV via API endpoint for employer viewing candidate resume
-      const API_BASE_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
-      const url = `${API_BASE_URL}/employers/applications/${application._id}/resume/view`;
-
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        // Fallback to direct URL if API endpoint doesn't exist
+      const res = await viewApplicationResume(application._id, token);
+      if (res.success && res.url) {
+        setPreviewUrl(res.url);
+        setShowPreview(true);
+      } else {
         if (application.resume?.url) {
           window.open(application.resume.url, "_blank");
-          return;
+        } else {
+          setError(res.error || "Không thể xem CV");
         }
-        throw new Error("Không thể tải CV");
       }
-
-      const blob = await response.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      setPreviewUrl(objectUrl);
-      setShowPreview(true);
     } catch (err: any) {
-      // Fallback to direct URL
       if (application.resume?.url) {
         window.open(application.resume.url, "_blank");
       } else {
@@ -287,10 +266,7 @@ export default function EmployerApplicationsPage() {
           <div className="text-sm font-medium">Bộ lọc</div>
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Trạng thái:</span>
-            <Select
-              value={filters.status}
-              onValueChange={handleStatusChange}
-            >
+            <Select value={filters.status} onValueChange={handleStatusChange}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Tất cả" />
               </SelectTrigger>
@@ -313,9 +289,7 @@ export default function EmployerApplicationsPage() {
             <div className="max-w-md mx-auto space-y-4">
               <UserRound className="h-12 w-12 mx-auto text-gray-300" />
               <div>
-                <p className="text-lg font-medium mb-2">
-                  Chưa có ứng viên nào
-                </p>
+                <p className="text-lg font-medium mb-2">Chưa có ứng viên nào</p>
                 <p className="text-sm">
                   Khi ứng viên nộp hồ sơ vào tin tuyển dụng, thông tin của họ sẽ
                   xuất hiện ở đây.
@@ -370,7 +344,9 @@ export default function EmployerApplicationsPage() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell>{renderStatusBadge(application.status)}</TableCell>
+                    <TableCell>
+                      {renderStatusBadge(application.status)}
+                    </TableCell>
                     <TableCell>
                       <div className="text-sm text-muted-foreground">
                         {formatDateTime(application.createdAt)}
@@ -452,9 +428,7 @@ export default function EmployerApplicationsPage() {
                   <h3 className="text-base font-semibold text-slate-900">
                     Xem trước CV
                   </h3>
-                  <p className="text-xs text-slate-500">
-                    CV của ứng viên
-                  </p>
+                  <p className="text-xs text-slate-500">CV của ứng viên</p>
                 </div>
               </div>
               <Button
@@ -503,5 +477,3 @@ export default function EmployerApplicationsPage() {
     </div>
   );
 }
-
-

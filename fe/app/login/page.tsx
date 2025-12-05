@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import {
   Eye,
@@ -16,10 +16,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
+import { useGoogleAuth } from "@/hooks/useGoogleAuth";
 
 export default function LoginPage() {
   const router = useRouter();
   const { login, user, loading } = useAuth();
+  const { handleGoogleSignIn, renderGoogleButton, loading: googleLoading } = useGoogleAuth();
+  const googleButtonRef = useRef<HTMLDivElement>(null);
 
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -31,6 +34,34 @@ export default function LoginPage() {
   const [warning, setWarning] = useState<string | null>(null);
   const [errorType, setErrorType] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  const [googleButtonRendered, setGoogleButtonRendered] = useState(false);
+
+  // Render Google button when component mounts and Google script is loaded
+  useEffect(() => {
+    if (googleButtonRef.current && typeof window !== "undefined") {
+      const checkGoogle = setInterval(() => {
+        if (window.google?.accounts?.id) {
+          const element = document.getElementById("google-signin-button");
+          if (element && !googleButtonRendered) {
+            renderGoogleButton("google-signin-button");
+            setGoogleButtonRendered(true);
+            clearInterval(checkGoogle);
+          }
+        }
+      }, 100);
+
+      // Cleanup after 5 seconds if Google script doesn't load
+      const timeout = setTimeout(() => {
+        clearInterval(checkGoogle);
+      }, 5000);
+
+      return () => {
+        clearInterval(checkGoogle);
+        clearTimeout(timeout);
+      };
+    }
+  }, [renderGoogleButton, googleButtonRendered]);
 
   // Redirect if user is already logged in
   useEffect(() => {
@@ -86,7 +117,26 @@ export default function LoginPage() {
 
     try {
       const res = await login(formData.email, formData.password);
-      if (res.success) {
+      if (res.success && res.user) {
+        // Check if user role is candidate
+        if (res.user.role !== 'candidate') {
+          setError("Tài khoản này là tài khoản employer. Đang chuyển hướng...");
+          setWarning("Bạn đang cố đăng nhập vào trang ứng viên với tài khoản employer.");
+          
+          // Redirect to employer frontend
+          const isLocalhost = typeof window !== "undefined" && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+          const employerUrl = isLocalhost 
+            ? 'http://localhost:3002' 
+            : 'https://internbridge-employer.web.app';
+          
+          setTimeout(() => {
+            if (typeof window !== "undefined") {
+              window.location.href = employerUrl;
+            }
+          }, 2000);
+          return;
+        }
+
         setSuccess("Đăng nhập thành công! Đang chuyển hướng...");
         setTimeout(() => {
           router.push("/");
@@ -197,13 +247,13 @@ export default function LoginPage() {
                         <Button
                           variant="outline"
                           className="h-10 bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
-                          onClick={() => {
-                            // TODO: Implement Google OAuth with custom auth
-                            alert("Google OAuth chưa được implement");
-                          }}
+                          onClick={handleGoogleSignIn}
+                          disabled={googleLoading}
                         >
                           <span className="font-bold text-lg">G</span>
-                          <span className="ml-2">Đăng nhập bằng Google</span>
+                          <span className="ml-2">
+                            {googleLoading ? "Đang xử lý..." : "Đăng nhập bằng Google"}
+                          </span>
                         </Button>
                       </div>
                     )}
@@ -322,22 +372,31 @@ export default function LoginPage() {
             </div>
 
             <div className="flex justify-center">
-              <Button
-                type="button"
-                variant="outline"
-                className="h-12 w-full max-w-xs flex items-center justify-center gap-3 border border-border hover:bg-gray-100 bg-white text-foreground font-semibold rounded-lg shadow-sm transition-all"
-                onClick={() => {
-                  // TODO: Kết nối Google OAuth (NextAuth hoặc custom)
-                  alert("Đăng nhập bằng Google chưa khả dụng.");
-                }}
-              >
-                <img
-                  src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-                  alt="Google Icon"
-                  className="h-5 w-5"
-                />
-                <span className="ml-2">Đăng nhập với Google</span>
-              </Button>
+              {/* Google Identity Services Button */}
+              <div
+                id="google-signin-button"
+                ref={googleButtonRef}
+                className={`w-full max-w-xs flex items-center justify-center ${googleButtonRendered ? '' : 'hidden'}`}
+              />
+              {/* Fallback Button - only show if Google button not rendered */}
+              {!googleButtonRendered && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-12 w-full max-w-xs flex items-center justify-center gap-3 border border-border hover:bg-gray-100 bg-white text-foreground font-semibold rounded-lg shadow-sm transition-all"
+                  onClick={handleGoogleSignIn}
+                  disabled={googleLoading}
+                >
+                  <img
+                    src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                    alt="Google Icon"
+                    className="h-5 w-5"
+                  />
+                  <span className="ml-2">
+                    {googleLoading ? "Đang xử lý..." : "Đăng nhập với Google"}
+                  </span>
+                </Button>
+              )}
             </div>
           </div>
 

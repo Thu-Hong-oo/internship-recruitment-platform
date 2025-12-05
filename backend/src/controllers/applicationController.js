@@ -5,6 +5,7 @@ const CandidateProfile = require('../models/CandidateProfile');
 const aiService = require('../services/ai/aiService');
 const { logger } = require('../utils/logger');
 const asyncHandler = require('express-async-handler');
+const { AppError } = require('../utils/errors');
 
 // @desc    Get all applications for a user
 // @route   GET /api/applications
@@ -529,6 +530,115 @@ const getEmployerApplications = asyncHandler(async (req, res) => {
   }
 });
 
+// @desc    View applicant resume (employer/admin) for a specific application
+// @route   GET /api/jobs/applications/:applicationId/resume
+// @route   GET /api/jobs/:id/applications/:applicationId/resume (legacy)
+// @access  Private (Employer/Admin)
+const viewApplicationResume = asyncHandler(async (req, res) => {
+  const { id: jobIdParam, applicationId } = req.params;
+
+  const application = await Application.findById(applicationId).populate(
+    'jobId',
+    'postedBy employer companyId'
+  );
+
+  if (!application) {
+    throw new AppError('Không tìm thấy đơn ứng tuyển', 404);
+  }
+
+  // Validate job match if jobId is provided in path (legacy)
+  if (
+    jobIdParam &&
+    (!application.jobId || application.jobId._id.toString() !== jobIdParam)
+  ) {
+    throw new AppError('Đơn ứng tuyển không thuộc công việc này', 400);
+  }
+
+  // Permission check: admin or owner of the job
+  const isAdmin = req.user?.role === 'admin';
+  const isOwner =
+    application.jobId?.postedBy &&
+    application.jobId.postedBy.toString() === req.user.id;
+
+  if (!isAdmin && !isOwner) {
+    throw new AppError('Bạn không có quyền xem CV ứng viên này', 403);
+  }
+
+  // Find candidate profile
+  const candidateProfile =
+    (application.candidateId &&
+      (await CandidateProfile.findById(application.candidateId))) ||
+    (application.jobseekerId &&
+      (await CandidateProfile.findOne({ userId: application.jobseekerId })));
+
+  const resume = candidateProfile?.resume?.current;
+  if (!resume || (!resume.url && !resume.publicId)) {
+    throw new AppError('Ứng viên chưa cập nhật CV', 404);
+  }
+
+  // Build accessible URL (follow ResumeController logic)
+  let accessibleUrl = null;
+  if (resume.url) {
+    accessibleUrl = resume.url.replace('http://', 'https://');
+    if (
+      accessibleUrl.includes('/image/upload/') &&
+      (accessibleUrl.includes('.pdf') || resume.mimeType === 'application/pdf')
+    ) {
+      accessibleUrl = accessibleUrl.replace('/image/upload/', '/raw/upload/');
+    }
+  } else if (resume.publicId) {
+    try {
+      const { cloudinary } = require('../utils/cloudinary');
+      accessibleUrl = cloudinary.url(resume.publicId, {
+        resource_type: 'raw',
+        secure: true,
+      });
+    } catch (err) {
+      logger.error('Failed to generate CV URL from publicId', {
+        error: err.message,
+        publicId: resume.publicId,
+      });
+    }
+  }
+
+  if (!accessibleUrl) {
+    throw new AppError('Không lấy được URL CV', 404);
+  }
+
+  // Fetch and stream with proper headers
+  let response;
+  try {
+    response = await fetch(accessibleUrl, {
+      method: 'GET',
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+    });
+  } catch (fetchErr) {
+    logger.error('Failed to fetch CV', { error: fetchErr.message });
+    throw new AppError('Không thể tải CV', 502);
+  }
+
+  if (!response.ok) {
+    logger.error('CV URL returned error', {
+      status: response.status,
+      statusText: response.statusText,
+      url: accessibleUrl,
+    });
+    throw new AppError('Không thể tải CV', 502);
+  }
+
+  const fileBuffer = Buffer.from(await response.arrayBuffer());
+  const contentType = resume.mimeType || 'application/pdf';
+  const filename = resume.displayName || resume.filename || 'resume.pdf';
+  const encodedFilename = encodeURIComponent(filename);
+
+  res.setHeader('Content-Type', contentType);
+  res.setHeader(
+    'Content-Disposition',
+    `inline; filename="resume.pdf"; filename*=UTF-8''${encodedFilename}`
+  );
+  res.send(fileBuffer);
+});
+
 module.exports = {
   getUserApplications,
   getApplication,
@@ -536,5 +646,6 @@ module.exports = {
   updateApplication,
   deleteApplication,
   updateApplicationStatus,
-  getEmployerApplications
+  getEmployerApplications,
+  viewApplicationResume
 };

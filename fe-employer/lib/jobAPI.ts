@@ -156,6 +156,32 @@ export const getMyJobs = async (
   }
 };
 
+// View applicant resume for a specific job/application (returns blob URL for inline view)
+export const viewApplicationResume = async (
+  applicationId: string,
+  token: string
+): Promise<{ success: boolean; url?: string; error?: string }> => {
+  try {
+    const url = `${API_BASE_URL}/jobs/applications/${applicationId}/resume`;
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      return { success: false, error: `Failed to fetch CV (${response.status})` };
+    }
+
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    return { success: true, url: objectUrl };
+  } catch (e: any) {
+    return { success: false, error: e?.message || "Không thể tải CV" };
+  }
+};
+
 // Get job by ID
 export const getJobById = async (
   jobId: string,
@@ -236,10 +262,25 @@ export const deleteJob = async (
 // Get job applications
 export const getJobApplications = async (
   jobId: string,
-  token: string
+  token: string,
+  options?: {
+    status?: string;
+    page?: number;
+    limit?: number;
+  }
 ): Promise<JobsListResponse> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/jobs/${jobId}/applications`, {
+    const params = new URLSearchParams();
+    if (options?.status) params.append("status", options.status);
+    if (options?.page) params.append("page", options.page.toString());
+    if (options?.limit) params.append("limit", options.limit.toString());
+
+    const queryString = params.toString();
+    const url = `${API_BASE_URL}/jobs/${jobId}/applications${
+      queryString ? `?${queryString}` : ""
+    }`;
+
+    const response = await fetch(url, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
