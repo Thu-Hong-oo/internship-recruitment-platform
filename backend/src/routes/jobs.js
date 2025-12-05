@@ -22,6 +22,9 @@ const {
   getEmployerJobs,
   getDraftJobs,
 } = require('../controllers/jobController');
+const {
+  viewApplicationResume,
+} = require('../controllers/applicationController');
 
 const router = express.Router();
 
@@ -29,6 +32,14 @@ const router = express.Router();
 router.get('/', getAllJobs); // GET /api/jobs
 router.get('/recent', getRecentJobs); // GET /api/jobs/recent
 router.get('/slug/:slug', getJobBySlug); // GET /api/jobs/slug/:slug
+
+router.get(
+  '/applications/:applicationId/resume',
+  protect,
+  authorize('employer', 'admin'),
+  requireVerifiedEmployer,
+  viewApplicationResume
+); // GET /api/jobs/applications/:applicationId/resume
 
 // Protected routes - Employer only (require profile) - BEFORE parameterized routes
 router.get(
@@ -87,6 +98,13 @@ router.get(
   requireVerifiedEmployer,
   getJobApplications
 ); // GET /api/jobs/:id/applications
+router.get(
+  '/:id/applications/:applicationId/resume',
+  protect,
+  authorize('employer', 'admin'),
+  requireVerifiedEmployer,
+  viewApplicationResume
+); // GET /api/jobs/:id/applications/:applicationId/resume
 router.post(
   '/employer/:id/submit',
   protect,

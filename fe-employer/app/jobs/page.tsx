@@ -433,32 +433,40 @@ export default function JobsPage() {
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
+                        {job.status === "active" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              router.push(`/jobs/${job._id}/applications`)
+                            }
+                            title="Xem ứng viên"
+                          >
+                            <Users className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => router.push(`/jobs/${job._id}/edit`)}
+                          title="Chỉnh sửa"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
                         {job.status === "draft" && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() =>
-                                router.push(`/jobs/${job._id}/edit`)
-                              }
-                              title="Chỉnh sửa"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setSubmitJobId(job._id)}
-                              disabled={actionLoading === job._id}
-                              title="Gửi duyệt"
-                            >
-                              {actionLoading === job._id ? (
-                                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current"></div>
-                              ) : (
-                                <Send className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSubmitJobId(job._id)}
+                            disabled={actionLoading === job._id}
+                            title="Gửi duyệt"
+                          >
+                            {actionLoading === job._id ? (
+                              <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current"></div>
+                            ) : (
+                              <Send className="h-4 w-4" />
+                            )}
+                          </Button>
                         )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
