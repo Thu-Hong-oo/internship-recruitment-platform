@@ -409,30 +409,74 @@ class ProfileController {
         deletedAt: { $exists: false },
       }).populate(['userId']);
 
+      // Fix existing profile with invalid gender (empty string)
+      if (profile && profile.personalInfo && profile.personalInfo.gender === '') {
+        console.log(`🔧 Fixing invalid gender field for user: ${req.user.id}`);
+        profile.personalInfo.gender = undefined;
+        try {
+          await profile.save();
+          console.log(`✅ Fixed gender field for user: ${req.user.id}`);
+        } catch (error) {
+          console.error(`❌ Failed to fix gender field:`, error.message);
+          // If save fails, delete the invalid gender field
+          profile.personalInfo.gender = undefined;
+          profile.markModified('personalInfo.gender');
+          await profile.save({ validateBeforeSave: false });
+        }
+      }
+
       // Auto-create profile if not found (similar to employer logic)
       if (!profile) {
         console.log(`Creating new candidate profile for user: ${req.user.id}`);
 
-        profile = new CandidateProfile({
-          userId: req.user.id,
-          personalInfo: {
-            fullName: req.user.fullName || '',
-            email: req.user.email || '',
-            phone: '',
-            address: null,
-            dateOfBirth: null,
-            gender: '',
-            avatar: req.user.avatar || null,
-          },
-          progress: {
-            profileCompleteness: 10, // Start with basic info
-            lastUpdated: new Date(),
-          },
-          status: 'active',
-        });
+        try {
+          profile = new CandidateProfile({
+            userId: req.user.id,
+            personalInfo: {
+              fullName: req.user.fullName || '',
+              email: req.user.email || '',
+              phone: '',
+              address: null,
+              dateOfBirth: null,
+              // Don't set gender if not provided - let it be undefined
+              // gender must be one of: 'male', 'female', 'other', 'prefer_not_to_say'
+              avatar: req.user.avatar || null,
+            },
+            progress: {
+              profileCompleteness: 10, // Start with basic info
+              lastUpdated: new Date(),
+            },
+            status: 'active',
+          });
 
-        await profile.save();
-        console.log(`✅ Created candidate profile for user: ${req.user.id}`);
+          await profile.save();
+          console.log(`✅ Created candidate profile for user: ${req.user.id}`);
+        } catch (error) {
+          console.error(`❌ Failed to create candidate profile:`, error.message);
+          // If validation fails, try again without gender field
+          if (error.message.includes('gender')) {
+            profile = new CandidateProfile({
+              userId: req.user.id,
+              personalInfo: {
+                fullName: req.user.fullName || '',
+                email: req.user.email || '',
+                phone: '',
+                address: null,
+                dateOfBirth: null,
+                avatar: req.user.avatar || null,
+              },
+              progress: {
+                profileCompleteness: 10,
+                lastUpdated: new Date(),
+              },
+              status: 'active',
+            });
+            await profile.save();
+            console.log(`✅ Created candidate profile (retry) for user: ${req.user.id}`);
+          } else {
+            throw error;
+          }
+        }
 
         // Re-populate after creation
         profile = await CandidateProfile.findById(profile._id).populate([

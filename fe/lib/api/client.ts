@@ -64,11 +64,17 @@ export class ApiClient {
 
   constructor() {
     // Use API_BASE_URL with fallback
-    // Only throw error at runtime (client-side) if URL is clearly invalid, not at build time
-    if (typeof window !== 'undefined' && (!API_BASE_URL || API_BASE_URL.includes('localhost'))) {
-      console.warn(
-        "NEXT_PUBLIC_API_URL is not properly configured. Using fallback URL."
-      );
+    // Only warn at runtime (client-side) if URL is not configured, not at build time
+    if (typeof window !== 'undefined') {
+      const envUrl = process.env.NEXT_PUBLIC_API_URL;
+      if (!envUrl) {
+        console.warn(
+          "NEXT_PUBLIC_API_URL is not configured. Using fallback URL: http://localhost:3000/api"
+        );
+        console.warn(
+          "Please create .env.local file with NEXT_PUBLIC_API_URL=your-backend-url"
+        );
+      }
     }
     this.baseURL = API_BASE_URL || 'http://localhost:3000/api';
     this.token = null; // Initialize as null, will be set when needed
