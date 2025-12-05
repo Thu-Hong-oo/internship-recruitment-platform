@@ -9,6 +9,7 @@ export interface JobItem {
   title: string;
   companyId?: CompanyLite | null;
   fullLocation?: string;
+  city?: string; // City from address.city
   salaryRange?: string;
   isUrgent?: boolean;
   isFeatured?: boolean;

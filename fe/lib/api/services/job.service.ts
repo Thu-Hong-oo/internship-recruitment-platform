@@ -27,6 +27,7 @@ class JobService {
       experienceLevel?: string; // New: junior, mid, senior, fresh
       industry?: string;
       industryCode?: string; // New: normalized industry code
+      subIndustryCode?: string; // New: sub-industry code
       salaryMin?: string | number;
       salaryMax?: string | number;
       minSalary?: string | number; // Alternative param name
@@ -72,6 +73,7 @@ class JobService {
       setParam("experienceLevel", params.experienceLevel);
       setParam("industry", params.industry);
       setParam("industryCode", params.industryCode);
+      setParam("subIndustryCode", params.subIndustryCode);
 
       // Salary - backend expects salaryMin / salaryMax
       // Ưu tiên dùng salaryMin/salaryMax, vẫn hỗ trợ minSalary/maxSalary để tương thích cũ
@@ -127,9 +129,9 @@ class JobService {
 
         if (min && max) {
           if (currency === "VND") {
-            salary = `${(min / 1000000).toFixed(0)}M - ${(max / 1000000).toFixed(
-              0
-            )}M VND`;
+            salary = `${(min / 1000000).toFixed(0)}M - ${(
+              max / 1000000
+            ).toFixed(0)}M VND`;
           } else {
             salary = `${min.toLocaleString()} - ${max.toLocaleString()} ${currency}`;
           }
@@ -149,26 +151,34 @@ class JobService {
       }
 
       if (!salary) {
-        salary =
-          (job as any).currency
-            ? `${(job as any).currency} - Thỏa thuận`
-            : "Thỏa thuận";
+        salary = (job as any).currency
+          ? `${(job as any).currency} - Thỏa thuận`
+          : "Thỏa thuận";
       }
 
       // Format location từ address hoặc location string
       let fullLocation: string =
         (job as any).location || (job as any).fullLocation || "";
-      if (!fullLocation && (job as any).address) {
+      let city: string = "";
+
+      if ((job as any).address) {
         const addr = (job as any).address;
-        fullLocation =
-          addr.fullAddress ||
-          [addr.street, addr.ward, addr.district, addr.city, addr.country]
-            .filter(Boolean)
-            .join(", ");
+        city = addr.city || "";
+        if (!fullLocation) {
+          fullLocation =
+            addr.fullAddress ||
+            [addr.street, addr.ward, addr.district, addr.city, addr.country]
+              .filter(Boolean)
+              .join(", ");
+        }
       }
 
       if (!fullLocation) {
         fullLocation = fallbackCity || "";
+      }
+
+      if (!city) {
+        city = fallbackCity || "";
       }
 
       return {
@@ -180,6 +190,7 @@ class JobService {
           logo: { url: logoUrl },
         },
         fullLocation,
+        city,
         salaryRange: salary,
         isUrgent: (job as any).isUrgent || false,
         isFeatured: (job as any).isFeatured || false,
@@ -247,17 +258,19 @@ class JobService {
       `/jobs/${id}?t=${timestamp}`
     );
     const j = res.data;
-    
+
     // Format salary from salaryMin, salaryMax, currency
     let salaryString = (j as any).salary;
     if (!salaryString && ((j as any).salaryMin || (j as any).salaryMax)) {
       const min = (j as any).salaryMin;
       const max = (j as any).salaryMax;
       const currency = (j as any).currency || "VND";
-      
+
       if (min && max) {
         if (currency === "VND") {
-          salaryString = `${(min / 1000000).toFixed(0)}M - ${(max / 1000000).toFixed(0)}M VND`;
+          salaryString = `${(min / 1000000).toFixed(0)}M - ${(
+            max / 1000000
+          ).toFixed(0)}M VND`;
         } else {
           salaryString = `${min.toLocaleString()} - ${max.toLocaleString()} ${currency}`;
         }
@@ -275,17 +288,18 @@ class JobService {
         }
       }
     }
-    
+
     // Format location from address object or location string
     let locationString = (j as any).location;
     if (!locationString && (j as any).address) {
       const addr = (j as any).address;
-      locationString = addr.fullAddress || 
+      locationString =
+        addr.fullAddress ||
         [addr.street, addr.ward, addr.district, addr.city, addr.country]
           .filter(Boolean)
           .join(", ");
     }
-    
+
     return {
       success: res.success,
       data: {
