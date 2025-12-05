@@ -1641,8 +1641,4 @@ module.exports = {
   submitJobForReview,
   getEmployerJobs,
   getDraftJobs,
-<<<<<<< HEAD
 };
-=======
-};
->>>>>>> 7ab598374151bdee47540a3b162923f48e63ca5e

@@ -55,23 +55,6 @@ class ProfileController {
         return false;
       }
 
-<<<<<<< HEAD
-      // Use the centralized auto-fill helper
-      const ResumeHelpers = require('./helpers/resumeHelpers');
-      await ResumeHelpers.autoFillProfileFromParsedData(profile, aiAnalysis);
-
-      // Save the updated profile
-      await profile.save();
-      console.log('✅ Profile updated and saved successfully');
-
-      return true;
-    } catch (error) {
-      console.error('❌ Error mapping CV to profile:', error);
-      throw error;
-    }
-  }
-
-=======
       console.log('🎯 Processing sections:', {
         personalInfo: !!aiAnalysis.personalInfo,
         education: !!aiAnalysis.education,
@@ -391,7 +374,6 @@ class ProfileController {
       return false;
     }
   }
->>>>>>> 7ab598374151bdee47540a3b162923f48e63ca5e
   constructor() {
     // Bind all methods to preserve this context
     this.getProfile = this.getProfile.bind(this);
