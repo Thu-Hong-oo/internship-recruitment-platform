@@ -653,6 +653,24 @@ class RuleBasedCVParser {
       skillList.forEach(skill => {
         const skillLower = skill.toLowerCase();
 
+        // Skip single-character skills unless they have clear context
+        // Single chars like "c" and "r" are too ambiguous and often false positives
+        if (skillLower.length === 1) {
+          // Only match single chars if they appear with programming context
+          const contextPatterns = [
+            new RegExp(`\\b${skillLower}\\s+(?:programming|language|lang|code|development|dev)`, 'i'),
+            new RegExp(`(?:programming|language|lang|code|development|dev)\\s+${skillLower}\\b`, 'i'),
+            new RegExp(`\\b${skillLower}\\s*[+#]`, 'i'), // C++, C#
+            new RegExp(`\\b${skillLower}\\s*/\s*[a-z]`, 'i'), // C/O (but this is usually Certificate of Origin, not C language)
+          ];
+          
+          // Check if any context pattern matches
+          const hasContext = contextPatterns.some(pattern => pattern.test(textLower));
+          if (!hasContext) {
+            return; // Skip single-char skills without clear programming context
+          }
+        }
+
         // Create regex pattern for word boundary matching
         // Handle special chars in skill name (e.g., "node.js", "c++")
         const escapedSkill = skillLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -708,6 +726,22 @@ class RuleBasedCVParser {
           const skillList = this.skillKeywords[name] || [];
           skillList.forEach(skill => {
             const skillLower = skill.toLowerCase();
+
+            // Skip single-character skills unless they have clear context
+            if (skillLower.length === 1) {
+              const contextPatterns = [
+                new RegExp(`\\b${skillLower}\\s+(?:programming|language|lang|code|development|dev)`, 'i'),
+                new RegExp(`(?:programming|language|lang|code|development|dev)\\s+${skillLower}\\b`, 'i'),
+                new RegExp(`\\b${skillLower}\\s*[+#]`, 'i'), // C++, C#
+                new RegExp(`\\b${skillLower}\\s*/\s*[a-z]`, 'i'), // C/O (but this is usually Certificate of Origin, not C language)
+              ];
+              
+              const hasContext = contextPatterns.some(pattern => pattern.test(pointLower));
+              if (!hasContext) {
+                return; // Skip single-char skills without clear programming context
+              }
+            }
+
             const escapedSkill = skillLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const pattern = new RegExp(`\\b${escapedSkill}\\b`, 'i');
 

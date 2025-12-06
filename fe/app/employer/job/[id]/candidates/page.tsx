@@ -81,6 +81,7 @@ export default function CandidateRecommendationsPage() {
   const [tierFilter, setTierFilter] = useState<string>("all");
   const [minScore, setMinScore] = useState<number>(0);
   const [selectedCandidate, setSelectedCandidate] = useState<CandidateRecommendation | null>(null);
+  const [isRecalculating, setIsRecalculating] = useState(false);
 
   useEffect(() => {
     if (jobId) {
@@ -124,6 +125,32 @@ export default function CandidateRecommendationsPage() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleRecalculateScores = async () => {
+    setIsRecalculating(true);
+    try {
+      const response = await nlpService.recalculateScores(jobId);
+      if (response.success) {
+        toast({
+          title: "Đã khởi động tính lại điểm",
+          description: response.message || "Điểm phù hợp sẽ được cập nhật trong vài phút.",
+        });
+        // Refresh candidates after a short delay
+        setTimeout(() => {
+          fetchCandidates();
+        }, 2000);
+      }
+    } catch (error: any) {
+      console.error("Failed to recalculate scores:", error);
+      toast({
+        title: "Lỗi",
+        description: error?.response?.data?.message || "Không thể tính lại điểm. Vui lòng thử lại.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRecalculating(false);
     }
   };
 
@@ -225,8 +252,22 @@ export default function CandidateRecommendationsPage() {
               )}
             </div>
 
-            <Button onClick={fetchCandidates} variant="outline">
-              Recalculate Matches
+            <Button 
+              onClick={handleRecalculateScores} 
+              variant="outline"
+              disabled={isRecalculating}
+            >
+              {isRecalculating ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Đang tính lại...
+                </>
+              ) : (
+                <>
+                  <TrendingUp className="mr-2 h-4 w-4" />
+                  Tính lại điểm phù hợp
+                </>
+              )}
             </Button>
           </div>
         </div>

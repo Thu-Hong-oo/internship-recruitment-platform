@@ -12,7 +12,7 @@
  * Replace các hàm Gemini trong aiService.js với implementation tự chủ
  */
 
-const phobertService = require('../phobertService');
+// const phobertService = require('../phobertService'); // DISABLED - will re-enable after fixing PhoBERT extraction issues
 const { getSentenceBertService } = require('./sentenceBertService');
 const { getJobMatchingService } = require('./jobMatchingService');
 const { logger } = require('../../utils/logger');
@@ -186,21 +186,28 @@ class SelfSufficientAIService {
       let currentSkills = [];
       let requiredSkills = [];
 
-      // ✅ Use PhoBERT for Vietnamese CV text (most accurate for Vietnamese)
-      // DISABLED: PhoBERT timeout issues, enhanced fuzzy matching is sufficient
-      if (false && isCVVietnamese && cvText.length > 50) {
-        logger.info('🇻🇳 Vietnamese CV detected, using PhoBERT NER (10s timeout)');
+      // ✅ Use Hybrid System (Rule-based + Multilingual NER) instead of PhoBERT
+      // PhoBERT is disabled due to extraction issues - will re-enable after fixing
+      if (cvText.length > 50) {
+        logger.info(`🌍 Using Hybrid System for skill extraction (${isCVVietnamese ? 'Vietnamese' : 'English'} text)`);
         try {
-          const phobertSkills = await phobertService.extractSkills(cvText);
-          if (phobertSkills && phobertSkills.length > 0) {
-            currentSkills.push(...phobertSkills);
-            logger.info(`✅ PhoBERT extracted ${phobertSkills.length} skills from CV`);
+          const { getSkillExtractionService } = require('./skillExtractionService');
+          const skillExtractor = getSkillExtractionService();
+          const extractedSkills = await skillExtractor.extractSkills(cvText, {
+            useHybrid: true,      // Use Hybrid System (Rule-based + Multilingual NER)
+            usePhoBERT: false,    // Disabled - will re-enable after fixing
+            useGemini: false,
+            maxSkills: 50
+          });
+          
+          if (extractedSkills && extractedSkills.length > 0) {
+            const skillNames = extractedSkills.map(s => s.name);
+            currentSkills.push(...skillNames);
+            logger.info(`✅ Hybrid System extracted ${skillNames.length} skills from CV`);
           }
         } catch (error) {
-          logger.warn('⚠️ PhoBERT failed, falling back to keyword extraction:', error.message);
+          logger.warn('⚠️ Hybrid System failed, falling back to keyword extraction:', error.message);
         }
-      } else if (!isCVVietnamese) {
-        logger.info('🇬🇧 English text detected, using keyword extraction');
       }
       
       // Add manual skills if provided
@@ -214,15 +221,54 @@ class SelfSufficientAIService {
       let allRequiredSkills = [
         ...requiredSkills,
         ...(jobData.skills || [])
-      ].map(s => (typeof s === 'string' ? s : s.name).toLowerCase().trim());
+      ].map(s => (typeof s === 'string' ? s : s.name).toLowerCase().trim()).filter(Boolean);
 
-      // 🔥 AUTO-GENERATE required skills if empty (using job title)
-      if (allRequiredSkills.length === 0 && jobData.title) {
-        logger.info(`🤖 Auto-generating required skills for job title: "${jobData.title}"`);
-        const suggestedSkills = await this.suggestSkills(jobData.title, 'mid-level');
-        if (suggestedSkills && suggestedSkills.suggestions) {
-          allRequiredSkills = suggestedSkills.suggestions.map(s => s.toLowerCase().trim());
-          logger.info(`✅ Auto-generated ${allRequiredSkills.length} required skills:`, allRequiredSkills.join(', '));
+      // 🔥 AUTO-GENERATE required skills if empty or too few (using job title/description)
+      // Always try to generate skills if we have job title, even if some skills exist
+      if (jobData.title) {
+        if (allRequiredSkills.length === 0 || allRequiredSkills.length < 3) {
+          logger.info(`🤖 Auto-generating required skills for job title: "${jobData.title}" (current: ${allRequiredSkills.length})`);
+          try {
+            const suggestedSkills = await this.suggestSkills(jobData.title, 'mid-level');
+            if (suggestedSkills && suggestedSkills.suggestions && suggestedSkills.suggestions.length > 0) {
+              const newSkills = suggestedSkills.suggestions
+                .map(s => (typeof s === 'string' ? s : (s.name || s.skill || String(s))).toLowerCase().trim())
+                .filter(Boolean);
+              
+              // Merge with existing skills, avoiding duplicates
+              const existingSet = new Set(allRequiredSkills);
+              const uniqueNewSkills = newSkills.filter(s => !existingSet.has(s));
+              allRequiredSkills = [...allRequiredSkills, ...uniqueNewSkills];
+              
+              logger.info(`✅ Auto-generated ${uniqueNewSkills.length} additional skills (total: ${allRequiredSkills.length}):`, allRequiredSkills.join(', '));
+            } else {
+              logger.warn(`⚠️ suggestSkills returned no suggestions for: "${jobData.title}"`);
+            }
+          } catch (error) {
+            logger.error(`❌ Error auto-generating skills:`, error.message);
+          }
+        }
+      }
+      
+      // If still no skills, try to extract from job description
+      if (allRequiredSkills.length === 0 && jobData.description) {
+        logger.info(`🤖 No skills found, trying to extract from job description...`);
+        try {
+          const { getSkillExtractionService } = require('./skillExtractionService');
+          const skillExtractor = getSkillExtractionService();
+          const extractedSkills = await skillExtractor.extractSkills(jobData.description, {
+            useHybrid: true,
+            usePhoBERT: false,
+            useGemini: false,
+            maxSkills: 10
+          });
+          
+          if (extractedSkills && extractedSkills.length > 0) {
+            allRequiredSkills = extractedSkills.map(s => s.name.toLowerCase().trim());
+            logger.info(`✅ Extracted ${allRequiredSkills.length} skills from job description:`, allRequiredSkills.join(', '));
+          }
+        } catch (error) {
+          logger.error(`❌ Error extracting skills from description:`, error.message);
         }
       }
 
@@ -709,31 +755,96 @@ class SelfSufficientAIService {
   _buildCVText(cvData) {
     const parts = [];
 
-    // Skills (shortened)
+    // Skills (handle both string arrays and object arrays)
     if (cvData.skills) {
-      if (cvData.skills.technical) parts.push(`Technical: ${cvData.skills.technical.slice(0, 10).map(s => s.name || s).join(', ')}`);
-      if (cvData.skills.soft) parts.push(`Soft skills: ${cvData.skills.soft.slice(0, 5).map(s => s.name || s).join(', ')}`);
+      if (cvData.skills.technical && Array.isArray(cvData.skills.technical)) {
+        const techSkills = cvData.skills.technical
+          .slice(0, 20) // Increased from 10 to 20
+          .map(s => (typeof s === 'string' ? s : (s.name || s.skill || String(s))))
+          .filter(Boolean)
+          .join(', ');
+        if (techSkills) parts.push(`Technical skills: ${techSkills}`);
+      }
+      if (cvData.skills.soft && Array.isArray(cvData.skills.soft)) {
+        const softSkills = cvData.skills.soft
+          .slice(0, 10) // Increased from 5 to 10
+          .map(s => (typeof s === 'string' ? s : (s.name || s.skill || String(s))))
+          .filter(Boolean)
+          .join(', ');
+        if (softSkills) parts.push(`Soft skills: ${softSkills}`);
+      }
+      if (cvData.skills.languages && Array.isArray(cvData.skills.languages)) {
+        const langSkills = cvData.skills.languages
+          .slice(0, 5)
+          .map(s => (typeof s === 'string' ? s : (s.name || s.skill || String(s))))
+          .filter(Boolean)
+          .join(', ');
+        if (langSkills) parts.push(`Languages: ${langSkills}`);
+      }
     }
 
-    // Experience (limit to 3 most recent, truncate descriptions)
-    if (cvData.experience && Array.isArray(cvData.experience)) {
-      cvData.experience.slice(0, 3).forEach(exp => {
-        const desc = (exp.description || '').substring(0, 200); // Max 200 chars
-        parts.push(`${exp.position} at ${exp.company}: ${desc}`);
+    // Experience (limit to 5 most recent, truncate descriptions)
+    if (cvData.experience && Array.isArray(cvData.experience) && cvData.experience.length > 0) {
+      cvData.experience.slice(0, 5).forEach(exp => {
+        if (!exp) return;
+        const position = exp.position || exp.title || 'Position';
+        const company = exp.company || exp.organization || 'Company';
+        const desc = (exp.description || exp.responsibilities || '').substring(0, 300); // Increased from 200 to 300
+        if (desc) {
+          parts.push(`${position} at ${company}: ${desc}`);
+        } else {
+          parts.push(`${position} at ${company}`);
+        }
       });
     }
 
-    // Education (limit to 2)
-    if (cvData.education && Array.isArray(cvData.education)) {
-      cvData.education.slice(0, 2).forEach(edu => {
+    // Education (limit to 3)
+    if (cvData.education && Array.isArray(cvData.education) && cvData.education.length > 0) {
+      cvData.education.slice(0, 3).forEach(edu => {
+        if (!edu) return;
         const degree = edu.degree || 'Degree';
-        const major = edu.major || edu.field || 'Field';
+        const major = edu.major || edu.field || '';
         const school = edu.school || edu.institution || 'Institution';
-        parts.push(`${degree} in ${major} from ${school}`);
+        if (major) {
+          parts.push(`${degree} in ${major} from ${school}`);
+        } else {
+          parts.push(`${degree} from ${school}`);
+        }
       });
     }
 
-    return parts.join('\n');
+    // Personal info (bio, summary)
+    if (cvData.personalInfo) {
+      if (cvData.personalInfo.bio) {
+        parts.push(`Bio: ${cvData.personalInfo.bio.substring(0, 200)}`);
+      }
+      if (cvData.personalInfo.summary) {
+        parts.push(`Summary: ${cvData.personalInfo.summary.substring(0, 200)}`);
+      }
+      if (cvData.personalInfo.jobTitle) {
+        parts.push(`Current role: ${cvData.personalInfo.jobTitle}`);
+      }
+    }
+
+    const text = parts.join('\n');
+    
+    // Ensure minimum length for skill extraction
+    if (text.length < 50 && cvData.skills) {
+      // If text is too short, add all skills
+      const allSkills = [
+        ...(cvData.skills.technical || []),
+        ...(cvData.skills.soft || []),
+        ...(cvData.skills.languages || [])
+      ]
+        .map(s => (typeof s === 'string' ? s : (s.name || s.skill || String(s))))
+        .filter(Boolean)
+        .join(', ');
+      if (allSkills) {
+        return `Skills: ${allSkills}\n${text}`;
+      }
+    }
+
+    return text;
   }
 
   /**
@@ -819,10 +930,20 @@ class SelfSufficientAIService {
    */
   async analyzeCV(cvText) {
     try {
-      logger.info('🔬 Self-sufficient CV analysis (PhoBERT)');
+      logger.info('🔬 Self-sufficient CV analysis (Hybrid System: Rule-based + Multilingual NER)');
 
-      // Extract skills using PhoBERT
-      const skills = await phobertService.extractSkills(cvText);
+      // Extract skills using Hybrid System (Rule-based + Multilingual NER)
+      // PhoBERT is disabled - will re-enable after fixing
+      const { getSkillExtractionService } = require('./skillExtractionService');
+      const skillExtractor = getSkillExtractionService();
+      const extractedSkills = await skillExtractor.extractSkills(cvText, {
+        useHybrid: true,      // Use Hybrid System
+        usePhoBERT: false,    // Disabled - will re-enable after fixing
+        useGemini: false,
+        maxSkills: 50
+      });
+      
+      const skills = extractedSkills.map(s => s.name);
 
       // Categorize skills
       const categorized = {
@@ -845,7 +966,7 @@ class SelfSufficientAIService {
       return {
         skills: categorized,
         totalSkills: skills.length,
-        _method: 'self-sufficient (PhoBERT)',
+        _method: 'self-sufficient (Hybrid System: Rule-based + Multilingual NER)',
         _timestamp: new Date()
       };
 
@@ -1062,7 +1183,16 @@ class SelfSufficientAIService {
       logger.info('🔬 Analyzing job description (PhoBERT)');
 
       // Extract skills from job description
-      const skills = await phobertService.extractSkills(jobDescription);
+      // Use Hybrid System instead of PhoBERT
+      const { getSkillExtractionService } = require('./skillExtractionService');
+      const skillExtractor = getSkillExtractionService();
+      const extractedSkills = await skillExtractor.extractSkills(jobDescription, {
+        useHybrid: true,
+        usePhoBERT: false,  // Disabled - will re-enable after fixing
+        useGemini: false,
+        maxSkills: 50
+      });
+      const skills = extractedSkills.map(s => s.name);
 
       // Extract experience requirements (simple regex)
       const expMatch = jobDescription.match(/(\d+)\+?\s*years?/i);
@@ -1077,7 +1207,7 @@ class SelfSufficientAIService {
         experienceRequired: experienceRequired,
         educationRequired: educationRequired,
         keyResponsibilities: this._extractResponsibilities(jobDescription),
-        _method: 'self-sufficient (PhoBERT + patterns)'
+        _method: 'self-sufficient (Hybrid System + patterns)'
       };
 
     } catch (error) {
@@ -1113,7 +1243,7 @@ class SelfSufficientAIService {
    * ✅ SELF-SUFFICIENT: Analyze Job Posting
    * Replace aiService.analyzeJobPosting()
    * 
-   * Uses: PhoBERT + rule-based structure analysis
+   * Uses: Hybrid System (Rule-based + Multilingual NER) + rule-based structure analysis
    */
   async analyzeJobPosting(job) {
     try {
@@ -1122,8 +1252,16 @@ class SelfSufficientAIService {
       const description = job.description || '';
       const title = job.title || '';
 
-      // Extract skills using PhoBERT
-      const skillsExtracted = await phobertService.extractSkills(description);
+      // Extract skills using Hybrid System
+      const { getSkillExtractionService } = require('./skillExtractionService');
+      const skillExtractor = getSkillExtractionService();
+      const extractedSkills = await skillExtractor.extractSkills(description, {
+        useHybrid: true,
+        usePhoBERT: false,  // Disabled - will re-enable after fixing
+        useGemini: false,
+        maxSkills: 50
+      });
+      const skillsExtracted = extractedSkills.map(s => s.name);
 
       // Structure analysis
       const hasRequirements = /requirement|yêu cầu/i.test(description);
@@ -1156,7 +1294,7 @@ class SelfSufficientAIService {
         experienceLevel,
         readabilityScore: Math.min(100, description.length / 50),
         suggestions,
-        _method: 'self-sufficient (PhoBERT + rules)',
+        _method: 'self-sufficient (Hybrid System + rules)',
       };
     } catch (error) {
       logger.error('❌ Job posting analysis error:', error);
@@ -1232,7 +1370,7 @@ class SelfSufficientAIService {
    * ✅ SELF-SUFFICIENT: Analyze Job Match
    * Replace aiService.analyzeJobMatch()
    * 
-   * Uses: jobMatchingService (PhoBERT + Sentence-BERT)
+   * Uses: jobMatchingService (Hybrid System + Sentence-BERT)
    */
   async analyzeJobMatch(cvData, jobData) {
     try {
@@ -1246,8 +1384,25 @@ class SelfSufficientAIService {
       const cvText = this._buildCVText(cvData);
       const jobText = this._buildJobText(jobData);
 
-      const cvSkills = await phobertService.extractSkills(cvText);
-      const jobSkills = await phobertService.extractSkills(jobText);
+      // Use Hybrid System instead of PhoBERT
+      const { getSkillExtractionService } = require('./skillExtractionService');
+      const skillExtractor = getSkillExtractionService();
+      
+      const cvExtracted = await skillExtractor.extractSkills(cvText, {
+        useHybrid: true,
+        usePhoBERT: false,  // Disabled - will re-enable after fixing
+        useGemini: false,
+        maxSkills: 50
+      });
+      const jobExtracted = await skillExtractor.extractSkills(jobText, {
+        useHybrid: true,
+        usePhoBERT: false,  // Disabled - will re-enable after fixing
+        useGemini: false,
+        maxSkills: 50
+      });
+      
+      const cvSkills = cvExtracted.map(s => s.name);
+      const jobSkills = jobExtracted.map(s => s.name);
 
       // Find matches and gaps
       const matchedSkills = [];
@@ -1318,7 +1473,7 @@ class SelfSufficientAIService {
         recommendations,
         fitLevel,
         tier: matchResult.tier,
-        _method: 'self-sufficient (jobMatchingService + PhoBERT)',
+        _method: 'self-sufficient (jobMatchingService + Hybrid System)',
       };
     } catch (error) {
       logger.error('❌ Job match analysis error:', error);
@@ -1448,6 +1603,49 @@ class SelfSufficientAIService {
    */
   async _analyzeCVWithAI(cvData, cvText) {
     try {
+      // Normalize experience to array format
+      let experienceArray = [];
+      if (cvData.experience) {
+        if (Array.isArray(cvData.experience)) {
+          experienceArray = cvData.experience;
+        } else if (typeof cvData.experience === 'object') {
+          // Handle object format: { internships: [], fullTime: [], ... }
+          const allExp = [];
+          if (cvData.experience.internships && Array.isArray(cvData.experience.internships)) {
+            allExp.push(...cvData.experience.internships);
+          }
+          if (cvData.experience.fullTime && Array.isArray(cvData.experience.fullTime)) {
+            allExp.push(...cvData.experience.fullTime);
+          }
+          if (cvData.experience.partTime && Array.isArray(cvData.experience.partTime)) {
+            allExp.push(...cvData.experience.partTime);
+          }
+          if (cvData.experience.freelance && Array.isArray(cvData.experience.freelance)) {
+            allExp.push(...cvData.experience.freelance);
+          }
+          if (cvData.experience.projects && Array.isArray(cvData.experience.projects)) {
+            allExp.push(...cvData.experience.projects);
+          }
+          experienceArray = allExp;
+        }
+      }
+
+      // Normalize education to array format
+      let educationArray = [];
+      if (cvData.education) {
+        if (Array.isArray(cvData.education)) {
+          educationArray = cvData.education;
+        } else if (typeof cvData.education === 'object') {
+          // Handle object format: { university: {...}, certifications: [...] }
+          if (cvData.education.university) {
+            educationArray.push(cvData.education.university);
+          }
+          if (cvData.education.certifications && Array.isArray(cvData.education.certifications)) {
+            educationArray.push(...cvData.education.certifications);
+          }
+        }
+      }
+
       // Build structured CV data for context
       const cvStructure = {
         personalInfo: cvData.personalInfo || {},
@@ -1456,13 +1654,13 @@ class SelfSufficientAIService {
           soft: (cvData.skills?.soft || []).map(s => typeof s === 'string' ? s : s.name),
           languages: (cvData.skills?.languages || []).map(s => typeof s === 'string' ? s : s.name),
         },
-        experience: (cvData.experience || []).map(exp => ({
+        experience: experienceArray.map(exp => ({
           position: exp.position || exp.title || '',
           company: exp.company || exp.organization || '',
           duration: exp.duration || `${exp.startDate || ''} - ${exp.endDate || ''}`,
           description: exp.description || ''
         })),
-        education: (cvData.education || []).map(edu => ({
+        education: educationArray.map(edu => ({
           degree: edu.degree || edu.type || '',
           major: edu.major || edu.field || '',
           school: edu.school || edu.institution || ''
@@ -1658,6 +1856,134 @@ CHỈ TRẢ VỀ JSON, KHÔNG CÓ MARKDOWN HOẶC TEXT THÊM.`;
       specificImprovements: []
     };
 
+    // Normalize experience to array format
+    let experienceArray = [];
+    if (cvData.experience) {
+      if (Array.isArray(cvData.experience)) {
+        experienceArray = cvData.experience;
+      } else if (typeof cvData.experience === 'object') {
+        // Handle object format: { internships: [], fullTime: [], ... }
+        const allExp = [];
+        if (cvData.experience.internships && Array.isArray(cvData.experience.internships)) {
+          allExp.push(...cvData.experience.internships);
+        }
+        if (cvData.experience.fullTime && Array.isArray(cvData.experience.fullTime)) {
+          allExp.push(...cvData.experience.fullTime);
+        }
+        if (cvData.experience.partTime && Array.isArray(cvData.experience.partTime)) {
+          allExp.push(...cvData.experience.partTime);
+        }
+        if (cvData.experience.freelance && Array.isArray(cvData.experience.freelance)) {
+          allExp.push(...cvData.experience.freelance);
+        }
+        if (cvData.experience.projects && Array.isArray(cvData.experience.projects)) {
+          allExp.push(...cvData.experience.projects);
+        }
+        experienceArray = allExp;
+      }
+    }
+
+    // Normalize education to array format
+    let educationArray = [];
+    if (cvData.education) {
+      if (Array.isArray(cvData.education)) {
+        educationArray = cvData.education;
+      } else if (typeof cvData.education === 'object') {
+        // Handle object format: { university: {...}, certifications: [...] }
+        if (cvData.education.university) {
+          educationArray.push(cvData.education.university);
+        }
+        if (cvData.education.certifications && Array.isArray(cvData.education.certifications)) {
+          educationArray.push(...cvData.education.certifications);
+        }
+      }
+    }
+
+    // ACCURATE ANALYSIS: Check what's ACTUALLY in the CV, not assumptions
+    const hasExperience = experienceArray.length > 0;
+    const hasEducation = educationArray.length > 0;
+    const hasSkills = (cvData.skills?.technical?.length || 0) + 
+                     (cvData.skills?.soft?.length || 0) + 
+                     (cvData.skills?.languages?.length || 0) > 0;
+    const hasPersonalInfo = cvData.personalInfo && 
+                           (cvData.personalInfo.fullName || cvData.personalInfo.email || cvData.personalInfo.phone);
+    const hasSummary = cvData.personalInfo?.summary || cvText.toLowerCase().includes('mục tiêu');
+    
+    // Calculate score based on ACTUAL content
+    let score = 0;
+    
+    // Structure (25 points)
+    if (hasPersonalInfo) score += 5;
+    if (hasSummary) score += 5;
+    if (hasEducation) score += 5;
+    if (hasExperience) score += 5;
+    if (hasSkills) score += 5;
+    
+    // Content quality (25 points)
+    if (hasExperience) {
+      const hasDescriptions = experienceArray.some(exp => exp.description && exp.description.length > 50);
+      if (hasDescriptions) score += 10;
+      else score += 5;
+    }
+    if (hasSkills && (cvData.skills.technical?.length || 0) >= 3) score += 5;
+    if (hasSkills && (cvData.skills.soft?.length || 0) >= 2) score += 5;
+    if (cvText.length > 500) score += 5;
+    
+    // Writing style (25 points) - check actual text
+    const hasActionVerbs = /(phát triển|triển khai|tạo|quản lý|dẫn dắt|thiết kế|cải thiện|đạt được|thực hiện|hỗ trợ|phối hợp)/i.test(cvText);
+    if (hasActionVerbs) score += 10;
+    const hasBulletPoints = (cvText.match(/^[-•*]\s/gm) || []).length >= 5;
+    if (hasBulletPoints) score += 10;
+    if (cvText.length > 1000) score += 5;
+    
+    // Keywords/ATS (25 points)
+    const hasKeywords = /(kỹ năng|kinh nghiệm|học vấn|dự án|thành tích|chứng chỉ)/i.test(cvText);
+    if (hasKeywords) score += 10;
+    if (hasSkills) score += 10;
+    if (hasExperience && hasEducation) score += 5;
+    
+    improvements.overallScore = Math.min(100, score);
+    
+    // Strengths based on ACTUAL content
+    if (hasExperience && hasEducation) {
+      improvements.strengths.push('CV có đầy đủ thông tin học vấn và kinh nghiệm');
+    }
+    if (hasSkills && (cvData.skills.technical?.length || 0) + (cvData.skills.soft?.length || 0) >= 5) {
+      improvements.strengths.push('CV có nhiều kỹ năng được liệt kê');
+    }
+    if (hasSummary) {
+      improvements.strengths.push('CV có mục tiêu nghề nghiệp rõ ràng');
+    }
+    
+    // Weaknesses based on ACTUAL gaps
+    if (!hasSummary) {
+      improvements.weaknesses.push('Thiếu mục tiêu nghề nghiệp');
+      improvements.suggestions.structure.push('Nên thêm phần mục tiêu nghề nghiệp để thể hiện định hướng rõ ràng');
+    }
+    if (hasExperience) {
+      const hasFullDescriptions = experienceArray.every(exp => exp.description && exp.description.length > 50);
+      if (!hasFullDescriptions) {
+        improvements.weaknesses.push('Mô tả kinh nghiệm chưa đầy đủ');
+        improvements.suggestions.content.push('Nên bổ sung mô tả chi tiết cho từng kinh nghiệm làm việc, bao gồm trách nhiệm và thành tích cụ thể');
+      }
+    }
+    if (hasSkills && (cvData.skills.technical?.length || 0) < 3) {
+      improvements.weaknesses.push('Cần bổ sung thêm kỹ năng kỹ thuật');
+      improvements.suggestions.content.push('Nên bổ sung thêm kỹ năng kỹ thuật phù hợp với vị trí ứng tuyển');
+    }
+    
+    // Only suggest what's ACTUALLY missing
+    if (!hasEducation) {
+      improvements.suggestions.structure.push('Thiếu phần học vấn - cần thêm thông tin về bằng cấp, trường học');
+    }
+    if (!hasExperience) {
+      improvements.suggestions.structure.push('Thiếu phần kinh nghiệm làm việc - đây là phần quan trọng nhất');
+    }
+    if (!hasSkills) {
+      improvements.suggestions.content.push('Nên bổ sung thêm kỹ năng kỹ thuật (ít nhất 5-7 kỹ năng)');
+      improvements.suggestions.content.push('Nên bổ sung kỹ năng mềm (giao tiếp, làm việc nhóm, quản lý thời gian...)');
+    }
+
     // 1. Analyze CV Structure
     const structureAnalysis = this._analyzeCVStructure(cvData, cvText);
     improvements.suggestions.structure = structureAnalysis.suggestions;
@@ -1700,12 +2026,19 @@ CHỈ TRẢ VỀ JSON, KHÔNG CÓ MARKDOWN HOẶC TEXT THÊM.`;
     const suggestions = [];
     let score = 25; // Base score
 
-    // Check for required sections
-    const hasPersonalInfo = !!(cvData.personalInfo || cvText.match(/(email|phone|điện thoại|email)/i));
-    const hasEducation = !!(cvData.education && cvData.education.length > 0) || cvText.match(/(education|học vấn|bằng cấp|university|đại học)/i);
-    const hasExperience = !!(cvData.experience && cvData.experience.length > 0) || cvText.match(/(experience|kinh nghiệm|công ty|company|work)/i);
-    const hasSkills = !!(cvData.skills && (cvData.skills.technical?.length > 0 || cvData.skills.soft?.length > 0)) || cvText.match(/(skill|kỹ năng|competenc)/i);
+    // ACCURATE CHECK: Use actual data from cvData, not just text matching
+    const hasPersonalInfo = !!(cvData.personalInfo && 
+                               (cvData.personalInfo.fullName || cvData.personalInfo.email || cvData.personalInfo.phone));
+    const hasEducation = !!(cvData.education && cvData.education.length > 0);
+    const hasExperience = !!(cvData.experience && cvData.experience.length > 0);
+    const hasSkills = !!(cvData.skills && 
+                        ((cvData.skills.technical?.length || 0) > 0 || 
+                         (cvData.skills.soft?.length || 0) > 0 || 
+                         (cvData.skills.languages?.length || 0) > 0));
+    const hasSummary = !!(cvData.personalInfo?.summary || 
+                         cvText.match(/(mục tiêu|objective|summary|tóm tắt)/i));
 
+    // Only suggest what's ACTUALLY missing
     if (!hasPersonalInfo) {
       suggestions.push('Thiếu thông tin liên hệ (email, số điện thoại)');
       score -= 5;
@@ -1724,7 +2057,6 @@ CHỈ TRẢ VỀ JSON, KHÔNG CÓ MARKDOWN HOẶC TEXT THÊM.`;
     }
 
     // Check for optional but valuable sections
-    const hasSummary = cvText.match(/(summary|tóm tắt|objective|mục tiêu|profile)/i);
     if (!hasSummary) {
       suggestions.push('Nên thêm phần tóm tắt/mục tiêu nghề nghiệp ở đầu CV để thu hút nhà tuyển dụng');
     }
@@ -1741,16 +2073,17 @@ CHỈ TRẢ VỀ JSON, KHÔNG CÓ MARKDOWN HOẶC TEXT THÊM.`;
     const weaknesses = [];
     let score = 25;
 
-    // Analyze experience descriptions
-    if (cvData.experience && cvData.experience.length > 0) {
-      cvData.experience.forEach((exp, index) => {
+    // Analyze experience descriptions - check ACTUAL data
+    if (experienceArray.length > 0) {
+      experienceArray.forEach((exp, index) => {
         const desc = exp.description || '';
-        const hasActionVerbs = /(developed|implemented|created|managed|led|designed|built|improved|achieved|increased|reduced)/i.test(desc);
+        // Check Vietnamese action verbs too
+        const hasActionVerbs = /(phát triển|triển khai|tạo|quản lý|dẫn dắt|thiết kế|cải thiện|đạt được|thực hiện|hỗ trợ|phối hợp|developed|implemented|created|managed|led|designed|built|improved|achieved|increased|reduced)/i.test(desc);
         const hasQuantifiableResults = /\d+/.test(desc);
         const descLength = desc.length;
 
         if (!hasActionVerbs && descLength > 0) {
-          suggestions.push(`Kinh nghiệm "${exp.position || `Vị trí ${index + 1}`}": Nên sử dụng động từ hành động mạnh (developed, implemented, created...) thay vì "worked on" hoặc "responsible for"`);
+          suggestions.push(`Kinh nghiệm "${exp.position || `Vị trí ${index + 1}`}": Nên sử dụng động từ hành động mạnh (phát triển, triển khai, tạo, quản lý...) thay vì "làm việc" hoặc "chịu trách nhiệm"`);
           score -= 2;
         }
         if (!hasQuantifiableResults && descLength > 50) {
@@ -1766,6 +2099,7 @@ CHỈ TRẢ VỀ JSON, KHÔNG CÓ MARKDOWN HOẶC TEXT THÊM.`;
         }
       });
     } else {
+      // Only add weakness if experience is ACTUALLY missing
       weaknesses.push('Thiếu thông tin kinh nghiệm làm việc');
       score -= 10;
     }
@@ -1938,8 +2272,8 @@ CHỈ TRẢ VỀ JSON, KHÔNG CÓ MARKDOWN HOẶC TEXT THÊM.`;
     };
 
     // Experience improvements
-    if (cvData.experience && cvData.experience.length > 0) {
-      cvData.experience.forEach((exp, index) => {
+    if (experienceArray.length > 0) {
+      experienceArray.forEach((exp, index) => {
         const desc = exp.description || '';
         const position = exp.position || '';
         

@@ -158,17 +158,17 @@ import { Sparkles, Heart } from "lucide-react";
               </span>
             </Link>
 
-            {/* Candidate Insights */}
-            <Link
-              href="/insights"
-              className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
-            >
-              <BarChart3 className="w-4 h-4 mr-3" />
-              Thông tin ứng viên
-              <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
-                →
-              </span>
-            </Link>
+            // {/* Candidate Insights */}
+            // <Link
+            //   href="/insights"
+            //   className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
+            // >
+            //   <BarChart3 className="w-4 h-4 mr-3" />
+            //   Thông tin ứng viên
+            //   <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
+            //     →
+            //   </span>
+            // </Link>
           </div>
         </div>
       </div>

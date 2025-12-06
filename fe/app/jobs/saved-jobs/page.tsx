@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { PageLayout } from "@/components/layout";
 import {
@@ -11,10 +11,21 @@ import {
   Calendar,
   Loader2,
   Briefcase,
+  Search,
+  X,
+  Filter,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { savedJobService, type SavedJob } from "@/lib/api";
 import { SaveJobButton } from "@/components/jobs/SaveJobButton";
 import { useToast } from "@/hooks/use-toast";
@@ -27,6 +38,8 @@ export default function SavedJobsPage() {
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [uniqueCompanies, setUniqueCompanies] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "salary-high" | "salary-low" | "deadline">("newest");
 
   useEffect(() => {
     const fetchSavedJobs = async () => {
@@ -106,11 +119,8 @@ export default function SavedJobsPage() {
 
   const formatLocation = (job: SavedJob) => {
     if (!job.jobId) return "Không xác định";
-    return (
-      job.jobId.address?.fullAddress ||
-      job.jobId.address?.city ||
-      "Không xác định"
-    );
+    // Chỉ hiển thị tỉnh/thành phố
+    return job.jobId.address?.city || "Không xác định";
   };
 
   const formatDate = (dateString: string) => {
@@ -120,6 +130,76 @@ export default function SavedJobsPage() {
       month: "long",
       day: "numeric",
     });
+  };
+
+  // Filter and sort saved jobs
+  const filteredJobs = useMemo(() => {
+    let filtered = savedJobs;
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      filtered = savedJobs.filter((savedJob) => {
+        const job = savedJob.jobId;
+        if (!job) return false;
+
+        const title = job.title?.toLowerCase() || "";
+        const companyName = job.employer?.company?.name?.toLowerCase() || "";
+        const location = formatLocation(savedJob).toLowerCase();
+        const salary = formatSalary(savedJob).toLowerCase();
+
+        return (
+          title.includes(query) ||
+          companyName.includes(query) ||
+          location.includes(query) ||
+          salary.includes(query)
+        );
+      });
+    }
+
+    // Apply sorting
+    const sorted = [...filtered].sort((a, b) => {
+      const jobA = a.jobId;
+      const jobB = b.jobId;
+
+      switch (sortBy) {
+        case "newest":
+          // Mới nhất trước (savedAt giảm dần)
+          return new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime();
+        
+        case "oldest":
+          // Cũ nhất trước (savedAt tăng dần)
+          return new Date(a.savedAt).getTime() - new Date(b.savedAt).getTime();
+        
+        case "salary-high":
+          // Lương cao nhất trước
+          const salaryA = jobA?.salaryMax || jobA?.salaryMin || 0;
+          const salaryB = jobB?.salaryMax || jobB?.salaryMin || 0;
+          return salaryB - salaryA;
+        
+        case "salary-low":
+          // Lương thấp nhất trước
+          const salaryALow = jobA?.salaryMin || jobA?.salaryMax || 0;
+          const salaryBLow = jobB?.salaryMin || jobB?.salaryMax || 0;
+          return salaryALow - salaryBLow;
+        
+        case "deadline":
+          // Deadline sớm nhất trước
+          if (!jobA?.deadline && !jobB?.deadline) return 0;
+          if (!jobA?.deadline) return 1;
+          if (!jobB?.deadline) return -1;
+          return new Date(jobA.deadline).getTime() - new Date(jobB.deadline).getTime();
+        
+        default:
+          return 0;
+      }
+    });
+
+    return sorted;
+  }, [savedJobs, searchQuery, sortBy]);
+
+  const handleClearSearch = () => {
+    setSearchQuery("");
   };
 
   if (loading) {
@@ -142,9 +222,62 @@ export default function SavedJobsPage() {
           <h1 className="text-3xl font-bold text-foreground mb-2">
             Việc làm đã lưu
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground mb-4">
             Quản lý và theo dõi những việc làm bạn quan tâm
           </p>
+
+          {/* Search Bar and Filter */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-4">
+            <div className="relative flex-1 max-w-2xl">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Tìm kiếm theo tên công việc, công ty, địa điểm, mức lương..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-10 h-12 text-base"
+              />
+              {searchQuery && (
+                <button
+                  onClick={handleClearSearch}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Filter className="w-5 h-5 text-muted-foreground" />
+              <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                <SelectTrigger className="w-[200px] h-12">
+                  <SelectValue placeholder="Sắp xếp theo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Mới lưu nhất</SelectItem>
+                  <SelectItem value="oldest">Lưu cũ nhất</SelectItem>
+                  <SelectItem value="salary-high">Lương cao nhất</SelectItem>
+                  <SelectItem value="salary-low">Lương thấp nhất</SelectItem>
+                  <SelectItem value="deadline">Hạn nộp sớm nhất</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {(searchQuery || sortBy !== "newest") && (
+            <p className="text-sm text-muted-foreground mb-4">
+              {searchQuery ? (
+                <>
+                  Tìm thấy <strong>{filteredJobs.length}</strong> việc làm phù hợp
+                  {filteredJobs.length !== savedJobs.length && (
+                    <span> trong {savedJobs.length} việc làm đã lưu</span>
+                  )}
+                </>
+              ) : (
+                <>
+                  Hiển thị <strong>{filteredJobs.length}</strong> việc làm
+                </>
+              )}
+            </p>
+          )}
         </div>
 
         {/* Stats */}
@@ -157,7 +290,9 @@ export default function SavedJobsPage() {
                   <p className="text-sm text-muted-foreground">
                     Tổng số việc làm
                   </p>
-                  <p className="text-2xl font-bold text-foreground">{total}</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    {searchQuery ? filteredJobs.length : total}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -197,7 +332,8 @@ export default function SavedJobsPage() {
         {/* Saved Jobs List */}
         {savedJobs.length > 0 ? (
           <div className="space-y-4">
-            {savedJobs.map((savedJob) => {
+            {filteredJobs.length > 0 ? (
+              filteredJobs.map((savedJob) => {
               const job = savedJob.jobId;
               if (!job) return null;
 
@@ -290,7 +426,23 @@ export default function SavedJobsPage() {
                   </CardContent>
                 </Card>
               );
-            })}
+              })
+            ) : (
+              <Card>
+                <CardContent className="p-12 text-center">
+                  <Search className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold text-foreground mb-2">
+                    Không tìm thấy việc làm phù hợp
+                  </h3>
+                  <p className="text-muted-foreground mb-6">
+                    Không có việc làm nào khớp với từ khóa "{searchQuery}"
+                  </p>
+                  <Button variant="outline" onClick={handleClearSearch}>
+                    Xóa bộ lọc
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
         ) : (
           <Card>

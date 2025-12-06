@@ -869,11 +869,15 @@ class AdvancedNLPController {
     try {
       const {
         targetJobId,
+        jobId, // Support both jobId and targetJobId for compatibility
         targetRole,
         cvData,
         timeframe = 12,
         useRag = true,
       } = req.body;
+
+      // Use jobId if targetJobId is not provided (for frontend compatibility)
+      const finalJobId = targetJobId || jobId;
 
       const candidateId = req.user._id;
 
@@ -899,26 +903,71 @@ class AdvancedNLPController {
       }
 
       // Convert candidateProfile to cvData format for selfSufficientAI
+      // Extract skills as strings (from objects with 'name' property)
+      const extractSkillNames = (skillArray) => {
+        if (!Array.isArray(skillArray)) return [];
+        return skillArray.map(skill => {
+          if (typeof skill === 'string') return skill;
+          if (skill && typeof skill === 'object') {
+            return skill.name || skill.skill || String(skill);
+          }
+          return String(skill);
+        }).filter(Boolean);
+      };
+
+      // Extract all experience types
+      const allExperience = [
+        ...(candidateProfile.experience?.fulltime || []),
+        ...(candidateProfile.experience?.internships || []),
+        ...(candidateProfile.experience?.parttime || []),
+        ...(candidateProfile.experience?.freelance || []),
+        ...(candidateProfile.experience?.projects || [])
+      ];
+
+      // Extract education (university, certifications, etc.)
+      const allEducation = [];
+      if (candidateProfile.education?.university) {
+        allEducation.push(candidateProfile.education.university);
+      }
+      if (Array.isArray(candidateProfile.education?.certifications)) {
+        allEducation.push(...candidateProfile.education.certifications);
+      }
+      if (Array.isArray(candidateProfile.certifications)) {
+        allEducation.push(...candidateProfile.certifications);
+      }
+
       const convertedCvData = {
         skills: {
-          technical: candidateProfile.skills?.technical || [],
-          soft: candidateProfile.skills?.soft || [],
-          languages: candidateProfile.skills?.languages || []
+          technical: extractSkillNames(candidateProfile.skills?.technical || []),
+          soft: extractSkillNames(candidateProfile.skills?.soft || []),
+          languages: extractSkillNames(candidateProfile.skills?.languages || [])
         },
-        experience: candidateProfile.experience?.internships || candidateProfile.experience?.projects || [],
-        education: candidateProfile.education?.university ? [candidateProfile.education.university] : []
+        experience: allExperience,
+        education: allEducation,
+        personalInfo: candidateProfile.personalInfo || {}
       };
+
+      logger.info(`📋 Converted CV data:`, {
+        technicalSkills: convertedCvData.skills.technical.length,
+        softSkills: convertedCvData.skills.soft.length,
+        languages: convertedCvData.skills.languages.length,
+        experienceCount: convertedCvData.experience.length,
+        educationCount: convertedCvData.education.length,
+        hasPersonalInfo: !!convertedCvData.personalInfo,
+        sampleTechnicalSkills: convertedCvData.skills.technical.slice(0, 3),
+        sampleSoftSkills: convertedCvData.skills.soft.slice(0, 3),
+      });
 
       // Get matching score to identify skill gaps
       let skillGaps = [];
       let jobData = null;
       let extractedTargetRole = targetRole; // Use provided or extract from job
       
-      if (targetJobId) {
+      if (finalJobId) {
         // Try to get existing matching score
         let matchingScore = await CVMatchingScore.findOne({
           candidateId,
-          jobId: targetJobId,
+          jobId: finalJobId,
         }).lean();
 
         // If no matching score exists, calculate it automatically
@@ -926,7 +975,7 @@ class AdvancedNLPController {
           logger.info(`⚠️ No matching score found, calculating automatically...`);
           
           // Get job data
-          jobData = await Job.findById(targetJobId);
+          jobData = await Job.findById(finalJobId);
           if (!jobData) {
             return res.status(404).json({
               success: false,
@@ -948,6 +997,12 @@ class AdvancedNLPController {
             convertedCvData,
             jobData
           );
+
+          logger.info(`📊 Skill gap analysis result:`, {
+            hasResult: !!skillGapResult,
+            missingSkillsCount: skillGapResult?.missingSkills?.length || 0,
+            stats: skillGapResult?._stats,
+          });
 
           if (skillGapResult && skillGapResult.missingSkills && skillGapResult.missingSkills.length > 0) {
             skillGaps = skillGapResult.missingSkills.map(skill => {
@@ -982,7 +1037,48 @@ class AdvancedNLPController {
             });
             logger.info(`✅ Auto-calculated ${skillGaps.length} skill gaps:`, skillGaps.map(s => s.skill).join(', '));
           } else {
-            logger.warn(`⚠️ No missing skills found in skill gap analysis`);
+            logger.warn(`⚠️ No missing skills found in skill gap analysis, trying fallback...`);
+            
+            // FALLBACK: Generate skills from job title if no gaps found
+            if (extractedTargetRole && jobData) {
+              logger.info(`🔄 Fallback: Generating skills from job title: "${extractedTargetRole}"`);
+              try {
+                const suggestedSkills = await selfSufficientAI.suggestSkills(extractedTargetRole, 'mid-level');
+                if (suggestedSkills && suggestedSkills.suggestions && suggestedSkills.suggestions.length > 0) {
+                  // Get current skills as set for comparison
+                  const currentSkillsSet = new Set([
+                    ...convertedCvData.skills.technical,
+                    ...convertedCvData.skills.soft,
+                    ...convertedCvData.skills.languages
+                  ].map(s => s.toLowerCase()));
+                  
+                  // Find skills that candidate doesn't have
+                  const missingFromSuggestions = suggestedSkills.suggestions
+                    .filter(skill => {
+                      const skillName = (typeof skill === 'string' ? skill : skill.name || skill.skill || String(skill)).toLowerCase();
+                      return !currentSkillsSet.has(skillName) && 
+                             !Array.from(currentSkillsSet).some(cs => cs.includes(skillName) || skillName.includes(cs));
+                    })
+                    .slice(0, 5); // Limit to top 5
+                  
+                  if (missingFromSuggestions.length > 0) {
+                    skillGaps = missingFromSuggestions.map((skill, index) => {
+                      const skillName = typeof skill === 'string' ? skill : (skill.name || skill.skill || String(skill));
+                      return {
+                        skill: skillName,
+                        currentLevel: 'none',
+                        targetLevel: 'intermediate',
+                        importance: 0.7 - (index * 0.1), // Decreasing importance
+                        priority: index < 2 ? 'high' : 'medium',
+                      };
+                    });
+                    logger.info(`✅ Fallback generated ${skillGaps.length} skill gaps:`, skillGaps.map(s => s.skill).join(', '));
+                  }
+                }
+              } catch (fallbackError) {
+                logger.error('❌ Fallback skill generation failed:', fallbackError);
+              }
+            }
           }
         } else if (matchingScore.skillGapAnalysis?.missingSkills) {
           skillGaps = matchingScore.skillGapAnalysis.missingSkills.map(skill => {
@@ -1137,12 +1233,135 @@ class AdvancedNLPController {
         }
       }
 
+      // FINAL FALLBACK: Generate generic skill gaps based on job title if still empty
       if (skillGaps.length === 0) {
-        logger.error('❌ No skill gaps identified', {
+        logger.warn(`⚠️ Still no skill gaps after all attempts, using final fallback`);
+        
+        // Use targetRole or job title
+        const roleForFallback = extractedTargetRole || jobData?.title || 'Target Position';
+        logger.info(`🔄 Final fallback for role: "${roleForFallback}"`);
+        
+        try {
+          const { getSelfSufficientAIService } = require('../services/ai/selfSufficientAIService');
+          const selfSufficientAI = getSelfSufficientAIService();
+          
+          // Get current skills (all types)
+          const currentSkillsSet = new Set([
+            ...convertedCvData.skills.technical,
+            ...convertedCvData.skills.soft,
+            ...convertedCvData.skills.languages
+          ].map(s => s.toLowerCase()).filter(Boolean));
+          
+          logger.info(`📊 Current skills count: ${currentSkillsSet.size}`, Array.from(currentSkillsSet).slice(0, 5));
+          
+          // Try 1: Generate skills based on job title/role
+          let suggestedSkills = null;
+          try {
+            suggestedSkills = await selfSufficientAI.suggestSkills(roleForFallback, 'mid-level');
+            logger.info(`💡 suggestSkills result:`, {
+              hasResult: !!suggestedSkills,
+              hasSuggestions: !!(suggestedSkills?.suggestions),
+              suggestionsCount: suggestedSkills?.suggestions?.length || 0,
+            });
+          } catch (suggestError) {
+            logger.error(`❌ suggestSkills failed:`, suggestError.message);
+          }
+          
+          if (suggestedSkills && suggestedSkills.suggestions && suggestedSkills.suggestions.length > 0) {
+            // Find missing skills (top 5-7)
+            const missingFromSuggestions = suggestedSkills.suggestions
+              .map(skill => typeof skill === 'string' ? skill : (skill.name || skill.skill || String(skill)))
+              .filter(skill => {
+                const skillName = skill.toLowerCase();
+                // Check if candidate doesn't have this skill
+                const hasExact = currentSkillsSet.has(skillName);
+                const hasPartial = Array.from(currentSkillsSet).some(cs => 
+                  cs.includes(skillName) || skillName.includes(cs)
+                );
+                return !hasExact && !hasPartial && skillName.length > 2; // Filter out too short skills
+              })
+              .slice(0, 7); // Get top 7
+            
+            if (missingFromSuggestions.length > 0) {
+              skillGaps = missingFromSuggestions.map((skill, index) => {
+                const skillName = typeof skill === 'string' ? skill : (skill.name || skill.skill || String(skill));
+                return {
+                  skill: skillName,
+                  currentLevel: 'none',
+                  targetLevel: 'intermediate',
+                  importance: Math.max(0.5, 0.8 - (index * 0.1)), // Decreasing importance
+                  priority: index < 3 ? 'high' : (index < 5 ? 'medium' : 'low'),
+                };
+              });
+              logger.info(`✅ Final fallback generated ${skillGaps.length} skill gaps from suggestions:`, skillGaps.map(s => s.skill).join(', '));
+            }
+          }
+          
+          // Try 2: If still no gaps, create generic improvement skills based on role
+          if (skillGaps.length === 0) {
+            logger.warn(`⚠️ No gaps from suggestions, creating generic skills for: "${roleForFallback}"`);
+            
+            // Extract key words from role
+            const roleWords = roleForFallback.toLowerCase().split(/\s+/);
+            const isOffice = roleWords.some(w => ['văn', 'phòng', 'office', 'assistant', 'trợ', 'lý'].includes(w));
+            const isLogistics = roleWords.some(w => ['logistics', 'vận', 'tải', 'giao', 'nhận'].includes(w));
+            const isAccounting = roleWords.some(w => ['kế', 'toán', 'accounting', 'chứng', 'từ'].includes(w));
+            
+            const genericSkills = [];
+            
+            if (isOffice || isLogistics || isAccounting) {
+              genericSkills.push(
+                { name: 'Microsoft Office (Excel, Word, PowerPoint)', priority: 'high' },
+                { name: 'Quản lý thời gian và tổ chức công việc', priority: 'high' },
+                { name: 'Giao tiếp và làm việc nhóm', priority: 'medium' },
+                { name: 'Kỹ năng tin học văn phòng nâng cao', priority: 'medium' }
+              );
+            } else {
+              genericSkills.push(
+                { name: 'Kỹ năng chuyên môn nâng cao', priority: 'high' },
+                { name: 'Best practices trong ngành', priority: 'high' },
+                { name: 'Kỹ năng mềm chuyên nghiệp', priority: 'medium' }
+              );
+            }
+            
+            skillGaps = genericSkills.map((skill, index) => ({
+              skill: skill.name,
+              currentLevel: 'basic',
+              targetLevel: 'intermediate',
+              importance: 0.7 - (index * 0.1),
+              priority: skill.priority,
+            }));
+            
+            logger.info(`✅ Created ${skillGaps.length} generic skill gaps:`, skillGaps.map(s => s.skill).join(', '));
+          }
+        } catch (fallbackError) {
+          logger.error('❌ Final fallback failed:', fallbackError);
+          // Last resort: create at least one skill gap
+          skillGaps = [{
+            skill: 'Kỹ năng cần thiết cho ' + roleForFallback,
+            currentLevel: 'basic',
+            targetLevel: 'intermediate',
+            importance: 0.7,
+            priority: 'high',
+          }];
+          logger.info(`✅ Created minimal skill gap as last resort`);
+        }
+      }
+
+      if (skillGaps.length === 0) {
+        logger.error('❌ No skill gaps identified after all fallbacks', {
           candidateId,
-          targetJobId,
-          targetRole,
+          targetJobId: finalJobId,
+          targetRole: extractedTargetRole,
           hasCvData: !!candidateCvData,
+          convertedCvData: {
+            technicalSkillsCount: convertedCvData.skills?.technical?.length || 0,
+            softSkillsCount: convertedCvData.skills?.soft?.length || 0,
+            experienceCount: convertedCvData.experience?.length || 0,
+            educationCount: convertedCvData.education?.length || 0,
+          },
+          hasJobData: !!jobData,
+          jobTitle: jobData?.title,
         });
         
         return res.status(400).json({
@@ -1150,9 +1369,16 @@ class AdvancedNLPController {
           message: 'Unable to identify skill gaps. Please ensure you have a complete profile with skills, experience, and education.',
           details: {
             candidateId: candidateId,
-            jobId: targetJobId,
-            targetRole: targetRole,
+            jobId: finalJobId,
+            targetRole: extractedTargetRole || targetRole,
             suggestion: 'Please complete your profile at /api/candidate-profile or provide targetRole in request body',
+            debug: {
+              hasCvData: !!candidateCvData,
+              technicalSkillsCount: convertedCvData.skills?.technical?.length || 0,
+              softSkillsCount: convertedCvData.skills?.soft?.length || 0,
+              experienceCount: convertedCvData.experience?.length || 0,
+              educationCount: convertedCvData.education?.length || 0,
+            },
           },
         });
       }
@@ -1172,7 +1398,7 @@ class AdvancedNLPController {
       // Save to database
       const learningRoadmap = new LearningRoadmap({
         candidateId: candidateId,
-        targetJobId: targetJobId || null,
+        targetJobId: finalJobId || null,
         targetRole: extractedTargetRole || 'Target Position',
         skillGaps: skillGaps,
         currentLevel: ragRoadmap.currentLevel,
