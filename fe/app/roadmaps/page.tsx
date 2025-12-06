@@ -368,6 +368,46 @@ export default function SkillRoadmapsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedIdFromUrl]);
 
+  // Helper function to transform skillGaps from array format to object format
+  const transformSkillGaps = (skillGaps: any): { critical: string[]; important: string[]; optional: string[] } | undefined => {
+    if (!skillGaps) return undefined;
+    
+    // If already in object format, return as is
+    if (skillGaps.critical || skillGaps.important || skillGaps.optional) {
+      return {
+        critical: skillGaps.critical || [],
+        important: skillGaps.important || [],
+        optional: skillGaps.optional || [],
+      };
+    }
+    
+    // If it's an array, transform it
+    if (Array.isArray(skillGaps)) {
+      const result = {
+        critical: [] as string[],
+        important: [] as string[],
+        optional: [] as string[],
+      };
+      
+      skillGaps.forEach((gap: any) => {
+        const skillName = gap.skill || gap.skillName || gap;
+        const priority = gap.priority?.toLowerCase() || 'medium';
+        
+        if (priority === 'critical' || priority === 'high') {
+          result.critical.push(skillName);
+        } else if (priority === 'important' || priority === 'medium') {
+          result.important.push(skillName);
+        } else {
+          result.optional.push(skillName);
+        }
+      });
+      
+      return result;
+    }
+    
+    return undefined;
+  };
+
   const handleSelectRoadmap = async (id: string, updateUrl = true) => {
     try {
       setLoadingDetail(true);
@@ -380,6 +420,12 @@ export default function SkillRoadmapsPage() {
 
       const res = await api.client.get(`/roadmaps/${id}`);
       const roadmap: Roadmap = res.data?.data || res.data;
+      
+      // Transform skillGaps if needed
+      if (roadmap) {
+        roadmap.skillGaps = transformSkillGaps(roadmap.skillGaps);
+      }
+      
       setSelectedRoadmap(roadmap);
     } catch (e: any) {
       setError(
@@ -1122,8 +1168,7 @@ export default function SkillRoadmapsPage() {
                                   Kỹ năng quan trọng (Critical)
                                 </p>
                                 <div className="flex flex-wrap gap-1.5">
-                                  {selectedRoadmap.skillGaps.critical.length ===
-                                  0 ? (
+                                  {!selectedRoadmap.skillGaps.critical || selectedRoadmap.skillGaps.critical.length === 0 ? (
                                     <span className="text-[11px] text-slate-500">
                                       Không có kỹ năng critical.
                                     </span>
@@ -1146,8 +1191,7 @@ export default function SkillRoadmapsPage() {
                                   Kỹ năng nên có (Important)
                                 </p>
                                 <div className="flex flex-wrap gap-1.5">
-                                  {selectedRoadmap.skillGaps.important.length ===
-                                  0 ? (
+                                  {!selectedRoadmap.skillGaps.important || selectedRoadmap.skillGaps.important.length === 0 ? (
                                     <span className="text-[11px] text-slate-500">
                                       Không có kỹ năng important.
                                     </span>
@@ -1170,8 +1214,7 @@ export default function SkillRoadmapsPage() {
                                   Kỹ năng bổ sung (Optional)
                                 </p>
                                 <div className="flex flex-wrap gap-1.5">
-                                  {selectedRoadmap.skillGaps.optional.length ===
-                                  0 ? (
+                                  {!selectedRoadmap.skillGaps.optional || selectedRoadmap.skillGaps.optional.length === 0 ? (
                                     <span className="text-[11px] text-slate-500">
                                       Không có kỹ năng optional.
                                     </span>
