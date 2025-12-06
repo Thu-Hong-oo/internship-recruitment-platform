@@ -31,6 +31,7 @@ import {
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import moment from "moment";
+import { jobsAPI } from "../../../api/jobs";
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -256,79 +257,64 @@ const Jobs = () => {
     [navigate]
   );
 
-  const buildQuery = (values) => {
-    const params = new URLSearchParams();
-    params.set("page", String(pagination.page));
-    params.set("limit", String(pagination.limit));
+  const buildQueryParams = (values, overrideValues = {}) => {
+    const mergedValues = { ...values, ...overrideValues };
+    const params = {
+      page: overrideValues.page || pagination.page,
+      limit: overrideValues.limit || pagination.limit,
+    };
 
-    if (values.status && values.status !== "all")
-      params.set("status", values.status);
-    if (values.level && values.level !== "all")
-      params.set("level", values.level);
-    if (values.jobType && values.jobType !== "all")
-      params.set("jobType", values.jobType);
-    if (values.location) params.set("location", values.location.trim());
-    if (values.salaryMin) params.set("salaryMin", values.salaryMin);
-    if (values.salaryMax) params.set("salaryMax", values.salaryMax);
-    if (values.search) params.set("search", values.search.trim());
-    if (typeof values.flagged === "boolean")
-      params.set("flagged", String(values.flagged));
+    if (mergedValues.status && mergedValues.status !== "all")
+      params.status = mergedValues.status;
+    if (mergedValues.level && mergedValues.level !== "all")
+      params.level = mergedValues.level;
+    if (mergedValues.jobType && mergedValues.jobType !== "all")
+      params.jobType = mergedValues.jobType;
+    if (mergedValues.location) params.location = mergedValues.location.trim();
+    if (mergedValues.salaryMin) params.salaryMin = mergedValues.salaryMin;
+    if (mergedValues.salaryMax) params.salaryMax = mergedValues.salaryMax;
+    if (mergedValues.search) params.search = mergedValues.search.trim();
+    if (typeof mergedValues.flagged === "boolean")
+      params.flagged = mergedValues.flagged;
 
-    if (values.dateRange && values.dateRange.length === 2) {
-      const [from, to] = values.dateRange;
-      if (from) params.set("dateFrom", from.startOf("day").toISOString());
-      if (to) params.set("dateTo", to.endOf("day").toISOString());
+    if (mergedValues.dateRange && mergedValues.dateRange.length === 2) {
+      const [from, to] = mergedValues.dateRange;
+      if (from) params.dateFrom = from.startOf("day").toISOString();
+      if (to) params.dateTo = to.endOf("day").toISOString();
     }
 
-    return params.toString();
+    return params;
   };
 
   const fetchJobs = async (overrideValues) => {
     try {
       setLoading(true);
       setError(null);
-      const values = { ...form.getFieldsValue(), ...overrideValues };
-      const qs = buildQuery(values);
-      const token =
-        localStorage.getItem("accessToken") ||
-        sessionStorage.getItem("accessToken");
+      const values = form.getFieldsValue();
+      const params = buildQueryParams(values, overrideValues);
 
-      if (!token) {
-        throw new Error("Vui lòng đăng nhập để sử dụng tính năng này");
+      const response = await jobsAPI.getJobs(params);
+
+      if (!response.success) {
+        throw new Error(
+          response.error || "Không thể tải danh sách công việc"
+        );
       }
 
-      const res = await fetch(`http://localhost:3000/api/admin/jobs?${qs}`, {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (res.status === 401) {
-          throw new Error(
-            "Token không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại."
-          );
-        } else if (res.status === 403) {
-          throw new Error("Bạn không có quyền truy cập tính năng này.");
-        } else {
-          throw new Error(
-            data?.error || `Lỗi ${res.status}: Không thể tải danh sách công việc`
-          );
-        }
-      }
-
-      if (!data?.success) {
-        throw new Error(data?.error || "Không thể tải danh sách công việc");
-      }
-
-      setJobs(data.data || []);
-      setStats(data.stats || null);
-      setPagination((p) => ({ ...p, total: data.pagination?.total || 0 }));
+      setJobs(response.data || []);
+      setStats(response.stats || null);
+      setPagination((p) => ({
+        ...p,
+        page: params.page,
+        limit: params.limit,
+        total: response.pagination?.total || 0,
+      }));
     } catch (e) {
-      setError(e.message || "Có lỗi xảy ra");
+      const errorMessage =
+        e?.response?.data?.error ||
+        e?.message ||
+        "Có lỗi xảy ra khi tải danh sách công việc";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
