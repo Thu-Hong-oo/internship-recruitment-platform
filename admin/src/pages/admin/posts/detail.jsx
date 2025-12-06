@@ -46,9 +46,7 @@ export default function AdminJobDetail() {
       setError(null);
       const response = await jobsAPI.getJobDetail(id);
       if (!response.success) {
-        throw new Error(
-          response.error || "Không thể tải chi tiết job"
-        );
+        throw new Error(response.error || "Không thể tải chi tiết job");
       }
       setJobData(response.data);
     } catch (e) {
@@ -70,10 +68,7 @@ export default function AdminJobDetail() {
     if (!jobData?.job?._id) return;
     try {
       setApproving(true);
-      const response = await jobsAPI.updateJobStatus(
-        jobData.job._id,
-        "active"
-      );
+      const response = await jobsAPI.updateJobStatus(jobData.job._id, "active");
       if (!response.success) {
         throw new Error(response.error || "Không thể duyệt bài");
       }
@@ -82,9 +77,7 @@ export default function AdminJobDetail() {
       fetchDetail();
     } catch (e) {
       const errorMessage =
-        e?.response?.data?.error ||
-        e?.message ||
-        "Không thể duyệt bài";
+        e?.response?.data?.error || e?.message || "Không thể duyệt bài";
       message.error(errorMessage);
     } finally {
       setApproving(false);
