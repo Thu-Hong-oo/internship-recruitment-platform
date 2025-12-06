@@ -39,8 +39,13 @@ class PhoBERTService {
     const truncatedText = text.substring(0, maxLength);
 
     return new Promise((resolve, reject) => {
+      // Try python3 first, fallback to python
+      const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+      
       // Pass text via stdin instead of command line argument
-      const pythonProcess = spawn('python', [this.pythonScript]);
+      const pythonProcess = spawn(pythonCmd, [this.pythonScript], {
+        env: { ...process.env, PYTHONUNBUFFERED: '1' } // Ensure unbuffered output
+      });
 
       let stdout = '';
       let stderr = '';
@@ -48,6 +53,9 @@ class PhoBERTService {
       // Write text to stdin
       pythonProcess.stdin.write(truncatedText);
       pythonProcess.stdin.end();
+      
+      // Log when process starts
+      logger.debug(`Starting PhoBERT process: ${pythonCmd} ${this.pythonScript}`);
 
       pythonProcess.stdout.on('data', (data) => {
         stdout += data.toString();
@@ -59,23 +67,42 @@ class PhoBERTService {
 
       pythonProcess.on('close', (code) => {
         if (code !== 0) {
-          logger.error(`PhoBERT inference failed: ${stderr}`);
+          const errorMsg = stderr || stdout || 'Unknown error';
+          logger.error(`PhoBERT inference failed (exit code ${code}): ${errorMsg}`);
+          logger.debug(`PhoBERT stdout: ${stdout}`);
+          logger.debug(`PhoBERT stderr: ${stderr}`);
           resolve([]); // Return empty array instead of rejecting
           return;
         }
 
         try {
+          // Check if stdout is empty
+          if (!stdout || stdout.trim().length === 0) {
+            logger.warn('PhoBERT returned empty output');
+            resolve([]);
+            return;
+          }
+
           const result = JSON.parse(stdout);
+          
+          // Check for error in result
+          if (result.error) {
+            logger.error(`PhoBERT error: ${result.error}`);
+            resolve([]);
+            return;
+          }
           
           if (result.success && Array.isArray(result.skills)) {
             logger.info(`PhoBERT extracted ${result.skills.length} skills`);
             resolve(result.skills);
           } else {
-            logger.error('Invalid PhoBERT response format');
+            logger.error('Invalid PhoBERT response format', { result });
             resolve([]);
           }
         } catch (error) {
           logger.error(`Failed to parse PhoBERT output: ${error.message}`);
+          logger.debug(`Raw stdout: ${stdout}`);
+          logger.debug(`Raw stderr: ${stderr}`);
           resolve([]);
         }
       });
@@ -85,12 +112,13 @@ class PhoBERTService {
         resolve([]);
       });
 
-      // Optimized timeout: 10 seconds max (allow model loading time)
+      // Optimized timeout: 15 seconds max (allow model loading time on first run)
+      // Model loading can take 5-10s on first run, inference is fast after that
       const timeoutId = setTimeout(() => {
         pythonProcess.kill('SIGKILL'); // Force kill immediately
-        logger.warn('⏱️ PhoBERT inference timeout (10s)');
+        logger.warn('⏱️ PhoBERT inference timeout (15s) - model may be loading or process stuck');
         resolve([]);
-      }, 10000);
+      }, 15000);
       
       // Clear timeout if process completes
       pythonProcess.on('close', () => {

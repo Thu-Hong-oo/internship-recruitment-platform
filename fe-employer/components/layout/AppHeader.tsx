@@ -201,16 +201,24 @@ export default function AppHeader() {
     });
   }, [notificationDropdownOpen]);
 
-  useEffect(() => {
-    // Load user data from localStorage first (for immediate display)
+  // Function to load user data
+  const loadUserData = () => {
     const userData = getUserData();
     setUser(userData);
+  };
+
+  useEffect(() => {
+    // Load user data from localStorage first (for immediate display)
+    loadUserData();
 
     // Fetch profile data from API to get latest avatar and name
     const fetchProfile = async () => {
       try {
         const token = getToken();
-        if (!token) return;
+        if (!token) {
+          setUser(null);
+          return;
+        }
 
         const json = await getEmployerProfile(token);
         const profile = json?.data || json?.profile || null;
@@ -220,11 +228,23 @@ export default function AppHeader() {
           // Update user data with profile info from API response
           // API returns user.fullName and user.avatar in data.user
           if (profile.user) {
-            setUser((prev: any) => ({
-              ...prev,
-              fullName: profile.user.fullName || prev?.fullName,
-              avatar: profile.user.avatar || prev?.avatar,
-            }));
+            setUser((prev: any) => {
+              const updatedUser = {
+                ...prev,
+                fullName: profile.user.fullName || prev?.fullName,
+                avatar: profile.user.avatar || prev?.avatar,
+              };
+              // Also update localStorage to keep it in sync
+              if (updatedUser) {
+                const storage = localStorage;
+                try {
+                  storage.setItem("user", JSON.stringify(updatedUser));
+                } catch (err) {
+                  console.error("Failed to update user in localStorage:", err);
+                }
+              }
+              return updatedUser;
+            });
           }
         }
       } catch (err) {
@@ -235,6 +255,61 @@ export default function AppHeader() {
 
     fetchProfile();
     fetchUnreadCount();
+  }, [pathname]); // Reload when pathname changes (e.g., after login redirect)
+
+  // Listen for storage changes (when user logs in from another tab/window or same tab)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'user' || e.key === 'token') {
+        loadUserData();
+        // Refetch profile if token exists
+        const token = getToken();
+        if (token) {
+          getEmployerProfile(token)
+            .then((json) => {
+              const profile = json?.data || json?.profile || null;
+              if (profile?.user) {
+                setUser((prev: any) => ({
+                  ...prev,
+                  fullName: profile.user.fullName || prev?.fullName,
+                  avatar: profile.user.avatar || prev?.avatar,
+                }));
+              }
+            })
+            .catch(() => {});
+        } else {
+          setUser(null);
+        }
+      }
+    };
+
+    // Also listen for custom event when login happens in same tab
+    const handleLogin = () => {
+      loadUserData();
+      const token = getToken();
+      if (token) {
+        getEmployerProfile(token)
+          .then((json) => {
+            const profile = json?.data || json?.profile || null;
+            if (profile?.user) {
+              setUser((prev: any) => ({
+                ...prev,
+                fullName: profile.user.fullName || prev?.fullName,
+                avatar: profile.user.avatar || prev?.avatar,
+              }));
+            }
+          })
+          .catch(() => {});
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('user-login', handleLogin);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('user-login', handleLogin);
+    };
   }, []);
 
   const handleMarkAsRead = async (notificationId: string) => {
@@ -375,13 +450,13 @@ export default function AppHeader() {
               <button className="relative p-2 rounded-lg hover:bg-white/10 transition-colors">
                 <Bell className="w-5 h-5 text-white" />
                 {unreadCount > 0 && (
-                  <Badge className="absolute -top-1 -right-1 bg-red-500 text-white text-xs min-w-[20px] h-5 rounded-full flex items-center justify-center px-1.5 font-bold animate-pulse">
+                  <Badge className="absolute top-0 right-0 bg-red-500 text-white text-xs min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1 font-bold animate-pulse transform translate-x-1/2 -translate-y-1/2">
                     {unreadCount > 99 ? "99+" : unreadCount}
                   </Badge>
                 )}
                 {/* Socket connection indicator */}
                 {socketConnected && (
-                  <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-green-500 rounded-full border-2 border-slate-800"></div>
+                  <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-slate-800 transform translate-x-1/2 translate-y-1/2"></div>
                 )}
               </button>
             </DropdownMenuTrigger>

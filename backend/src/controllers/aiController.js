@@ -94,6 +94,36 @@ class AIController {
   // ========================================
 
   /**
+   * Format degree name for better display
+   * @private
+   */
+  _formatDegree(degree) {
+    if (!degree) return '';
+    
+    const degreeLower = degree.toLowerCase();
+    
+    // Map common degree types
+    if (degreeLower.includes('university') || degreeLower.includes('đại học')) {
+      return 'Cử nhân'; // Default to Bachelor for university
+    }
+    if (degreeLower.includes('master') || degreeLower.includes('thạc sĩ')) {
+      return 'Thạc sĩ';
+    }
+    if (degreeLower.includes('phd') || degreeLower.includes('doctor') || degreeLower.includes('tiến sĩ')) {
+      return 'Tiến sĩ';
+    }
+    if (degreeLower.includes('college') || degreeLower.includes('cao đẳng')) {
+      return 'Cao đẳng';
+    }
+    if (degreeLower.includes('tốt nghiệp')) {
+      return 'Tốt nghiệp';
+    }
+    
+    // Return original if already in Vietnamese or valid format
+    return degree;
+  }
+
+  /**
    * POST /api/ai/analyze-cv
    * Phân tích CV từ file upload
    */
@@ -105,14 +135,20 @@ class AIController {
 
       const filePath = req.file.path;
       const userId = req.user.id;
+      const fs = require('fs').promises;
 
       logger.info(`Starting CV analysis for user ${userId}`, {
         filename: req.file.filename,
         originalName: req.file.originalname,
+        mimetype: req.file.mimetype,
       });
 
+      // Read file buffer and get mimeType
+      const fileBuffer = await fs.readFile(filePath);
+      const mimeType = req.file.mimetype || 'application/pdf'; // Default to PDF if not provided
+
       // Extract text from CV
-      const extractedText = await aiService.extractTextFromCV(filePath);
+      const extractedText = await aiService.extractTextFromCV(fileBuffer, mimeType);
 
       if (!extractedText || extractedText.trim().length === 0) {
         await fs.unlink(filePath);
@@ -123,11 +159,132 @@ class AIController {
         );
       }
 
-      // Analyze CV content using self-sufficient AI
+      // Extract skills using self-sufficient AI
       const { getSelfSufficientAIService } = require('../services/ai/selfSufficientAIService');
       const selfSufficientAI = getSelfSufficientAIService();
-      const analysis = await selfSufficientAI.analyzeCV(extractedText);
+      const skillsAnalysis = await selfSufficientAI.analyzeCV(extractedText);
       logger.info('🔬 CV analyzed (self-sufficient mode)');
+
+      // Try to parse CV using cvParsingService for full extraction
+      let extractedData = {};
+      let parseResult = null;
+      try {
+        parseResult = await aiService.cvParsingService?.parseResumeFromBuffer(fileBuffer, mimeType);
+        if (parseResult && parseResult.extractedData) {
+          extractedData = parseResult.extractedData;
+        }
+      } catch (parseError) {
+        logger.warn('CV parsing failed, using fallback extraction:', parseError.message);
+      }
+
+      // Fallback: Extract experience and education directly from text if parsing failed
+      if (!extractedData.experience || extractedData.experience.length === 0) {
+        try {
+          extractedData.experience = aiService.cvParsingService?.extractExperienceInfo(extractedText) || [];
+        } catch (e) {
+          logger.warn('Experience extraction failed:', e.message);
+          extractedData.experience = [];
+        }
+      }
+
+      if (!extractedData.education) {
+        try {
+          extractedData.education = aiService.cvParsingService?.extractEducationInfo(extractedText) || null;
+        } catch (e) {
+          logger.warn('Education extraction failed:', e.message);
+          extractedData.education = null;
+        }
+      }
+
+      // Combine all skills
+      const allSkills = [
+        ...(skillsAnalysis.skills?.technical || []).map(s => typeof s === 'string' ? s : (s.name || s)),
+        ...(skillsAnalysis.skills?.soft || []).map(s => typeof s === 'string' ? s : (s.name || s)),
+        ...(skillsAnalysis.skills?.languages || []).map(s => typeof s === 'string' ? s : (s.name || s)),
+        ...(extractedData.skills || []).map(s => typeof s === 'string' ? s : (s.name || s)),
+      ];
+      
+      // Remove duplicates
+      const uniqueSkills = [...new Set(allSkills.filter(Boolean))];
+
+      // Categorize skills into technical/soft/languages
+      const categorizedSkills = {
+        technical: [],
+        soft: [],
+        languages: []
+      };
+
+      // Helper function to categorize a skill
+      const categorizeSkill = (skillName) => {
+        const lower = skillName.toLowerCase();
+        
+        // Language skills
+        const languageKeywords = ['english', 'vietnamese', 'chinese', 'japanese', 'korean', 
+          'tiếng anh', 'tiếng việt', 'tiếng trung', 'tiếng nhật', 'tiếng hàn', 'toeic', 'ielts'];
+        if (languageKeywords.some(kw => lower.includes(kw))) {
+          return 'languages';
+        }
+        
+        // Soft skills
+        const softKeywords = ['giao tiếp', 'làm việc nhóm', 'quản lý', 'lãnh đạo', 'communication', 
+          'teamwork', 'leadership', 'management', 'quản lý thời gian', 'time management', 
+          'kiểm tra', 'quản lý', 'lưu trữ', 'thuyết trình', 'presentation'];
+        if (softKeywords.some(kw => lower.includes(kw))) {
+          return 'soft';
+        }
+        
+        // Default to technical
+        return 'technical';
+      };
+
+      // Categorize all unique skills
+      uniqueSkills.forEach(skill => {
+        const category = categorizeSkill(skill);
+        categorizedSkills[category].push(skill);
+      });
+
+      // Format experience
+      const experience = (extractedData.experience || []).map(exp => ({
+        position: exp.position || exp.title || exp.role || '',
+        company: exp.company || exp.organization || '',
+        duration: exp.duration || exp.period || (exp.startDate && exp.endDate 
+          ? `${exp.startDate} - ${exp.endDate}` 
+          : ''),
+      })).filter(exp => exp.position || exp.company);
+
+      // Format education
+      const education = extractedData.education 
+        ? [{
+            degree: this._formatDegree(extractedData.education.degree || extractedData.education.type || ''),
+            major: extractedData.education.field || extractedData.education.major || '',
+            school: extractedData.education.institution || extractedData.education.school || '',
+          }].filter(e => e.degree || e.major || e.school)
+        : [];
+
+      // Generate suggestions
+      const suggestions = [];
+      if (uniqueSkills.length === 0) {
+        suggestions.push('CV của bạn chưa có kỹ năng rõ ràng. Hãy thêm phần kỹ năng với các công nghệ, ngôn ngữ lập trình, hoặc kỹ năng mềm bạn đã học.');
+      }
+      if (experience.length === 0) {
+        suggestions.push('Hãy thêm phần kinh nghiệm làm việc hoặc thực tập để CV của bạn nổi bật hơn.');
+      }
+      if (education.length === 0) {
+        suggestions.push('Hãy thêm thông tin học vấn bao gồm tên trường, ngành học, và bằng cấp.');
+      }
+      if (extractedText.length < 200) {
+        suggestions.push('CV của bạn khá ngắn. Hãy mở rộng mô tả về kinh nghiệm và dự án để thể hiện tốt hơn năng lực của bạn.');
+      }
+      if (suggestions.length === 0) {
+        suggestions.push('CV của bạn đã có cấu trúc tốt. Hãy tiếp tục cập nhật và cải thiện để phù hợp với từng vị trí ứng tuyển.');
+      }
+
+      const analysis = {
+        skills: categorizedSkills, // Use categorized skills instead of empty structure
+        totalSkills: uniqueSkills.length,
+        _method: 'self-sufficient (PhoBERT) + Rule-based parsing',
+        _timestamp: new Date(),
+      };
 
       // Update user profile with extracted information
       const updateData = {
@@ -138,33 +295,38 @@ class AIController {
         },
       };
 
-      if (analysis.skills && analysis.skills.length > 0) {
-        updateData.skills = analysis.skills.map(skill => ({
-          name: skill.name,
-          level: skill.level || 'intermediate',
-          yearsOfExperience: skill.yearsOfExperience || 0,
+      if (uniqueSkills.length > 0) {
+        updateData.skills = uniqueSkills.map(skill => ({
+          name: skill,
+          level: 'intermediate',
+          yearsOfExperience: 0,
         }));
       }
 
-      if (analysis.experience && analysis.experience.length > 0) {
-        updateData.experience = analysis.experience;
+      if (experience.length > 0) {
+        updateData.experience = experience;
       }
 
-      if (analysis.education) {
-        updateData.education = analysis.education;
+      if (education.length > 0) {
+        updateData.education = education[0];
       }
 
       await User.findByIdAndUpdate(userId, updateData, { new: true });
 
       logger.info(`CV analysis completed for user ${userId}`, {
-        skillsCount: analysis.skills?.length || 0,
-        experienceCount: analysis.experience?.length || 0,
+        skillsCount: uniqueSkills.length,
+        experienceCount: experience.length,
+        educationCount: education.length,
       });
 
       return ApiResponse.success(
         res,
         {
           analysis,
+          extractedSkills: uniqueSkills,
+          experience,
+          education,
+          suggestions,
           extractedText: extractedText.substring(0, 500) + '...',
           filename: req.file.filename,
           uploadedAt: new Date(),

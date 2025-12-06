@@ -13,11 +13,14 @@ import {
   Briefcase,
   UserCircle2,
   CheckCircle2,
+  GraduationCap,
+  Loader2,
 } from "lucide-react";
 import { PageLayout } from "@/components/layout";
-import { jobsAPI, nlpService } from "@/lib/api";
+import { jobsAPI, nlpService, apiClient } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { ApplyButton } from "@/components/jobs/ApplyButton";
+import { SaveJobButton } from "@/components/jobs/SaveJobButton";
 import { useToast } from "@/hooks/use-toast";
 
 interface JobDetailPageProps {
@@ -34,6 +37,7 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
   const [bestMatches, setBestMatches] = useState<any[]>([]);
   const [relatedJobs, setRelatedJobs] = useState<any[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
 
   // Get job ID from URL pathname (works in both dev and production)
   useEffect(() => {
@@ -193,6 +197,51 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
   const formattedSalary = formatSalary();
   const formattedLocation = formatLocation();
 
+  // Handle generate roadmap from job
+  const handleGenerateRoadmap = async () => {
+    if (!id) return;
+
+    // Check if user is logged in
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (!token) {
+      toast({
+        title: "Cần đăng nhập",
+        description: "Vui lòng đăng nhập để tạo lộ trình học tập",
+        variant: "destructive",
+      });
+      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+      return;
+    }
+
+    setIsGeneratingRoadmap(true);
+    try {
+      const response = await apiClient.post(`/roadmaps/generate-from-job/${id}`, {
+        duration: 12, // 12 weeks default
+      });
+
+      if (response.success && response.data) {
+        const roadmapId = response.data._id || response.data.id;
+        toast({
+          title: "Tạo lộ trình thành công",
+          description: "Lộ trình học tập đã được tạo. Đang chuyển đến trang chi tiết...",
+        });
+        // Redirect to roadmap detail page
+        router.push(`/roadmaps/${roadmapId}`);
+      } else {
+        throw new Error(response.message || "Không thể tạo lộ trình");
+      }
+    } catch (error: any) {
+      console.error("Error generating roadmap:", error);
+      toast({
+        title: "Lỗi tạo lộ trình",
+        description: error?.response?.data?.message || error?.message || "Không thể tạo lộ trình học tập. Vui lòng thử lại.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingRoadmap(false);
+    }
+  };
+
   return (
     <PageLayout>
       <div className="max-w-6xl mx-auto px-4 py-8">
@@ -272,9 +321,28 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
                   jobId={id}
                   jobTitle={job.title}
                   className="font-medium"
+                  applied={job.hasApplied}
                 />
               )}
-              <Button variant="outline">Lưu việc làm</Button>
+              <Button 
+                variant="outline"
+                onClick={handleGenerateRoadmap}
+                disabled={isGeneratingRoadmap}
+                className="gap-2"
+              >
+                {isGeneratingRoadmap ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Đang tạo...
+                  </>
+                ) : (
+                  <>
+                    <GraduationCap className="w-4 h-4" />
+                    Tạo lộ trình học tập
+                  </>
+                )}
+              </Button>
+              {id && <SaveJobButton jobId={id} />}
             </div>
           </div>
 
@@ -399,15 +467,34 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
                       {new Date(job.deadline).toLocaleDateString()}
                     </div>
                   )}
-                  <div className="flex gap-3">
+                  <div className="flex flex-wrap gap-3">
                     {id && (
                       <ApplyButton
                         jobId={id}
                         jobTitle={job.title}
                         className="font-medium"
+                        applied={job.hasApplied}
                       />
                     )}
-                    <Button variant="outline">Lưu việc làm</Button>
+                    <Button 
+                      variant="outline"
+                      onClick={handleGenerateRoadmap}
+                      disabled={isGeneratingRoadmap}
+                      className="gap-2"
+                    >
+                      {isGeneratingRoadmap ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Đang tạo...
+                        </>
+                      ) : (
+                        <>
+                          <GraduationCap className="w-4 h-4" />
+                          Tạo lộ trình học tập
+                        </>
+                      )}
+                    </Button>
+                    {id && <SaveJobButton jobId={id} />}
                   </div>
                 </CardContent>
               </Card>
@@ -504,6 +591,37 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
                       {job.experience}
                     </div>
                   )}
+                </CardContent>
+              </Card>
+
+              {/* Tạo lộ trình học tập */}
+              <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-blue-50/50">
+                <CardContent className="p-6 space-y-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <GraduationCap className="w-5 h-5 text-primary" />
+                    <h3 className="font-semibold">Lộ trình học tập</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Tạo lộ trình học tập cá nhân hóa dựa trên yêu cầu của công việc này để phát triển kỹ năng cần thiết.
+                  </p>
+                  <Button 
+                    onClick={handleGenerateRoadmap}
+                    disabled={isGeneratingRoadmap}
+                    className="w-full gap-2"
+                    variant="default"
+                  >
+                    {isGeneratingRoadmap ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Đang tạo lộ trình...
+                      </>
+                    ) : (
+                      <>
+                        <GraduationCap className="w-4 h-4" />
+                        Tạo lộ trình học tập
+                      </>
+                    )}
+                  </Button>
                 </CardContent>
               </Card>
 

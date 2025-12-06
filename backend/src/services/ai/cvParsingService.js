@@ -357,20 +357,27 @@ ${textForGemini}
    */
   async extractTextFromCV(fileBuffer, mimeType) {
     try {
-      let text = '';
+      // Validate mimeType
+      if (!mimeType || typeof mimeType !== 'string') {
+        logger.error('Invalid mimeType:', mimeType);
+        throw new Error('File type (mimeType) is required and must be a string');
+      }
 
-      if (mimeType === 'application/pdf') {
+      let text = '';
+      const normalizedMimeType = mimeType.toLowerCase();
+
+      if (normalizedMimeType === 'application/pdf') {
         const pdfParse = require('pdf-parse');
         const pdfData = await pdfParse(fileBuffer);
         text = pdfData.text;
-      } else if (mimeType.includes('word') || mimeType.includes('docx')) {
+      } else if (normalizedMimeType.includes('word') || normalizedMimeType.includes('docx') || normalizedMimeType.includes('msword') || normalizedMimeType.includes('officedocument.wordprocessingml')) {
         const mammoth = require('mammoth');
         const result = await mammoth.extractRawText({ buffer: fileBuffer });
         text = result.value;
-      } else if (mimeType.includes('text')) {
+      } else if (normalizedMimeType.includes('text') || normalizedMimeType.includes('plain')) {
         text = fileBuffer.toString('utf-8');
       } else {
-        throw new Error('Unsupported file type: ' + mimeType);
+        throw new Error(`Unsupported file type: ${mimeType}. Supported types: PDF, DOC, DOCX`);
       }
 
       // Clean and fix Vietnamese encoding
