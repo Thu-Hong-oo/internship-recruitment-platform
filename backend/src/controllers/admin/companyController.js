@@ -10,6 +10,44 @@ const { EMPLOYER_PROFILE_STATUS } = require('../../constants/common.constants');
 // COMPANY MANAGEMENT (Using EmployerProfile.company)
 // ========================================
 
+/**
+ * Helper function to check if a company has sufficient information
+ * Returns true if company has enough basic info, false otherwise
+ */
+const hasSufficientCompanyInfo = (company) => {
+  // Check if name is not a placeholder
+  const isPlaceholderName = 
+    !company.name || 
+    company.name.trim() === '' || 
+    company.name === 'Tên công ty' ||
+    company.name.toLowerCase().includes('placeholder');
+
+  // Check if description exists and is meaningful
+  const hasDescription = 
+    company.description && 
+    company.description.trim() !== '' && 
+    company.description.trim().length > 10;
+
+  // Check if logo has actual URL (not just uploadedAt)
+  const hasLogo = company.logo && company.logo.url;
+
+  // Check if office address has meaningful data
+  const hasAddress = 
+    company.officeAddress && (
+      (company.officeAddress.street && 
+       company.officeAddress.street.trim() !== '' &&
+       company.officeAddress.street !== 'Chưa cập nhật') ||
+      (company.officeAddress.city && 
+       company.officeAddress.city.trim() !== '' &&
+       company.officeAddress.city !== 'Chưa cập nhật')
+    );
+
+  // Company is considered complete if it has:
+  // - Non-placeholder name AND
+  // - (Description OR Logo OR Address)
+  return !isPlaceholderName && (hasDescription || hasLogo || hasAddress);
+};
+
 // @desc    Get all companies (admin only)
 // @route   GET /api/admin/companies
 // @access  Private (Admin only)
@@ -44,15 +82,82 @@ const getCompanies = asyncHandler(async (req, res) => {
     ];
   }
 
-  const total = await EmployerProfile.countDocuments(filter);
-  const employerProfiles = await EmployerProfile.find(filter)
-    .populate('owner', 'email fullName')
-    .select('company businessInfo verification status createdAt updatedAt')
-    .sort({ createdAt: -1 })
-    .limit(limit)
-    .skip(startIndex);
+  // Check if we should include incomplete companies
+  const includeIncomplete = req.query.includeIncomplete === 'true';
 
-  // Transform data to look like companies
+  // If filtering incomplete companies, we need to fetch all matching records first,
+  // then filter and paginate in memory to get accurate total count
+  let employerProfiles;
+  let total;
+  
+  if (!includeIncomplete) {
+    // Fetch all matching records (without pagination) to filter properly
+    const allProfiles = await EmployerProfile.find(filter)
+      .populate('owner', 'email fullName')
+      .select('company businessInfo verification status createdAt updatedAt')
+      .sort({ createdAt: -1 });
+
+    // Transform and filter
+    let allCompanies = allProfiles.map(profile => ({
+      _id: profile._id,
+      name: profile.company.name,
+      industry: profile.company.industry,
+      size: profile.company.size,
+      email: profile.company.email,
+      website: profile.company.website,
+      description: profile.company.description,
+      logo: profile.company.logo,
+      employeesCount: profile.company.employeesCount,
+      foundedYear: profile.company.foundedYear,
+      officeAddress: profile.company.officeAddress,
+      businessInfo: profile.businessInfo,
+      verification: profile.verification,
+      status: profile.status,
+      createdBy: profile.owner,
+      createdAt: profile.createdAt,
+      updatedAt: profile.updatedAt,
+    }));
+
+    // Filter out incomplete companies
+    allCompanies = allCompanies.filter(company => hasSufficientCompanyInfo(company));
+    
+    // Calculate accurate total after filtering
+    total = allCompanies.length;
+    
+    // Apply pagination after filtering
+    const companies = allCompanies.slice(startIndex, startIndex + limit);
+    
+    // Pagination
+    const totalPages = Math.ceil(total / limit) || 1;
+    const pagination = {
+      page,
+      limit,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPrevPage: page > 1,
+      total,
+    };
+
+    return res.status(200).json({
+      success: true,
+      count: companies.length,
+      total,
+      pagination,
+      data: companies,
+      message: 'Companies từ EmployerProfile.company',
+    });
+  } else {
+    // Include incomplete companies - use normal pagination
+    total = await EmployerProfile.countDocuments(filter);
+    employerProfiles = await EmployerProfile.find(filter)
+      .populate('owner', 'email fullName')
+      .select('company businessInfo verification status createdAt updatedAt')
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .skip(startIndex);
+  }
+
+  // Transform data to look like companies (for includeIncomplete case)
   const companies = employerProfiles.map(profile => ({
     _id: profile._id,
     name: profile.company.name,
@@ -73,7 +178,7 @@ const getCompanies = asyncHandler(async (req, res) => {
     updatedAt: profile.updatedAt,
   }));
 
-  // Pagination
+  // Pagination (for includeIncomplete case)
   const totalPages = Math.ceil(total / limit) || 1;
   const pagination = {
     page,

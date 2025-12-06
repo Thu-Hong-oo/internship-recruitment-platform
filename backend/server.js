@@ -34,6 +34,7 @@ const templatesAdminRoutes = require('./src/routes/admin/templatesAdmin');
 const employerRoutes = require('./src/routes/employerProfiles');
 const jobRoutes = require('./src/routes/jobs');
 const candidateRoutes = require('./src/routes/candidate/candidates');
+const applicationRoutes = require('./src/routes/applications');
 
 // AI & Analysis Routes
 const aiRoutes = require('./src/routes/ai');
@@ -329,6 +330,7 @@ app.use('/api/admin/templates', templatesAdminRoutes);
 app.use('/api/employers', employerRoutes);
 app.use('/api/jobs', jobRoutes);
 app.use('/api/candidates', candidateRoutes);
+app.use('/api/applications', applicationRoutes);
 
 // AI & Analysis Routes
 app.use('/api/ai', aiRoutes);

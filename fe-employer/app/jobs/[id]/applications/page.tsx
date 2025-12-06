@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getJobApplications, viewApplicationResume } from "@/lib/jobAPI";
-import { getToken } from "@/lib/userStorage";
+import {
+  getJobApplications,
+  viewApplicationResume,
+  updateApplicationStatus,
+} from "@/lib/jobAPI";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -22,7 +25,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Users, ArrowLeft, ExternalLink } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Users,
+  ArrowLeft,
+  ExternalLink,
+  UserRound,
+  Mail,
+  FileText,
+  Eye,
+  X,
+  AlertCircle,
+} from "lucide-react";
 
 type ApplicationItem = {
   _id: string;
@@ -31,7 +46,9 @@ type ApplicationItem = {
   candidateId?: {
     userId?: {
       fullName?: string;
+      displayFullName?: string;
       email?: string;
+      avatar?: string;
     };
     resume?: {
       current?: {
@@ -42,12 +59,64 @@ type ApplicationItem = {
   };
 };
 
+const statusConfig: Record<
+  string,
+  { label: string; variant: "default" | "secondary" | "destructive" }
+> = {
+  pending: { label: "Chờ duyệt", variant: "secondary" },
+  reviewing: { label: "Đang xem xét", variant: "default" },
+  shortlisted: { label: "Vòng tiếp theo", variant: "default" },
+  interview: { label: "Đã phỏng vấn", variant: "default" },
+  offer: { label: "Đã đề xuất", variant: "default" },
+  accepted: { label: "Đã chấp nhận", variant: "default" },
+  rejected: { label: "Từ chối", variant: "destructive" },
+};
+
+const STATUS_OPTIONS_FOR_SELECT = [
+  { value: "pending", label: "Chờ duyệt" },
+  { value: "reviewing", label: "Đang xem xét" },
+  { value: "shortlisted", label: "Vòng tiếp theo" },
+  { value: "interview", label: "Đã phỏng vấn" },
+  { value: "offer", label: "Đã đề xuất" },
+  { value: "accepted", label: "Đã tuyển" },
+  { value: "rejected", label: "Từ chối" },
+];
+
+// Các trạng thái cuối cùng không thể chỉnh sửa
+const FINAL_STATUSES = ["accepted", "rejected"];
+
+// Xác định các trạng thái có thể chuyển từ trạng thái hiện tại
+const getAvailableStatuses = (currentStatus: string): string[] => {
+  switch (currentStatus) {
+    case "pending":
+      return ["reviewing", "accepted", "rejected"];
+    case "reviewing":
+      return ["accepted", "rejected"];
+    case "shortlisted":
+      // Có thể chuyển sang các trạng thái tiếp theo
+      return ["interview", "offer", "accepted", "rejected"];
+    case "interview":
+      return ["offer", "accepted", "rejected"];
+    case "offer":
+      return ["accepted", "rejected"];
+    case "accepted":
+    case "rejected":
+      // Trạng thái cuối, không thể chuyển
+      return [];
+    default:
+      // Mặc định cho các trạng thái khác
+      return ["reviewing", "accepted", "rejected"];
+  }
+};
+
 const STATUS_OPTIONS = [
   { value: "all", label: "Tất cả" },
   { value: "pending", label: "Chờ xử lý" },
+  { value: "reviewing", label: "Đang xem xét" },
   { value: "shortlisted", label: "Đã shortlist" },
-  { value: "interviewed", label: "Đã phỏng vấn" },
-  { value: "hired", label: "Đã tuyển" },
+  { value: "interview", label: "Đã phỏng vấn" },
+  { value: "offer", label: "Đã đề xuất" },
+  { value: "accepted", label: "Đã tuyển" },
   { value: "rejected", label: "Từ chối" },
 ];
 
@@ -55,6 +124,7 @@ export default function JobApplicationsPage() {
   const router = useRouter();
   const params = useParams();
   const jobId = params?.id as string;
+  const { toast } = useToast();
 
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,7 +142,8 @@ export default function JobApplicationsPage() {
     try {
       setLoading(true);
       setError(null);
-      const token = getToken();
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       if (!token) {
         setError("Vui lòng đăng nhập");
         return;
@@ -110,16 +181,45 @@ export default function JobApplicationsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId, statusFilter]);
 
-  const formatDate = (value?: string) => {
+  const formatDateTime = (value?: string) => {
     if (!value) return "-";
     return new Date(value).toLocaleString("vi-VN");
   };
 
-  const getCandidateName = (item: ApplicationItem) => {
+  const renderStatusBadge = (status: string) => {
+    const config = statusConfig[status] || {
+      label: status || "pending",
+      variant: "secondary" as const,
+    };
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const renderCandidateInfo = (item: ApplicationItem) => {
+    const user = item.candidateId?.userId;
+    const displayName =
+      user?.displayFullName || user?.fullName || "Ứng viên ẩn danh";
+
     return (
-      item.candidateId?.userId?.fullName ||
-      item.candidateId?.userId?.email ||
-      "Ứng viên"
+      <div className="flex items-center gap-3">
+        <Avatar className="h-10 w-10">
+          <AvatarImage src={user?.avatar} alt={displayName} />
+          <AvatarFallback>
+            {displayName.substring(0, 2).toUpperCase()}
+          </AvatarFallback>
+        </Avatar>
+        <div className="space-y-1">
+          <div className="font-medium flex items-center gap-1">
+            <UserRound className="h-4 w-4 text-muted-foreground" />
+            {displayName}
+          </div>
+          {user?.email && (
+            <div className="text-sm text-muted-foreground flex items-center gap-1">
+              <Mail className="h-3 w-3" />
+              {user.email}
+            </div>
+          )}
+        </div>
+      </div>
     );
   };
 
@@ -130,12 +230,14 @@ export default function JobApplicationsPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [loadingCV, setLoadingCV] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
 
   const handleViewCV = async (applicationId: string, resumeUrl?: string) => {
     try {
       setLoadingCV(true);
       setError(null);
-      const token = getToken();
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
       if (!token) {
         setError("Vui lòng đăng nhập");
         return;
@@ -169,28 +271,107 @@ export default function JobApplicationsPage() {
     setPreviewUrl(null);
   };
 
+  const handleStatusChange = async (
+    applicationId: string,
+    newStatus: string
+  ) => {
+    try {
+      setUpdatingStatus(applicationId);
+      setError(null);
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
+      if (!token) {
+        setError("Vui lòng đăng nhập");
+        return;
+      }
+
+      const res = await updateApplicationStatus(
+        applicationId,
+        newStatus,
+        token
+      );
+
+      if (res.success) {
+        toast({
+          title: "Thành công",
+          description: "Đã cập nhật trạng thái ứng viên",
+        });
+        // Refresh data after successful update
+        await loadData(page, statusFilter);
+      } else {
+        const errorMsg = res.error || "Không thể cập nhật trạng thái";
+        setError(errorMsg);
+        toast({
+          title: "Lỗi",
+          description: errorMsg,
+          variant: "destructive",
+        });
+      }
+    } catch (err: any) {
+      const errorMsg = err?.message || "Có lỗi xảy ra khi cập nhật trạng thái";
+      setError(errorMsg);
+      toast({
+        title: "Lỗi",
+        description: errorMsg,
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-gray-600">Đang tải danh sách ứng viên...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      <div className="flex items-center gap-3 mb-6">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.back()}
-          className="flex items-center gap-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Quay lại
-        </Button>
-        <h1 className="text-2xl font-semibold flex items-center gap-2">
-          <Users className="h-5 w-5" />
-          Ứng viên của tin tuyển dụng
-        </h1>
+    <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.back()}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Quay lại
+          </Button>
+          <div>
+            <h1 className="text-2xl font-semibold mb-2 flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Ứng viên của tin tuyển dụng
+            </h1>
+            <p className="text-gray-600">
+              Xem và quản lý tất cả ứng viên đã ứng tuyển vào tin tuyển dụng này
+            </p>
+          </div>
+        </div>
       </div>
 
-      <Card className="mb-4">
+      {error && (
+        <Card className="border-red-200 bg-red-50 mb-6">
+          <CardContent className="p-4 flex items-center gap-2 text-red-700">
+            <AlertCircle className="h-4 w-4" />
+            <span>{error}</span>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="mb-6">
         <CardContent className="p-4 flex flex-wrap items-center gap-4">
+          <div className="text-sm font-medium">Bộ lọc</div>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">Trạng thái:</span>
+            <span className="text-sm text-muted-foreground">Trạng thái:</span>
             <Select
               value={statusFilter}
               onValueChange={(v) => {
@@ -199,7 +380,7 @@ export default function JobApplicationsPage() {
               }}
             >
               <SelectTrigger className="w-[180px]">
-                <SelectValue />
+                <SelectValue placeholder="Tất cả" />
               </SelectTrigger>
               <SelectContent>
                 {STATUS_OPTIONS.map((opt) => (
@@ -210,111 +391,164 @@ export default function JobApplicationsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="text-sm text-gray-600">Tổng số ứng viên: {total}</div>
+          <div className="text-sm text-muted-foreground">
+            Tổng số ứng viên: {total}
+          </div>
         </CardContent>
       </Card>
 
-      {error && (
-        <Card className="border-red-200 bg-red-50 mb-4">
-          <CardContent className="p-4 text-red-600 text-sm">
-            {error}
+      {applications.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center text-muted-foreground">
+            <div className="max-w-md mx-auto space-y-4">
+              <UserRound className="h-12 w-12 mx-auto text-gray-300" />
+              <div>
+                <p className="text-lg font-medium mb-2">Chưa có ứng viên nào</p>
+                <p className="text-sm">
+                  Khi ứng viên nộp hồ sơ vào tin tuyển dụng này, thông tin của
+                  họ sẽ xuất hiện ở đây.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              Danh sách ứng viên ({applications.length} ứng viên trên trang{" "}
+              {page}/{pages})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Ứng viên</TableHead>
+                  <TableHead>Trạng thái</TableHead>
+                  <TableHead>Thời gian</TableHead>
+                  <TableHead>Tài liệu</TableHead>
+                  <TableHead className="w-[120px]">Hành động</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {applications.map((app) => {
+                  const resume = getResume(app);
+                  return (
+                    <TableRow key={app._id}>
+                      <TableCell>{renderCandidateInfo(app)}</TableCell>
+                      <TableCell>
+                        {FINAL_STATUSES.includes(app.status || "") ? (
+                          // Hiển thị Badge cố định cho các trạng thái cuối
+                          renderStatusBadge(app.status || "pending")
+                        ) : (
+                          // Hiển thị Select dropdown với các trạng thái hợp lệ
+                          <Select
+                            value={app.status || "pending"}
+                            onValueChange={(value) =>
+                              handleStatusChange(app._id, value)
+                            }
+                            disabled={updatingStatus === app._id}
+                          >
+                            <SelectTrigger className="w-[160px]">
+                              <SelectValue>
+                                {statusConfig[app.status || "pending"]?.label ||
+                                  app.status ||
+                                  "Chờ duyệt"}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {STATUS_OPTIONS_FOR_SELECT.filter((option) => {
+                                const availableStatuses = getAvailableStatuses(
+                                  app.status || "pending"
+                                );
+                                // Luôn hiển thị trạng thái hiện tại và các trạng thái có thể chuyển
+                                return (
+                                  option.value === app.status ||
+                                  availableStatuses.includes(option.value)
+                                );
+                              }).map((option) => (
+                                <SelectItem
+                                  key={option.value}
+                                  value={option.value}
+                                >
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm text-muted-foreground">
+                          {formatDateTime(app.createdAt)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {resume?.url ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewCV(app._id, resume.url)}
+                            disabled={loadingCV}
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            {loadingCV ? "Đang tải..." : "Xem CV"}
+                          </Button>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">
+                            Không có tệp
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            router.push(
+                              `/jobs/${jobId}/applications/${app._id}`
+                            )
+                          }
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          Chi tiết
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+
+            {pages > 1 && (
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-muted-foreground">
+                  Trang {page} / {pages}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadData(page - 1)}
+                    disabled={page <= 1}
+                  >
+                    Trước
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => loadData(page + 1)}
+                    disabled={page >= pages}
+                  >
+                    Sau
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Danh sách ứng viên</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="py-10 text-center text-sm text-gray-600">
-              Đang tải...
-            </div>
-          ) : applications.length === 0 ? (
-            <div className="py-10 text-center text-sm text-gray-600">
-              Chưa có ứng viên nào.
-            </div>
-          ) : (
-            <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ứng viên</TableHead>
-                    <TableHead>Trạng thái</TableHead>
-                    <TableHead>Ngày ứng tuyển</TableHead>
-                    <TableHead>Hồ sơ</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {applications.map((app) => {
-                    const resume = getResume(app);
-                    return (
-                      <TableRow key={app._id}>
-                        <TableCell className="font-medium">
-                          {getCandidateName(app)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="capitalize">
-                            {app.status || "pending"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-gray-600">
-                          {formatDate(app.createdAt)}
-                        </TableCell>
-                        <TableCell>
-                          {resume?.url ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-blue-600"
-                              onClick={() => handleViewCV(app._id, resume.url)}
-                              disabled={loadingCV}
-                            >
-                              <ExternalLink className="h-4 w-4 mr-1" />
-                              {loadingCV ? "Đang tải..." : "CV"}
-                            </Button>
-                          ) : (
-                            <span className="text-sm text-gray-500">
-                              Không có CV
-                            </span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-
-              {pages > 1 && (
-                <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
-                  <div>
-                    Trang {page}/{pages}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => loadData(page - 1)}
-                      disabled={page <= 1}
-                    >
-                      Trước
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => loadData(page + 1)}
-                      disabled={page >= pages}
-                    >
-                      Sau
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
 
       {/* CV Preview Modal */}
       {showPreview && previewUrl && (
@@ -323,7 +557,7 @@ export default function JobApplicationsPage() {
             <div className="flex items-center justify-between border-b border-white/40 bg-white/70 px-6 py-4 backdrop-blur-lg">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-white shadow-lg">
-                  <Users className="h-5 w-5" />
+                  <Eye className="h-5 w-5" />
                 </div>
                 <div>
                   <h3 className="text-base font-semibold text-slate-900">
@@ -338,7 +572,7 @@ export default function JobApplicationsPage() {
                 onClick={closePreview}
                 className="rounded-xl border-slate-200 bg-white/80 px-4 py-2 text-sm font-medium text-slate-600 transition-colors duration-300 hover:border-primary hover:text-primary"
               >
-                <ExternalLink className="mr-2 h-4 w-4" />
+                <X className="mr-2 h-4 w-4" />
                 Đóng
               </Button>
             </div>
@@ -348,6 +582,29 @@ export default function JobApplicationsPage() {
                 title="CV Preview"
                 className="h-full w-full border-0"
               />
+            </div>
+            <div className="flex items-center justify-between border-t border-white/40 bg-white/80 px-6 py-4 backdrop-blur-lg">
+              <p className="text-xs font-medium text-slate-500">
+                CV của ứng viên đã ứng tuyển
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open(previewUrl, "_blank")}
+                  className="rounded-xl border-slate-200 bg-white/80 px-4 py-2 text-sm font-medium text-slate-600 transition-colors duration-300 hover:border-primary hover:text-primary"
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Mở tab mới
+                </Button>
+                <Button
+                  onClick={closePreview}
+                  size="sm"
+                  className="rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-lg transition-transform duration-300 hover:-translate-y-0.5 bg-primary"
+                >
+                  Xong
+                </Button>
+              </div>
             </div>
           </div>
         </div>
