@@ -130,6 +130,12 @@ export default function LoginPage() {
         if (data?.user) {
           saveUserData(data.user, remember);
         }
+        
+        // Dispatch custom event to notify AppHeader to reload user data
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event('user-login'));
+        }
+        
         setSuccess("Đăng nhập thành công! Đang chuyển hướng...");
         setTimeout(() => router.push("/dashboard"), 1000);
         return;

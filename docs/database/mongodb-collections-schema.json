@@ -1,0 +1,435 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MongoDB Collections Schema",
+  "description": "Chi tiết schema cho tất cả collections trong MongoDB",
+  
+  "collections": {
+    "users": {
+      "description": "Bảng người dùng chính (candidate và employer)",
+      "fields": {
+        "_id": { "type": "ObjectId", "required": true, "primaryKey": true },
+        "email": { "type": "String", "required": true, "unique": true, "index": true },
+        "passwordHash": { "type": "String", "required": true },
+        "fullName": { "type": "String", "required": true },
+        "phone": { "type": "String" },
+        "userStatus": { "type": "Enum", "values": ["ACTIVE", "INACTIVE"], "default": "ACTIVE" },
+        "userRole": { "type": "Enum", "values": ["CANDIDATE", "EMPLOYER"], "required": true },
+        "lastLogin": { "type": "DateTime" },
+        "createdAt": { "type": "DateTime", "required": true },
+        "updatedAt": { "type": "DateTime", "required": true }
+      },
+      "relationships": {
+        "candidates": { "type": "one-to-one", "collection": "candidates", "foreignKey": "userId" },
+        "employers": { "type": "one-to-one", "collection": "employers", "foreignKey": "userId" },
+        "notifications": { "type": "one-to-many", "collection": "notifications", "foreignKey": "userId" },
+        "jobFollowings": { "type": "one-to-many", "collection": "job_followings", "foreignKey": "userId" }
+      }
+    },
+    
+    "candidates": {
+      "description": "Hồ sơ ứng viên",
+      "fields": {
+        "_id": { "type": "ObjectId", "required": true, "primaryKey": true },
+        "userId": { "type": "ObjectId", "required": true, "unique": true, "references": "users._id", "index": true },
+        "bio": { "type": "String" },
+        "jobSeekingStatus": { "type": "Enum", "values": ["ACTIVE", "INACTIVE"], "default": "ACTIVE", "index": true },
+        "profileCompleteness": { "type": "Integer", "min": 0, "max": 100 },
+        "address": {
+          "type": "Embedded",
+          "fields": {
+            "street": { "type": "String" },
+            "city": { "type": "String" },
+            "state": { "type": "String" },
+            "country": { "type": "String", "default": "Vietnam" },
+            "zipCode": { "type": "String" }
+          }
+        },
+        "skills": { "type": "Array", "items": { "type": "ObjectId", "references": "skills._id" }, "index": true },
+        "createdAt": { "type": "DateTime", "required": true },
+        "updatedAt": { "type": "DateTime", "required": true }
+      },
+      "relationships": {
+        "user": { "type": "many-to-one", "collection": "users", "foreignKey": "userId" },
+        "educations": { "type": "one-to-many", "collection": "educations", "foreignKey": "candidateId" },
+        "cvs": { "type": "one-to-many", "collection": "cvs", "foreignKey": "candidateId" },
+        "jobApplications": { "type": "one-to-many", "collection": "job_applications", "foreignKey": "candidateId" },
+        "jobSavings": { "type": "one-to-many", "collection": "job_savings", "foreignKey": "candidateId" },
+        "skillGraphAnalyses": { "type": "one-to-many", "collection": "skill_graph_analyses", "foreignKey": "candidateId" },
+        "skillMaps": { "type": "one-to-many", "collection": "skill_maps", "foreignKey": "candidateId" },
+        "skills": { "type": "many-to-many", "collection": "skills", "via": "skills[]" }
+      }
+    },
+    
+    "employers": {
+      "description": "Hồ sơ nhà tuyển dụng",
+      "fields": {
+        "_id": { "type": "ObjectId", "required": true, "primaryKey": true },
+        "userId": { "type": "ObjectId", "required": true, "unique": true, "references": "users._id", "index": true },
+        "companyId": { "type": "ObjectId", "references": "companies._id", "index": true },
+        "memberStatus": { "type": "Enum", "values": ["OWNER", "MEMBER"], "default": "MEMBER" },
+        "joinedAt": { "type": "DateTime", "required": true },
+        "createdAt": { "type": "DateTime", "required": true },
+        "updatedAt": { "type": "DateTime", "required": true }
+      },
+      "relationships": {
+        "user": { "type": "many-to-one", "collection": "users", "foreignKey": "userId" },
+        "company": { "type": "many-to-one", "collection": "companies", "foreignKey": "companyId" }
+      }
+    },
+    
+    "companies": {
+      "description": "Thông tin công ty",
+      "fields": {
+        "_id": { "type": "ObjectId", "required": true, "primaryKey": true },
+        "name": { "type": "String", "required": true, "index": "text" },
+        "description": { "type": "String" },
+        "companySize": { "type": "Enum", "values": ["SMALL_1_10", "MEDIUM_11_200", "LARGE_201_1000", "ENTERPRISE_1000_PLUS"] },
+        "taxCode": { "type": "String", "unique": true, "index": true },
+        "verificationStatus": { "type": "Enum", "values": ["PENDING", "UNDER_REVIEW", "VERIFIED"], "default": "PENDING", "index": true },
+        "website": { "type": "String" },
+        "businessEmail": { "type": "String" },
+        "businessPhone": { "type": "String" },
+        "businessLogoUrl": { "type": "String" },
+        "registrationDate": { "type": "Date" },
+        "address": {
+          "type": "Embedded",
+          "fields": {
+            "street": { "type": "String" },
+            "city": { "type": "String" },
+            "state": { "type": "String" },
+            "country": { "type": "String", "default": "Vietnam" },
+            "zipCode": { "type": "String" },
+            "fullAddress": { "type": "String" }
+          }
+        },
+        "industryCodes": { "type": "Array", "items": { "type": "String", "references": "industries.code" } },
+        "createdAt": { "type": "DateTime", "required": true },
+        "updatedAt": { "type": "DateTime", "required": true }
+      },
+      "relationships": {
+        "employers": { "type": "one-to-many", "collection": "employers", "foreignKey": "companyId" },
+        "jobPostings": { "type": "one-to-many", "collection": "job_postings", "foreignKey": "companyId" },
+        "industries": { "type": "many-to-many", "collection": "industries", "via": "industryCodes[]" }
+      }
+    },
+    
+    "educations": {
+      "description": "Học vấn của ứng viên",
+      "fields": {
+        "_id": { "type": "ObjectId", "required": true, "primaryKey": true },
+        "candidateId": { "type": "ObjectId", "required": true, "references": "candidates._id", "index": true },
+        "degree": { "type": "String", "required": true },
+        "major": { "type": "String" },
+        "school": { "type": "String", "required": true },
+        "startDate": { "type": "Date" },
+        "endDate": { "type": "Date" },
+        "gpa": { "type": "Float" },
+        "createdAt": { "type": "DateTime", "required": true },
+        "updatedAt": { "type": "DateTime", "required": true }
+      },
+      "relationships": {
+        "candidate": { "type": "many-to-one", "collection": "candidates", "foreignKey": "candidateId" }
+      }
+    },
+    
+    "cvs": {
+      "description": "CV của ứng viên",
+      "fields": {
+        "_id": { "type": "ObjectId", "required": true, "primaryKey": true },
+        "candidateId": { "type": "ObjectId", "required": true, "references": "candidates._id", "index": true },
+        "content": { "type": "String" },
+        "fileName": { "type": "String", "required": true },
+        "fileUrl": { "type": "String", "required": true },
+        "displayName": { "type": "String" },
+        "uploadDate": { "type": "DateTime", "required": true },
+        "isDefault": { "type": "Boolean", "default": false },
+        "createdAt": { "type": "DateTime", "required": true },
+        "updatedAt": { "type": "DateTime", "required": true }
+      },
+      "relationships": {
+        "candidate": { "type": "many-to-one", "collection": "candidates", "foreignKey": "candidateId" },
+        "jobApplications": { "type": "one-to-many", "collection": "job_applications", "foreignKey": "cvId" }
+      }
+    },
+    
+    "skills": {
+      "description": "Kỹ năng trong hệ thống",
+      "fields": {
+        "_id": { "type": "ObjectId", "required": true, "primaryKey": true },
+        "code": { "type": "String", "unique": true, "index": true },
+        "name": { "type": "String", "required": true, "index": "text" },
+        "description": { "type": "String" },
+        "aliases": { "type": "Array", "items": { "type": "String" } },
+        "category": { "type": "Enum", "values": ["TECHNICAL", "SOFT", "LANGUAGE", "TOOL", "CERTIFICATION"] },
+        "popularity": { "type": "Integer", "default": 0 },
+        "demandLevel": { "type": "Enum", "values": ["CRITICAL", "HIGH", "MEDIUM", "LOW"] },
+        "trend": { "type": "Enum", "values": ["EMERGING", "STABLE", "DECLINING"] },
+        "isActive": { "type": "Boolean", "default": true, "index": true },
+        "createdAt": { "type": "DateTime", "required": true },
+        "updatedAt": { "type": "DateTime", "required": true }
+      },
+      "relationships": {
+        "candidates": { "type": "many-to-many", "collection": "candidates", "via": "skills[]" },
+        "jobPostings": { "type": "many-to-many", "collection": "job_postings", "via": "skillIds[]" }
+      }
+    },
+    
+    "industries": {
+      "description": "Ngành nghề",
+      "fields": {
+        "_id": { "type": "ObjectId", "required": true, "primaryKey": true },
+        "code": { "type": "String", "unique": true, "required": true, "index": true },
+        "name": { "type": "String", "required": true },
+        "description": { "type": "String" },
+        "parentCode": { "type": "String", "references": "industries.code" },
+        "isActive": { "type": "Boolean", "default": true },
+        "createdAt": { "type": "DateTime", "required": true },
+        "updatedAt": { "type": "DateTime", "required": true }
+      },
+      "relationships": {
+        "companies": { "type": "many-to-many", "collection": "companies", "via": "industryCodes[]" },
+        "jobPostings": { "type": "many-to-many", "collection": "job_postings", "via": "industryCodes[]" }
+      }
+    },
+    
+    "job_postings": {
+      "description": "Tin tuyển dụng",
+      "fields": {
+        "_id": { "type": "ObjectId", "required": true, "primaryKey": true },
+        "companyId": { "type": "ObjectId", "required": true, "references": "companies._id", "index": true },
+        "postedBy": { "type": "ObjectId", "required": true, "references": "employers._id", "index": true },
+        "title": { "type": "String", "required": true, "index": "text" },
+        "description": { "type": "String", "required": true, "index": "text" },
+        "requirements": { "type": "String" },
+        "benefits": { "type": "String" },
+        "jobType": { "type": "Enum", "values": ["FULL_TIME", "PART_TIME", "CONTRACT", "INTERNSHIP"] },
+        "jobStatus": { "type": "Enum", "values": ["DRAFT", "PUBLISHED", "CLOSED", "EXPIRED", "ARCHIVED"], "default": "DRAFT", "index": true },
+        "level": { "type": "Enum", "values": ["INTERN", "JUNIOR", "MIDDLE", "SENIOR", "MANAGER"] },
+        "workingMode": { "type": "Enum", "values": ["ONSITE", "REMOTE", "HYBRID"] },
+        "address": {
+          "type": "Embedded",
+          "fields": {
+            "street": { "type": "String" },
+            "ward": { "type": "String" },
+            "district": { "type": "String" },
+            "city": { "type": "String" },
+            "country": { "type": "String", "default": "Vietnam" },
+            "fullAddress": { "type": "String" }
+          }
+        },
+        "salaryRange": {
+          "type": "Embedded",
+          "fields": {
+            "min": { "type": "Double" },
+            "max": { "type": "Double" },
+            "currency": { "type": "String", "default": "VND" }
+          }
+        },
+        "jobRequirements": {
+          "type": "Embedded",
+          "fields": {
+            "requiredSkills": { "type": "Array", "items": { "type": "String" } },
+            "certifications": { "type": "Array", "items": { "type": "String" } },
+            "languages": { "type": "Array", "items": { "type": "String" } },
+            "minExperience": { "type": "Integer" },
+            "maxExperience": { "type": "Integer" },
+            "requiresCertification": { "type": "String" }
+          }
+        },
+        "skillIds": { "type": "Array", "items": { "type": "ObjectId", "references": "skills._id" }, "index": true },
+        "industryCodes": { "type": "Array", "items": { "type": "String", "references": "industries.code" } },
+        "postedAt": { "type": "DateTime", "index": -1 },
+        "expiresAt": { "type": "DateTime", "index": true },
+        "deadline": { "type": "DateTime" },
+        "positions": { "type": "Integer", "default": 1 },
+        "applicationCount": { "type": "Integer", "default": 0 },
+        "views": { "type": "Integer", "default": 0 },
+        "createdAt": { "type": "DateTime", "required": true },
+        "updatedAt": { "type": "DateTime", "required": true }
+      },
+      "relationships": {
+        "company": { "type": "many-to-one", "collection": "companies", "foreignKey": "companyId" },
+        "postedByEmployer": { "type": "many-to-one", "collection": "employers", "foreignKey": "postedBy" },
+        "jobApplications": { "type": "one-to-many", "collection": "job_applications", "foreignKey": "jobId" },
+        "jobSavings": { "type": "one-to-many", "collection": "job_savings", "foreignKey": "jobId" },
+        "skills": { "type": "many-to-many", "collection": "skills", "via": "skillIds[]" },
+        "industries": { "type": "many-to-many", "collection": "industries", "via": "industryCodes[]" }
+      }
+    },
+    
+    "job_applications": {
+      "description": "Đơn ứng tuyển",
+      "fields": {
+        "_id": { "type": "ObjectId", "required": true, "primaryKey": true },
+        "candidateId": { "type": "ObjectId", "required": true, "references": "candidates._id", "index": true },
+        "jobId": { "type": "ObjectId", "required": true, "references": "job_postings._id", "index": true },
+        "cvId": { "type": "ObjectId", "references": "cvs._id" },
+        "coverLetter": { "type": "String" },
+        "status": { "type": "Enum", "values": ["SUBMITTED", "REVIEWED", "ACCEPTED", "REJECTED", "WITHDRAWN"], "default": "SUBMITTED", "index": true },
+        "matchResult": {
+          "type": "Embedded",
+          "fields": {
+            "score": { "type": "Double" },
+            "matchLevel": { "type": "Enum", "values": ["EXCELLENT", "GOOD", "FAIR", "POOR"] },
+            "scoreBreakdown": { "type": "Object" },
+            "strengths": { "type": "Array", "items": { "type": "String" } },
+            "weaknesses": { "type": "Array", "items": { "type": "String" } },
+            "calculatedAt": { "type": "DateTime" }
+          }
+        },
+        "submittedAt": { "type": "DateTime", "required": true, "index": -1 },
+        "reviewedAt": { "type": "DateTime" },
+        "createdAt": { "type": "DateTime", "required": true },
+        "updatedAt": { "type": "DateTime", "required": true }
+      },
+      "relationships": {
+        "candidate": { "type": "many-to-one", "collection": "candidates", "foreignKey": "candidateId" },
+        "job": { "type": "many-to-one", "collection": "job_postings", "foreignKey": "jobId" },
+        "cv": { "type": "many-to-one", "collection": "cvs", "foreignKey": "cvId" }
+      },
+      "indexes": [
+        { "fields": { "candidateId": 1, "jobId": 1 }, "unique": true }
+      ]
+    },
+    
+    "job_savings": {
+      "description": "Việc làm đã lưu",
+      "fields": {
+        "_id": { "type": "ObjectId", "required": true, "primaryKey": true },
+        "candidateId": { "type": "ObjectId", "required": true, "references": "candidates._id", "index": true },
+        "jobId": { "type": "ObjectId", "required": true, "references": "job_postings._id", "index": true },
+        "savedAt": { "type": "DateTime", "required": true },
+        "createdAt": { "type": "DateTime", "required": true }
+      },
+      "relationships": {
+        "candidate": { "type": "many-to-one", "collection": "candidates", "foreignKey": "candidateId" },
+        "job": { "type": "many-to-one", "collection": "job_postings", "foreignKey": "jobId" }
+      },
+      "indexes": [
+        { "fields": { "candidateId": 1, "jobId": 1 }, "unique": true }
+      ]
+    },
+    
+    "job_followings": {
+      "description": "Theo dõi công ty hoặc việc làm",
+      "fields": {
+        "_id": { "type": "ObjectId", "required": true, "primaryKey": true },
+        "userId": { "type": "ObjectId", "required": true, "references": "users._id", "index": true },
+        "targetType": { "type": "Enum", "values": ["JOB_POSTING", "COMPANY"], "required": true },
+        "targetId": { "type": "ObjectId", "required": true },
+        "followedAt": { "type": "DateTime", "required": true },
+        "createdAt": { "type": "DateTime", "required": true }
+      },
+      "relationships": {
+        "user": { "type": "many-to-one", "collection": "users", "foreignKey": "userId" }
+      },
+      "indexes": [
+        { "fields": { "userId": 1, "targetType": 1, "targetId": 1 }, "unique": true }
+      ]
+    },
+    
+    "notifications": {
+      "description": "Thông báo cho người dùng",
+      "fields": {
+        "_id": { "type": "ObjectId", "required": true, "primaryKey": true },
+        "userId": { "type": "ObjectId", "required": true, "references": "users._id", "index": true },
+        "type": { "type": "Enum", "values": ["JOB_APPLICATION_STATUS", "NEW_JOB_WATCH", "COMPANY_UPDATE", "SKILL_RECOMMENDATION", "SYSTEM_ANNOUNCEMENT", "PROFILE_VIEW"], "required": true },
+        "title": { "type": "String", "required": true },
+        "message": { "type": "String", "required": true },
+        "data": { "type": "Object" },
+        "isRead": { "type": "Boolean", "default": false, "index": true },
+        "readAt": { "type": "DateTime" },
+        "createdAt": { "type": "DateTime", "required": true, "index": -1 }
+      },
+      "relationships": {
+        "user": { "type": "many-to-one", "collection": "users", "foreignKey": "userId" }
+      },
+      "indexes": [
+        { "fields": { "userId": 1, "createdAt": -1 } },
+        { "fields": { "userId": 1, "isRead": 1 } }
+      ]
+    },
+    
+    "skill_graph_analyses": {
+      "description": "Phân tích khoảng cách kỹ năng",
+      "fields": {
+        "_id": { "type": "ObjectId", "required": true, "primaryKey": true },
+        "candidateId": { "type": "ObjectId", "required": true, "references": "candidates._id", "index": true },
+        "jobId": { "type": "ObjectId", "references": "job_postings._id", "index": true },
+        "missingSkills": {
+          "type": "Array",
+          "items": {
+            "type": "Embedded",
+            "fields": {
+              "skillId": { "type": "ObjectId", "references": "skills._id" },
+              "requiredLevel": { "type": "Enum", "values": ["BEGINNER", "INTERMEDIATE", "ADVANCED"] },
+              "currentLevel": { "type": "Enum", "values": ["BEGINNER", "INTERMEDIATE", "ADVANCED"] },
+              "gapDescription": { "type": "String" },
+              "timeToClose": { "type": "Integer" },
+              "isCritical": { "type": "Boolean" }
+            }
+          }
+        },
+        "recommendedCourses": { "type": "Array", "items": { "type": "String" } },
+        "analysisLevel": { "type": "Enum", "values": ["HIGH", "MEDIUM"] },
+        "generatedAt": { "type": "DateTime", "required": true },
+        "nextUpdate": { "type": "DateTime" },
+        "createdAt": { "type": "DateTime", "required": true },
+        "updatedAt": { "type": "DateTime", "required": true }
+      },
+      "relationships": {
+        "candidate": { "type": "many-to-one", "collection": "candidates", "foreignKey": "candidateId" },
+        "job": { "type": "many-to-one", "collection": "job_postings", "foreignKey": "jobId" }
+      }
+    },
+    
+    "skill_maps": {
+      "description": "Lộ trình phát triển kỹ năng",
+      "fields": {
+        "_id": { "type": "ObjectId", "required": true, "primaryKey": true },
+        "candidateId": { "type": "ObjectId", "required": true, "references": "candidates._id", "index": true },
+        "targetSkillTitle": { "type": "String", "required": true },
+        "currentSkillLevel": { "type": "Enum", "values": ["BEGINNER", "INTERMEDIATE", "ADVANCED"] },
+        "estimatedMonths": { "type": "Integer" },
+        "status": { "type": "Enum", "values": ["ACTIVE", "COMPLETED", "PAUSED", "CANCELED"], "default": "ACTIVE" },
+        "completionDate": { "type": "Date" },
+        "steps": {
+          "type": "Array",
+          "items": {
+            "type": "Embedded",
+            "fields": {
+              "stepOrder": { "type": "Integer", "required": true },
+              "title": { "type": "String", "required": true },
+              "description": { "type": "String" },
+              "resources": {
+                "type": "Array",
+                "items": {
+                  "type": "Embedded",
+                  "fields": {
+                    "title": { "type": "String", "required": true },
+                    "description": { "type": "String" },
+                    "type": { "type": "Enum", "values": ["COURSE", "ARTICLE", "VIDEO", "BOOK", "PRACTICE_PROJECT", "TUTORIAL"] },
+                    "provider": { "type": "String" },
+                    "url": { "type": "String" },
+                    "estimatedDuration": { "type": "Integer" },
+                    "difficultyLevel": { "type": "Enum", "values": ["BEGINNER", "INTERMEDIATE", "ADVANCED"] }
+                  }
+                }
+              },
+              "estimatedHours": { "type": "Integer" },
+              "status": { "type": "Enum", "values": ["PENDING", "IN_PROGRESS", "COMPLETED", "SKIPPED"], "default": "PENDING" },
+              "completionDate": { "type": "DateTime" },
+              "createdAt": { "type": "DateTime", "required": true }
+            }
+          }
+        },
+        "createdAt": { "type": "DateTime", "required": true },
+        "updatedAt": { "type": "DateTime", "required": true }
+      },
+      "relationships": {
+        "candidate": { "type": "many-to-one", "collection": "candidates", "foreignKey": "candidateId" }
+      }
+    }
+  }
+}
+

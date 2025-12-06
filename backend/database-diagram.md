@@ -14,7 +14,7 @@ erDiagram
     users ||--o{ notifications : "receives"
     users ||--o| candidates : "is"
     users ||--o| employers : "is"
-    
+
     %% Candidate Collections
     candidates ||--o{ educations : "has"
     candidates ||--o{ cvs : "has"
@@ -24,15 +24,15 @@ erDiagram
     candidates ||--o{ skill_maps : "has"
     candidates }o--o{ skills : "possesses"
     candidates ||--|| addresses : "lives_at"
-    
+
     %% Employer Collections
     employers }o--o{ companies : "works_for"
-    
+
     %% Company Collections
     companies ||--|| addresses : "located_at"
     companies }o--o{ industries : "belongs_to"
     companies ||--o{ job_postings : "posts"
-    
+
     %% Job Collections
     job_postings ||--|| job_requirements : "requires"
     job_postings ||--|| salary_ranges : "offers"
@@ -40,22 +40,22 @@ erDiagram
     job_postings }o--o{ industries : "in"
     job_postings ||--o{ job_applications : "receives"
     job_postings ||--o{ job_savings : "saved_by"
-    
+
     %% Application Collections
     job_applications ||--|| match_results : "has"
     job_applications ||--|| cvs : "uses"
-    
+
     %% Skill Management Collections
     skill_graph_analyses ||--o{ skill_gaps : "contains"
     skill_maps ||--o{ development_steps : "contains"
     development_steps ||--o{ resources : "includes"
-    
+
     %% Reference Collections
     skills ||--o{ candidates : "possessed_by"
     skills ||--o{ job_postings : "required_by"
     industries ||--o{ companies : "categorized_by"
     industries ||--o{ job_postings : "categorized_by"
-    
+
     %% User Collection
     users {
         ObjectId _id PK
@@ -69,7 +69,7 @@ erDiagram
         datetime createdAt
         datetime updatedAt
     }
-    
+
     %% OAuth Credentials (Embedded in User)
     oauth_credentials {
         ObjectId _id PK
@@ -80,7 +80,7 @@ erDiagram
         string refreshToken
         datetime expiresIn
     }
-    
+
     %% Candidate Collection
     candidates {
         ObjectId _id PK
@@ -93,7 +93,7 @@ erDiagram
         datetime createdAt
         datetime updatedAt
     }
-    
+
     %% Employer Collection
     employers {
         ObjectId _id PK
@@ -104,7 +104,7 @@ erDiagram
         datetime createdAt
         datetime updatedAt
     }
-    
+
     %% Company Collection
     companies {
         ObjectId _id PK
@@ -122,7 +122,7 @@ erDiagram
         datetime createdAt
         datetime updatedAt
     }
-    
+
     %% Address (Embedded Value Object)
     addresses {
         string street
@@ -131,7 +131,7 @@ erDiagram
         string country
         string zipCode
     }
-    
+
     %% Education (Embedded in Candidate)
     educations {
         ObjectId _id PK
@@ -145,7 +145,7 @@ erDiagram
         datetime createdAt
         datetime updatedAt
     }
-    
+
     %% CV Collection
     cvs {
         ObjectId _id PK
@@ -158,7 +158,7 @@ erDiagram
         datetime createdAt
         datetime updatedAt
     }
-    
+
     %% Skill Collection
     skills {
         ObjectId _id PK
@@ -174,7 +174,7 @@ erDiagram
         datetime createdAt
         datetime updatedAt
     }
-    
+
     %% Industry Collection
     industries {
         ObjectId _id PK
@@ -186,7 +186,7 @@ erDiagram
         datetime createdAt
         datetime updatedAt
     }
-    
+
     %% Job Posting Collection
     job_postings {
         ObjectId _id PK
@@ -213,7 +213,7 @@ erDiagram
         datetime createdAt
         datetime updatedAt
     }
-    
+
     %% Job Requirements (Embedded in Job Posting)
     job_requirements {
         array requiredSkills "string[]"
@@ -223,14 +223,14 @@ erDiagram
         int maxExperience
         string requiresCertification
     }
-    
+
     %% Salary Range (Embedded in Job Posting)
     salary_ranges {
         double min
         double max
         string currency
     }
-    
+
     %% Job Application Collection
     job_applications {
         ObjectId _id PK
@@ -245,7 +245,7 @@ erDiagram
         datetime createdAt
         datetime updatedAt
     }
-    
+
     %% Match Result (Embedded in Job Application)
     match_results {
         double score
@@ -255,7 +255,7 @@ erDiagram
         array weaknesses "string[]"
         datetime calculatedAt
     }
-    
+
     %% Job Saving Collection
     job_savings {
         ObjectId _id PK
@@ -264,7 +264,7 @@ erDiagram
         datetime savedAt
         datetime createdAt
     }
-    
+
     %% Job Following Collection
     job_followings {
         ObjectId _id PK
@@ -274,7 +274,7 @@ erDiagram
         datetime followedAt
         datetime createdAt
     }
-    
+
     %% Notification Collection
     notifications {
         ObjectId _id PK
@@ -287,7 +287,7 @@ erDiagram
         datetime readAt
         datetime createdAt
     }
-    
+
     %% Skill Graph Analysis Collection
     skill_graph_analyses {
         ObjectId _id PK
@@ -301,7 +301,7 @@ erDiagram
         datetime createdAt
         datetime updatedAt
     }
-    
+
     %% Skill Gap (Embedded in Skill Graph Analysis)
     skill_gaps {
         ObjectId skillId FK "references skills._id"
@@ -311,7 +311,7 @@ erDiagram
         int timeToClose "months"
         boolean isCritical
     }
-    
+
     %% Skill Map Collection
     skill_maps {
         ObjectId _id PK
@@ -325,7 +325,7 @@ erDiagram
         datetime createdAt
         datetime updatedAt
     }
-    
+
     %% Development Step (Embedded in Skill Map)
     development_steps {
         int stepOrder
@@ -337,7 +337,7 @@ erDiagram
         datetime completionDate
         datetime createdAt
     }
-    
+
     %% Resource (Embedded in Development Step)
     resources {
         string title
@@ -481,4 +481,3 @@ db.job_followings.createIndex({ userId: 1 })
 4. **Data Consistency:**
    - Use transactions for critical operations (e.g., creating job application)
    - Implement application-level validation for references
-

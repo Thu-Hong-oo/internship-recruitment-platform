@@ -163,6 +163,7 @@ export const nlpService = {
     minScore?: number;
   }): Promise<{
     success: boolean;
+    message?: string;
     data: Array<{
       overallScore: number;
       tier: "A" | "B" | "C" | "D";
@@ -200,59 +201,88 @@ export const nlpService = {
       data: any[];
     }>(`/nlp/best-matches${query ? `?${query}` : ""}`);
 
-    const mapped = (raw.data || []).map((item) => {
-      const job = item.job || item.jobId || {};
-      const scoreBreakdown = item.scoreBreakdown || {};
-      const insights = item.insights || {};
+    const mapped = (raw.data || [])
+      .map((item) => {
+        const job = item.job || item.jobId || {};
+        if (!job || !job._id) return null; // skip invalid
 
-      const overallScore: number = item.overallScore || 0;
+        const scoreBreakdown = item.scoreBreakdown || {};
+        const insights = item.insights || {};
 
-      // Derive tier from overallScore if backend doesn't provide it
-      let tier: "A" | "B" | "C" | "D";
-      if (overallScore >= 80) tier = "A";
-      else if (overallScore >= 70) tier = "B";
-      else if (overallScore >= 60) tier = "C";
-      else tier = "D";
+        const overallScore: number = item.overallScore || 0;
 
-      return {
-        overallScore,
-        tier,
+        // Map company + logo
+        const companyName =
+          job.company ||
+          job.companyName ||
+          job.employer?.company?.name ||
+          "Nhà tuyển dụng";
+        const logoRaw = job.employer?.company?.logo as any;
+        const companyLogo =
+          (logoRaw && typeof logoRaw === "object" ? logoRaw.url : logoRaw) || "";
+
+        // Salary
+        const salary =
+          job.salaryMin && job.salaryMax
+            ? {
+                min: job.salaryMin,
+                max: job.salaryMax,
+                currency: job.currency || "VND",
+              }
+            : undefined;
+
+        // Location / city shorthand
+        const location = job.location || job.address?.fullAddress || "";
+
+        return {
+          overallScore,
+          job: {
+            _id: job._id,
+            title: job.title,
+            company: companyName,
+            companyLogo,
+            location,
+            salary,
+          },
+          matchedSkills:
+            scoreBreakdown.skillsScore?.details?.matchedSkills?.map(
+              (s: any) => s.skill
+            ) || [],
+          breakdown: {
+            skillsScore: scoreBreakdown.skillsScore?.score || 0,
+            experienceScore: scoreBreakdown.experienceScore?.score || 0,
+            educationScore: scoreBreakdown.educationScore?.score || 0,
+            projectsScore: scoreBreakdown.keywordScore?.score || 0,
+          },
+          strengths: insights.strengths || [],
+          concerns: insights.weaknesses || [],
+        };
+      })
+      .filter(Boolean) as Array<{
+        overallScore: number;
         job: {
-          _id: job._id,
-          title: job.title,
-          company:
-            job.company ||
-            job.companyName ||
-            job.employer?.company?.name ||
-            "Nhà tuyển dụng",
-          location: job.location || "",
-          salary:
-            job.salaryMin && job.salaryMax
-              ? {
-                  min: job.salaryMin,
-                  max: job.salaryMax,
-                  currency: job.currency || "VND",
-                }
-              : undefined,
-        },
-        matchedSkills:
-          scoreBreakdown.skillsScore?.details?.matchedSkills?.map(
-            (s: any) => s.skill
-          ) || [],
+          _id: string;
+          title: string;
+          company: string;
+          companyLogo?: string;
+          location: string;
+          salary?: { min: number; max: number; currency: string };
+        };
+        matchedSkills: string[];
         breakdown: {
-          skillsScore: scoreBreakdown.skillsScore?.score || 0,
-          experienceScore: scoreBreakdown.experienceScore?.score || 0,
-          educationScore: scoreBreakdown.educationScore?.score || 0,
-          projectsScore: scoreBreakdown.keywordScore?.score || 0,
-        },
-        strengths: insights.strengths || [],
-        concerns: insights.weaknesses || [],
-      };
-    });
+          skillsScore: number;
+          experienceScore: number;
+          educationScore: number;
+          projectsScore?: number;
+        };
+        strengths: string[];
+        concerns: string[];
+      }>;
 
     return {
       success: raw.success,
       data: mapped,
+      ...(raw.message && { message: raw.message }), // Preserve message if present
     };
   },
 

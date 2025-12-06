@@ -1,5 +1,5 @@
 const express = require('express');
-const { protect, authorize } = require('../middleware/auth');
+const { protect, optionalProtect, authorize } = require('../middleware/auth');
 const {
   requireEmployerProfile,
   requireVerifiedEmployer,
@@ -21,6 +21,7 @@ const {
   submitJobForReview,
   getEmployerJobs,
   getDraftJobs,
+  getRelatedJobs,
 } = require('../controllers/jobController');
 const {
   viewApplicationResume,
@@ -32,6 +33,7 @@ const router = express.Router();
 router.get('/', getAllJobs); // GET /api/jobs
 router.get('/recent', getRecentJobs); // GET /api/jobs/recent
 router.get('/slug/:slug', getJobBySlug); // GET /api/jobs/slug/:slug
+router.get('/:id/related', getRelatedJobs); // GET /api/jobs/:id/related
 
 router.get(
   '/applications/:applicationId/resume',
@@ -58,7 +60,8 @@ router.get(
 ); // GET /api/jobs/drafts
 
 // Public routes with parameters - AFTER specific routes
-router.get('/:id', getJob); // GET /api/jobs/:id
+// Use optionalProtect to check hasApplied if user is authenticated
+router.get('/:id', optionalProtect, getJob); // GET /api/jobs/:id
 router.get('/:id/company', getJobCompany); // GET /api/jobs/:id/company
 router.get('/:id/stats', getJobStats); // GET /api/jobs/:id/stats
 router.post(

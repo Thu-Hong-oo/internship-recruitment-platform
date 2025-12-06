@@ -48,14 +48,21 @@ export function ApplyButton({
       return;
     }
 
+    // Don't open modal if already applied
+    if (applied) {
+      return;
+    }
+
     // Open modal
     setModalOpen(true);
   };
 
   const handleSuccess = () => {
     setApplied(true);
-    // Refresh page to update stats
-    router.refresh();
+    // Close modal and refresh page to update stats and hasApplied status
+    setModalOpen(false);
+    // Force reload to get updated hasApplied from backend
+    window.location.reload();
   };
 
   if (applied) {

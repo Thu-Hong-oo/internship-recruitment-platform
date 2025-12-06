@@ -1,0 +1,84 @@
+@startuml
+title Sơ đồ Lớp UML (Đã sửa) - Mô hình Dữ liệu
+
+' Cấu hình để sơ đồ trông giống UML chuẩn hơn
+skinparam classAttributeIconSize 0
+skinparam defaultFontName "Segoe UI"
+skinparam linetype ortho
+hide empty members
+
+' Định nghĩa các lớp (models) với thuộc tính và phương thức
+class User {
+  - _id: ObjectId
+  - email: String
+  - passwordHash: String
+  - role: String
+  --
+  + findByCredentials()
+  + generateAuthToken()
+}
+
+class CandidateProfile {
+  - _id: ObjectId
+  - name: String
+  - cvUrl: String
+  --
+  + findByUserId(userId)
+}
+
+class EmployerProfile {
+  - _id: ObjectId
+  - companyName: String
+  - description: String
+  --
+  + findByOwnerId(userId)
+}
+
+class Job {
+  - _id: ObjectId
+  - title: String
+  - description: String
+  - location: String
+  --
+  + findJobsByFilter(filters)
+  + getApplicants()
+}
+
+class Application {
+  - _id: ObjectId
+  - status: String
+  - coverLetter: String
+  - appliedAt: Date
+  --
+  + updateStatus(newStatus)
+  + scheduleInterview(details)
+}
+
+class Skill {
+  - _id: ObjectId
+  - name: String
+  - category: String
+  --
+  + findOrCreate(skillName)
+}
+
+' Định nghĩa các mối quan hệ
+
+' Composition: Mối quan hệ sở hữu mạnh.
+' Profile không thể tồn tại nếu không có User.
+User "1" *-- "0..1" CandidateProfile : owns >
+User "1" *-- "0..1" EmployerProfile : owns >
+
+' Job không thể tồn tại nếu không có EmployerProfile.
+EmployerProfile "1" *-- "0..*" Job : posts >
+
+' Application không có ý nghĩa nếu thiếu Job hoặc Candidate.
+Application "0..*" *-- "1" Job : applies to >
+Application "0..*" *-- "1" " " CandidateProfile : submitted by <
+
+' Aggregation: Mối quan hệ "has-a" nhưng các thành phần có thể tồn tại độc lập.
+' Job "có" nhiều Skill, nhưng Skill vẫn tồn tại trong hệ thống nếu Job bị xóa.
+Job "0..*" o-- "0..*" Skill : requires >
+CandidateProfile "0..*" o-- "0..*" Skill : possesses >
+
+@enduml

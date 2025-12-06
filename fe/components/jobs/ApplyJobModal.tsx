@@ -60,17 +60,45 @@ export function ApplyJobModal({
     },
   });
 
-  // Load resumes when modal opens
+  // Check if already applied and load resumes when modal opens
   useEffect(() => {
     if (open) {
-      loadResumes();
-      setShowResumeSelect(false);
+      const checkAndLoad = async () => {
+        const alreadyApplied = await checkAlreadyApplied();
+        if (!alreadyApplied) {
+          loadResumes();
+        }
+        setShowResumeSelect(false);
+      };
+      checkAndLoad();
     } else {
       // Reset when modal closes
       setShowResumeSelect(false);
       setSelectedResume(null);
+      setError(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  const checkAlreadyApplied = async () => {
+    try {
+      const jobRes = await jobsAPI.getJobById(jobId);
+      if (jobRes?.success && jobRes.data?.hasApplied) {
+        setError("Bạn đã ứng tuyển cho công việc này");
+        // Close modal immediately and trigger page reload
+        onOpenChange(false);
+        // Reload page to update button state
+        setTimeout(() => {
+          window.location.reload();
+        }, 500);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error("Failed to check application status:", err);
+      return false;
+    }
+  };
 
   const loadResumes = async () => {
     try {

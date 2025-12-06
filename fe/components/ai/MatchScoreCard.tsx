@@ -12,7 +12,7 @@ import {
 
 interface MatchScoreCardProps {
   score: number;
-  tier: "A" | "B" | "C" | "D";
+  tier?: "A" | "B" | "C" | "D";
   breakdown?: {
     skillsScore: number;
     experienceScore: number;
@@ -59,7 +59,10 @@ export function MatchScoreCard({
   concerns,
   className = "",
 }: MatchScoreCardProps) {
-  const config = tierConfig[tier];
+  const tierValue: "A" | "B" | "C" | "D" =
+    tier ||
+    (score >= 80 ? "A" : score >= 70 ? "B" : score >= 60 ? "C" : "D");
+  const config = tierConfig[tierValue];
 
   return (
     <Card className={className}>
@@ -67,7 +70,7 @@ export function MatchScoreCard({
         <CardTitle className="flex items-center justify-between">
           <span>Match Score</span>
           <Badge className={`${config.bgColor} ${config.textColor} font-bold`}>
-            Tier {tier}
+            Tier {tierValue}
           </Badge>
         </CardTitle>
       </CardHeader>

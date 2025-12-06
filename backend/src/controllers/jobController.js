@@ -950,6 +950,12 @@ const applyForJob = async (req, res) => {
     // Update job stats
     await Job.findByIdAndUpdate(id, { $inc: { 'stats.applications': 1 } });
 
+    // Invalidate job cache so hasApplied will be updated on next request
+    const cacheService = getCacheService();
+    if (cacheService) {
+      await cacheService.invalidateJobCache(id);
+    }
+
     // Notify employer về application mới
     try {
       const NotificationService = require('../services/notification/notificationService');
@@ -1669,6 +1675,100 @@ const submitJobForReview = async (req, res) => {
   }
 };
 
+// @desc    Get related jobs based on industry/skills
+// @route   GET /api/jobs/:id/related
+// @access  Public
+const getRelatedJobs = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { limit = 6 } = req.query;
+    const parsedLimit = Math.min(parseInt(limit, 10) || 6, 20);
+
+    const baseJob = await Job.findById(id).lean();
+    if (!baseJob) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy công việc',
+      });
+    }
+
+    const activeStatuses = [JOB_STATUS.OPEN, JOB_STATUS.ACTIVE, 'active'];
+
+    const query = {
+      _id: { $ne: id },
+      status: { $in: activeStatuses },
+    };
+
+    const orConditions = [];
+    if (baseJob.industryCode) {
+      orConditions.push({ industryCode: baseJob.industryCode });
+    }
+    if (baseJob.subIndustryCode) {
+      orConditions.push({ subIndustryCode: baseJob.subIndustryCode });
+    }
+    if (Array.isArray(baseJob.skills) && baseJob.skills.length > 0) {
+      orConditions.push({ skills: { $in: baseJob.skills } });
+    }
+    if (Array.isArray(baseJob.tags) && baseJob.tags.length > 0) {
+      orConditions.push({ tags: { $in: baseJob.tags } });
+    }
+
+    if (orConditions.length > 0) {
+      query.$or = orConditions;
+    } else if (Array.isArray(baseJob.industryPath) && baseJob.industryPath.length > 0) {
+      query.$or = [{ industryPath: { $in: baseJob.industryPath } }];
+    }
+
+    const projection = {
+      title: 1,
+      salaryMin: 1,
+      salaryMax: 1,
+      currency: 1,
+      location: 1,
+      address: 1,
+      skills: 1,
+      tags: 1,
+      industryCode: 1,
+      subIndustryCode: 1,
+      status: 1,
+      employer: 1,
+      skillIds: 1,
+      createdAt: 1,
+    };
+
+    let relatedJobs = await Job.find(query)
+      .select(projection)
+      .populate('employer', 'company.name company.logo')
+      .sort({ createdAt: -1 })
+      .limit(parsedLimit)
+      .lean({ virtuals: true });
+
+    // Fallback: if no related by industry/skills, return newest open jobs
+    if (!relatedJobs || relatedJobs.length === 0) {
+      relatedJobs = await Job.find({ _id: { $ne: id }, status: { $in: activeStatuses } })
+        .select(projection)
+        .populate('employer', 'company.name company.logo')
+        .sort({ createdAt: -1 })
+        .limit(parsedLimit)
+        .lean({ virtuals: true });
+    }
+
+    const formatted = formatMinimalJobsResponse(relatedJobs || []);
+
+    res.status(200).json({
+      success: true,
+      data: formatted,
+      total: formatted.length,
+    });
+  } catch (error) {
+    logger.error('Error getting related jobs:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi khi lấy danh sách việc làm liên quan',
+    });
+  }
+};
+
 module.exports = {
   getAllJobs,
   getJob,
@@ -1686,4 +1786,5 @@ module.exports = {
   submitJobForReview,
   getEmployerJobs,
   getDraftJobs,
+  getRelatedJobs,
 };

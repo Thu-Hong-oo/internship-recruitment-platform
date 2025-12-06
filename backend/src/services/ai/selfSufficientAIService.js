@@ -16,11 +16,29 @@ const phobertService = require('../phobertService');
 const { getSentenceBertService } = require('./sentenceBertService');
 const { getJobMatchingService } = require('./jobMatchingService');
 const { logger } = require('../../utils/logger');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 class SelfSufficientAIService {
   constructor() {
     this.sentenceBert = getSentenceBertService();
     this.jobMatching = getJobMatchingService();
+    
+    // Initialize Gemini API for AI-powered CV improvements
+    this.geminiApiKey = process.env.GEMINI_API_KEY?.trim();
+    this.geminiModel = null;
+    if (this.geminiApiKey && this.geminiApiKey.startsWith('AIzaSy')) {
+      try {
+        const genAI = new GoogleGenerativeAI(this.geminiApiKey);
+        this.geminiModel = genAI.getGenerativeModel({
+          model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp'
+        });
+        logger.info('✅ Gemini model initialized for CV improvements analysis');
+      } catch (error) {
+        logger.warn('⚠️ Gemini initialization failed, will use rule-based fallback:', error.message);
+      }
+    } else {
+      logger.info('ℹ️ Gemini API not available, will use rule-based CV improvements');
+    }
     
     // DEPRECATED: Hardcoded categories (kept for fallback only)
     // Use database Skill model instead!
@@ -1381,6 +1399,624 @@ class SelfSufficientAIService {
       logger.error('❌ Roadmap generation error:', error);
       throw error;
     }
+  }
+
+  /**
+   * ✅ AI-POWERED: Analyze CV Improvements
+   * Phân tích CV và đưa ra gợi ý cải thiện cụ thể, chính xác dựa trên CV thực tế
+   * 
+   * Uses: Gemini AI for intelligent analysis + Rule-based fallback
+   */
+  async analyzeCVImprovements(cvData, cvText) {
+    try {
+      logger.info('📝 Analyzing CV for improvements');
+
+      // Try AI-powered analysis first (if Gemini available)
+      if (this.geminiModel && cvText && cvText.length > 50) {
+        try {
+          logger.info('🤖 Using Gemini AI for intelligent CV improvements analysis');
+          const aiAnalysis = await this._analyzeCVWithAI(cvData, cvText);
+          if (aiAnalysis && aiAnalysis.specificImprovements && aiAnalysis.specificImprovements.length > 0) {
+            logger.info(`✅ AI analysis completed: ${aiAnalysis.specificImprovements.length} specific improvements found`);
+            return aiAnalysis;
+          }
+        } catch (aiError) {
+          logger.warn('⚠️ AI analysis failed, falling back to rule-based:', aiError.message);
+        }
+      }
+
+      // Fallback to rule-based analysis
+      logger.info('📋 Using rule-based CV improvements analysis (fallback)');
+      return await this._analyzeCVWithRules(cvData, cvText);
+
+    } catch (error) {
+      logger.error('❌ CV improvements analysis error:', error);
+      return {
+        overallScore: 0,
+        strengths: [],
+        weaknesses: [],
+        suggestions: { structure: [], content: [], writing: [], keywords: [] },
+        specificImprovements: [],
+        _method: 'error fallback'
+      };
+    }
+  }
+
+  /**
+   * AI-powered CV analysis using Gemini
+   * @private
+   */
+  async _analyzeCVWithAI(cvData, cvText) {
+    try {
+      // Build structured CV data for context
+      const cvStructure = {
+        personalInfo: cvData.personalInfo || {},
+        skills: {
+          technical: (cvData.skills?.technical || []).map(s => typeof s === 'string' ? s : s.name),
+          soft: (cvData.skills?.soft || []).map(s => typeof s === 'string' ? s : s.name),
+          languages: (cvData.skills?.languages || []).map(s => typeof s === 'string' ? s : s.name),
+        },
+        experience: (cvData.experience || []).map(exp => ({
+          position: exp.position || exp.title || '',
+          company: exp.company || exp.organization || '',
+          duration: exp.duration || `${exp.startDate || ''} - ${exp.endDate || ''}`,
+          description: exp.description || ''
+        })),
+        education: (cvData.education || []).map(edu => ({
+          degree: edu.degree || edu.type || '',
+          major: edu.major || edu.field || '',
+          school: edu.school || edu.institution || ''
+        }))
+      };
+
+      // Split CV text into lines for position tracking
+      const cvLines = cvText.split('\n');
+      
+      const prompt = `Bạn là chuyên gia tư vấn CV hàng đầu với 15+ năm kinh nghiệm, từng giúp hàng nghìn ứng viên cải thiện CV và thành công trong việc tìm việc.
+
+NHIỆM VỤ: Phân tích CV này và đưa ra gợi ý cải thiện CỤ THỂ, CHÍNH XÁC dựa trên nội dung thực tế của CV.
+
+CV TEXT (${cvLines.length} dòng):
+${cvText}
+
+CV STRUCTURE:
+${JSON.stringify(cvStructure, null, 2)}
+
+YÊU CẦU PHÂN TÍCH:
+
+1. Đọc kỹ từng dòng của CV text
+2. Tìm các phần cần cải thiện CỤ THỂ với:
+   - Số dòng chính xác (lineNumber)
+   - Text cần cải thiện (text)
+   - Vấn đề cụ thể (issue)
+   - Gợi ý cải thiện chi tiết (suggestion)
+   - Mức độ ưu tiên (severity: high/medium/low)
+
+3. Phân tích các khía cạnh:
+   - Cấu trúc: Thiếu phần nào? Thứ tự hợp lý không?
+   - Nội dung: Mô tả có đủ chi tiết? Có số liệu không? Có action verbs không?
+   - Văn phong: Có dùng passive voice quá nhiều? Có generic phrases không?
+   - Từ khóa: Có đủ keywords cho ATS? Có action verbs mạnh không?
+
+4. Điểm số tổng thể (0-100) dựa trên:
+   - Cấu trúc đầy đủ (25 điểm)
+   - Nội dung chất lượng (25 điểm)
+   - Văn phong chuyên nghiệp (25 điểm)
+   - Tối ưu ATS/keywords (25 điểm)
+
+TRẢ VỀ JSON FORMAT (QUAN TRỌNG: Phải có lineNumber chính xác):
+{
+  "overallScore": 75,
+  "strengths": [
+    "Điểm mạnh 1 cụ thể từ CV",
+    "Điểm mạnh 2 cụ thể từ CV"
+  ],
+  "weaknesses": [
+    "Điểm yếu 1 cụ thể từ CV",
+    "Điểm yếu 2 cụ thể từ CV"
+  ],
+  "suggestions": {
+    "structure": [
+      "Gợi ý cấu trúc cụ thể 1",
+      "Gợi ý cấu trúc cụ thể 2"
+    ],
+    "content": [
+      "Gợi ý nội dung cụ thể 1",
+      "Gợi ý nội dung cụ thể 2"
+    ],
+    "writing": [
+      "Gợi ý văn phong cụ thể 1",
+      "Gợi ý văn phong cụ thể 2"
+    ],
+    "keywords": [
+      "Gợi ý từ khóa cụ thể 1",
+      "Gợi ý từ khóa cụ thể 2"
+    ]
+  },
+  "specificImprovements": [
+    {
+      "section": "KINH NGHIỆM",
+      "item": "Tên vị trí hoặc công ty",
+      "text": "Text cụ thể cần cải thiện (copy từ CV)",
+      "issue": "Vấn đề cụ thể với text này",
+      "suggestion": "Gợi ý cải thiện chi tiết, cụ thể",
+      "severity": "high|medium|low",
+      "lineNumber": 15,
+      "startIndex": 245,
+      "endIndex": 280
+    }
+  ]
+}
+
+LƯU Ý QUAN TRỌNG:
+- Phải tìm chính xác số dòng (lineNumber) và vị trí (startIndex, endIndex) của text trong CV
+- Gợi ý phải CỤ THỂ, không chung chung
+- Text trong "text" field phải là text thực tế từ CV (copy chính xác)
+- Mỗi improvement phải có vị trí cụ thể để highlight trong editor
+- Ưu tiên các vấn đề nghiêm trọng (severity: high) trước
+- Đưa ra gợi ý actionable, có thể thực hiện ngay
+
+CHỈ TRẢ VỀ JSON, KHÔNG CÓ MARKDOWN HOẶC TEXT THÊM.`;
+
+      const result = await this.geminiModel.generateContent(prompt);
+      const response = await result.response;
+      let text = response.text();
+
+      // Clean response
+      text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      
+      // Extract JSON
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON found in AI response');
+      }
+
+      const aiResult = JSON.parse(jsonMatch[0]);
+
+      // Validate and enhance with position data
+      if (aiResult.specificImprovements && Array.isArray(aiResult.specificImprovements)) {
+        aiResult.specificImprovements = aiResult.specificImprovements.map(imp => {
+          // Ensure position data is correct
+          if (imp.lineNumber && imp.startIndex === undefined) {
+            // Calculate startIndex from lineNumber
+            const lineIndex = imp.lineNumber - 1;
+            if (lineIndex >= 0 && lineIndex < cvLines.length) {
+              const textBefore = cvLines.slice(0, lineIndex).join('\n');
+              const startIndex = textBefore.length + (lineIndex > 0 ? 1 : 0);
+              const endIndex = startIndex + (imp.text?.length || 0);
+              
+              imp.position = {
+                startIndex,
+                endIndex,
+                lineNumber: imp.lineNumber,
+                lineContent: cvLines[lineIndex] || '',
+                text: imp.text || ''
+              };
+            }
+          } else if (imp.startIndex !== undefined) {
+            // Use provided position
+            imp.position = {
+              startIndex: imp.startIndex,
+              endIndex: imp.endIndex || imp.startIndex + (imp.text?.length || 0),
+              lineNumber: imp.lineNumber || this._getLineNumberFromIndex(cvText, imp.startIndex),
+              lineContent: imp.lineContent || this._getLineContentFromIndex(cvText, imp.startIndex),
+              text: imp.text || ''
+            };
+          }
+
+          return imp;
+        });
+      }
+
+      return {
+        ...aiResult,
+        _method: 'AI-powered (Gemini)',
+        _timestamp: new Date()
+      };
+
+    } catch (error) {
+      logger.error('❌ AI CV analysis error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Helper: Get line number from character index
+   * @private
+   */
+  _getLineNumberFromIndex(text, index) {
+    const textBefore = text.substring(0, index);
+    return textBefore.split('\n').length;
+  }
+
+  /**
+   * Helper: Get line content from character index
+   * @private
+   */
+  _getLineContentFromIndex(text, index) {
+    const lines = text.split('\n');
+    const lineNumber = this._getLineNumberFromIndex(text, index);
+    const lineIndex = lineNumber - 1;
+    return lines[lineIndex] || '';
+  }
+
+  /**
+   * Rule-based CV analysis (fallback)
+   * @private
+   */
+  async _analyzeCVWithRules(cvData, cvText) {
+    const improvements = {
+      overallScore: 0,
+      strengths: [],
+      weaknesses: [],
+      suggestions: {
+        structure: [],
+        content: [],
+        writing: [],
+        keywords: []
+      },
+      specificImprovements: []
+    };
+
+    // 1. Analyze CV Structure
+    const structureAnalysis = this._analyzeCVStructure(cvData, cvText);
+    improvements.suggestions.structure = structureAnalysis.suggestions;
+    improvements.overallScore += structureAnalysis.score;
+
+    // 2. Analyze Content Quality
+    const contentAnalysis = this._analyzeContentQuality(cvData, cvText);
+    improvements.suggestions.content = contentAnalysis.suggestions;
+    improvements.overallScore += contentAnalysis.score;
+    improvements.strengths.push(...contentAnalysis.strengths);
+    improvements.weaknesses.push(...contentAnalysis.weaknesses);
+
+    // 3. Analyze Writing Style
+    const writingAnalysis = this._analyzeWritingStyle(cvText);
+    improvements.suggestions.writing = writingAnalysis.suggestions;
+    improvements.overallScore += writingAnalysis.score;
+
+    // 4. Analyze Keywords and ATS Optimization
+    const keywordAnalysis = this._analyzeKeywords(cvData, cvText);
+    improvements.suggestions.keywords = keywordAnalysis.suggestions;
+    improvements.overallScore += keywordAnalysis.score;
+
+    // 5. Generate Specific Improvements
+    improvements.specificImprovements = this._generateSpecificImprovements(cvData, cvText);
+
+    // Calculate final score (0-100)
+    improvements.overallScore = Math.min(100, Math.max(0, improvements.overallScore / 4));
+
+    return {
+      ...improvements,
+      _method: 'rule-based (fallback)',
+      _timestamp: new Date()
+    };
+  }
+
+  /**
+   * Analyze CV structure
+   */
+  _analyzeCVStructure(cvData, cvText) {
+    const suggestions = [];
+    let score = 25; // Base score
+
+    // Check for required sections
+    const hasPersonalInfo = !!(cvData.personalInfo || cvText.match(/(email|phone|điện thoại|email)/i));
+    const hasEducation = !!(cvData.education && cvData.education.length > 0) || cvText.match(/(education|học vấn|bằng cấp|university|đại học)/i);
+    const hasExperience = !!(cvData.experience && cvData.experience.length > 0) || cvText.match(/(experience|kinh nghiệm|công ty|company|work)/i);
+    const hasSkills = !!(cvData.skills && (cvData.skills.technical?.length > 0 || cvData.skills.soft?.length > 0)) || cvText.match(/(skill|kỹ năng|competenc)/i);
+
+    if (!hasPersonalInfo) {
+      suggestions.push('Thiếu thông tin liên hệ (email, số điện thoại)');
+      score -= 5;
+    }
+    if (!hasEducation) {
+      suggestions.push('Thiếu phần học vấn - cần thêm thông tin về bằng cấp, trường học');
+      score -= 5;
+    }
+    if (!hasExperience) {
+      suggestions.push('Thiếu phần kinh nghiệm làm việc - đây là phần quan trọng nhất');
+      score -= 10;
+    }
+    if (!hasSkills) {
+      suggestions.push('Thiếu phần kỹ năng - cần liệt kê kỹ năng kỹ thuật và kỹ năng mềm');
+      score -= 5;
+    }
+
+    // Check for optional but valuable sections
+    const hasSummary = cvText.match(/(summary|tóm tắt|objective|mục tiêu|profile)/i);
+    if (!hasSummary) {
+      suggestions.push('Nên thêm phần tóm tắt/mục tiêu nghề nghiệp ở đầu CV để thu hút nhà tuyển dụng');
+    }
+
+    return { suggestions, score: Math.max(0, score) };
+  }
+
+  /**
+   * Analyze content quality
+   */
+  _analyzeContentQuality(cvData, cvText) {
+    const suggestions = [];
+    const strengths = [];
+    const weaknesses = [];
+    let score = 25;
+
+    // Analyze experience descriptions
+    if (cvData.experience && cvData.experience.length > 0) {
+      cvData.experience.forEach((exp, index) => {
+        const desc = exp.description || '';
+        const hasActionVerbs = /(developed|implemented|created|managed|led|designed|built|improved|achieved|increased|reduced)/i.test(desc);
+        const hasQuantifiableResults = /\d+/.test(desc);
+        const descLength = desc.length;
+
+        if (!hasActionVerbs && descLength > 0) {
+          suggestions.push(`Kinh nghiệm "${exp.position || `Vị trí ${index + 1}`}": Nên sử dụng động từ hành động mạnh (developed, implemented, created...) thay vì "worked on" hoặc "responsible for"`);
+          score -= 2;
+        }
+        if (!hasQuantifiableResults && descLength > 50) {
+          suggestions.push(`Kinh nghiệm "${exp.position || `Vị trí ${index + 1}`}": Nên thêm số liệu cụ thể (ví dụ: "tăng doanh số 30%", "quản lý team 5 người") để thể hiện thành tích`);
+          score -= 2;
+        }
+        if (descLength < 50 && descLength > 0) {
+          suggestions.push(`Kinh nghiệm "${exp.position || `Vị trí ${index + 1}`}": Mô tả quá ngắn, nên mở rộng để thể hiện chi tiết trách nhiệm và thành tích`);
+          score -= 2;
+        }
+        if (hasActionVerbs && hasQuantifiableResults) {
+          strengths.push(`Kinh nghiệm "${exp.position || `Vị trí ${index + 1}`}" được mô tả tốt với động từ hành động và số liệu cụ thể`);
+        }
+      });
+    } else {
+      weaknesses.push('Thiếu thông tin kinh nghiệm làm việc');
+      score -= 10;
+    }
+
+    // Analyze skills
+    const technicalSkills = cvData.skills?.technical || [];
+    const softSkills = cvData.skills?.soft || [];
+    
+    if (technicalSkills.length === 0 && softSkills.length === 0) {
+      weaknesses.push('Thiếu thông tin kỹ năng');
+      score -= 5;
+    } else {
+      if (technicalSkills.length < 5) {
+        suggestions.push('Nên bổ sung thêm kỹ năng kỹ thuật (ít nhất 5-7 kỹ năng)');
+      }
+      if (softSkills.length < 3) {
+        suggestions.push('Nên bổ sung kỹ năng mềm (giao tiếp, làm việc nhóm, quản lý thời gian...)');
+      }
+      if (technicalSkills.length >= 5 && softSkills.length >= 3) {
+        strengths.push('Danh sách kỹ năng đầy đủ và cân bằng');
+      }
+    }
+
+    // Analyze education
+    if (cvData.education && cvData.education.length > 0) {
+      const hasGPA = cvData.education.some(edu => edu.gpa || edu.grade);
+      if (!hasGPA && cvText.match(/(university|đại học|college|cao đẳng)/i)) {
+        suggestions.push('Nên thêm GPA/xếp loại nếu điểm số tốt (>= 3.0/4.0 hoặc Khá trở lên)');
+      }
+    }
+
+    return { suggestions, strengths, weaknesses, score: Math.max(0, score) };
+  }
+
+  /**
+   * Analyze writing style
+   */
+  _analyzeWritingStyle(cvText) {
+    const suggestions = [];
+    let score = 25;
+
+    // Check for passive voice (common issue)
+    const passiveVoicePatterns = /(was|were|been|being)\s+\w+ed/gi;
+    const passiveMatches = (cvText.match(passiveVoicePatterns) || []).length;
+    if (passiveMatches > 3) {
+      suggestions.push('Tránh sử dụng quá nhiều câu bị động. Nên dùng câu chủ động với động từ hành động mạnh (ví dụ: "Developed" thay vì "Was developed by me")');
+      score -= 3;
+    }
+
+    // Check for weak verbs
+    const weakVerbs = /(worked|did|made|helped|assisted|involved)/gi;
+    const weakMatches = (cvText.match(weakVerbs) || []).length;
+    if (weakMatches > 2) {
+      suggestions.push('Thay thế các động từ yếu (worked, did, made) bằng động từ hành động mạnh hơn (developed, implemented, created, achieved, optimized)');
+      score -= 3;
+    }
+
+    // Check for generic phrases
+    const genericPhrases = /(responsible for|duties include|job responsibilities)/gi;
+    const genericMatches = (cvText.match(genericPhrases) || []).length;
+    if (genericMatches > 0) {
+      suggestions.push('Tránh các cụm từ chung chung như "responsible for" hoặc "duties include". Thay vào đó, hãy mô tả cụ thể những gì bạn đã làm và đạt được');
+      score -= 2;
+    }
+
+    // Check for bullet points usage
+    const bulletPoints = (cvText.match(/^[-•*]\s/gm) || []).length;
+    if (bulletPoints < 5 && cvText.length > 500) {
+      suggestions.push('Nên sử dụng bullet points (dấu đầu dòng) để trình bày thông tin rõ ràng và dễ đọc hơn');
+    } else if (bulletPoints >= 5) {
+      score += 2;
+    }
+
+    // Check for consistency
+    const hasInconsistentTense = /(worked|working|work)/gi.test(cvText) && /(develop|developing|developed)/gi.test(cvText);
+    if (hasInconsistentTense) {
+      suggestions.push('Đảm bảo sử dụng thì quá khứ nhất quán cho các công việc đã hoàn thành');
+    }
+
+    return { suggestions, score: Math.max(0, score) };
+  }
+
+  /**
+   * Analyze keywords for ATS optimization
+   */
+  _analyzeKeywords(cvData, cvText) {
+    const suggestions = [];
+    let score = 25;
+
+    // Extract skills from CV
+    const cvSkills = [];
+    if (cvData.skills?.technical) {
+      cvSkills.push(...cvData.skills.technical.map(s => (typeof s === 'string' ? s : s.name).toLowerCase()));
+    }
+    if (cvData.skills?.soft) {
+      cvSkills.push(...cvData.skills.soft.map(s => (typeof s === 'string' ? s : s.name).toLowerCase()));
+    }
+
+    // Check for common important keywords
+    const importantKeywords = {
+      technical: ['javascript', 'python', 'java', 'react', 'node', 'sql', 'git', 'api', 'database', 'html', 'css'],
+      soft: ['communication', 'leadership', 'teamwork', 'problem solving', 'time management'],
+      action: ['developed', 'implemented', 'created', 'managed', 'led', 'designed', 'improved', 'achieved']
+    };
+
+    const cvTextLower = cvText.toLowerCase();
+    let foundKeywords = 0;
+    const missingKeywords = [];
+
+    // Check technical keywords
+    importantKeywords.technical.forEach(keyword => {
+      if (cvTextLower.includes(keyword) || cvSkills.some(s => s.includes(keyword))) {
+        foundKeywords++;
+      } else {
+        missingKeywords.push(keyword);
+      }
+    });
+
+    if (foundKeywords < 5) {
+      suggestions.push(`Nên thêm nhiều từ khóa kỹ thuật hơn để tối ưu cho hệ thống ATS. Các từ khóa quan trọng: ${importantKeywords.technical.slice(0, 5).join(', ')}`);
+      score -= 5;
+    }
+
+    // Check for action verbs
+    const actionVerbsFound = importantKeywords.action.filter(verb => cvTextLower.includes(verb)).length;
+    if (actionVerbsFound < 3) {
+      suggestions.push('Nên sử dụng nhiều động từ hành động mạnh hơn trong mô tả kinh nghiệm (developed, implemented, created, managed, led...)');
+      score -= 3;
+    }
+
+    // Check for industry-specific terms
+    const hasIndustryTerms = /(agile|scrum|devops|ci\/cd|microservices|restful|api|framework|library|tool|platform)/i.test(cvText);
+    if (!hasIndustryTerms && cvSkills.length > 0) {
+      suggestions.push('Nên thêm các thuật ngữ chuyên ngành phù hợp với lĩnh vực của bạn để tăng độ chuyên nghiệp');
+    }
+
+    return { suggestions, score: Math.max(0, score) };
+  }
+
+  /**
+   * Generate specific improvements with text positions
+   */
+  _generateSpecificImprovements(cvData, cvText) {
+    const improvements = [];
+    const lines = cvText.split('\n');
+
+    // Helper function to find text position in CV
+    const findTextPosition = (searchText, section = null) => {
+      const lowerText = cvText.toLowerCase();
+      const lowerSearch = searchText.toLowerCase();
+      const index = lowerText.indexOf(lowerSearch);
+      
+      if (index === -1) return null;
+      
+      // Find line number
+      const textBefore = cvText.substring(0, index);
+      const lineNumber = textBefore.split('\n').length;
+      
+      // Find line content
+      const lineIndex = lineNumber - 1;
+      const lineContent = lines[lineIndex] || '';
+      
+      return {
+        startIndex: index,
+        endIndex: index + searchText.length,
+        lineNumber: lineNumber,
+        lineContent: lineContent.trim(),
+        text: searchText
+      };
+    };
+
+    // Experience improvements
+    if (cvData.experience && cvData.experience.length > 0) {
+      cvData.experience.forEach((exp, index) => {
+        const desc = exp.description || '';
+        const position = exp.position || '';
+        
+        // Find experience section in text
+        let textPos = null;
+        if (position) {
+          textPos = findTextPosition(position, 'experience');
+        } else if (exp.company) {
+          textPos = findTextPosition(exp.company, 'experience');
+        }
+        
+        if (desc.length < 100) {
+          improvements.push({
+            section: 'KINH NGHIỆM',
+            item: exp.position || `Vị trí ${index + 1}`,
+            text: desc || position || 'Chưa có mô tả',
+            issue: 'Mô tả kinh nghiệm quá ngắn, thiếu chi tiết về trách nhiệm và thành tích',
+            suggestion: 'Mở rộng mô tả với: (1) Trách nhiệm cụ thể, (2) Thành tích với số liệu, (3) Công nghệ/tools sử dụng',
+            severity: 'high',
+            position: textPos
+          });
+        }
+      });
+    }
+
+    // Skills improvements
+    const technicalSkills = cvData.skills?.technical || [];
+    if (technicalSkills.length < 5) {
+      // Find skills section
+      const skillsPos = findTextPosition('kỹ năng', 'skills') || 
+                       findTextPosition('skills', 'skills') ||
+                       findTextPosition('competenc', 'skills');
+      
+      improvements.push({
+        section: 'KỸ NĂNG',
+        item: 'Kỹ năng kỹ thuật',
+        text: `${technicalSkills.length} kỹ năng`,
+        issue: `Chỉ có ${technicalSkills.length} kỹ năng kỹ thuật, cần bổ sung thêm`,
+        suggestion: 'Bổ sung thêm ít nhất 5-7 kỹ năng kỹ thuật phù hợp với vị trí ứng tuyển',
+        severity: 'high',
+        position: skillsPos
+      });
+    }
+
+    // Summary/Objective improvements
+    const summaryMatch = cvText.match(/(summary|objective|profile|tóm tắt|mục tiêu)/i);
+    if (!summaryMatch) {
+      improvements.push({
+        section: 'TÓM TẮT',
+        item: 'Thiếu phần tóm tắt',
+        text: 'Chưa có',
+        issue: 'CV thiếu phần tóm tắt/mục tiêu nghề nghiệp ở đầu',
+        suggestion: 'Thêm phần tóm tắt ngắn gọn (2-3 câu) ở đầu CV để highlight điểm mạnh và mục tiêu nghề nghiệp',
+        severity: 'medium',
+        position: { lineNumber: 1, lineContent: lines[0] || '', startIndex: 0, endIndex: 0 }
+      });
+    }
+
+    // Education improvements
+    if (cvData.education && cvData.education.length > 0) {
+      cvData.education.forEach((edu, index) => {
+        const eduPos = findTextPosition(edu.school || edu.major || 'education', 'education');
+        if (!edu.degree || !edu.major) {
+          improvements.push({
+            section: 'HỌC VẤN',
+            item: edu.school || `Trường ${index + 1}`,
+            text: `${edu.degree || ''} ${edu.major || ''}`.trim() || 'Thiếu thông tin',
+            issue: 'Thiếu thông tin về bằng cấp hoặc ngành học',
+            suggestion: 'Bổ sung đầy đủ thông tin: Bằng cấp, Ngành học, Trường, Năm tốt nghiệp',
+            severity: 'medium',
+            position: eduPos
+          });
+        }
+      });
+    }
+
+    return improvements;
   }
 
   /**

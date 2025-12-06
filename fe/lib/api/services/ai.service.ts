@@ -221,4 +221,35 @@ export const aiService = {
   }> {
     return apiClient.get("/ai/insights");
   },
+
+  /**
+   * Analyze CV improvements with specific line-by-line suggestions
+   */
+  async analyzeCVImprovements(params: {
+    cvText?: string;
+    cvData?: CVData;
+  }): Promise<{
+    success: boolean;
+    data: {
+      overallScore: number;
+      strengths: string[];
+      weaknesses: string[];
+      suggestions: {
+        structure: string[];
+        content: string[];
+        writing: string[];
+        keywords: string[];
+      };
+      specificImprovements: Array<{
+        line?: number;
+        section?: string;
+        text: string;
+        issue: string;
+        suggestion: string;
+        severity: "high" | "medium" | "low";
+      }>;
+    };
+  }> {
+    return apiClient.post("/ai/analyze-cv-improvements", params);
+  },
 };

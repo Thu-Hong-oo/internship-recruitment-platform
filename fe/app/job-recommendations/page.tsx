@@ -27,6 +27,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { EmptyProfileState } from "@/components/profile/EmptyProfileState";
+import UploadCVModal from "@/components/cv/UploadCVModal";
 
 export default function JobRecommendationsPage() {
   const router = useRouter();
@@ -38,6 +40,9 @@ export default function JobRecommendationsPage() {
   const [tierFilter, setTierFilter] = useState<string>("all");
   const [minScore, setMinScore] = useState(30);
   const [isUpdatingMatches, setIsUpdatingMatches] = useState(false);
+  const [isProfileEmpty, setIsProfileEmpty] = useState(false);
+  const [profileEmptyMessage, setProfileEmptyMessage] = useState<string>("");
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -65,18 +70,47 @@ export default function JobRecommendationsPage() {
 
   const fetchJobRecommendations = async () => {
     setIsLoading(true);
+    setIsProfileEmpty(false);
     try {
       const response = await nlpService.getBestMatches({
         limit: 20,
         minScore,
       });
+      
+      // Check if response indicates profile is empty (success: false)
+      if (!response.success) {
+        // API returned success: false, likely profile empty
+        const errorMessage = response.message || 
+          "Bạn chưa cập nhật hồ sơ hoặc tải CV. Vui lòng upload CV hoặc cập nhật thông tin (kỹ năng, kinh nghiệm, học vấn) trước khi sử dụng tính năng gợi ý việc làm.";
+        setIsProfileEmpty(true);
+        setProfileEmptyMessage(errorMessage);
+        setJobs([]);
+        setFilteredJobs([]);
+        setIsLoading(false);
+        return;
+      }
+      
       setJobs(response.data);
       setFilteredJobs(response.data);
-    } catch (error) {
+      setIsProfileEmpty(false);
+    } catch (error: any) {
       console.error("Failed to fetch job recommendations:", error);
+      
+      // Check if it's a 400 error (profile empty)
+      if (error?.response?.status === 400 || error?.status === 400) {
+        const errorMessage = error?.response?.data?.message || error?.message || 
+          "Bạn chưa cập nhật hồ sơ hoặc tải CV. Vui lòng upload CV hoặc cập nhật thông tin (kỹ năng, kinh nghiệm, học vấn) trước khi sử dụng tính năng gợi ý việc làm.";
+        setIsProfileEmpty(true);
+        setProfileEmptyMessage(errorMessage);
+        setJobs([]);
+        setFilteredJobs([]);
+        setIsLoading(false);
+        return;
+      }
+      
       toast({
-        title: "Error",
-        description: "Failed to load job recommendations. Please try again.",
+        title: "Lỗi",
+        description: "Không thể tải danh sách gợi ý việc làm. Vui lòng thử lại sau.",
         variant: "destructive",
       });
     } finally {
@@ -112,24 +146,41 @@ export default function JobRecommendationsPage() {
 
   // Tính lại toàn bộ điểm phù hợp rồi reload danh sách gợi ý
   const refreshJobMatchesAndRecommendations = async () => {
+    let shouldFetchRecommendations = true;
     try {
       setIsUpdatingMatches(true);
+      setIsProfileEmpty(false);
+      setIsLoading(true);
       // Gọi API tính lại toàn bộ matching score cho candidate hiện tại
       const result = await nlpService.calculateAllMatches();
 
       if (!result.success) {
-        toast({
-          title: "Không thể cập nhật điểm phù hợp",
-          description: result.message || "Vui lòng thử lại sau.",
-          variant: "destructive",
-        });
+        const errorMessage = result.message || "Vui lòng thử lại sau.";
+        setIsProfileEmpty(true);
+        setProfileEmptyMessage(errorMessage);
+        setJobs([]);
+        setFilteredJobs([]);
+        setIsLoading(false);
+        shouldFetchRecommendations = false;
+        return;
       } else if (result.message) {
         toast({
           title: "Đã cập nhật điểm phù hợp",
           description: result.message,
         });
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.response?.status === 400 || error?.status === 400) {
+        const errorMessage = error?.response?.data?.message || error?.message ||
+          "Bạn chưa cập nhật hồ sơ hoặc tải CV. Vui lòng upload CV hoặc cập nhật thông tin (kỹ năng, kinh nghiệm, học vấn) trước khi sử dụng tính năng gợi ý việc làm.";
+        setIsProfileEmpty(true);
+        setProfileEmptyMessage(errorMessage);
+        setJobs([]);
+        setFilteredJobs([]);
+        setIsLoading(false);
+        shouldFetchRecommendations = false;
+        return;
+      }
       console.error("Failed to calculate all matches:", error);
       toast({
         title: "Lỗi khi cập nhật điểm phù hợp",
@@ -138,8 +189,10 @@ export default function JobRecommendationsPage() {
       });
     } finally {
       setIsUpdatingMatches(false);
-      // Luôn reload danh sách gợi ý sau khi tính điểm xong
-      await fetchJobRecommendations();
+      // Chỉ reload danh sách gợi ý nếu không có lỗi profile empty
+      if (shouldFetchRecommendations) {
+        await fetchJobRecommendations();
+      }
     }
   };
 
@@ -148,8 +201,8 @@ export default function JobRecommendationsPage() {
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header + Filters */}
         <div className="mb-8">
-          <Card className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-none shadow-sm">
-            <CardContent className="pt-6 pb-4">
+          <Card className="bg-gradient-to-r from-sky-50 via-indigo-50 to-purple-50 border-none shadow-sm">
+            <CardContent className="pt-6 pb-5">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
                   <div className="flex items-center gap-3 mb-2">
@@ -159,13 +212,11 @@ export default function JobRecommendationsPage() {
                     </h1>
                   </div>
                   <p className="text-muted-foreground max-w-2xl">
-                    Danh sách việc làm được xếp hạng theo mức độ phù hợp với hồ sơ
-                    và kỹ năng hiện tại của bạn. Bạn có thể lọc theo tier và điểm
-                    tối thiểu để tinh chỉnh kết quả.
+                    Danh sách xếp hạng theo mức độ phù hợp hồ sơ. Bạn có thể tìm kiếm và chọn điểm tối thiểu.
                   </p>
                 </div>
 
-                <div className="w-full md:w-[420px]">
+                <div className="w-full md:w-[440px]">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Search */}
                     <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 shadow-xs border">
@@ -198,62 +249,29 @@ export default function JobRecommendationsPage() {
                     </div>
                   </div>
 
-                  {/* Tier filter + summary */}
-                  <div className="mt-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant={tierFilter === "all" ? "default" : "outline"}
-                        onClick={() => setTierFilter("all")}
-                      >
-                        Tất cả tier
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={tierFilter === "A" ? "default" : "outline"}
-                        onClick={() => setTierFilter("A")}
-                      >
-                        Tier A
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={tierFilter === "B" ? "default" : "outline"}
-                        onClick={() => setTierFilter("B")}
-                      >
-                        Tier B
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={tierFilter === "C" ? "default" : "outline"}
-                        onClick={() => setTierFilter("C")}
-                      >
-                        Tier C
-                      </Button>
-                    </div>
-                    <div className="flex items-center gap-3 justify-between sm:justify-end">
-                      <p className="text-xs text-muted-foreground">
-                        Đang hiển thị{" "}
-                        <span className="font-semibold">
-                          {filteredJobs.length} việc làm
-                        </span>{" "}
-                        với điểm ≥ {minScore}%.
-                      </p>
-                      <Button
-                        onClick={refreshJobMatchesAndRecommendations}
-                        variant="outline"
-                        size="sm"
-                        disabled={isUpdatingMatches || isLoading}
-                      >
-                        {isUpdatingMatches ? (
-                          <span className="flex items-center gap-1">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Đang cập nhật gợi ý...
-                          </span>
-                        ) : (
-                          "Cập nhật gợi ý"
-                        )}
-                      </Button>
-                    </div>
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">
+                      Đang hiển thị{" "}
+                      <span className="font-semibold">
+                        {filteredJobs.length} việc làm
+                      </span>{" "}
+                      với điểm ≥ {minScore}%.
+                    </p>
+                    <Button
+                      onClick={refreshJobMatchesAndRecommendations}
+                      variant="outline"
+                      size="sm"
+                      disabled={isUpdatingMatches || isLoading}
+                    >
+                      {isUpdatingMatches ? (
+                        <span className="flex items-center gap-1">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Đang cập nhật...
+                        </span>
+                      ) : (
+                        "Cập nhật gợi ý"
+                      )}
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -262,7 +280,7 @@ export default function JobRecommendationsPage() {
         </div>
 
         {/* Loading State */}
-        {isLoading && (
+        {isLoading && !isProfileEmpty && (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
               <Card key={i}>
@@ -281,8 +299,33 @@ export default function JobRecommendationsPage() {
           </div>
         )}
 
-        {/* Job List */}
-        {!isLoading && filteredJobs.length === 0 && (
+        {/* Empty Profile State */}
+        {!isLoading && isProfileEmpty && (
+          <EmptyProfileState 
+            message={profileEmptyMessage}
+            onUploadCV={() => setShowUploadModal(true)}
+            onUpdateProfile={() => router.push("/profile")}
+          />
+        )}
+
+        {/* Upload CV Modal */}
+        <UploadCVModal
+          open={showUploadModal}
+          onOpenChange={setShowUploadModal}
+          onSuccess={() => {
+            toast({
+              description: "CV đã được tải lên thành công! Đang làm mới gợi ý việc làm...",
+              duration: 3000,
+            });
+            // Refresh job recommendations after CV upload
+            setTimeout(() => {
+              refreshJobMatchesAndRecommendations();
+            }, 1000);
+          }}
+        />
+
+        {/* Empty Job List (when profile is OK but no matches) */}
+        {!isLoading && !isProfileEmpty && filteredJobs.length === 0 && (
           <Card>
             <CardContent className="pt-6">
               <div className="text-center py-12">
@@ -302,32 +345,59 @@ export default function JobRecommendationsPage() {
           </Card>
         )}
 
-        {!isLoading && filteredJobs.length > 0 && (
+        {!isLoading && !isProfileEmpty && filteredJobs.length > 0 && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Jobs List */}
             <div className="lg:col-span-2 space-y-4">
-              {filteredJobs.map((item) => {
+              {filteredJobs.map((item, idx) => {
                 const companyName = item.job.company || "Nhà tuyển dụng";
                 const companyInitial =
                   typeof companyName === "string" && companyName.length > 0
                     ? companyName.charAt(0).toUpperCase()
                     : "C";
-
+                const companyLogo = (item.job as any).companyLogo as string | undefined;
+                const tier =
+                  item.overallScore >= 80
+                    ? "A"
+                    : item.overallScore >= 70
+                      ? "B"
+                      : item.overallScore >= 60
+                        ? "C"
+                        : "D";
                 const deadline = item.job.deadline
                   ? new Date(item.job.deadline)
                   : null;
+                const city =
+                  item.job.location?.split(",").pop()?.trim() ||
+                  item.job.location ||
+                  "Đang cập nhật";
+                const salary =
+                  item.job.salary?.min && item.job.salary?.max
+                    ? `${item.job.salary.min.toLocaleString()} - ${item.job.salary.max.toLocaleString()} ${item.job.salary.currency || "VND"}`
+                    : "Thỏa thuận";
 
                 return (
                   <Card
-                    key={item.jobId}
-                    className="hover:shadow-md transition-shadow border border-slate-100 rounded-xl"
+                    key={`${item.job._id || item.jobId || "job"}-${idx}`}
+                    className="hover:shadow-lg transition-shadow border border-slate-100 rounded-xl"
                   >
                     <CardContent className="pt-5 pb-5">
                       <div className="flex gap-4">
                         {/* Logo / Initial */}
                         <div className="hidden sm:flex items-start">
-                          <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white font-bold text-lg shadow-sm">
-                            {companyInitial}
+                          <div className="w-14 h-14 rounded-xl bg-white border border-slate-200 flex items-center justify-center overflow-hidden shadow-sm">
+                            {companyLogo ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={companyLogo}
+                                alt={companyName}
+                                className="w-full h-full object-contain p-1"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white font-bold text-lg">
+                                {companyInitial}
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -343,18 +413,8 @@ export default function JobRecommendationsPage() {
                               </p>
                             </div>
                             <div className="flex flex-col items-end gap-2">
-                              <Badge
-                                className={
-                                  item.tier === "A"
-                                    ? "bg-green-100 text-green-700"
-                                    : item.tier === "B"
-                                    ? "bg-blue-100 text-blue-700"
-                                    : item.tier === "C"
-                                    ? "bg-yellow-100 text-yellow-700"
-                                    : "bg-red-100 text-red-700"
-                                }
-                              >
-                                Tier {item.tier} • {item.overallScore}%
+                              <Badge variant="outline" className="text-xs">
+                                Điểm phù hợp {item.overallScore}%
                               </Badge>
                               {deadline && (
                                 <span className="text-[11px] text-muted-foreground">
@@ -368,16 +428,12 @@ export default function JobRecommendationsPage() {
                           <div className="flex flex-wrap gap-3 text-xs sm:text-sm text-muted-foreground">
                             <span className="flex items-center gap-1">
                               <MapPin className="w-4 h-4" />
-                              {item.job.location || "Đang cập nhật"}
+                              {city}
                             </span>
-                            {item.job.salary && (
-                              <span className="flex items-center gap-1">
-                                <DollarSign className="w-4 h-4" />
-                                {item.job.salary.min.toLocaleString()} -{" "}
-                                {item.job.salary.max.toLocaleString()}{" "}
-                                {item.job.salary.currency}
-                              </span>
-                            )}
+                            <span className="flex items-center gap-1">
+                              <DollarSign className="w-4 h-4" />
+                              {salary}
+                            </span>
                             {item.job.level && (
                               <span className="flex items-center gap-1">
                                 <Briefcase className="w-4 h-4" />
@@ -446,7 +502,15 @@ export default function JobRecommendationsPage() {
                 {filteredJobs[0] && (
                   <MatchScoreCard
                     score={filteredJobs[0].overallScore}
-                    tier={filteredJobs[0].tier}
+                    tier={
+                      filteredJobs[0].overallScore >= 80
+                        ? "A"
+                        : filteredJobs[0].overallScore >= 70
+                          ? "B"
+                          : filteredJobs[0].overallScore >= 60
+                            ? "C"
+                            : "D"
+                    }
                     breakdown={filteredJobs[0].breakdown}
                     strengths={filteredJobs[0].strengths}
                     concerns={filteredJobs[0].concerns}
