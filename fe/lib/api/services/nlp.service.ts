@@ -317,6 +317,7 @@ export const nlpService = {
 
   /**
    * Generate RAG-powered learning roadmap (sử dụng dữ liệu thực tế)
+   * API returns: { success: true, data: { roadmap: LearningRoadmap, credibilityMetrics: {...}, ... } }
    */
   async generateLearningRoadmapRag(params: {
     candidateId?: string;
@@ -326,7 +327,13 @@ export const nlpService = {
     cvData?: CVData;
   }): Promise<{
     success: boolean;
-    data: LearningRoadmap;
+    data: {
+      roadmap: LearningRoadmap;
+      credibilityMetrics?: any;
+      totalResources?: number;
+      sourceBreakdown?: any;
+    } | LearningRoadmap; // Support both structures for backward compatibility
+    message?: string;
   }> {
     return apiClient.post("/nlp/learning-roadmap-rag", params);
   },
@@ -436,5 +443,24 @@ export const nlpService = {
     data?: unknown;
   }> {
     return apiClient.post("/nlp/calculate-all-matches", {});
+  },
+
+  /**
+   * Check RAG service health and statistics
+   */
+  async checkRagHealth(): Promise<{
+    success: boolean;
+    data: {
+      status: "healthy" | "degraded" | "down";
+      statistics?: {
+        totalResources?: number;
+        indexedResources?: number;
+        lastIndexed?: string;
+        averageResponseTime?: number;
+      };
+      message?: string;
+    };
+  }> {
+    return apiClient.get("/nlp/rag-health");
   },
 };

@@ -148,7 +148,7 @@ class AIController {
       const mimeType = req.file.mimetype || 'application/pdf'; // Default to PDF if not provided
 
       // Extract text from CV
-      const extractedText = await aiService.extractTextFromCV(fileBuffer, mimeType);
+      let extractedText = await aiService.extractTextFromCV(fileBuffer, mimeType);
 
       if (!extractedText || extractedText.trim().length === 0) {
         await fs.unlink(filePath);
@@ -159,7 +159,13 @@ class AIController {
         );
       }
 
-      // Extract skills using self-sufficient AI
+      // CRITICAL: Clean text again to ensure no corruption before parsing
+      extractedText = aiService.cvParsingService?.cleanExtractedText(extractedText) || extractedText;
+      
+      // Log cleaned text for debugging
+      logger.info('📄 Extracted text (first 500 chars):', extractedText.substring(0, 500));
+
+      // Extract skills using self-sufficient AI (use cleaned text)
       const { getSelfSufficientAIService } = require('../services/ai/selfSufficientAIService');
       const selfSufficientAI = getSelfSufficientAIService();
       const skillsAnalysis = await selfSufficientAI.analyzeCV(extractedText);
@@ -243,21 +249,28 @@ class AIController {
         categorizedSkills[category].push(skill);
       });
 
-      // Format experience
+      // Format experience with full description
       const experience = (extractedData.experience || []).map(exp => ({
         position: exp.position || exp.title || exp.role || '',
         company: exp.company || exp.organization || '',
         duration: exp.duration || exp.period || (exp.startDate && exp.endDate 
           ? `${exp.startDate} - ${exp.endDate}` 
           : ''),
+        description: exp.description || '', // Include full description
       })).filter(exp => exp.position || exp.company);
 
-      // Format education
+      // Format education with duration
       const education = extractedData.education 
         ? [{
             degree: this._formatDegree(extractedData.education.degree || extractedData.education.type || ''),
             major: extractedData.education.field || extractedData.education.major || '',
             school: extractedData.education.institution || extractedData.education.school || '',
+            duration: extractedData.education.duration || 
+              (extractedData.education.startYear && extractedData.education.endYear
+                ? `${extractedData.education.startYear} - ${extractedData.education.endYear}`
+                : extractedData.education.startDate && extractedData.education.endDate
+                ? `${extractedData.education.startDate} - ${extractedData.education.endDate}`
+                : ''),
           }].filter(e => e.degree || e.major || e.school)
         : [];
 
@@ -282,7 +295,7 @@ class AIController {
       const analysis = {
         skills: categorizedSkills, // Use categorized skills instead of empty structure
         totalSkills: uniqueSkills.length,
-        _method: 'self-sufficient (PhoBERT) + Rule-based parsing',
+        _method: 'self-sufficient (Hybrid System: Rule-based + Multilingual NER) + Rule-based parsing',
         _timestamp: new Date(),
       };
 
@@ -327,7 +340,8 @@ class AIController {
           experience,
           education,
           suggestions,
-          extractedText: extractedText.substring(0, 500) + '...',
+          extractedText: extractedText, // Return full cleaned text for frontend parsing
+          personalInfo: extractedData.personalInfo || {}, // Include personal info
           filename: req.file.filename,
           uploadedAt: new Date(),
         },

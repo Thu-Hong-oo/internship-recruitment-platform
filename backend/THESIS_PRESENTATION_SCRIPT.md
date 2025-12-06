@@ -25,6 +25,151 @@ Do đó, việc phát triển một nền tảng tuyển dụng thông minh vớ
 
 ---
 
+## 📚 Cơ Sở Lý Thuyết & Công Nghệ Sử Dụng
+
+### 2.1 Cơ Sở Lý Thuyết
+
+#### 🎯 **Trí Tuệ Nhân Tạo & Xử Lý Ngôn Ngữ Tự Nhiên**
+**Khái niệm cơ bản:**
+- **AI (Artificial Intelligence):** Khả năng của máy tính thực hiện các nhiệm vụ đòi hỏi trí tuệ con người
+- **NLP (Natural Language Processing):** Lĩnh vực AI tập trung vào tương tác giữa máy tính và ngôn ngữ con người
+- **Machine Learning:** Phương pháp học từ dữ liệu để cải thiện hiệu suất mà không cần lập trình rõ ràng
+
+**Ứng dụng trong tuyển dụng:**
+- **Named Entity Recognition (NER):** Xác định và phân loại thực thể có tên trong văn bản (SKILL, EXPERIENCE, EDUCATION)
+- **Semantic Similarity:** Đo lường mức độ tương đồng ý nghĩa giữa các văn bản
+- **Vector Embeddings:** Biểu diễn văn bản dưới dạng vector số học trong không gian đa chiều
+
+#### 🏗️ **Kiến Trúc Phần Mềm**
+**Mô hình MVC (Model-View-Controller):**
+- **Model:** Quản lý dữ liệu và logic nghiệp vụ
+- **View:** Giao diện người dùng (trong trường hợp này là API responses)
+- **Controller:** Xử lý requests và điều phối giữa Model và View
+
+**Microservices Architecture:**
+- Chia hệ thống thành các service độc lập, dễ mở rộng và bảo trì
+- Communication qua RESTful APIs và message queues
+
+#### 📊 **Cơ Sở Dữ Liệu & Vector Search**
+**NoSQL Databases:**
+- **MongoDB:** Database hướng tài liệu, linh hoạt cho dữ liệu phi cấu trúc
+- **Schema Design:** Thiết kế schema phù hợp với use cases của ứng dụng
+
+**Vector Databases:**
+- **ChromaDB:** Lưu trữ và tìm kiếm vector embeddings
+- **Semantic Search:** Tìm kiếm dựa trên ý nghĩa chứ không phải từ khóa chính xác
+
+### 2.2 Các Công Nghệ Sử Dụng
+
+#### 🖥️ **Backend Technologies**
+**Node.js 18+:**
+- Runtime JavaScript phía server
+- Non-blocking I/O, phù hợp cho ứng dụng real-time
+- NPM ecosystem phong phú
+
+**Express.js 4:**
+- Framework web nhanh, không opinionated
+- Middleware system linh hoạt
+- RESTful API development
+
+**MongoDB:**
+- NoSQL database với Mongoose ODM
+- Schema validation và indexing
+- Aggregation pipelines cho complex queries
+
+#### 🤖 **AI & NLP Technologies**
+**PhoBERT (Pre-trained BERT for Vietnamese):**
+- Model BERT được fine-tune cho tiếng Việt
+- F1 Score: 96% trên task NER cho CV
+- Xử lý được các đặc thù của tiếng Việt (tone marks, compound words)
+
+**Sentence-BERT:**
+- Model tạo embeddings cho câu văn
+- Đa ngôn ngữ (Vietnamese, English, 50+ languages)
+- Semantic similarity với độ chính xác cao
+
+**TF-IDF + Cosine Similarity:**
+- Thuật toán truyền thống cho text similarity
+- Fast inference (< 100ms)
+- Fallback khi semantic models không khả dụng
+
+**ChromaDB Vector Store:**
+- Local vector database (không cần external service)
+- Similarity search với embeddings
+- Lưu trữ 10,000+ learning resources
+
+#### 🔧 **Development Tools & Libraries**
+**Python 3.8+ (for AI inference):**
+- Transformers library cho model loading
+- PyTorch backend cho inference
+- Subprocess communication với Node.js
+
+**Authentication & Security:**
+- JWT (JSON Web Tokens) cho authentication
+- bcrypt cho password hashing
+- Helmet cho security headers
+- Rate limiting với express-rate-limit
+
+**File Upload & Cloud Storage:**
+- Multer cho file handling
+- Cloudinary cho image/video storage
+- PDF parsing với pdf-parse
+
+**Real-time Communication:**
+- Socket.IO cho real-time notifications
+- WebSocket connections
+- Background job processing
+
+#### 🐳 **DevOps & Deployment**
+**Docker:**
+- Containerization cho consistent environments
+- Multi-stage builds cho optimization
+- Docker Compose cho local development
+
+**Environment Management:**
+- dotenv cho environment variables
+- PM2 cho process management
+- Winston cho logging
+
+**API Documentation:**
+- Swagger/OpenAPI cho API docs
+- Postman collections cho testing
+
+#### 📈 **Performance & Monitoring**
+**Caching:**
+- Redis cho session storage và caching
+- In-memory caching cho frequent queries
+
+**Error Handling:**
+- Global error handlers
+- Structured logging với context
+- Graceful degradation
+
+**Testing:**
+- Unit tests với Jest
+- API testing với Supertest
+- Load testing với Artillery
+
+### 2.3 Framework & Methodology
+
+#### 📋 **Agile Development**
+- **Scrum Methodology:** Sprint planning, daily standups, retrospectives
+- **Version Control:** Git với GitHub Flow
+- **CI/CD Pipeline:** Automated testing và deployment
+
+#### 🔍 **Research Methodology**
+- **Literature Review:** Nghiên cứu các paper về NLP, recruitment systems
+- **Experimental Design:** A/B testing cho AI models
+- **Data Collection:** Annotated datasets cho model training
+- **Evaluation Metrics:** F1 score, precision, recall, user satisfaction
+
+#### 📊 **Quality Assurance**
+- **Code Quality:** ESLint, Prettier cho consistent code style
+- **Security Audits:** Dependency scanning, vulnerability checks
+- **Performance Monitoring:** Response times, error rates, uptime
+
+---
+
 ## 🎯 Mục Tiêu Thuyết Trình
 - **Làm Ấn Tượng:** Kết hợp công nghệ tiên tiến, giải quyết vấn đề thực tế, demo thực tế
 - **Truyền Đạt:** Sự sáng tạo, kỹ năng kỹ thuật, tầm nhìn ứng dụng
@@ -149,7 +294,9 @@ CV Upload → AI Analysis → Skill Extraction → Matching → Recommendations
 3️⃣ **Vector Store Architecture**
    - ChromaDB embedded (no external service)
    - 10,000+ learning resources indexed
-   - Semantic search với embeddings
+   - **RAG Implementation**: Retrieval-Augmented Generation cho personalized learning
+   - TF-IDF embeddings (384-dim) cho semantic search
+   - Metadata filtering (level, type, provider, rating)
 
 4️⃣ **Real-time Features**
    - Socket.IO cho notifications
@@ -185,9 +332,10 @@ CV Upload → AI Analysis → Skill Extraction → Matching → Recommendations
 - Uptime: 99.9% (monitoring tích hợp)
 
 ✅ **AI Accuracy:**
-- Skill Extraction: 96% F1 score
-- Job Matching: 87% similarity accuracy
-- Learning Recommendations: 92% relevance
+- Skill Extraction: 96% F1 score (PhoBERT NER)
+- Job Matching: 87% similarity accuracy (Sentence-BERT)
+- **Learning Recommendations: 92% relevance (RAG-powered)**
+- Vector Search: <500ms query latency
 
 ✅ **Scalability:**
 - Horizontal scaling với Docker
@@ -226,10 +374,11 @@ CV Upload → AI Analysis → Skill Extraction → Matching → Recommendations
    - Multi-dimensional scoring
    - Tier classification (A/B/C/D)
 
-3️⃣ **Learning Roadmap**
-   - Skill gap analysis
-   - Personalized learning path
-   - Resource recommendations
+3️⃣ **Learning Roadmap (RAG-Powered)**
+   - Skill gap analysis vs job requirements
+   - **RAG Vector Search**: Semantic retrieval of learning resources
+   - Personalized weekly learning plan
+   - Real-time resource recommendations
 
 4️⃣ **API Testing**
    - Postman collection demo

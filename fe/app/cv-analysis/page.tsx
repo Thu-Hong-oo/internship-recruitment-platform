@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import PageLayout from "@/components/layout/page-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,14 +26,22 @@ import {
   Edit3,
   MessageSquare,
   Target,
+  Download,
 } from "lucide-react";
-import { aiService } from "@/lib/api";
+import { aiService, candidateService } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function CVAnalysisPage() {
   const router = useRouter();
@@ -87,19 +95,368 @@ export default function CVAnalysisPage() {
     severity: "high" | "medium" | "low";
     suggestion: string;
   }>>([]);
+  const [availableCVs, setAvailableCVs] = useState<Array<{
+    id: string;
+    label: string;
+    url: string;
+    filename: string;
+    isCurrent?: boolean;
+  }>>([]);
+  const [selectedCVId, setSelectedCVId] = useState<string>("");
+  const [loadingCVs, setLoadingCVs] = useState(false);
+
+  // Load available CVs on mount
+  useEffect(() => {
+    const loadCVs = async () => {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      if (!token) return;
+
+      try {
+        setLoadingCVs(true);
+        const response = await candidateService.getResumesAll();
+        if (response.success && response.data) {
+          const cvList: Array<{
+            id: string;
+            label: string;
+            url: string;
+            filename: string;
+            isCurrent?: boolean;
+          }> = [];
+
+          // Add current CV
+          const current = (response.data as any).current;
+          if (current && (current.url || current.downloadUrl)) {
+            cvList.push({
+              id: "current",
+              label: current.displayName || current.filename || "CV hiện tại",
+              url: current.url || current.downloadUrl || "",
+              filename: current.filename || "current.pdf",
+              isCurrent: true,
+            });
+          }
+
+          // Add history CVs
+          const history = (response.data as any).history || [];
+          history.forEach((cv: any, index: number) => {
+            if (cv.url || cv.downloadUrl) {
+              cvList.push({
+                id: cv._id || `history-${index}`,
+                label: cv.displayName || cv.filename || `CV ${index + 1}`,
+                url: cv.url || cv.downloadUrl || "",
+                filename: cv.filename || `cv-${index + 1}.pdf`,
+              });
+            }
+          });
+
+          setAvailableCVs(cvList);
+        }
+      } catch (error) {
+        console.error("Failed to load CVs:", error);
+      } finally {
+        setLoadingCVs(false);
+      }
+    };
+
+    loadCVs();
+  }, []);
+
+  // Helper function to download CV file from URL and convert to File object
+  const downloadCVAsFile = async (url: string, filename: string): Promise<File> => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    
+    const response = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to download CV: ${response.statusText}`);
+    }
+    
+    const blob = await response.blob();
+    
+    // Determine MIME type from filename extension
+    let mimeType = "application/pdf";
+    if (filename.toLowerCase().endsWith(".doc")) {
+      mimeType = "application/msword";
+    } else if (filename.toLowerCase().endsWith(".docx")) {
+      mimeType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    }
+    
+    // Create File object from blob
+    const file = new File([blob], filename, { type: mimeType });
+    return file;
+  };
+
+  // Handle analyze from selected CV
+  const handleAnalyzeFromSavedCV = async () => {
+    if (!selectedCVId) {
+      toast({
+        title: "Chưa chọn CV",
+        description: "Vui lòng chọn CV để phân tích",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const selectedCV = availableCVs.find((cv) => cv.id === selectedCVId);
+    if (!selectedCV) {
+      toast({
+        title: "CV không tồn tại",
+        description: "Không tìm thấy CV đã chọn",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsAnalyzing(true);
+      setShowProgressModal(true);
+      setProgressValue(0);
+      setProgressMessage("Đang tải CV...");
+
+      // Download CV file
+      await updateProgress(10, "Đang tải CV từ hệ thống...", 300);
+      const cvFile = await downloadCVAsFile(selectedCV.url, selectedCV.filename);
+      setSelectedFile(cvFile);
+
+      // Analyze the downloaded file
+      await updateProgress(20, "Đang trích xuất nội dung từ CV...", 300);
+      const response = await aiService.analyzeCVFromFile(cvFile);
+      
+      // Process response (same as handleAnalyzeFile)
+      const data = response.data || response || {};
+      const analysis = data.analysis || {};
+      const skills = analysis.skills || {};
+      
+      await updateProgress(40, "Đang phân tích kỹ năng...", 200);
+      
+      const allSkills = [
+        ...(data.extractedSkills || []),
+        ...(skills.technical || []).map(s => typeof s === 'string' ? s : s.name || s),
+        ...(skills.soft || []).map(s => typeof s === 'string' ? s : s.name || s),
+        ...(skills.languages || []).map(s => typeof s === 'string' ? s : s.name || s),
+      ].filter(Boolean);
+      const uniqueSkills = [...new Set(allSkills)];
+      
+      await updateProgress(60, "Đang xử lý kinh nghiệm và học vấn...", 200);
+      
+      setAnalysisResult({
+        extractedSkills: uniqueSkills,
+        experience: data.experience || [],
+        education: data.education || [],
+        suggestions: data.suggestions || [],
+        extractedText: data.extractedText || "",
+      });
+      
+      if (data.extractedText) {
+        setEditableCVText(data.extractedText);
+      }
+      
+      await updateProgress(80, "Đang tạo form chỉnh sửa...", 200);
+      
+      // Clean and parse personal info from extracted text
+      const cleanedText = data.extractedText ? cleanText(data.extractedText) : "";
+      const personalInfoFromText = cleanedText ? parsePersonalInfo(cleanedText) : {};
+      
+      // Prioritize backend parsed data, fallback to frontend parsing
+      const formData = {
+        personalInfo: {
+          fullName: data.personalInfo?.fullName || data.analysis?.extractedData?.personalInfo?.fullName || personalInfoFromText.fullName || "",
+          email: data.personalInfo?.email || data.analysis?.extractedData?.personalInfo?.email || personalInfoFromText.email || "",
+          phone: data.personalInfo?.phone || data.analysis?.extractedData?.personalInfo?.phone || personalInfoFromText.phone || "",
+          address: data.personalInfo?.address || data.analysis?.extractedData?.personalInfo?.address || personalInfoFromText.address || "",
+          summary: data.personalInfo?.summary || data.personalInfo?.bio || data.analysis?.extractedData?.personalInfo?.summary || "",
+        },
+        experience: (data.experience || []).map(exp => ({
+          position: exp.position || "",
+          company: exp.company || "",
+          duration: exp.duration || "",
+          description: exp.description || "",
+        })),
+        education: (data.education || []).map(edu => ({
+          degree: edu.degree || "",
+          major: edu.major || "",
+          school: edu.school || "",
+        })),
+        skills: {
+          technical: uniqueSkills.filter(s => {
+            const lower = s.toLowerCase();
+            return !lower.includes('giao tiếp') && !lower.includes('làm việc nhóm') && 
+                   !lower.includes('quản lý') && !lower.includes('communication') && 
+                   !lower.includes('teamwork');
+          }),
+          soft: uniqueSkills.filter(s => {
+            const lower = s.toLowerCase();
+            return lower.includes('giao tiếp') || lower.includes('làm việc nhóm') || 
+                   lower.includes('quản lý') || lower.includes('communication') || 
+                   lower.includes('teamwork');
+          }),
+          languages: uniqueSkills.filter(s => {
+            const lower = s.toLowerCase();
+            return lower.includes('tiếng') || lower.includes('english') || 
+                   lower.includes('vietnamese');
+          }),
+        },
+      };
+      setCvFormData(formData);
+      
+      await updateProgress(90, "Đang phân tích cải thiện...", 300);
+      
+      // Automatically analyze improvements
+      try {
+        const improvementsResponse = await aiService.analyzeCVImprovements({
+          cvText: cleanedText || data.extractedText || editableCVText,
+          personalInfo: formData.personalInfo,
+          experience: formData.experience,
+          education: formData.education,
+          skills: formData.skills,
+        });
+        
+        if (improvementsResponse.success && improvementsResponse.data) {
+          const improvementsData = improvementsResponse.data;
+          setImprovements({
+            overallScore: improvementsData.overallScore || 0,
+            strengths: improvementsData.strengths || [],
+            weaknesses: improvementsData.weaknesses || [],
+            suggestions: improvementsData.suggestions || {
+              structure: [],
+              content: [],
+              writing: [],
+              keywords: [],
+            },
+            specificImprovements: improvementsData.specificImprovements || [],
+          });
+        }
+      } catch (error) {
+        console.error("Failed to analyze improvements:", error);
+        // Don't fail the whole process if improvements analysis fails
+      }
+      
+      await updateProgress(100, "Hoàn thành!", 500);
+      
+      setTimeout(() => {
+        setShowProgressModal(false);
+        setProgressValue(0);
+      }, 500);
+      
+      toast({
+        title: "Phân tích CV thành công",
+        description: "CV của bạn đã được phân tích. Xem các gợi ý cải thiện bên dưới.",
+      });
+    } catch (error: any) {
+      console.error("CV Analysis Error:", error);
+      setShowProgressModal(false);
+      toast({
+        title: "Phân tích thất bại",
+        description: error?.message || "Không thể phân tích CV. Vui lòng thử lại.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
   
-  // Helper function to parse personal info from text
+  // Helper function to clean corrupted text
+  const cleanText = (text: string): string => {
+    if (!text) return "";
+    // Remove common corruption patterns (Đỗ, Ngô, etc.)
+    let cleaned = text
+      .replace(/Đỗ/g, " ")
+      .replace(/Ngô/g, " ")
+      .replace(/Đặng/g, " ")
+      .replace(/Chứ/g, " ")
+      .replace(/viên/g, " ")
+      .replace(/Nhân/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    return cleaned;
+  };
+
+  // Helper function to parse personal info from text (improved)
   const parsePersonalInfo = (text: string) => {
     const info: any = {};
-    // Try to extract email
-    const emailMatch = text.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-    if (emailMatch) info.email = emailMatch[1];
-    // Try to extract phone
-    const phoneMatch = text.match(/(0[3|5|7|8|9][0-9]{8}|[0-9]{10,11})/);
-    if (phoneMatch) info.phone = phoneMatch[1];
-    // Try to extract name (first line or after "Họ tên", "Tên", etc.)
-    const nameMatch = text.match(/(?:Họ\s+tên|Tên|Name)[\s:]+([A-ZÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ][a-zàáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ\s]+)/i);
-    if (nameMatch) info.fullName = nameMatch[1].trim();
+    if (!text) return info;
+
+    // Clean text first
+    const cleanedText = cleanText(text);
+
+    // Extract email (case insensitive, handle corrupted text)
+    const emailPatterns = [
+      /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i,
+      /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.(?:com|vn|edu|org|net))/i,
+    ];
+    for (const pattern of emailPatterns) {
+      const emailMatch = cleanedText.match(pattern);
+      if (emailMatch) {
+        info.email = emailMatch[1].toLowerCase();
+        break;
+      }
+    }
+
+    // Extract phone (Vietnamese format)
+    const phonePatterns = [
+      /(0[3|5|7|8|9][0-9]{8})/,
+      /(\+84[3|5|7|8|9][0-9]{8})/,
+      /(84[3|5|7|8|9][0-9]{8})/,
+      /([0-9]{10,11})/,
+    ];
+    for (const pattern of phonePatterns) {
+      const phoneMatch = cleanedText.match(pattern);
+      if (phoneMatch) {
+        let phone = phoneMatch[1].replace(/\s+/g, "");
+        // Normalize to 10 digits (remove +84, 84 prefix)
+        if (phone.startsWith("+84")) phone = "0" + phone.substring(3);
+        if (phone.startsWith("84") && phone.length === 11) phone = "0" + phone.substring(2);
+        if (phone.length === 10 || phone.length === 11) {
+          info.phone = phone;
+          break;
+        }
+      }
+    }
+
+    // Extract full name (multiple patterns)
+    const namePatterns = [
+      // Pattern 1: After "Họ tên", "Tên", "Name"
+      /(?:Họ\s*[và\s]*tên|Tên|Name|Họ\s+tên)[\s:]+([A-ZÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ][a-zàáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ\s]{2,50})/i,
+      // Pattern 2: Vietnamese name at start of text (2-5 words, capitalized)
+      /^([A-ZÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ][a-zàáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]+(?:\s+[A-ZÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ][a-zàáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]+){1,4})/m,
+      // Pattern 3: Name before email or phone
+      /([A-ZÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ][a-zàáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]+(?:\s+[A-ZÀÁẢÃẠĂẰẮẲẴẶÂẦẤẨẪẬÈÉẺẼẸÊỀẾỂỄỆÌÍỈĨỊÒÓỎÕỌÔỒỐỔỖỘƠỜỚỞỠỢÙÚỦŨỤƯỪỨỬỮỰỲÝỶỸỴĐ][a-zàáảãạăằắẳẵặâầấẩẫậèéẻẽẹêềếểễệìíỉĩịòóỏõọôồốổỗộơờớởỡợùúủũụưừứửữựỳýỷỹỵđ]+){1,4})(?=\s*(?:@|\d{10}))/i,
+    ];
+    for (const pattern of namePatterns) {
+      const nameMatch = cleanedText.match(pattern);
+      if (nameMatch) {
+        let name = nameMatch[1].trim();
+        // Validate: Name should be 2-5 words and max 50 chars
+        const words = name.split(/\s+/).filter(w => w.length > 0);
+        if (words.length >= 2 && words.length <= 5 && name.length <= 50) {
+          // Filter out common non-name words
+          const nonNameWords = ['nhân', 'viên', 'chứng', 'từ', 'thực', 'tập', 'sinh', 'công', 'ty', 'từ'];
+          const filteredWords = words.filter(w => !nonNameWords.includes(w.toLowerCase()));
+          if (filteredWords.length >= 2) {
+            info.fullName = filteredWords.join(' ');
+            break;
+          }
+        }
+      }
+    }
+
+    // Extract address
+    const addressPatterns = [
+      /(?:Địa\s*chỉ|Address|Địa\s*điểm)[\s:]+([^,\n]+(?:,\s*[^,\n]+)*)/i,
+      /(Phường|Quận|District|Ward|[\w\s]+(?:Hồ\s*Chí\s*Minh|HCM|TP\.HCM|HCMC|Hà\s*Nội|Đà\s*Nẵng|Cần\s*Thơ)[\w\s,]*)/i,
+    ];
+    for (const pattern of addressPatterns) {
+      const addressMatch = cleanedText.match(pattern);
+      if (addressMatch) {
+        const addr = addressMatch[1]?.trim();
+        if (addr && addr.length > 5 && addr.length < 200) {
+          info.address = addr;
+          break;
+        }
+      }
+    }
+
     return info;
   };
   
@@ -757,10 +1114,14 @@ export default function CVAnalysisPage() {
                 </CardHeader>
                 <CardContent className="pt-6">
                   <Tabs defaultValue="file" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2 bg-muted/50">
+                    <TabsList className="grid w-full grid-cols-3 bg-muted/50">
                       <TabsTrigger value="file" className="data-[state=active]:bg-primary data-[state=active]:text-white">
                         <Upload className="w-4 h-4 mr-2" />
                         Tải file
+                      </TabsTrigger>
+                      <TabsTrigger value="saved" className="data-[state=active]:bg-primary data-[state=active]:text-white">
+                        <FileText className="w-4 h-4 mr-2" />
+                        CV đã lưu
                       </TabsTrigger>
                       <TabsTrigger value="text" className="data-[state=active]:bg-primary data-[state=active]:text-white">
                         <FileText className="w-4 h-4 mr-2" />
@@ -861,6 +1222,92 @@ export default function CVAnalysisPage() {
                       </Button>
                     </TabsContent>
 
+                    <TabsContent value="saved" className="space-y-4 mt-6">
+                      {loadingCVs ? (
+                        <div className="flex items-center justify-center py-12">
+                          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                          <span className="ml-2 text-muted-foreground">Đang tải danh sách CV...</span>
+                        </div>
+                      ) : availableCVs.length === 0 ? (
+                        <Alert>
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            Bạn chưa có CV nào đã lưu. Vui lòng tải lên CV mới hoặc nhập văn bản.
+                          </AlertDescription>
+                        </Alert>
+                      ) : (
+                        <>
+                          <div className="space-y-2">
+                            <Label htmlFor="cv-select">Chọn CV để phân tích</Label>
+                            <Select value={selectedCVId} onValueChange={setSelectedCVId}>
+                              <SelectTrigger id="cv-select" className="h-12">
+                                <SelectValue placeholder="Chọn CV đã lưu..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableCVs.map((cv) => (
+                                  <SelectItem key={cv.id} value={cv.id}>
+                                    <div className="flex items-center gap-2">
+                                      {cv.isCurrent && <span className="text-primary">⭐</span>}
+                                      <span>{cv.label}</span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                              Chọn CV đã upload trước đó để phân tích và cải thiện
+                            </p>
+                          </div>
+
+                          {selectedCVId && (
+                            <Alert className="border-blue-200 bg-blue-50/50">
+                              <FileCheck className="h-4 w-4 text-blue-600" />
+                              <AlertDescription className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <FileText className="w-5 h-5 text-blue-600" />
+                                  <div>
+                                    <p className="font-medium text-blue-900">
+                                      {availableCVs.find(cv => cv.id === selectedCVId)?.label}
+                                    </p>
+                                    <p className="text-xs text-blue-700">
+                                      Sẵn sàng để phân tích
+                                    </p>
+                                  </div>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setSelectedCVId("")}
+                                  className="text-blue-700 hover:text-blue-900"
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </AlertDescription>
+                            </Alert>
+                          )}
+
+                          <Button
+                            onClick={handleAnalyzeFromSavedCV}
+                            disabled={!selectedCVId || isAnalyzing}
+                            className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90 shadow-lg hover:shadow-xl transition-all duration-300"
+                            size="lg"
+                          >
+                            {isAnalyzing ? (
+                              <>
+                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                Đang phân tích...
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="mr-2 h-5 w-5" />
+                                Phân tích CV đã lưu
+                              </>
+                            )}
+                          </Button>
+                        </>
+                      )}
+                    </TabsContent>
+
                     <TabsContent value="text" className="space-y-4 mt-6">
                       <div className="relative">
                         <Textarea
@@ -926,32 +1373,501 @@ export default function CVAnalysisPage() {
 
               {analysisResult && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                {/* Skills */}
-                {analysisResult.extractedSkills && analysisResult.extractedSkills.length > 0 && (
-                  <Card className="border-2 shadow-lg hover:shadow-xl transition-shadow duration-300">
-                    <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b">
-                      <CardTitle className="flex items-center gap-2 text-xl">
-                        <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-                          <CheckCircle2 className="w-5 h-5 text-green-600" />
+                {/* Skills and CV Editor Form - Side by Side */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Skills Card - Left */}
+                  {analysisResult.extractedSkills && analysisResult.extractedSkills.length > 0 && (
+                    <Card className="border-2 shadow-lg hover:shadow-xl transition-shadow duration-300">
+                      <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b">
+                        <CardTitle className="flex items-center gap-2 text-xl">
+                          <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+                            <CheckCircle2 className="w-5 h-5 text-green-600" />
+                          </div>
+                          Kỹ năng được phát hiện
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-6">
+                        <div className="flex flex-wrap gap-2">
+                          {(analysisResult.extractedSkills || []).map((skill, index) => (
+                            <Badge
+                              key={index}
+                              variant="secondary"
+                              className="px-3 py-1.5 text-sm font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
+                            >
+                              {skill}
+                            </Badge>
+                          ))}
                         </div>
-                        Kỹ năng được phát hiện
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-6">
-                      <div className="flex flex-wrap gap-2">
-                        {(analysisResult.extractedSkills || []).map((skill, index) => (
-                          <Badge
-                            key={index}
-                            variant="secondary"
-                            className="px-3 py-1.5 text-sm font-medium bg-green-100 text-green-700 hover:bg-green-200 transition-colors"
-                          >
-                            {skill}
-                          </Badge>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* CV Editor Form - Right */}
+                  {analysisResult && (
+                    <Card className="border-2 shadow-lg">
+                      <CardHeader className="bg-gradient-to-r from-indigo-50 to-purple-50 border-b">
+                        <CardTitle className="flex items-center gap-2 text-xl">
+                          <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+                            <Edit3 className="w-5 h-5 text-indigo-600" />
+                          </div>
+                          Chỉnh sửa CV với AI
+                        </CardTitle>
+                        {improvements && improvements.specificImprovements.length > 0 && (
+                          <p className="text-sm text-muted-foreground mt-2">
+                            💡 Có {improvements.specificImprovements.length} gợi ý cải thiện. Hover vào các icon cảnh báo để xem chi tiết.
+                          </p>
+                        )}
+                      </CardHeader>
+                      <CardContent className="pt-6 max-h-[600px] overflow-y-auto">
+                        <div className="space-y-6">
+                          {/* Personal Info Section */}
+                          <div className="space-y-4">
+                            <h3 className="text-lg font-semibold flex items-center gap-2 pb-2 border-b">
+                              <FileText className="w-5 h-5 text-indigo-600" />
+                              Thông tin cá nhân
+                            </h3>
+                            <div className="grid grid-cols-1 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="fullName">Họ và tên</Label>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <div className="relative">
+                                      <Input
+                                        id="fullName"
+                                        value={cvFormData.personalInfo.fullName}
+                                        onChange={(e) => setCvFormData({
+                                          ...cvFormData,
+                                          personalInfo: { ...cvFormData.personalInfo, fullName: e.target.value }
+                                        })}
+                                        className={getFieldSuggestion('personalInfo.fullName') ? 'border-yellow-400 bg-yellow-50/50 pr-8' : ''}
+                                      />
+                                      {getFieldSuggestion('personalInfo.fullName') && (
+                                        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                                          <AlertCircle className="w-4 h-4 text-yellow-600 animate-pulse" />
+                                        </div>
+                                      )}
+                                    </div>
+                                  </PopoverTrigger>
+                                  {getFieldSuggestion('personalInfo.fullName') && (
+                                    <PopoverContent side="right" className="w-80">
+                                      <div className="space-y-2">
+                                        <div className="flex items-start gap-2">
+                                          <AlertCircle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
+                                            getFieldSuggestion('personalInfo.fullName')?.severity === 'high' 
+                                              ? 'text-red-600' 
+                                              : 'text-yellow-600'
+                                          }`} />
+                                          <div className="flex-1">
+                                            <p className="font-semibold text-sm mb-1">Vấn đề:</p>
+                                            <p className="text-xs text-muted-foreground mb-2">
+                                              {getFieldSuggestion('personalInfo.fullName')?.issue}
+                                            </p>
+                                            <p className="font-semibold text-sm mb-1">Gợi ý:</p>
+                                            <p className="text-xs text-muted-foreground">
+                                              {getFieldSuggestion('personalInfo.fullName')?.suggestion}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </PopoverContent>
+                                  )}
+                                </Popover>
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="email">Email</Label>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <div className="relative">
+                                      <Input
+                                        id="email"
+                                        type="email"
+                                        value={cvFormData.personalInfo.email}
+                                        onChange={(e) => setCvFormData({
+                                          ...cvFormData,
+                                          personalInfo: { ...cvFormData.personalInfo, email: e.target.value }
+                                        })}
+                                        className={getFieldSuggestion('personalInfo.email') ? 'border-yellow-400 bg-yellow-50/50 pr-8' : ''}
+                                      />
+                                      {getFieldSuggestion('personalInfo.email') && (
+                                        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                                          <AlertCircle className="w-4 h-4 text-yellow-600 animate-pulse" />
+                                        </div>
+                                      )}
+                                    </div>
+                                  </PopoverTrigger>
+                                  {getFieldSuggestion('personalInfo.email') && (
+                                    <PopoverContent side="right" className="w-80">
+                                      <div className="space-y-2">
+                                        <div className="flex items-start gap-2">
+                                          <AlertCircle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
+                                            getFieldSuggestion('personalInfo.email')?.severity === 'high' 
+                                              ? 'text-red-600' 
+                                              : 'text-yellow-600'
+                                          }`} />
+                                          <div className="flex-1">
+                                            <p className="font-semibold text-sm mb-1">Vấn đề:</p>
+                                            <p className="text-xs text-muted-foreground mb-2">
+                                              {getFieldSuggestion('personalInfo.email')?.issue}
+                                            </p>
+                                            <p className="font-semibold text-sm mb-1">Gợi ý:</p>
+                                            <p className="text-xs text-muted-foreground">
+                                              {getFieldSuggestion('personalInfo.email')?.suggestion}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </PopoverContent>
+                                  )}
+                                </Popover>
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="phone">Số điện thoại</Label>
+                                <Input
+                                  id="phone"
+                                  value={cvFormData.personalInfo.phone}
+                                  onChange={(e) => setCvFormData({
+                                    ...cvFormData,
+                                    personalInfo: { ...cvFormData.personalInfo, phone: e.target.value }
+                                  })}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="address">Địa chỉ</Label>
+                                <Input
+                                  id="address"
+                                  value={cvFormData.personalInfo.address}
+                                  onChange={(e) => setCvFormData({
+                                    ...cvFormData,
+                                    personalInfo: { ...cvFormData.personalInfo, address: e.target.value }
+                                  })}
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="summary">Tóm tắt / Mục tiêu nghề nghiệp</Label>
+                              <Textarea
+                                id="summary"
+                                value={cvFormData.personalInfo.summary}
+                                onChange={(e) => setCvFormData({
+                                  ...cvFormData,
+                                  personalInfo: { ...cvFormData.personalInfo, summary: e.target.value }
+                                })}
+                                rows={3}
+                                placeholder="Viết 2-3 câu tóm tắt về bản thân và mục tiêu nghề nghiệp..."
+                              />
+                            </div>
+                          </div>
+
+                          {/* Experience Section */}
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between pb-2 border-b">
+                              <h3 className="text-lg font-semibold flex items-center gap-2">
+                                <Briefcase className="w-5 h-5 text-blue-600" />
+                                Kinh nghiệm làm việc
+                              </h3>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCvFormData({
+                                  ...cvFormData,
+                                  experience: [...cvFormData.experience, { position: '', company: '', duration: '', description: '' }]
+                                })}
+                              >
+                                + Thêm
+                              </Button>
+                            </div>
+                            <div className="space-y-4">
+                              {cvFormData.experience.map((exp, index) => (
+                                <div key={index} className="p-4 border rounded-lg space-y-3">
+                                  <div className="grid grid-cols-1 gap-3">
+                                    <div className="space-y-2">
+                                      <Label className="text-xs">Vị trí</Label>
+                                      <Input
+                                        value={exp.position}
+                                        onChange={(e) => {
+                                          const newExp = [...cvFormData.experience];
+                                          newExp[index].position = e.target.value;
+                                          setCvFormData({ ...cvFormData, experience: newExp });
+                                        }}
+                                        className="text-sm"
+                                        placeholder="VD: Thực tập sinh"
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label className="text-xs">Công ty</Label>
+                                      <Input
+                                        value={exp.company}
+                                        onChange={(e) => {
+                                          const newExp = [...cvFormData.experience];
+                                          newExp[index].company = e.target.value;
+                                          setCvFormData({ ...cvFormData, experience: newExp });
+                                        }}
+                                        className="text-sm"
+                                        placeholder="VD: Công ty ABC"
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label className="text-xs">Thời gian</Label>
+                                      <Input
+                                        value={exp.duration}
+                                        onChange={(e) => {
+                                          const newExp = [...cvFormData.experience];
+                                          newExp[index].duration = e.target.value;
+                                          setCvFormData({ ...cvFormData, experience: newExp });
+                                        }}
+                                        className="text-sm"
+                                        placeholder="VD: 01/2023 - 12/2024"
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label className="text-xs">Mô tả</Label>
+                                      <Textarea
+                                        value={exp.description}
+                                        onChange={(e) => {
+                                          const newExp = [...cvFormData.experience];
+                                          newExp[index].description = e.target.value;
+                                          setCvFormData({ ...cvFormData, experience: newExp });
+                                        }}
+                                        rows={2}
+                                        className="text-sm"
+                                        placeholder="Mô tả công việc..."
+                                      />
+                                    </div>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      const newExp = cvFormData.experience.filter((_, i) => i !== index);
+                                      setCvFormData({ ...cvFormData, experience: newExp });
+                                    }}
+                                    className="text-red-600 hover:text-red-700 text-xs"
+                                  >
+                                    <X className="w-3 h-3 mr-1" />
+                                    Xóa
+                                  </Button>
+                                </div>
+                              ))}
+                              {cvFormData.experience.length === 0 && (
+                                <p className="text-xs text-muted-foreground text-center py-4">
+                                  Chưa có kinh nghiệm
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Education Section */}
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between pb-2 border-b">
+                              <h3 className="text-lg font-semibold flex items-center gap-2">
+                                <GraduationCap className="w-5 h-5 text-purple-600" />
+                                Học vấn
+                              </h3>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCvFormData({
+                                  ...cvFormData,
+                                  education: [...cvFormData.education, { degree: '', major: '', school: '' }]
+                                })}
+                              >
+                                + Thêm
+                              </Button>
+                            </div>
+                            <div className="space-y-3">
+                              {cvFormData.education.map((edu, index) => (
+                                <div key={index} className="p-4 border rounded-lg space-y-3">
+                                  <div className="grid grid-cols-1 gap-3">
+                                    <div className="space-y-2">
+                                      <Label className="text-xs">Bằng cấp</Label>
+                                      <Input
+                                        value={edu.degree}
+                                        onChange={(e) => {
+                                          const newEdu = [...cvFormData.education];
+                                          newEdu[index].degree = e.target.value;
+                                          setCvFormData({ ...cvFormData, education: newEdu });
+                                        }}
+                                        className="text-sm"
+                                        placeholder="VD: Cử nhân"
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label className="text-xs">Ngành học</Label>
+                                      <Input
+                                        value={edu.major}
+                                        onChange={(e) => {
+                                          const newEdu = [...cvFormData.education];
+                                          newEdu[index].major = e.target.value;
+                                          setCvFormData({ ...cvFormData, education: newEdu });
+                                        }}
+                                        className="text-sm"
+                                        placeholder="VD: Kinh doanh quốc tế"
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label className="text-xs">Trường</Label>
+                                      <Input
+                                        value={edu.school}
+                                        onChange={(e) => {
+                                          const newEdu = [...cvFormData.education];
+                                          newEdu[index].school = e.target.value;
+                                          setCvFormData({ ...cvFormData, education: newEdu });
+                                        }}
+                                        className="text-sm"
+                                        placeholder="VD: Đại học Sài Gòn"
+                                      />
+                                    </div>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      const newEdu = cvFormData.education.filter((_, i) => i !== index);
+                                      setCvFormData({ ...cvFormData, education: newEdu });
+                                    }}
+                                    className="text-red-600 hover:text-red-700 text-xs"
+                                  >
+                                    <X className="w-3 h-3 mr-1" />
+                                    Xóa
+                                  </Button>
+                                </div>
+                              ))}
+                              {cvFormData.education.length === 0 && (
+                                <p className="text-xs text-muted-foreground text-center py-4">
+                                  Chưa có thông tin học vấn
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Skills Section */}
+                          <div className="space-y-4">
+                            <h3 className="text-lg font-semibold flex items-center gap-2 pb-2 border-b">
+                              <Zap className="w-5 h-5 text-green-600" />
+                              Kỹ năng
+                            </h3>
+                            <div className="space-y-4">
+                              <div className="space-y-2">
+                                <Label className="text-xs">Kỹ năng kỹ thuật</Label>
+                                <div className="flex flex-wrap gap-2 min-h-[60px] p-2 border rounded-md">
+                                  {cvFormData.skills.technical.map((skill, idx) => (
+                                    <Badge key={idx} variant="secondary" className="px-2 py-0.5 text-xs">
+                                      {skill}
+                                      <button
+                                        onClick={() => {
+                                          const newSkills = cvFormData.skills.technical.filter((_, i) => i !== idx);
+                                          setCvFormData({
+                                            ...cvFormData,
+                                            skills: { ...cvFormData.skills, technical: newSkills }
+                                          });
+                                        }}
+                                        className="ml-1 hover:text-red-600"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </Badge>
+                                  ))}
+                                  <Input
+                                    placeholder="Nhập và Enter"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                                        setCvFormData({
+                                          ...cvFormData,
+                                          skills: {
+                                            ...cvFormData.skills,
+                                            technical: [...cvFormData.skills.technical, e.currentTarget.value.trim()]
+                                          }
+                                        });
+                                        e.currentTarget.value = '';
+                                      }
+                                    }}
+                                    className="border-dashed text-xs h-8"
+                                  />
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs">Kỹ năng mềm</Label>
+                                <div className="flex flex-wrap gap-2 min-h-[60px] p-2 border rounded-md">
+                                  {cvFormData.skills.soft.map((skill, idx) => (
+                                    <Badge key={idx} variant="secondary" className="px-2 py-0.5 text-xs">
+                                      {skill}
+                                      <button
+                                        onClick={() => {
+                                          const newSkills = cvFormData.skills.soft.filter((_, i) => i !== idx);
+                                          setCvFormData({
+                                            ...cvFormData,
+                                            skills: { ...cvFormData.skills, soft: newSkills }
+                                          });
+                                        }}
+                                        className="ml-1 hover:text-red-600"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </Badge>
+                                  ))}
+                                  <Input
+                                    placeholder="Nhập và Enter"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                                        setCvFormData({
+                                          ...cvFormData,
+                                          skills: {
+                                            ...cvFormData.skills,
+                                            soft: [...cvFormData.skills.soft, e.currentTarget.value.trim()]
+                                          }
+                                        });
+                                        e.currentTarget.value = '';
+                                      }
+                                    }}
+                                    className="border-dashed text-xs h-8"
+                                  />
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-xs">Ngôn ngữ</Label>
+                                <div className="flex flex-wrap gap-2 min-h-[60px] p-2 border rounded-md">
+                                  {cvFormData.skills.languages.map((skill, idx) => (
+                                    <Badge key={idx} variant="secondary" className="px-2 py-0.5 text-xs">
+                                      {skill}
+                                      <button
+                                        onClick={() => {
+                                          const newSkills = cvFormData.skills.languages.filter((_, i) => i !== idx);
+                                          setCvFormData({
+                                            ...cvFormData,
+                                            skills: { ...cvFormData.skills, languages: newSkills }
+                                          });
+                                        }}
+                                        className="ml-1 hover:text-red-600"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </Badge>
+                                  ))}
+                                  <Input
+                                    placeholder="Nhập và Enter"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                                        setCvFormData({
+                                          ...cvFormData,
+                                          skills: {
+                                            ...cvFormData.skills,
+                                            languages: [...cvFormData.skills.languages, e.currentTarget.value.trim()]
+                                          }
+                                        });
+                                        e.currentTarget.value = '';
+                                      }
+                                    }}
+                                    className="border-dashed text-xs h-8"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
 
                   {/* Experience */}
                   {analysisResult.experience && analysisResult.experience.length > 0 && (
@@ -1052,782 +1968,178 @@ export default function CVAnalysisPage() {
                   </Card>
                   )}
 
-                  {/* Structured CV Editor Form - Always visible */}
-                  {analysisResult && (
-                    <Card className="border-2 shadow-lg">
-                      <CardHeader className="bg-gradient-to-r from-indigo-50 to-purple-50 border-b">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="flex items-center gap-2 text-xl">
-                            <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
-                              <Edit3 className="w-5 h-5 text-indigo-600" />
-                            </div>
-                            Chỉnh sửa CV với AI
-                          </CardTitle>
-                          <Button
-                            onClick={handleAnalyzeImprovements}
-                            disabled={isAnalyzingImprovements}
-                            className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
-                          >
-                            {isAnalyzingImprovements ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Đang phân tích...
-                              </>
-                            ) : (
-                              <>
-                                <Sparkles className="mr-2 h-4 w-4" />
-                                Phân tích cải thiện
-                              </>
-                            )}
-                          </Button>
+                  {/* Improvements Section */}
+                  {improvements && (
+                    <div className="space-y-4 pt-4 border-t">
+                      {/* Overall Score */}
+                      <div className="flex items-center gap-4 p-4 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50">
+                        <div className="flex-shrink-0">
+                          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl">
+                            {improvements.overallScore}
+                          </div>
                         </div>
-                      </CardHeader>
-                      <CardContent className="pt-6">
-                        <div className="space-y-8">
-                          {/* Personal Info Section */}
-                          <div className="space-y-4">
-                            <h3 className="text-lg font-semibold flex items-center gap-2 pb-2 border-b">
-                              <FileText className="w-5 h-5 text-indigo-600" />
-                              Thông tin cá nhân
-                            </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="fullName">Họ và tên</Label>
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <div className="relative">
-                                      <Input
-                                        id="fullName"
-                                        value={cvFormData.personalInfo.fullName}
-                                        onChange={(e) => setCvFormData({
-                                          ...cvFormData,
-                                          personalInfo: { ...cvFormData.personalInfo, fullName: e.target.value }
-                                        })}
-                                        className={getFieldSuggestion('personalInfo.fullName') ? 'border-yellow-400 bg-yellow-50/50 pr-8' : ''}
-                                      />
-                                      {getFieldSuggestion('personalInfo.fullName') && (
-                                        <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                                          <AlertCircle className="w-4 h-4 text-yellow-600 animate-pulse" />
-                                        </div>
+                        <div>
+                          <h4 className="font-semibold text-lg">Điểm tổng thể</h4>
+                          <p className="text-sm text-muted-foreground">CV của bạn đạt {improvements.overallScore}/100 điểm</p>
+                        </div>
+                      </div>
+
+                      {/* Specific Improvements */}
+                      {improvements.specificImprovements.length > 0 && (
+                        <div className="space-y-3">
+                          <h4 className="font-semibold text-base flex items-center gap-2">
+                            <Target className="w-4 h-4 text-orange-600" />
+                            Gợi ý cải thiện cụ thể ({improvements.specificImprovements.length})
+                          </h4>
+                          {improvements.specificImprovements.map((imp, idx) => {
+                            const hasPosition = imp.position && imp.position.lineNumber;
+                            return (
+                              <div
+                                key={idx}
+                                className={`p-4 rounded-lg border-l-4 ${
+                                  imp.severity === 'high'
+                                    ? 'bg-red-50 border-red-500'
+                                    : imp.severity === 'medium'
+                                    ? 'bg-yellow-50 border-yellow-500'
+                                    : 'bg-blue-50 border-blue-500'
+                                }`}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <AlertCircle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+                                    imp.severity === 'high'
+                                      ? 'text-red-600'
+                                      : imp.severity === 'medium'
+                                      ? 'text-yellow-600'
+                                      : 'text-blue-600'
+                                  }`} />
+                                  <div className="flex-1 space-y-2">
+                                    <div className="flex items-center gap-2">
+                                      {imp.section && (
+                                        <span className="text-xs font-medium text-muted-foreground uppercase bg-white/50 px-2 py-1 rounded">
+                                          {imp.section}
+                                        </span>
+                                      )}
+                                      {hasPosition && (
+                                        <span className="text-xs text-muted-foreground">
+                                          Dòng {imp.position.lineNumber}
+                                        </span>
                                       )}
                                     </div>
-                                  </PopoverTrigger>
-                                  {getFieldSuggestion('personalInfo.fullName') && (
-                                    <PopoverContent side="right" className="w-80">
-                                      <div className="space-y-2">
-                                        <div className="flex items-start gap-2">
-                                          <AlertCircle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
-                                            getFieldSuggestion('personalInfo.fullName')?.severity === 'high' 
-                                              ? 'text-red-600' 
-                                              : 'text-yellow-600'
-                                          }`} />
-                                          <div className="flex-1">
-                                            <p className="font-semibold text-sm mb-1">Vấn đề:</p>
-                                            <p className="text-xs text-muted-foreground mb-2">
-                                              {getFieldSuggestion('personalInfo.fullName')?.issue}
-                                            </p>
-                                            <p className="font-semibold text-sm mb-1">Gợi ý:</p>
-                                            <p className="text-xs text-muted-foreground">
-                                              {getFieldSuggestion('personalInfo.fullName')?.suggestion}
-                                            </p>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </PopoverContent>
-                                  )}
-                                </Popover>
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="email">Email</Label>
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <div className="relative">
-                                      <Input
-                                        id="email"
-                                        type="email"
-                                        value={cvFormData.personalInfo.email}
-                                        onChange={(e) => setCvFormData({
-                                          ...cvFormData,
-                                          personalInfo: { ...cvFormData.personalInfo, email: e.target.value }
-                                        })}
-                                        className={getFieldSuggestion('personalInfo.email') ? 'border-yellow-400 bg-yellow-50/50 pr-8' : ''}
-                                      />
-                                      {getFieldSuggestion('personalInfo.email') && (
-                                        <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                                          <AlertCircle className="w-4 h-4 text-yellow-600 animate-pulse" />
-                                        </div>
-                                      )}
-                                    </div>
-                                  </PopoverTrigger>
-                                  {getFieldSuggestion('personalInfo.email') && (
-                                    <PopoverContent side="right" className="w-80">
-                                      <div className="space-y-2">
-                                        <div className="flex items-start gap-2">
-                                          <AlertCircle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
-                                            getFieldSuggestion('personalInfo.email')?.severity === 'high' 
-                                              ? 'text-red-600' 
-                                              : 'text-yellow-600'
-                                          }`} />
-                                          <div className="flex-1">
-                                            <p className="font-semibold text-sm mb-1">Vấn đề:</p>
-                                            <p className="text-xs text-muted-foreground mb-2">
-                                              {getFieldSuggestion('personalInfo.email')?.issue}
-                                            </p>
-                                            <p className="font-semibold text-sm mb-1">Gợi ý:</p>
-                                            <p className="text-xs text-muted-foreground">
-                                              {getFieldSuggestion('personalInfo.email')?.suggestion}
-                                            </p>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </PopoverContent>
-                                  )}
-                                </Popover>
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="phone">Số điện thoại</Label>
-                                <Popover>
-                                  <PopoverTrigger asChild>
-                                    <div className="relative">
-                                      <Input
-                                        id="phone"
-                                        value={cvFormData.personalInfo.phone}
-                                        onChange={(e) => setCvFormData({
-                                          ...cvFormData,
-                                          personalInfo: { ...cvFormData.personalInfo, phone: e.target.value }
-                                        })}
-                                        className={getFieldSuggestion('personalInfo.phone') ? 'border-yellow-400 bg-yellow-50/50 pr-8' : ''}
-                                      />
-                                      {getFieldSuggestion('personalInfo.phone') && (
-                                        <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                                          <AlertCircle className="w-4 h-4 text-yellow-600 animate-pulse" />
-                                        </div>
-                                      )}
-                                    </div>
-                                  </PopoverTrigger>
-                                  {getFieldSuggestion('personalInfo.phone') && (
-                                    <PopoverContent side="right" className="w-80">
-                                      <div className="space-y-2">
-                                        <div className="flex items-start gap-2">
-                                          <AlertCircle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
-                                            getFieldSuggestion('personalInfo.phone')?.severity === 'high' 
-                                              ? 'text-red-600' 
-                                              : 'text-yellow-600'
-                                          }`} />
-                                          <div className="flex-1">
-                                            <p className="font-semibold text-sm mb-1">Vấn đề:</p>
-                                            <p className="text-xs text-muted-foreground mb-2">
-                                              {getFieldSuggestion('personalInfo.phone')?.issue}
-                                            </p>
-                                            <p className="font-semibold text-sm mb-1">Gợi ý:</p>
-                                            <p className="text-xs text-muted-foreground">
-                                              {getFieldSuggestion('personalInfo.phone')?.suggestion}
-                                            </p>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </PopoverContent>
-                                  )}
-                                </Popover>
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="address">Địa chỉ</Label>
-                                <Input
-                                  id="address"
-                                  value={cvFormData.personalInfo.address}
-                                  onChange={(e) => setCvFormData({
-                                    ...cvFormData,
-                                    personalInfo: { ...cvFormData.personalInfo, address: e.target.value }
-                                  })}
-                                />
-                              </div>
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="summary">Tóm tắt / Mục tiêu nghề nghiệp</Label>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <div className="relative">
-                                    <Textarea
-                                      id="summary"
-                                      value={cvFormData.personalInfo.summary}
-                                      onChange={(e) => setCvFormData({
-                                        ...cvFormData,
-                                        personalInfo: { ...cvFormData.personalInfo, summary: e.target.value }
-                                      })}
-                                      rows={3}
-                                      className={getFieldSuggestion('personalInfo.summary') ? 'border-yellow-400 bg-yellow-50/50 pr-8' : ''}
-                                      placeholder="Viết 2-3 câu tóm tắt về bản thân và mục tiêu nghề nghiệp..."
-                                    />
-                                    {getFieldSuggestion('personalInfo.summary') && (
-                                      <div className="absolute right-2 top-2">
-                                        <AlertCircle className="w-4 h-4 text-yellow-600 animate-pulse" />
+                                    {imp.text && imp.text !== 'Chưa có' && (
+                                      <div className="p-2 bg-white/70 rounded border border-gray-200">
+                                        <p className="text-xs text-muted-foreground mb-1">Phần cần cải thiện:</p>
+                                        <p className="text-sm font-medium font-mono">
+                                          "{imp.text}"
+                                        </p>
                                       </div>
                                     )}
-                                  </div>
-                                </PopoverTrigger>
-                                {getFieldSuggestion('personalInfo.summary') && (
-                                  <PopoverContent side="right" className="w-80">
-                                    <div className="space-y-2">
-                                      <div className="flex items-start gap-2">
-                                        <AlertCircle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
-                                          getFieldSuggestion('personalInfo.summary')?.severity === 'high' 
-                                            ? 'text-red-600' 
-                                            : 'text-yellow-600'
-                                        }`} />
-                                        <div className="flex-1">
-                                          <p className="font-semibold text-sm mb-1">Vấn đề:</p>
-                                          <p className="text-xs text-muted-foreground mb-2">
-                                            {getFieldSuggestion('personalInfo.summary')?.issue}
-                                          </p>
-                                          <p className="font-semibold text-sm mb-1">Gợi ý:</p>
-                                          <p className="text-xs text-muted-foreground">
-                                            {getFieldSuggestion('personalInfo.summary')?.suggestion}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </PopoverContent>
-                                )}
-                              </Popover>
-                            </div>
-                          </div>
-
-                          {/* Experience Section */}
-                          <div className="space-y-4">
-                            <div className="flex items-center justify-between pb-2 border-b">
-                              <h3 className="text-lg font-semibold flex items-center gap-2">
-                                <Briefcase className="w-5 h-5 text-blue-600" />
-                                Kinh nghiệm làm việc
-                              </h3>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setCvFormData({
-                                  ...cvFormData,
-                                  experience: [...cvFormData.experience, { position: '', company: '', duration: '', description: '' }]
-                                })}
-                              >
-                                + Thêm kinh nghiệm
-                              </Button>
-                            </div>
-                            <div className="space-y-6">
-                              {cvFormData.experience.map((exp, index) => (
-                                <Card key={index} className="border-2">
-                                  <CardContent className="pt-6">
-                                    <div className="space-y-4">
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                          <Label>Vị trí / Chức danh</Label>
-                                          <Input
-                                            value={exp.position}
-                                            onChange={(e) => {
-                                              const newExp = [...cvFormData.experience];
-                                              newExp[index].position = e.target.value;
-                                              setCvFormData({ ...cvFormData, experience: newExp });
-                                            }}
-                                            className={getFieldSuggestion(`experience.${index}.position`) ? 'border-yellow-400 bg-yellow-50/50' : ''}
-                                          />
-                                          {getFieldSuggestion(`experience.${index}.position`) && (
-                                            <div className="text-xs text-yellow-700 bg-yellow-50 p-2 rounded border border-yellow-200">
-                                              <Lightbulb className="w-3 h-3 inline mr-1" />
-                                              {getFieldSuggestion(`experience.${index}.position`)?.suggestion}
-                                            </div>
-                                          )}
-                                        </div>
-                                        <div className="space-y-2">
-                                          <Label>Công ty</Label>
-                                          <Input
-                                            value={exp.company}
-                                            onChange={(e) => {
-                                              const newExp = [...cvFormData.experience];
-                                              newExp[index].company = e.target.value;
-                                              setCvFormData({ ...cvFormData, experience: newExp });
-                                            }}
-                                          />
-                                        </div>
-                                        <div className="space-y-2">
-                                          <Label>Thời gian</Label>
-                                          <Input
-                                            value={exp.duration}
-                                            onChange={(e) => {
-                                              const newExp = [...cvFormData.experience];
-                                              newExp[index].duration = e.target.value;
-                                              setCvFormData({ ...cvFormData, experience: newExp });
-                                            }}
-                                            placeholder="VD: 01/2023 - 12/2024"
-                                          />
-                                        </div>
-                                      </div>
-                                      <div className="space-y-2">
-                                        <Label>Mô tả công việc</Label>
-                                        <Popover>
-                                          <PopoverTrigger asChild>
-                                            <div className="relative">
-                                              <Textarea
-                                                value={exp.description}
-                                                onChange={(e) => {
-                                                  const newExp = [...cvFormData.experience];
-                                                  newExp[index].description = e.target.value;
-                                                  setCvFormData({ ...cvFormData, experience: newExp });
-                                                }}
-                                                rows={4}
-                                                className={getFieldSuggestion(`experience.${index}.description`) ? 'border-yellow-400 bg-yellow-50/50 pr-8' : ''}
-                                                placeholder="Mô tả trách nhiệm, thành tích với số liệu cụ thể..."
-                                              />
-                                              {getFieldSuggestion(`experience.${index}.description`) && (
-                                                <div className="absolute right-2 top-2">
-                                                  <AlertCircle className={`w-4 h-4 animate-pulse ${
-                                                    getFieldSuggestion(`experience.${index}.description`)?.severity === 'high' 
-                                                      ? 'text-red-600' 
-                                                      : 'text-yellow-600'
-                                                  }`} />
-                                                </div>
-                                              )}
-                                            </div>
-                                          </PopoverTrigger>
-                                          {getFieldSuggestion(`experience.${index}.description`) && (
-                                            <PopoverContent side="right" className="w-80">
-                                              <div className="space-y-2">
-                                                <div className="flex items-start gap-2">
-                                                  <AlertCircle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
-                                                    getFieldSuggestion(`experience.${index}.description`)?.severity === 'high' 
-                                                      ? 'text-red-600' 
-                                                      : 'text-yellow-600'
-                                                  }`} />
-                                                  <div className="flex-1">
-                                                    <p className="font-semibold text-sm mb-1">Vấn đề:</p>
-                                                    <p className="text-xs text-muted-foreground mb-2">
-                                                      {getFieldSuggestion(`experience.${index}.description`)?.issue}
-                                                    </p>
-                                                    <p className="font-semibold text-sm mb-1">Gợi ý:</p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                      {getFieldSuggestion(`experience.${index}.description`)?.suggestion}
-                                                    </p>
-                                                  </div>
-                                                </div>
-                                              </div>
-                                            </PopoverContent>
-                                          )}
-                                        </Popover>
-                                      </div>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                          const newExp = cvFormData.experience.filter((_, i) => i !== index);
-                                          setCvFormData({ ...cvFormData, experience: newExp });
-                                        }}
-                                        className="text-red-600 hover:text-red-700"
-                                      >
-                                        <X className="w-4 h-4 mr-1" />
-                                        Xóa
-                                      </Button>
-                                    </div>
-                                  </CardContent>
-                                </Card>
-                              ))}
-                              {cvFormData.experience.length === 0 && (
-                                <div className="text-center py-8 text-muted-foreground">
-                                  <Briefcase className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                  <p>Chưa có kinh nghiệm. Nhấn "Thêm kinh nghiệm" để thêm.</p>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Education Section */}
-                          <div className="space-y-4">
-                            <div className="flex items-center justify-between pb-2 border-b">
-                              <h3 className="text-lg font-semibold flex items-center gap-2">
-                                <GraduationCap className="w-5 h-5 text-purple-600" />
-                                Học vấn
-                              </h3>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setCvFormData({
-                                  ...cvFormData,
-                                  education: [...cvFormData.education, { degree: '', major: '', school: '' }]
-                                })}
-                              >
-                                + Thêm học vấn
-                              </Button>
-                            </div>
-                            <div className="space-y-4">
-                              {cvFormData.education.map((edu, index) => (
-                                <Card key={index} className="border-2">
-                                  <CardContent className="pt-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                      <div className="space-y-2">
-                                        <Label>Bằng cấp</Label>
-                                        <Input
-                                          value={edu.degree}
-                                          onChange={(e) => {
-                                            const newEdu = [...cvFormData.education];
-                                            newEdu[index].degree = e.target.value;
-                                            setCvFormData({ ...cvFormData, education: newEdu });
-                                          }}
-                                          className={getFieldSuggestion(`education.${index}.degree`) ? 'border-yellow-400 bg-yellow-50/50' : ''}
-                                        />
-                                        {getFieldSuggestion(`education.${index}.degree`) && (
-                                          <div className="text-xs text-yellow-700 bg-yellow-50 p-2 rounded border border-yellow-200">
-                                            <Lightbulb className="w-3 h-3 inline mr-1" />
-                                            {getFieldSuggestion(`education.${index}.degree`)?.suggestion}
-                                          </div>
-                                        )}
-                                      </div>
-                                      <div className="space-y-2">
-                                        <Label>Ngành học</Label>
-                                        <Input
-                                          value={edu.major}
-                                          onChange={(e) => {
-                                            const newEdu = [...cvFormData.education];
-                                            newEdu[index].major = e.target.value;
-                                            setCvFormData({ ...cvFormData, education: newEdu });
-                                          }}
-                                        />
-                                      </div>
-                                      <div className="space-y-2">
-                                        <Label>Trường</Label>
-                                        <Input
-                                          value={edu.school}
-                                          onChange={(e) => {
-                                            const newEdu = [...cvFormData.education];
-                                            newEdu[index].school = e.target.value;
-                                            setCvFormData({ ...cvFormData, education: newEdu });
-                                          }}
-                                        />
-                                      </div>
-                                    </div>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => {
-                                        const newEdu = cvFormData.education.filter((_, i) => i !== index);
-                                        setCvFormData({ ...cvFormData, education: newEdu });
-                                      }}
-                                      className="mt-4 text-red-600 hover:text-red-700"
-                                    >
-                                      <X className="w-4 h-4 mr-1" />
-                                      Xóa
-                                    </Button>
-                                  </CardContent>
-                                </Card>
-                              ))}
-                              {cvFormData.education.length === 0 && (
-                                <div className="text-center py-8 text-muted-foreground">
-                                  <GraduationCap className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                                  <p>Chưa có thông tin học vấn. Nhấn "Thêm học vấn" để thêm.</p>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Skills Section */}
-                          <div className="space-y-4">
-                            <h3 className="text-lg font-semibold flex items-center gap-2 pb-2 border-b">
-                              <Zap className="w-5 h-5 text-green-600" />
-                              Kỹ năng
-                            </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                              <div className="space-y-2">
-                                <Label>Kỹ năng kỹ thuật</Label>
-                                <div className="flex flex-wrap gap-2 min-h-[100px] p-3 border rounded-md">
-                                  {cvFormData.skills.technical.map((skill, idx) => (
-                                    <Badge key={idx} variant="secondary" className="px-3 py-1">
-                                      {skill}
+                                    <p className="text-sm text-muted-foreground">
+                                      <span className="font-medium">Vấn đề: </span>
+                                      {imp.issue}
+                                    </p>
+                                    <p className="text-sm">
+                                      <span className="font-medium text-green-700">💡 Gợi ý: </span>
+                                      <span className="text-green-800">{imp.suggestion}</span>
+                                    </p>
+                                    {hasPosition && imp.position.lineContent && (
                                       <button
                                         onClick={() => {
-                                          const newSkills = cvFormData.skills.technical.filter((_, i) => i !== idx);
-                                          setCvFormData({
-                                            ...cvFormData,
-                                            skills: { ...cvFormData.skills, technical: newSkills }
-                                          });
-                                        }}
-                                        className="ml-2 hover:text-red-600"
-                                      >
-                                        <X className="w-3 h-3" />
-                                      </button>
-                                    </Badge>
-                                  ))}
-                                  <Input
-                                    placeholder="Nhập kỹ năng và nhấn Enter"
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                                        setCvFormData({
-                                          ...cvFormData,
-                                          skills: {
-                                            ...cvFormData.skills,
-                                            technical: [...cvFormData.skills.technical, e.currentTarget.value.trim()]
+                                          // Scroll to line in editor
+                                          const textarea = document.querySelector('textarea');
+                                          if (textarea) {
+                                            const lines = editableCVText.split('\n');
+                                            const lineIndex = imp.position.lineNumber - 1;
+                                            const textBeforeLine = lines.slice(0, lineIndex).join('\n');
+                                            const position = textBeforeLine.length + (lineIndex > 0 ? 1 : 0);
+                                            textarea.focus();
+                                            textarea.setSelectionRange(position, position);
+                                            textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                           }
-                                        });
-                                        e.currentTarget.value = '';
-                                      }
-                                    }}
-                                    className="border-dashed"
-                                  />
-                                </div>
-                                {getFieldSuggestion('skills.technical') && (
-                                  <div className="text-xs text-yellow-700 bg-yellow-50 p-2 rounded border border-yellow-200">
-                                    <Lightbulb className="w-3 h-3 inline mr-1" />
-                                    {getFieldSuggestion('skills.technical')?.suggestion}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Kỹ năng mềm</Label>
-                                <div className="flex flex-wrap gap-2 min-h-[100px] p-3 border rounded-md">
-                                  {cvFormData.skills.soft.map((skill, idx) => (
-                                    <Badge key={idx} variant="secondary" className="px-3 py-1">
-                                      {skill}
-                                      <button
-                                        onClick={() => {
-                                          const newSkills = cvFormData.skills.soft.filter((_, i) => i !== idx);
-                                          setCvFormData({
-                                            ...cvFormData,
-                                            skills: { ...cvFormData.skills, soft: newSkills }
-                                          });
                                         }}
-                                        className="ml-2 hover:text-red-600"
+                                        className="text-xs text-blue-600 hover:text-blue-800 underline"
                                       >
-                                        <X className="w-3 h-3" />
+                                        📍 Xem vị trí trong CV
                                       </button>
-                                    </Badge>
-                                  ))}
-                                  <Input
-                                    placeholder="Nhập kỹ năng và nhấn Enter"
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                                        setCvFormData({
-                                          ...cvFormData,
-                                          skills: {
-                                            ...cvFormData.skills,
-                                            soft: [...cvFormData.skills.soft, e.currentTarget.value.trim()]
-                                          }
-                                        });
-                                        e.currentTarget.value = '';
-                                      }
-                                    }}
-                                    className="border-dashed"
-                                  />
+                                    )}
+                                  </div>
                                 </div>
                               </div>
-                              <div className="space-y-2">
-                                <Label>Ngôn ngữ</Label>
-                                <div className="flex flex-wrap gap-2 min-h-[100px] p-3 border rounded-md">
-                                  {cvFormData.skills.languages.map((skill, idx) => (
-                                    <Badge key={idx} variant="secondary" className="px-3 py-1">
-                                      {skill}
-                                      <button
-                                        onClick={() => {
-                                          const newSkills = cvFormData.skills.languages.filter((_, i) => i !== idx);
-                                          setCvFormData({
-                                            ...cvFormData,
-                                            skills: { ...cvFormData.skills, languages: newSkills }
-                                          });
-                                        }}
-                                        className="ml-2 hover:text-red-600"
-                                      >
-                                        <X className="w-3 h-3" />
-                                      </button>
-                                    </Badge>
-                                  ))}
-                                  <Input
-                                    placeholder="Nhập ngôn ngữ và nhấn Enter"
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                                        setCvFormData({
-                                          ...cvFormData,
-                                          skills: {
-                                            ...cvFormData.skills,
-                                            languages: [...cvFormData.skills.languages, e.currentTarget.value.trim()]
-                                          }
-                                        });
-                                        e.currentTarget.value = '';
-                                      }
-                                    }}
-                                    className="border-dashed"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {improvements && (
-                            <div className="space-y-4 pt-4 border-t">
-                              {/* Overall Score */}
-                              <div className="flex items-center gap-4 p-4 rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50">
-                                <div className="flex-shrink-0">
-                                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl">
-                                    {improvements.overallScore}
-                                  </div>
-                                </div>
-                                <div>
-                                  <h4 className="font-semibold text-lg">Điểm tổng thể</h4>
-                                  <p className="text-sm text-muted-foreground">CV của bạn đạt {improvements.overallScore}/100 điểm</p>
-                                </div>
-                              </div>
-
-                              {/* Specific Improvements */}
-                              {improvements.specificImprovements.length > 0 && (
-                                <div className="space-y-3">
-                                  <h4 className="font-semibold text-base flex items-center gap-2">
-                                    <Target className="w-4 h-4 text-orange-600" />
-                                    Gợi ý cải thiện cụ thể ({improvements.specificImprovements.length})
-                                  </h4>
-                                  {improvements.specificImprovements.map((imp, idx) => {
-                                    const hasPosition = imp.position && imp.position.lineNumber;
-                                    return (
-                                      <div
-                                        key={idx}
-                                        className={`p-4 rounded-lg border-l-4 ${
-                                          imp.severity === 'high'
-                                            ? 'bg-red-50 border-red-500'
-                                            : imp.severity === 'medium'
-                                            ? 'bg-yellow-50 border-yellow-500'
-                                            : 'bg-blue-50 border-blue-500'
-                                        }`}
-                                      >
-                                        <div className="flex items-start gap-3">
-                                          <AlertCircle className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
-                                            imp.severity === 'high'
-                                              ? 'text-red-600'
-                                              : imp.severity === 'medium'
-                                              ? 'text-yellow-600'
-                                              : 'text-blue-600'
-                                          }`} />
-                                          <div className="flex-1 space-y-2">
-                                            <div className="flex items-center gap-2">
-                                              {imp.section && (
-                                                <span className="text-xs font-medium text-muted-foreground uppercase bg-white/50 px-2 py-1 rounded">
-                                                  {imp.section}
-                                                </span>
-                                              )}
-                                              {hasPosition && (
-                                                <span className="text-xs text-muted-foreground">
-                                                  Dòng {imp.position.lineNumber}
-                                                </span>
-                                              )}
-                                            </div>
-                                            {imp.text && imp.text !== 'Chưa có' && (
-                                              <div className="p-2 bg-white/70 rounded border border-gray-200">
-                                                <p className="text-xs text-muted-foreground mb-1">Phần cần cải thiện:</p>
-                                                <p className="text-sm font-medium font-mono">
-                                                  "{imp.text}"
-                                                </p>
-                                              </div>
-                                            )}
-                                            <p className="text-sm text-muted-foreground">
-                                              <span className="font-medium">Vấn đề: </span>
-                                              {imp.issue}
-                                            </p>
-                                            <p className="text-sm">
-                                              <span className="font-medium text-green-700">💡 Gợi ý: </span>
-                                              <span className="text-green-800">{imp.suggestion}</span>
-                                            </p>
-                                            {hasPosition && imp.position.lineContent && (
-                                              <button
-                                                onClick={() => {
-                                                  // Scroll to line in editor
-                                                  const textarea = document.querySelector('textarea');
-                                                  if (textarea) {
-                                                    const lines = editableCVText.split('\n');
-                                                    const lineIndex = imp.position.lineNumber - 1;
-                                                    const textBeforeLine = lines.slice(0, lineIndex).join('\n');
-                                                    const position = textBeforeLine.length + (lineIndex > 0 ? 1 : 0);
-                                                    textarea.focus();
-                                                    textarea.setSelectionRange(position, position);
-                                                    textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                                  }
-                                                }}
-                                                className="text-xs text-blue-600 hover:text-blue-800 underline"
-                                              >
-                                                📍 Xem vị trí trong CV
-                                              </button>
-                                            )}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              )}
-
-                              {/* Suggestions by Category */}
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {improvements.suggestions.structure.length > 0 && (
-                                  <div className="p-4 rounded-lg bg-purple-50 border border-purple-200">
-                                    <h5 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                                      <FileText className="w-4 h-4" />
-                                      Cấu trúc
-                                    </h5>
-                                    <ul className="space-y-1 text-sm text-muted-foreground">
-                                      {improvements.suggestions.structure.map((s, i) => (
-                                        <li key={i} className="flex items-start gap-2">
-                                          <span className="text-purple-600 mt-1">•</span>
-                                          <span>{s}</span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                )}
-
-                                {improvements.suggestions.writing.length > 0 && (
-                                  <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
-                                    <h5 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                                      <Edit3 className="w-4 h-4" />
-                                      Văn phong
-                                    </h5>
-                                    <ul className="space-y-1 text-sm text-muted-foreground">
-                                      {improvements.suggestions.writing.map((s, i) => (
-                                        <li key={i} className="flex items-start gap-2">
-                                          <span className="text-blue-600 mt-1">•</span>
-                                          <span>{s}</span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                )}
-
-                                {improvements.suggestions.content.length > 0 && (
-                                  <div className="p-4 rounded-lg bg-green-50 border border-green-200">
-                                    <h5 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                                      <MessageSquare className="w-4 h-4" />
-                                      Nội dung
-                                    </h5>
-                                    <ul className="space-y-1 text-sm text-muted-foreground">
-                                      {improvements.suggestions.content.map((s, i) => (
-                                        <li key={i} className="flex items-start gap-2">
-                                          <span className="text-green-600 mt-1">•</span>
-                                          <span>{s}</span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                )}
-
-                                {improvements.suggestions.keywords.length > 0 && (
-                                  <div className="p-4 rounded-lg bg-orange-50 border border-orange-200">
-                                    <h5 className="font-semibold text-sm mb-2 flex items-center gap-2">
-                                      <Zap className="w-4 h-4" />
-                                      Từ khóa
-                                    </h5>
-                                    <ul className="space-y-1 text-sm text-muted-foreground">
-                                      {improvements.suggestions.keywords.map((s, i) => (
-                                        <li key={i} className="flex items-start gap-2">
-                                          <span className="text-orange-600 mt-1">•</span>
-                                          <span>{s}</span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
+                            );
+                          })}
                         </div>
-                      </CardContent>
-                    </Card>
+                      )}
+
+                      {/* Suggestions by Category */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {improvements.suggestions.structure.length > 0 && (
+                          <div className="p-4 rounded-lg bg-purple-50 border border-purple-200">
+                            <h5 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                              <FileText className="w-4 h-4" />
+                              Cấu trúc
+                            </h5>
+                            <ul className="space-y-1 text-sm text-muted-foreground">
+                              {improvements.suggestions.structure.map((s, i) => (
+                                <li key={i} className="flex items-start gap-2">
+                                  <span className="text-purple-600 mt-1">•</span>
+                                  <span>{s}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {improvements.suggestions.writing.length > 0 && (
+                          <div className="p-4 rounded-lg bg-blue-50 border border-blue-200">
+                            <h5 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                              <Edit3 className="w-4 h-4" />
+                              Văn phong
+                            </h5>
+                            <ul className="space-y-1 text-sm text-muted-foreground">
+                              {improvements.suggestions.writing.map((s, i) => (
+                                <li key={i} className="flex items-start gap-2">
+                                  <span className="text-blue-600 mt-1">•</span>
+                                  <span>{s}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {improvements.suggestions.content.length > 0 && (
+                          <div className="p-4 rounded-lg bg-green-50 border border-green-200">
+                            <h5 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                              <MessageSquare className="w-4 h-4" />
+                              Nội dung
+                            </h5>
+                            <ul className="space-y-1 text-sm text-muted-foreground">
+                              {improvements.suggestions.content.map((s, i) => (
+                                <li key={i} className="flex items-start gap-2">
+                                  <span className="text-green-600 mt-1">•</span>
+                                  <span>{s}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {improvements.suggestions.keywords.length > 0 && (
+                          <div className="p-4 rounded-lg bg-orange-50 border border-orange-200">
+                            <h5 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                              <Zap className="w-4 h-4" />
+                              Từ khóa
+                            </h5>
+                            <ul className="space-y-1 text-sm text-muted-foreground">
+                              {improvements.suggestions.keywords.map((s, i) => (
+                                <li key={i} className="flex items-start gap-2">
+                                  <span className="text-orange-600 mt-1">•</span>
+                                  <span>{s}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
 
                   {/* Actions */}

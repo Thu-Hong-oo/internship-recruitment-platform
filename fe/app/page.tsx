@@ -8,7 +8,6 @@ import {
   ChevronRight,
   Sparkles,
   TrendingUp,
-  Heart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,6 +20,7 @@ import { useEffect, useState } from "react";
 import { jobsAPI, JobItem } from "@/lib/api";
 import { Row, Col } from "antd";
 import { JobFilters as JobFiltersType } from "@/components/jobs/JobFilters";
+import { SaveJobButton } from "@/components/jobs/SaveJobButton";
 interface HomePageProps {
   onSearch?: (keyword: string) => void;
 }
@@ -338,18 +338,15 @@ export default function HomePage({ onSearch }: HomePageProps) {
 
                                   {/* Bottom section with save button */}
                                   <div className="flex justify-end pt-3 border-t border-slate-200/50">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                      }}
-                                      className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center justify-center hover:bg-[oklch(0.60_0.12_195/.1)] hover:border-[oklch(0.60_0.12_195/.3)] transition-all duration-300 hover:scale-110 shadow-sm group/btn"
-                                    >
-                                      <Heart
-                                        className="w-4 h-4 text-slate-500 group-hover/btn:text-[oklch(0.60_0.12_195)] transition-colors duration-300"
-                                        fill="none"
-                                        strokeWidth={2.5}
+                                    <div onClick={(e) => e.stopPropagation()}>
+                                      <SaveJobButton
+                                        jobId={job.id}
+                                        variant="ghost"
+                                        size="sm"
+                                        showText={false}
+                                        className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200/60 hover:bg-[oklch(0.60_0.12_195/.1)] hover:border-[oklch(0.60_0.12_195/.3)] transition-all duration-300 hover:scale-110 shadow-sm"
                                       />
-                                    </button>
+                                    </div>
                                   </div>
                                 </div>
                               </div>

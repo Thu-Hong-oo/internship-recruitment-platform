@@ -219,8 +219,8 @@ export default function LoginPage() {
                             </>
                           ) : (
                             <>
-                              <span className="font-bold text-lg">G</span>
-                              <span className="ml-2">Đăng nhập bằng Google</span>
+                          <span className="font-bold text-lg">G</span>
+                          <span className="ml-2">Đăng nhập bằng Google</span>
                             </>
                           )}
                         </Button>
@@ -355,12 +355,12 @@ export default function LoginPage() {
                   </>
                 ) : (
                   <>
-                    <img
-                      src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-                      alt="Google Icon"
-                      className="h-5 w-5"
-                    />
-                    <span className="ml-2">Đăng nhập với Google</span>
+                <img
+                  src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                  alt="Google Icon"
+                  className="h-5 w-5"
+                />
+                <span className="ml-2">Đăng nhập với Google</span>
                   </>
                 )}
               </Button>
