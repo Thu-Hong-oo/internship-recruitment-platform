@@ -267,24 +267,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </li>
-              <li>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-slate-700 hover:bg-primary/10 hover:text-primary"
-                >
-                  <BarChart3 className="w-4 h-4 mr-3" />
-                  Thống kê
-                </Button>
-              </li>
-              <li>
-                <Button
-                  variant="ghost"
-                  className="w-full justify-start text-slate-700 hover:bg-primary/10 hover:text-primary"
-                >
-                  <ShoppingCart className="w-4 h-4 mr-3" />
-                  Mua dịch vụ
-                </Button>
-              </li>
+              
             </ul>
           </nav>
         </aside>

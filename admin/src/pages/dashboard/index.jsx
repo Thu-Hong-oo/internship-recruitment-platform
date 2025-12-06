@@ -1121,18 +1121,18 @@ const Dashboard = () => {
                       align: "center",
                       width: 130,
                     },
-                    {
-                      title: "Xác thực",
-                      dataIndex: "isVerified",
-                      key: "isVerified",
-                      align: "center",
-                      width: 120,
-                      render: (verified) => (
-                        <Tag color={verified ? "green" : "default"}>
-                          {verified ? "Đã xác thực" : "Chưa xác thực"}
-                        </Tag>
-                      ),
-                    },
+                    // {
+                    //   title: "Xác thực",
+                    //   dataIndex: "isVerified",
+                    //   key: "isVerified",
+                    //   align: "center",
+                    //   width: 120,
+                    //   render: (verified) => (
+                    //     <Tag color={verified ? "green" : "default"}>
+                    //       {verified ? "Đã xác thực" : "Chưa xác thực"}
+                    //     </Tag>
+                    //   ),
+                    // },
                     {
                       title: "Thao tác",
                       key: "action",
