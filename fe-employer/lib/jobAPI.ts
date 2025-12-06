@@ -377,3 +377,35 @@ export const getAnalytics = async (
     return { success: false, error: "Không thể kết nối máy chủ" };
   }
 };
+
+// Update application status
+export const updateApplicationStatus = async (
+  applicationId: string,
+  status: string,
+  token: string,
+  feedback?: string
+): Promise<{ success: boolean; data?: any; error?: string }> => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/applications/${applicationId}/status`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          status,
+          ...(feedback && { feedback }),
+        }),
+      }
+    );
+    return (await response.json()) as {
+      success: boolean;
+      data?: any;
+      error?: string;
+    };
+  } catch (e) {
+    return { success: false, error: "Không thể kết nối máy chủ" };
+  }
+};

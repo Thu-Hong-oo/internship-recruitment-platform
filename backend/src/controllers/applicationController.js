@@ -34,14 +34,14 @@ const getUserApplications = asyncHandler(async (req, res) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / limit)
-      }
+        pages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     logger.error('Error getting user applications:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy danh sách đơn ứng tuyển'
+      message: 'Lỗi khi lấy danh sách đơn ứng tuyển',
     });
   }
 });
@@ -59,31 +59,33 @@ const getApplication = asyncHandler(async (req, res) => {
     if (!application) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy đơn ứng tuyển'
+        message: 'Không tìm thấy đơn ứng tuyển',
       });
     }
 
     // Check if user has permission to view this application
     const isOwner = application.jobseekerId._id.toString() === req.user.id;
-    const isEmployer = req.user.role === 'employer' && 
-      application.jobId.companyId._id.toString() === req.user.companyId.toString();
+    const isEmployer =
+      req.user.role === 'employer' &&
+      application.jobId.companyId._id.toString() ===
+        req.user.companyId.toString();
 
     if (!isOwner && !isEmployer) {
       return res.status(403).json({
         success: false,
-        message: 'Không có quyền xem đơn ứng tuyển này'
+        message: 'Không có quyền xem đơn ứng tuyển này',
       });
     }
 
     res.status(200).json({
       success: true,
-      data: application
+      data: application,
     });
   } catch (error) {
     logger.error('Error getting application:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy thông tin đơn ứng tuyển'
+      message: 'Lỗi khi lấy thông tin đơn ứng tuyển',
     });
   }
 });
@@ -100,29 +102,31 @@ const createApplication = asyncHandler(async (req, res) => {
     if (!job) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy công việc'
+        message: 'Không tìm thấy công việc',
       });
     }
 
     // Check if already applied
     const existingApplication = await Application.findOne({
       jobId,
-      jobseekerId: req.user.id
+      jobseekerId: req.user.id,
     });
 
     if (existingApplication) {
       return res.status(400).json({
         success: false,
-        message: 'Bạn đã ứng tuyển cho công việc này'
+        message: 'Bạn đã ứng tuyển cho công việc này',
       });
     }
 
     // Check application deadline
-    if (job.applicationSettings?.deadline && 
-        new Date() > job.applicationSettings.deadline) {
+    if (
+      job.applicationSettings?.deadline &&
+      new Date() > job.applicationSettings.deadline
+    ) {
       return res.status(400).json({
         success: false,
-        message: 'Đã hết hạn ứng tuyển'
+        message: 'Đã hết hạn ứng tuyển',
       });
     }
 
@@ -132,7 +136,7 @@ const createApplication = asyncHandler(async (req, res) => {
       coverLetter,
       resumeUrl,
       portfolioUrl,
-      status: 'pending'
+      status: 'pending',
     });
 
     await application.populate('jobId', 'title companyId');
@@ -141,11 +145,13 @@ const createApplication = asyncHandler(async (req, res) => {
     // Auto-calculate matching score in background (don't block response)
     setImmediate(async () => {
       try {
-        logger.info(`📊 Auto-calculating matching score for application ${application._id}`);
-        
+        logger.info(
+          `📊 Auto-calculating matching score for application ${application._id}`
+        );
+
         // Get candidate profile
-        const candidateProfile = await CandidateProfile.findOne({ 
-          userId: req.user.id 
+        const candidateProfile = await CandidateProfile.findOne({
+          userId: req.user.id,
         }).lean();
 
         if (!candidateProfile) {
@@ -162,39 +168,60 @@ const createApplication = asyncHandler(async (req, res) => {
         };
 
         // Extract technical skills
-        if (candidateProfile.skills?.technical && Array.isArray(candidateProfile.skills.technical)) {
-          cvData.skills.push(...candidateProfile.skills.technical.map(skill => ({
-            name: skill.name || skill,
-            level: skill.level || 'beginner',
-          })));
+        if (
+          candidateProfile.skills?.technical &&
+          Array.isArray(candidateProfile.skills.technical)
+        ) {
+          cvData.skills.push(
+            ...candidateProfile.skills.technical.map(skill => ({
+              name: skill.name || skill,
+              level: skill.level || 'beginner',
+            }))
+          );
         }
 
         // Extract soft skills
-        if (candidateProfile.skills?.soft && Array.isArray(candidateProfile.skills.soft)) {
-          cvData.skills.push(...candidateProfile.skills.soft.map(skill => ({
-            name: skill.name || skill,
-            level: skill.level || 'beginner',
-          })));
+        if (
+          candidateProfile.skills?.soft &&
+          Array.isArray(candidateProfile.skills.soft)
+        ) {
+          cvData.skills.push(
+            ...candidateProfile.skills.soft.map(skill => ({
+              name: skill.name || skill,
+              level: skill.level || 'beginner',
+            }))
+          );
         }
 
         // Extract experience
-        if (candidateProfile.experience?.internships && Array.isArray(candidateProfile.experience.internships)) {
-          cvData.experience.push(...candidateProfile.experience.internships.map(exp => ({
-            position: exp.position || '',
-            company: exp.company || '',
-            startDate: exp.startDate || null,
-            endDate: exp.endDate || null,
-            description: exp.description || '',
-          })));
+        if (
+          candidateProfile.experience?.internships &&
+          Array.isArray(candidateProfile.experience.internships)
+        ) {
+          cvData.experience.push(
+            ...candidateProfile.experience.internships.map(exp => ({
+              position: exp.position || '',
+              company: exp.company || '',
+              startDate: exp.startDate || null,
+              endDate: exp.endDate || null,
+              description: exp.description || '',
+            }))
+          );
         }
 
         // Extract education
-        if (candidateProfile.education?.university && candidateProfile.education.university.name) {
+        if (
+          candidateProfile.education?.university &&
+          candidateProfile.education.university.name
+        ) {
           cvData.education.push({
             degree: candidateProfile.education.university.degree,
-            major: candidateProfile.education.university.major || candidateProfile.education.university.field,
+            major:
+              candidateProfile.education.university.major ||
+              candidateProfile.education.university.field,
             school: candidateProfile.education.university.name,
-            graduationYear: candidateProfile.education.university.graduationYear,
+            graduationYear:
+              candidateProfile.education.university.graduationYear,
           });
         }
 
@@ -202,7 +229,11 @@ const createApplication = asyncHandler(async (req, res) => {
         if (cvData.experience.length > 0) {
           const totalYears = cvData.experience.reduce((total, exp) => {
             // Validate dates
-            if (!exp.startDate || exp.startDate === 'undefined' || exp.startDate === 'null') {
+            if (
+              !exp.startDate ||
+              exp.startDate === 'undefined' ||
+              exp.startDate === 'null'
+            ) {
               return total;
             }
 
@@ -213,7 +244,12 @@ const createApplication = asyncHandler(async (req, res) => {
 
             // Handle endDate - if null/undefined, use current date
             let end;
-            if (!exp.endDate || exp.endDate === 'undefined' || exp.endDate === 'null' || exp.endDate === null) {
+            if (
+              !exp.endDate ||
+              exp.endDate === 'undefined' ||
+              exp.endDate === 'null' ||
+              exp.endDate === null
+            ) {
               end = new Date();
             } else {
               end = new Date(exp.endDate);
@@ -229,7 +265,7 @@ const createApplication = asyncHandler(async (req, res) => {
             }
 
             const years = (end - start) / (1000 * 60 * 60 * 24 * 365);
-            
+
             // Cap at 50 years to prevent data errors
             if (years > 50) {
               return total + 50;
@@ -251,7 +287,9 @@ const createApplication = asyncHandler(async (req, res) => {
           saveToDatabase: true,
         });
 
-        logger.info(`✅ Matching score calculated for application ${application._id}`);
+        logger.info(
+          `✅ Matching score calculated for application ${application._id}`
+        );
       } catch (scoringError) {
         logger.error('Error calculating matching score:', scoringError);
         // Don't throw - scoring failure shouldn't affect application creation
@@ -260,13 +298,13 @@ const createApplication = asyncHandler(async (req, res) => {
 
     res.status(201).json({
       success: true,
-      data: application
+      data: application,
     });
   } catch (error) {
     logger.error('Error creating application:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi tạo đơn ứng tuyển'
+      message: 'Lỗi khi tạo đơn ứng tuyển',
     });
   }
 });
@@ -281,7 +319,7 @@ const updateApplication = asyncHandler(async (req, res) => {
     if (!application) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy đơn ứng tuyển'
+        message: 'Không tìm thấy đơn ứng tuyển',
       });
     }
 
@@ -289,7 +327,7 @@ const updateApplication = asyncHandler(async (req, res) => {
     if (application.jobseekerId.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
-        message: 'Không có quyền chỉnh sửa đơn ứng tuyển này'
+        message: 'Không có quyền chỉnh sửa đơn ứng tuyển này',
       });
     }
 
@@ -297,7 +335,7 @@ const updateApplication = asyncHandler(async (req, res) => {
     if (application.status !== 'pending') {
       return res.status(400).json({
         success: false,
-        message: 'Không thể chỉnh sửa đơn ứng tuyển đã được xử lý'
+        message: 'Không thể chỉnh sửa đơn ứng tuyển đã được xử lý',
       });
     }
 
@@ -309,13 +347,13 @@ const updateApplication = asyncHandler(async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: updatedApplication
+      data: updatedApplication,
     });
   } catch (error) {
     logger.error('Error updating application:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi cập nhật đơn ứng tuyển'
+      message: 'Lỗi khi cập nhật đơn ứng tuyển',
     });
   }
 });
@@ -330,7 +368,7 @@ const deleteApplication = asyncHandler(async (req, res) => {
     if (!application) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy đơn ứng tuyển'
+        message: 'Không tìm thấy đơn ứng tuyển',
       });
     }
 
@@ -338,7 +376,7 @@ const deleteApplication = asyncHandler(async (req, res) => {
     if (application.jobseekerId.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
-        message: 'Không có quyền xóa đơn ứng tuyển này'
+        message: 'Không có quyền xóa đơn ứng tuyển này',
       });
     }
 
@@ -346,13 +384,13 @@ const deleteApplication = asyncHandler(async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Xóa đơn ứng tuyển thành công'
+      message: 'Xóa đơn ứng tuyển thành công',
     });
   } catch (error) {
     logger.error('Error deleting application:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi xóa đơn ứng tuyển'
+      message: 'Lỗi khi xóa đơn ứng tuyển',
     });
   }
 });
@@ -368,16 +406,41 @@ const updateApplicationStatus = asyncHandler(async (req, res) => {
     if (!application) {
       return res.status(404).json({
         success: false,
-        message: 'Không tìm thấy đơn ứng tuyển'
+        message: 'Không tìm thấy đơn ứng tuyển',
       });
     }
 
     // Check if user is employer of the job
     const job = await Job.findById(application.jobId);
-    if (!job || job.companyId.toString() !== req.user.companyId.toString()) {
+    if (!job) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy công việc',
+      });
+    }
+
+    // Check if user is the owner of the job (postedBy) or admin
+    const isAdmin = req.user.role === 'admin';
+    const isJobOwner = job.postedBy && job.postedBy.toString() === req.user.id;
+
+    // Also check if user is owner of the employer profile
+    let isEmployerOwner = false;
+    if (job.employer) {
+      const EmployerProfile = require('../models/EmployerProfile');
+      const employerProfile = await EmployerProfile.findById(job.employer);
+      if (
+        employerProfile &&
+        employerProfile.owner &&
+        employerProfile.owner.toString() === req.user.id
+      ) {
+        isEmployerOwner = true;
+      }
+    }
+
+    if (!isAdmin && !isJobOwner && !isEmployerOwner) {
       return res.status(403).json({
         success: false,
-        message: 'Không có quyền cập nhật trạng thái đơn ứng tuyển này'
+        message: 'Không có quyền cập nhật trạng thái đơn ứng tuyển này',
       });
     }
 
@@ -390,7 +453,11 @@ const updateApplicationStatus = asyncHandler(async (req, res) => {
     await application.populate('jobId', 'title');
 
     // Notify candidate về status change
-    if (oldStatus !== status && application.candidateId && application.candidateId.userId) {
+    if (
+      oldStatus !== status &&
+      application.candidateId &&
+      application.candidateId.userId
+    ) {
       try {
         const NotificationService = require('../services/notification/notificationService');
         await NotificationService.notifyApplicationStatusChange(
@@ -401,25 +468,33 @@ const updateApplicationStatus = asyncHandler(async (req, res) => {
           status
         );
       } catch (notifyError) {
-        logger.error('Failed to send application status change notification:', notifyError);
+        logger.error(
+          'Failed to send application status change notification:',
+          notifyError
+        );
         // Không fail request nếu notification fail
       }
     }
 
     // *** NEW: Auto collect job matching training data when status changes to final outcome ***
-    if (oldStatus !== status && ['hired', 'rejected', 'interviewed', 'shortlisted'].includes(status)) {
+    if (
+      oldStatus !== status &&
+      ['hired', 'rejected', 'interviewed', 'shortlisted'].includes(status)
+    ) {
       try {
         const TrainingData = require('../models/TrainingData');
         const CandidateProfile = require('../models/CandidateProfile');
         const Job = require('../models/Job');
-        
+
         // Get full application data with populated fields
         await application.populate('candidateId');
         await application.populate('jobId');
-        
-        const candidateProfile = await CandidateProfile.findById(application.candidateId);
+
+        const candidateProfile = await CandidateProfile.findById(
+          application.candidateId
+        );
         const job = await Job.findById(application.jobId);
-        
+
         if (candidateProfile && job) {
           // Collect job matching training data
           const trainingData = {
@@ -440,12 +515,13 @@ const updateApplicationStatus = asyncHandler(async (req, res) => {
             output: {
               predictedScore: application.matchingScore?.overall || 0,
               actualOutcome: status,
-              outcomeMapping: {
-                'hired': 1.0,
-                'shortlisted': 0.8,
-                'interviewed': 0.6,
-                'rejected': 0.2,
-              }[status] || 0.5,
+              outcomeMapping:
+                {
+                  hired: 1.0,
+                  shortlisted: 0.8,
+                  interviewed: 0.6,
+                  rejected: 0.2,
+                }[status] || 0.5,
             },
             metadata: {
               source: 'system_generated',
@@ -454,12 +530,15 @@ const updateApplicationStatus = asyncHandler(async (req, res) => {
               verified: true,
               cvId: candidateProfile._id,
               jobId: job._id,
-            }
+            },
           };
-          
+
           // Save to training data (async, don't block response)
           TrainingData.create(trainingData).catch(err => {
-            logger.warn('Failed to save job matching training data:', err.message);
+            logger.warn(
+              'Failed to save job matching training data:',
+              err.message
+            );
           });
           logger.info('📊 Job matching training data collected', {
             applicationId: application._id,
@@ -468,20 +547,23 @@ const updateApplicationStatus = asyncHandler(async (req, res) => {
           });
         }
       } catch (dataCollectionError) {
-        logger.warn('Error collecting job matching training data:', dataCollectionError.message);
+        logger.warn(
+          'Error collecting job matching training data:',
+          dataCollectionError.message
+        );
         // Don't fail the request if data collection fails
       }
     }
 
     res.status(200).json({
       success: true,
-      data: application
+      data: application,
     });
   } catch (error) {
     logger.error('Error updating application status:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi cập nhật trạng thái đơn ứng tuyển'
+      message: 'Lỗi khi cập nhật trạng thái đơn ứng tuyển',
     });
   }
 });
@@ -518,14 +600,14 @@ const getEmployerApplications = asyncHandler(async (req, res) => {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / limit)
-      }
+        pages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
     logger.error('Error getting employer applications:', error);
     res.status(500).json({
       success: false,
-      message: 'Lỗi khi lấy danh sách đơn ứng tuyển'
+      message: 'Lỗi khi lấy danh sách đơn ứng tuyển',
     });
   }
 });
@@ -647,5 +729,5 @@ module.exports = {
   deleteApplication,
   updateApplicationStatus,
   getEmployerApplications,
-  viewApplicationResume
+  viewApplicationResume,
 };

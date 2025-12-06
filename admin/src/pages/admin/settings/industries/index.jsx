@@ -79,25 +79,25 @@ const Industries = () => {
           <Tag color="green">Root</Tag>
         ),
     },
-    {
-      title: "Thống kê",
-      key: "stats",
-      render: (_, record) => {
-        if (!includeStats || !record.stats) return "-";
-        return (
-          <div className="text-sm">
-            <div>
-              <FileTextOutlined className="mr-1" />
-              {record.stats.totalJobs || 0} việc làm
-            </div>
-            <div>
-              <UserOutlined className="mr-1" />
-              {record.stats.totalCandidates || 0} ứng viên
-            </div>
-          </div>
-        );
-      },
-    },
+    // {
+    //   title: "Thống kê",
+    //   key: "stats",
+    //   render: (_, record) => {
+    //     if (!includeStats || !record.stats) return "-";
+    //     return (
+    //       <div className="text-sm">
+    //         <div>
+    //           <FileTextOutlined className="mr-1" />
+    //           {record.stats.totalJobs || 0} việc làm
+    //         </div>
+    //         <div>
+    //           <UserOutlined className="mr-1" />
+    //           {record.stats.totalCandidates || 0} ứng viên
+    //         </div>
+    //       </div>
+    //     );
+    //   },
+    // },
     {
       title: "Trạng thái",
       dataIndex: "visible",
@@ -180,7 +180,9 @@ const Industries = () => {
         includeStats: false,
       });
       if (success) {
-        setAllIndustries(data.map((item) => ({ key: item._id || item.code, ...item })));
+        setAllIndustries(
+          data.map((item) => ({ key: item._id || item.code, ...item }))
+        );
       }
     } catch (error) {
       console.error("Failed to fetch all industries:", error);
@@ -285,7 +287,9 @@ const Industries = () => {
   const handleDelete = (record) => {
     Modal.confirm({
       title: "Xác nhận xóa",
-      content: `Bạn có chắc chắn muốn xóa ngành nghề "${record.name?.vi || record.name}"?`,
+      content: `Bạn có chắc chắn muốn xóa ngành nghề "${
+        record.name?.vi || record.name
+      }"?`,
       okText: "Xóa",
       okType: "danger",
       cancelText: "Hủy",
@@ -444,15 +448,18 @@ const Industries = () => {
             onExpand: async (expanded, record) => {
               if (expanded) {
                 setExpandedRows([...expandedRows, record.key]);
-                
+
                 // Fetch sub-industries if not in cache
                 if (!subIndustriesCache.has(record.code)) {
-                  setLoadingSubIndustries((prev) => new Set(prev).add(record.code));
+                  setLoadingSubIndustries((prev) =>
+                    new Set(prev).add(record.code)
+                  );
                   try {
-                    const { data, success } = await industriesAPI.getSubIndustries(
-                      record.code,
-                      includeStats
-                    );
+                    const { data, success } =
+                      await industriesAPI.getSubIndustries(
+                        record.code,
+                        includeStats
+                      );
                     if (success && data.length > 0) {
                       const children = data.map((item) => ({
                         key: item._id || item.code,
@@ -553,4 +560,3 @@ const Industries = () => {
 };
 
 export default Industries;
-
