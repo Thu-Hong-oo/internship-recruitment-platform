@@ -16,6 +16,7 @@ import {
   CheckCircleOutlined,
   ReloadOutlined,
 } from "@ant-design/icons";
+import { jobsAPI } from "../../../api/jobs";
 
 const { Title, Text } = Typography;
 
@@ -43,27 +44,17 @@ export default function AdminJobDetail() {
     try {
       setLoading(true);
       setError(null);
-      const token =
-        localStorage.getItem("accessToken") ||
-        sessionStorage.getItem("accessToken");
-      if (!token) {
-        throw new Error("Vui lòng đăng nhập để sử dụng tính năng này");
+      const response = await jobsAPI.getJobDetail(id);
+      if (!response.success) {
+        throw new Error(response.error || "Không thể tải chi tiết job");
       }
-      const res = await fetch(`http://localhost:3000/api/admin/jobs/${id}`, {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const data = await res.json();
-      if (!res.ok || !data?.success) {
-        throw new Error(
-          data?.error || `Lỗi ${res.status}: Không thể tải chi tiết job`
-        );
-      }
-      setJobData(data.data);
+      setJobData(response.data);
     } catch (e) {
-      setError(e.message || "Có lỗi xảy ra");
+      const errorMessage =
+        e?.response?.data?.error ||
+        e?.message ||
+        "Có lỗi xảy ra khi tải chi tiết job";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -77,32 +68,17 @@ export default function AdminJobDetail() {
     if (!jobData?.job?._id) return;
     try {
       setApproving(true);
-      const token =
-        localStorage.getItem("accessToken") ||
-        sessionStorage.getItem("accessToken");
-      if (!token) return;
-      const res = await fetch(
-        `http://localhost:3000/api/admin/jobs/${jobData.job._id}/status`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ status: "active" }),
-        }
-      );
-      const data = await res.json();
-      if (!res.ok || !data?.success) {
-        throw new Error(
-          data?.error || `Lỗi ${res.status}: Không thể duyệt bài`
-        );
+      const response = await jobsAPI.updateJobStatus(jobData.job._id, "active");
+      if (!response.success) {
+        throw new Error(response.error || "Không thể duyệt bài");
       }
       message.success("Duyệt bài thành công");
       // Refresh detail to update status
       fetchDetail();
     } catch (e) {
-      message.error(e.message || "Không thể duyệt bài");
+      const errorMessage =
+        e?.response?.data?.error || e?.message || "Không thể duyệt bài";
+      message.error(errorMessage);
     } finally {
       setApproving(false);
     }

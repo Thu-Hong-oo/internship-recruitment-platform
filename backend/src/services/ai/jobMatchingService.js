@@ -485,9 +485,9 @@ class JobMatchingService {
 
     try {
       const extracted = await this.skillExtractor.extractSkills(text, {
-        usePhoBERT: true,
-        useGemini: false, // NO Gemini dependency
-        useHybrid: false
+        useHybrid: true,      // Use Hybrid System (Rule-based + Multilingual NER)
+        usePhoBERT: false,    // Disabled - will re-enable after fixing PhoBERT
+        useGemini: false      // NO Gemini dependency
       });
       
       return extracted.map(s => s.name);

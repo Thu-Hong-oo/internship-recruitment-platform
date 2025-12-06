@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import PageLayout from "@/components/layout/page-layout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,9 +17,11 @@ import {
   Search,
   TrendingUp,
   Filter,
+  GraduationCap,
 } from "lucide-react";
-import { nlpService } from "@/lib/api";
+import { nlpService, candidateService } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Select,
   SelectContent,
@@ -29,10 +31,13 @@ import {
 } from "@/components/ui/select";
 import { EmptyProfileState } from "@/components/profile/EmptyProfileState";
 import UploadCVModal from "@/components/cv/UploadCVModal";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
 
 export default function JobRecommendationsPage() {
   const router = useRouter();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [jobs, setJobs] = useState<any[]>([]);
   const [filteredJobs, setFilteredJobs] = useState<any[]>([]);
@@ -43,6 +48,11 @@ export default function JobRecommendationsPage() {
   const [isProfileEmpty, setIsProfileEmpty] = useState(false);
   const [profileEmptyMessage, setProfileEmptyMessage] = useState<string>("");
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
+  const [showRoadmapProgress, setShowRoadmapProgress] = useState(false);
+  const [roadmapProgress, setRoadmapProgress] = useState(0);
+  const [roadmapProgressMessage, setRoadmapProgressMessage] = useState("Đang khởi tạo...");
+  const [currentJobId, setCurrentJobId] = useState<string | null>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -140,9 +150,243 @@ export default function JobRecommendationsPage() {
     router.push(`/jobs/${jobId}`);
   };
 
-  const handleGenerateRoadmap = (jobId: string) => {
-    router.push(`/roadmaps?targetJobId=${jobId}`);
-  };
+  // Handle generate roadmap from job - MUST be before early returns (Rules of Hooks)
+  const handleGenerateRoadmap = useCallback(async (jobId: string, e?: React.MouseEvent | React.KeyboardEvent) => {
+    console.log('🔵 handleGenerateRoadmap called', { e, jobId, hasUser: !!user });
+    
+    // Prevent default behavior and form submission IMMEDIATELY
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      // Also prevent default on native event
+      if ('nativeEvent' in e && e.nativeEvent) {
+        e.nativeEvent.preventDefault?.();
+        e.nativeEvent.stopPropagation?.();
+        e.nativeEvent.stopImmediatePropagation?.();
+      }
+      // Prevent any form submission
+      const form = (e.target as HTMLElement)?.closest('form');
+      if (form) {
+        form.preventDefault?.();
+      }
+    }
+
+    if (!jobId) {
+      console.error('❌ No job ID available');
+      return;
+    }
+
+    setCurrentJobId(jobId);
+
+    // Check if user is logged in
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (!token) {
+      toast({
+        title: "Cần đăng nhập",
+        description: "Vui lòng đăng nhập để tạo lộ trình học tập",
+        variant: "destructive",
+      });
+      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+      return;
+    }
+
+    if (!user || !(user as any)._id) {
+      toast({
+        title: "Cần đăng nhập",
+        description: "Vui lòng đăng nhập để tạo lộ trình học tập",
+        variant: "destructive",
+      });
+      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+      return;
+    }
+
+    // Check if user has profile and CV before proceeding
+    try {
+      setRoadmapProgressMessage("Đang kiểm tra hồ sơ...");
+      setRoadmapProgress(10);
+      
+      const profileResponse = await candidateService.getProfile();
+      
+      if (!profileResponse.success || !profileResponse.data) {
+        toast({
+          title: "Chưa có hồ sơ",
+          description: "Vui lòng hoàn thiện hồ sơ hoặc tải CV lên trước khi tạo lộ trình học tập.",
+          variant: "destructive",
+        });
+        router.push("/my-cv");
+        return;
+      }
+
+      const profile = profileResponse.data;
+      
+      // Check if user has CV or profile data
+      const hasCV = profile.resume?.current;
+      const hasSkills = (profile.skills?.technical?.length || 0) + (profile.skills?.soft?.length || 0) > 0;
+      const hasExperience = (profile.experience?.internships?.length || 0) + 
+                           ((profile.experience as any)?.fulltime?.length || 0) + 
+                           (profile.experience?.projects?.length || 0) > 0;
+      const hasEducation = !!profile.education?.university || (profile.education?.certifications?.length || 0) > 0;
+
+      if (!hasCV && !hasSkills && !hasExperience && !hasEducation) {
+        toast({
+          title: "Chưa có thông tin hồ sơ",
+          description: "Vui lòng tải CV lên hoặc cập nhật thông tin (kỹ năng, kinh nghiệm, học vấn) trước khi tạo lộ trình học tập.",
+          variant: "destructive",
+        });
+        router.push("/my-cv");
+        return;
+      }
+
+      setRoadmapProgressMessage("Đang phân tích hồ sơ và công việc...");
+      setRoadmapProgress(20);
+    } catch (profileError: any) {
+      console.error("Error checking profile:", profileError);
+      toast({
+        title: "Lỗi kiểm tra hồ sơ",
+        description: profileError?.response?.data?.message || "Không thể kiểm tra hồ sơ. Vui lòng thử lại.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingRoadmap(true);
+    setShowRoadmapProgress(true);
+    setRoadmapProgress(25);
+    setRoadmapProgressMessage("Đang xác định kỹ năng cần thiết...");
+    
+    try {
+      // Find job data from current jobs list
+      const jobData = jobs.find(j => j.job._id === jobId || j.jobId === jobId);
+      const targetRole = jobData?.job?.title || undefined;
+      
+      console.log('🚀 Generating roadmap for job:', jobId, 'candidate:', (user as any)._id, 'targetRole:', targetRole);
+      
+      // Progress simulation based on actual backend steps
+      const progressSteps = [
+        { progress: 30, message: "Đang phân tích skill gaps..." },
+        { progress: 40, message: "Đang tìm kiếm tài liệu học tập..." },
+        { progress: 50, message: "Đang tìm kiếm video YouTube..." },
+        { progress: 60, message: "Đang tìm kiếm dự án GitHub..." },
+        { progress: 70, message: "Đang đánh giá độ tin cậy tài liệu..." },
+        { progress: 80, message: "Đang tạo lộ trình học tập..." },
+        { progress: 90, message: "Đang tính toán metrics..." },
+      ];
+
+      let currentStep = 0;
+      const progressInterval = setInterval(() => {
+        if (currentStep < progressSteps.length) {
+          const step = progressSteps[currentStep];
+          setRoadmapProgress(step.progress);
+          setRoadmapProgressMessage(step.message);
+          currentStep++;
+        } else {
+          // Slow down near completion
+          setRoadmapProgress((prev) => {
+            if (prev >= 95) return prev;
+            return prev + 1;
+          });
+        }
+      }, 3000); // Update every 3 seconds
+
+      // Use RAG-powered learning roadmap API
+      const response = await nlpService.generateLearningRoadmapRag({
+        jobId: jobId,
+        candidateId: (user as any)._id,
+        targetRole: targetRole,
+        timeframe: 12, // 12 weeks default
+      });
+
+      clearInterval(progressInterval);
+      setRoadmapProgress(95);
+      setRoadmapProgressMessage("Đang lưu lộ trình học tập...");
+
+      console.log('📦 API Response:', response);
+      console.log('📦 Response structure:', {
+        success: response.success,
+        hasData: !!response.data,
+        dataKeys: response.data ? Object.keys(response.data) : [],
+        roadmapExists: !!(response.data as any)?.roadmap,
+      });
+
+      if (response.success && response.data) {
+        // API returns { data: { roadmap: {...}, ... } }
+        const data = response.data as any;
+        const roadmap = data.roadmap || data;
+        const roadmapId = roadmap?._id || roadmap?.id;
+        
+        console.log('📋 Extracted roadmap:', roadmap);
+        console.log('🆔 Roadmap ID:', roadmapId);
+        
+        if (!roadmapId) {
+          console.error('❌ Roadmap ID not found in response:', {
+            data: response.data,
+            roadmap: data.roadmap,
+            directData: data,
+          });
+          setShowRoadmapProgress(false);
+          toast({
+            title: "Lỗi tạo lộ trình",
+            description: "Không tìm thấy ID lộ trình trong phản hồi. Vui lòng kiểm tra console để xem chi tiết.",
+            variant: "destructive",
+          });
+          setIsGeneratingRoadmap(false);
+          return; // Don't redirect, stay on current page
+        }
+        
+        setRoadmapProgress(100);
+        setRoadmapProgressMessage("Hoàn thành!");
+        
+        toast({
+          title: "Tạo lộ trình thành công",
+          description: "Lộ trình học tập đã được tạo với tài liệu thực tế. Đang chuyển đến trang chi tiết...",
+        });
+        
+        // Small delay to show completion before closing modal and navigating
+        setTimeout(() => {
+          setShowRoadmapProgress(false);
+          console.log('🔄 Redirecting to roadmap:', `/roadmaps/${roadmapId}`);
+          router.push(`/roadmaps/${roadmapId}`);
+        }, 1000);
+      } else {
+        console.error('❌ API returned unsuccessful response:', response);
+        setShowRoadmapProgress(false);
+        toast({
+          title: "Lỗi tạo lộ trình",
+          description: (response as any)?.message || "Không thể tạo lộ trình. Vui lòng thử lại.",
+          variant: "destructive",
+        });
+        setIsGeneratingRoadmap(false);
+      }
+    } catch (error: any) {
+      console.error("❌ Error generating roadmap:", error);
+      console.error("Error details:", {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        stack: error?.stack,
+      });
+      
+      setShowRoadmapProgress(false);
+      
+      // Check if error is about missing profile/CV
+      const errorMessage = error?.response?.data?.message || error?.message || "";
+      if (errorMessage.includes("profile") || errorMessage.includes("CV") || errorMessage.includes("complete")) {
+        toast({
+          title: "Chưa có đủ thông tin",
+          description: errorMessage || "Vui lòng hoàn thiện hồ sơ hoặc tải CV lên trước khi tạo lộ trình học tập.",
+          variant: "destructive",
+        });
+        router.push("/my-cv");
+      } else {
+        toast({
+          title: "Lỗi tạo lộ trình",
+          description: errorMessage || "Không thể tạo lộ trình học tập. Vui lòng thử lại.",
+          variant: "destructive",
+        });
+      }
+      setIsGeneratingRoadmap(false);
+    }
+  }, [user, jobs, router, toast]);
 
   // Tính lại toàn bộ điểm phù hợp rồi reload danh sách gợi ý
   const refreshJobMatchesAndRecommendations = async () => {
@@ -198,6 +442,42 @@ export default function JobRecommendationsPage() {
 
   return (
     <PageLayout>
+      {/* Progress Modal for Roadmap Generation */}
+      <Dialog open={showRoadmapProgress} onOpenChange={(open) => {
+        if (!open && !isGeneratingRoadmap) {
+          setShowRoadmapProgress(false);
+        }
+      }}>
+        <DialogContent className="sm:max-w-md" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Đang tạo lộ trình học tập
+            </DialogTitle>
+            <DialogDescription>
+              {roadmapProgressMessage}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Progress value={roadmapProgress} className="w-full" />
+            <div className="text-center space-y-2">
+              <p className="text-sm font-medium">{roadmapProgressMessage}</p>
+              <p className="text-xs text-muted-foreground">
+                {roadmapProgress < 50 
+                  ? "Đang phân tích và chuẩn bị..." 
+                  : roadmapProgress < 80
+                  ? "Đang tìm kiếm tài liệu học tập từ YouTube, GitHub..."
+                  : "Đang hoàn thiện lộ trình học tập..."
+                }
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Quá trình này có thể mất 30-90 giây. Vui lòng đợi...
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header + Filters */}
         <div className="mb-8">
@@ -479,13 +759,48 @@ export default function JobRecommendationsPage() {
                               Xem chi tiết
                             </Button>
                             <Button
-                              onClick={() =>
-                                handleGenerateRoadmap(item.job._id)
-                              }
+                              type="button"
+                              onClick={(e) => {
+                                console.log('🔴 Button onClick fired', { e, type: e.type, target: e.target });
+                                e.preventDefault();
+                                e.stopPropagation();
+                                e.nativeEvent?.stopImmediatePropagation?.();
+                                if (e.defaultPrevented) {
+                                  console.log('✅ Default prevented');
+                                }
+                                handleGenerateRoadmap(item.job._id, e);
+                                return false;
+                              }}
+                              onMouseDown={(e) => {
+                                console.log('🟡 Button onMouseDown fired');
+                                e.preventDefault();
+                                e.stopPropagation();
+                                return false;
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  handleGenerateRoadmap(item.job._id, e as any);
+                                }
+                              }}
+                              disabled={isGeneratingRoadmap}
                               variant="outline"
                               size="sm"
+                              className="gap-2"
+                              style={{ pointerEvents: isGeneratingRoadmap ? 'none' : 'auto' }}
                             >
-                              Tạo lộ trình học tập
+                              {isGeneratingRoadmap && currentJobId === item.job._id ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                  Đang tạo...
+                                </>
+                              ) : (
+                                <>
+                                  <GraduationCap className="w-4 h-4" />
+                                  Tạo lộ trình học tập
+                                </>
+                              )}
                             </Button>
                           </div>
                         </div>

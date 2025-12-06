@@ -100,7 +100,6 @@ export default function Header() {
   // Sử dụng custom hook cho 2 dropdowns
   const jobsDropdown = useDropdown(150);
   const aiDropdown = useDropdown(150);
-  const cvDropdown = useDropdown(150);
 
   // Đăng nhập khi có user trong context
 
@@ -256,55 +255,11 @@ export default function Header() {
     }
   };
 
-  // Mock data cho các mẫu CV
-  const cvTemplates = [
-    { id: 1, name: "Mẫu CV Đơn giản", style: "Simple" },
-    { id: 2, name: "Mẫu CV Ấn tượng", style: "Impressive" },
-    { id: 3, name: "Mẫu CV Chuyên nghiệp", style: "Professional" },
-    { id: 4, name: "Mẫu CV Hiện đại", style: "Modern" },
-  ];
-
-  // Mock data cho CV theo vị trí
-  const cvByPosition = [
-    { id: 1, name: "Nhân viên kinh doanh" },
-    { id: 2, name: "Lập trình viên" },
-    { id: 3, name: "Nhân viên kế toán" },
-    { id: 4, name: "Chuyên viên marketing" },
-  ];
-
-  // Mock data cho các tính năng CV
-  const cvFeatures = [
-    { id: 1, name: "Quản lý CV" },
-    { id: 2, name: "Tải CV lên" },
-    { id: 3, name: "Hướng dẫn viết CV" },
-    { id: 4, name: "Quản lý Cover Letter" },
-    { id: 5, name: "Mẫu Cover Letter" },
-  ];
-
   // Click handlers
   const handleJobPositionClick = (industry: Industry) => {
     const params = new URLSearchParams();
     params.set("industry", industry.code);
     router.push(`/search?${params.toString()}`);
-  };
-
-  const handleCVTemplateClick = (template: (typeof cvTemplates)[0]) => {
-    console.log(`Clicked on CV template: ${template.name} (${template.style})`);
-    // TODO: Navigate to CV template page
-  };
-
-  const handleCVByPositionClick = (position: (typeof cvByPosition)[0]) => {
-    console.log(`Clicked on CV by position: ${position.name}`);
-    // TODO: Navigate to CV by position page
-  };
-
-  const handleCVFeatureClick = (feature: (typeof cvFeatures)[0]) => {
-    console.log(`Clicked on CV feature: ${feature.name}`);
-    // Navigate to CV management page for specific features
-    if (feature.name === "Quản lý CV" || feature.name === "Tải CV lên") {
-      router.push("/my-cv");
-    }
-    // TODO: Navigate to other feature pages
   };
 
   return (
@@ -530,88 +485,19 @@ export default function Header() {
               )}
             </div>
 
-            <div className="relative">
-              <button
-                className="flex items-center text-foreground hover:text-primary transition-colors duration-200"
-                onMouseEnter={cvDropdown.openDropdown}
-                onMouseLeave={cvDropdown.closeDropdown}
+            <div className="flex items-center gap-4">
+              <Link
+                href="/my-cv/templates"
+                className="text-foreground hover:text-primary transition-colors duration-200"
               >
-                Tạo CV
-                <ChevronDown className="w-4 h-4 ml-1" />
-              </button>
-              {cvDropdown.isOpen && (
-                <div
-                  className="absolute top-full left-0 mt-2 w-150 bg-card border border-border rounded-lg shadow-xl z-50"
-                  onMouseEnter={cvDropdown.openDropdown}
-                  onMouseLeave={cvDropdown.closeDropdown}
-                >
-                  {/*tuyệt đối, trùng mép trái phần tử cha */}
-                  <div className="p-6">
-                    <div className="grid grid-cols-2 gap-6">
-                      {/* chia 2 cột, grid bố cục hàng cột */}
-                      <div>
-                        <div className="text-primary font-semibold mb-3 flex items-center">
-                          Mẫu CV theo style
-                        </div>
-                        <div className="space-y-3">
-                          {cvTemplates.map((template) => (
-                            <div
-                              key={template.id}
-                              className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
-                              onClick={() => handleCVTemplateClick(template)}
-                            >
-                              <div className="w-4 h-4 mr-3 bg-gray-300 rounded group-hover:bg-primary transition-colors duration-200"></div>
-                              <span>{template.name}</span>
-                              <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
-                                →
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="mt-6">
-                          <div className="text-primary font-semibold mb-3 flex items-center">
-                            Mẫu CV theo vị trí ứng tuyển
-                          </div>
-                          <div className="space-y-3">
-                            {cvByPosition.map((position) => (
-                              <div
-                                key={position.id}
-                                className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
-                                onClick={() =>
-                                  handleCVByPositionClick(position)
-                                }
-                              >
-                                <div className="w-4 h-4 mr-3 bg-gray-300 rounded group-hover:bg-primary transition-colors duration-200"></div>
-                                <span>{position.name}</span>
-                                <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
-                                  →
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <div className="space-y-4">
-                          {cvFeatures.map((feature) => (
-                            <div
-                              key={feature.id}
-                              className="flex items-center text-gray-600 hover:text-primary cursor-pointer group p-2 rounded-lg hover:bg-gray-100 transition-all duration-200"
-                              onClick={() => handleCVFeatureClick(feature)}
-                            >
-                              <div className="w-6 h-6 mr-3 bg-gray-300 rounded flex items-center justify-center group-hover:bg-primary transition-colors duration-200"></div>
-                              <span>{feature.name}</span>
-                              <span className="ml-auto text-xl opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-200">
-                                →
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+                Tạo CV với template
+              </Link>
+              <Link
+                href="/my-cv"
+                className="text-foreground hover:text-primary transition-colors duration-200"
+              >
+                Tải lên và quản lý CV
+              </Link>
             </div>
 
             <a
@@ -620,12 +506,6 @@ export default function Header() {
             >
               Cẩm nang nghề nghiệp
             </a>
-            <div className="flex items-center space-x-2">
-              <span className="text-foreground">InternBridge</span>
-              <Badge className="bg-secondary text-secondary-foreground">
-                Pro
-              </Badge>
-            </div>
           </nav>
 
           {/* User Actions */}

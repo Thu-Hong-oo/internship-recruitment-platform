@@ -240,7 +240,6 @@ const getJobAdmin = asyncHandler(async (req, res) => {
   const [applications, reports, views] = await Promise.all([
     Application.find({ jobId: job._id })
       .populate('candidateId', 'fullName email')
-      .populate('candidateProfile', 'personalInfo')
       .select('status createdAt score'),
     // If you have a reports collection, otherwise empty array
     [],

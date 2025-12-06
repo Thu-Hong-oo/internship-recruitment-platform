@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,12 +13,21 @@ import {
   Briefcase,
   UserCircle2,
   CheckCircle2,
+  GraduationCap,
+  Loader2,
+  TrendingUp,
 } from "lucide-react";
 import { PageLayout } from "@/components/layout";
-import { jobsAPI, nlpService } from "@/lib/api";
+import { jobsAPI, nlpService, apiClient, candidateService } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { ApplyButton } from "@/components/jobs/ApplyButton";
+import { SaveJobButton } from "@/components/jobs/SaveJobButton";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { MatchScoreCard } from "@/components/ai/MatchScoreCard";
+import type { MatchingScore } from "@/lib/api/services/nlp.service";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
 
 interface JobDetailPageProps {
   params: Promise<{ id: string }>;
@@ -27,6 +36,7 @@ interface JobDetailPageProps {
 export default function JobDetailPage({ params }: JobDetailPageProps) {
   const router = useRouter();
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
   const [id, setId] = useState<string | null>(null);
   const [job, setJob] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -34,6 +44,13 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
   const [bestMatches, setBestMatches] = useState<any[]>([]);
   const [relatedJobs, setRelatedJobs] = useState<any[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
+  const [showRoadmapProgress, setShowRoadmapProgress] = useState(false);
+  const [roadmapProgress, setRoadmapProgress] = useState(0);
+  const [roadmapProgressMessage, setRoadmapProgressMessage] = useState("Đang khởi tạo...");
+  const [matchingScore, setMatchingScore] = useState<MatchingScore | null>(null);
+  const [loadingMatchingScore, setLoadingMatchingScore] = useState(false);
+  const [calculatingScore, setCalculatingScore] = useState(false);
 
   // Get job ID from URL pathname (works in both dev and production)
   useEffect(() => {
@@ -133,6 +150,307 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
     loadSuggestions();
   }, [id, toast]);
 
+  // Fetch matching score for current job
+  useEffect(() => {
+    if (!id || !user?._id || id === 'dummy') return;
+    
+    const fetchMatchingScore = async () => {
+      setLoadingMatchingScore(true);
+      try {
+        const response = await nlpService.getMatchingScore(id, user._id);
+        if (response.success && response.data) {
+          setMatchingScore(response.data);
+        }
+      } catch (error: any) {
+        // If score doesn't exist, don't show error (it's normal)
+        if (error?.response?.status !== 404) {
+          console.error('Error fetching matching score:', error);
+        }
+      } finally {
+        setLoadingMatchingScore(false);
+      }
+    };
+
+    fetchMatchingScore();
+  }, [id, user?._id]);
+
+  // Handle generate roadmap from job - MUST be before early returns (Rules of Hooks)
+  const handleGenerateRoadmap = useCallback(async (e?: React.MouseEvent | React.KeyboardEvent) => {
+    console.log('🔵 handleGenerateRoadmap called', { e, id, hasUser: !!user });
+    
+    // Prevent default behavior and form submission IMMEDIATELY
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      // Also prevent default on native event
+      if ('nativeEvent' in e && e.nativeEvent) {
+        e.nativeEvent.preventDefault?.();
+        e.nativeEvent.stopPropagation?.();
+        e.nativeEvent.stopImmediatePropagation?.();
+      }
+      // Prevent any form submission
+      const form = (e.target as HTMLElement)?.closest('form');
+      if (form) {
+        form.preventDefault?.();
+      }
+    }
+
+    if (!id) {
+      console.error('❌ No job ID available');
+      return;
+    }
+
+    // Check if user is logged in
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (!token) {
+      toast({
+        title: "Cần đăng nhập",
+        description: "Vui lòng đăng nhập để tạo lộ trình học tập",
+        variant: "destructive",
+      });
+      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+      return;
+    }
+
+    // Get user ID - handle both _id and id properties, and handle loading state
+    let userId: string | undefined;
+    
+    if (authLoading) {
+      // If still loading, wait a bit and try to get user directly
+      try {
+        const { authAPI } = await import("@/lib/api");
+        const currentUser = await authAPI.getCurrentUser();
+        userId = (currentUser as any)?._id || (currentUser as any)?.id;
+      } catch (error) {
+        console.error('Error fetching user:', error);
+      }
+    } else {
+      // If not loading, use user from context
+      userId = (user as any)?._id || (user as any)?.id;
+    }
+
+    // If still no userId, try one more time to fetch directly
+    if (!userId && token) {
+      try {
+        const { authAPI } = await import("@/lib/api");
+        const currentUser = await authAPI.getCurrentUser();
+        userId = (currentUser as any)?._id || (currentUser as any)?.id;
+      } catch (error) {
+        console.error('Error fetching user on retry:', error);
+      }
+    }
+
+    // Final check - if still no userId, redirect to login
+    if (!userId) {
+      toast({
+        title: "Cần đăng nhập",
+        description: "Vui lòng đăng nhập để tạo lộ trình học tập",
+        variant: "destructive",
+      });
+      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+      return;
+    }
+
+    // Note: We don't check profile here because the backend API has fallback logic
+    // to generate skill gaps even if profile is incomplete. Let the API handle it.
+    setRoadmapProgressMessage("Đang phân tích hồ sơ và công việc...");
+    setRoadmapProgress(20);
+
+    setIsGeneratingRoadmap(true);
+    setShowRoadmapProgress(true);
+    setRoadmapProgress(25);
+    setRoadmapProgressMessage("Đang xác định kỹ năng cần thiết...");
+    
+    try {
+      console.log('🚀 Generating roadmap for job:', id, 'candidate:', userId);
+      
+      // Progress simulation based on actual backend steps
+      const progressSteps = [
+        { progress: 30, message: "Đang phân tích skill gaps..." },
+        { progress: 40, message: "Đang tìm kiếm tài liệu học tập..." },
+        { progress: 50, message: "Đang tìm kiếm video YouTube..." },
+        { progress: 60, message: "Đang tìm kiếm dự án GitHub..." },
+        { progress: 70, message: "Đang đánh giá độ tin cậy tài liệu..." },
+        { progress: 80, message: "Đang tạo lộ trình học tập..." },
+        { progress: 90, message: "Đang tính toán metrics..." },
+      ];
+
+      let currentStep = 0;
+      const progressInterval = setInterval(() => {
+        if (currentStep < progressSteps.length) {
+          const step = progressSteps[currentStep];
+          setRoadmapProgress(step.progress);
+          setRoadmapProgressMessage(step.message);
+          currentStep++;
+        } else {
+          // Slow down near completion
+          setRoadmapProgress((prev) => {
+            if (prev >= 95) return prev;
+            return prev + 1;
+          });
+        }
+      }, 3000); // Update every 3 seconds
+
+      // Use RAG-powered learning roadmap API
+      const response = await nlpService.generateLearningRoadmapRag({
+        jobId: id,
+        candidateId: userId,
+        targetRole: job?.title || undefined,
+        timeframe: 12, // 12 weeks default
+      });
+
+      clearInterval(progressInterval);
+      setRoadmapProgress(95);
+      setRoadmapProgressMessage("Đang lưu lộ trình học tập...");
+
+      console.log('📦 API Response:', response);
+      console.log('📦 Response structure:', {
+        success: response.success,
+        hasData: !!response.data,
+        dataKeys: response.data ? Object.keys(response.data) : [],
+        roadmapExists: !!(response.data as any)?.roadmap,
+      });
+
+      if (response.success && response.data) {
+        // API returns { data: { roadmap: {...}, ... } }
+        const data = response.data as any;
+        const roadmap = data.roadmap || data;
+        const roadmapId = roadmap?._id || roadmap?.id;
+        
+        console.log('📋 Extracted roadmap:', roadmap);
+        console.log('🆔 Roadmap ID:', roadmapId);
+        
+        if (!roadmapId) {
+          console.error('❌ Roadmap ID not found in response:', {
+            data: response.data,
+            roadmap: data.roadmap,
+            directData: data,
+          });
+          setShowRoadmapProgress(false);
+          toast({
+            title: "Lỗi tạo lộ trình",
+            description: "Không tìm thấy ID lộ trình trong phản hồi. Vui lòng kiểm tra console để xem chi tiết.",
+            variant: "destructive",
+          });
+          setIsGeneratingRoadmap(false);
+          return; // Don't redirect, stay on current page
+        }
+        
+        setRoadmapProgress(100);
+        setRoadmapProgressMessage("Hoàn thành!");
+        
+        toast({
+          title: "Tạo lộ trình thành công",
+          description: "Lộ trình học tập đã được tạo với tài liệu thực tế. Đang chuyển đến trang chi tiết...",
+        });
+        
+        // Small delay to show completion before closing modal and navigating
+        setTimeout(() => {
+          setShowRoadmapProgress(false);
+          console.log('🔄 Redirecting to roadmap:', `/roadmaps/${roadmapId}`);
+          router.push(`/roadmaps/${roadmapId}`);
+        }, 1000);
+      } else {
+        console.error('❌ API returned unsuccessful response:', response);
+        setShowRoadmapProgress(false);
+        toast({
+          title: "Lỗi tạo lộ trình",
+          description: (response as any)?.message || "Không thể tạo lộ trình. Vui lòng thử lại.",
+          variant: "destructive",
+        });
+        setIsGeneratingRoadmap(false);
+      }
+    } catch (error: any) {
+      console.error("❌ Error generating roadmap:", error);
+      console.error("Error details:", {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        stack: error?.stack,
+      });
+      
+      setShowRoadmapProgress(false);
+      
+      // Check if error is about missing profile/CV
+      const errorMessage = error?.response?.data?.message || error?.message || "";
+      if (errorMessage.includes("profile") || errorMessage.includes("CV") || errorMessage.includes("complete") || errorMessage.includes("Unable to identify skill gaps")) {
+        // Only show warning, don't auto-redirect
+        // Backend has fallback logic, so we let it handle incomplete profiles
+        toast({
+          title: "Thông tin hồ sơ chưa đầy đủ",
+          description: errorMessage || "Vui lòng cập nhật thông tin (kỹ năng, kinh nghiệm, học vấn) để tạo lộ trình học tập chính xác hơn.",
+          variant: "destructive",
+          duration: 5000,
+        });
+        // Don't auto-redirect - let user decide if they want to update profile
+        // The backend will still try to generate a roadmap with fallback logic
+      } else {
+        toast({
+          title: "Lỗi tạo lộ trình",
+          description: errorMessage || "Không thể tạo lộ trình học tập. Vui lòng thử lại.",
+          variant: "destructive",
+        });
+      }
+      setIsGeneratingRoadmap(false);
+    }
+  }, [id, user, job, router, toast, authLoading]);
+
+  // Calculate matching score
+  const handleCalculateMatchingScore = async () => {
+    if (!id || !user?._id) {
+      toast({
+        title: "Cần đăng nhập",
+        description: "Vui lòng đăng nhập để tính điểm phù hợp",
+        variant: "destructive",
+      });
+      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+      return;
+    }
+
+    setCalculatingScore(true);
+    try {
+      // Get CV data from candidate profile
+      const candidateService = (await import("@/lib/api")).candidateService;
+      const cvRes = await candidateService.getResumesAll();
+      const currentCV = cvRes.data?.find((cv: any) => cv.isCurrent) || cvRes.data?.[0];
+      
+      if (!currentCV) {
+        toast({
+          title: "Chưa có CV",
+          description: "Vui lòng tải CV lên để tính điểm phù hợp",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Get CV analysis data
+      const cvData = currentCV.aiAnalysis?.extractedData || {};
+      
+      const response = await nlpService.calculateMatchingScore({
+        cvData: cvData as any,
+        jobId: id,
+        candidateId: user._id,
+      });
+
+      if (response.success && response.data) {
+        setMatchingScore(response.data);
+        toast({
+          title: "Đã tính điểm phù hợp",
+          description: `Điểm phù hợp của bạn: ${response.data.overallScore}%`,
+        });
+      }
+    } catch (error: any) {
+      console.error('Error calculating matching score:', error);
+      toast({
+        title: "Lỗi tính điểm",
+        description: error?.response?.data?.message || "Không thể tính điểm phù hợp. Vui lòng thử lại.",
+        variant: "destructive",
+      });
+    } finally {
+      setCalculatingScore(false);
+    }
+  };
+
   // Loading state
   if (loading || !id) {
     return (
@@ -195,6 +513,42 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
 
   return (
     <PageLayout>
+      {/* Progress Modal for Roadmap Generation */}
+      <Dialog open={showRoadmapProgress} onOpenChange={(open) => {
+        if (!open && !isGeneratingRoadmap) {
+          setShowRoadmapProgress(false);
+        }
+      }}>
+        <DialogContent className="sm:max-w-md" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Đang tạo lộ trình học tập
+            </DialogTitle>
+            <DialogDescription>
+              {roadmapProgressMessage}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Progress value={roadmapProgress} className="w-full" />
+            <div className="text-center space-y-2">
+              <p className="text-sm font-medium">{roadmapProgressMessage}</p>
+              <p className="text-xs text-muted-foreground">
+                {roadmapProgress < 50 
+                  ? "Đang phân tích và chuẩn bị..." 
+                  : roadmapProgress < 80
+                  ? "Đang tìm kiếm tài liệu học tập từ YouTube, GitHub..."
+                  : "Đang hoàn thiện lộ trình học tập..."
+                }
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Quá trình này có thể mất 30-90 giây. Vui lòng đợi...
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Breadcrumbs */}
         <div className="text-sm text-muted-foreground mb-4 flex items-center gap-2">
@@ -272,9 +626,64 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
                   jobId={id}
                   jobTitle={job.title}
                   className="font-medium"
+                  applied={job.hasApplied}
                 />
               )}
-              <Button variant="outline">Lưu việc làm</Button>
+              <div
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }}
+              >
+                <Button 
+                  type="button"
+                  variant="outline"
+                  onClick={(e) => {
+                    console.log('🔴 Button onClick fired', { e, type: e.type, target: e.target });
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.nativeEvent?.stopImmediatePropagation?.();
+                    if (e.defaultPrevented) {
+                      console.log('✅ Default prevented');
+                    }
+                    handleGenerateRoadmap(e);
+                    return false;
+                  }}
+                  onMouseDown={(e) => {
+                    console.log('🟡 Button onMouseDown fired');
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleGenerateRoadmap(e as any);
+                    }
+                  }}
+                  disabled={isGeneratingRoadmap}
+                  className="gap-2"
+                  style={{ pointerEvents: isGeneratingRoadmap ? 'none' : 'auto' }}
+                >
+                {isGeneratingRoadmap ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Đang tạo...
+                  </>
+                ) : (
+                  <>
+                    <GraduationCap className="w-4 h-4" />
+                    Tạo lộ trình học tập
+                  </>
+                )}
+              </Button>
+              </div>
+              {id && <SaveJobButton jobId={id} />}
             </div>
           </div>
 
@@ -399,20 +808,100 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
                       {new Date(job.deadline).toLocaleDateString()}
                     </div>
                   )}
-                  <div className="flex gap-3">
+                  <div className="flex flex-wrap gap-3">
                     {id && (
                       <ApplyButton
                         jobId={id}
                         jobTitle={job.title}
                         className="font-medium"
+                        applied={job.hasApplied}
                       />
                     )}
-                    <Button variant="outline">Lưu việc làm</Button>
+                    <Button 
+                      type="button"
+                      variant="outline"
+                      onClick={(e) => {
+                        console.log('🔴 Button onClick fired (section 2)', { e, type: e.type, target: e.target });
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.nativeEvent?.stopImmediatePropagation?.();
+                        handleGenerateRoadmap(e);
+                      }}
+                      onMouseDown={(e) => {
+                        console.log('🟡 Button onMouseDown fired (section 2)');
+                        e.preventDefault();
+                      }}
+                      disabled={isGeneratingRoadmap}
+                      className="gap-2"
+                      style={{ pointerEvents: isGeneratingRoadmap ? 'none' : 'auto' }}
+                    >
+                      {isGeneratingRoadmap ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Đang tạo...
+                        </>
+                      ) : (
+                        <>
+                          <GraduationCap className="w-4 h-4" />
+                          Tạo lộ trình học tập
+                        </>
+                      )}
+                    </Button>
+                    {id && <SaveJobButton jobId={id} />}
                   </div>
                 </CardContent>
               </Card>
             </div>
             <div className="space-y-6 lg:sticky lg:top-20 h-fit">
+              {/* Matching Score Card - Only show if user is logged in */}
+              {user && (
+                <Card className="border-primary/20">
+                  <CardContent className="p-6">
+                    {loadingMatchingScore ? (
+                      <div className="text-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground">Đang tải điểm phù hợp...</p>
+                      </div>
+                    ) : matchingScore ? (
+                      <MatchScoreCard
+                        score={matchingScore.overallScore}
+                        tier={matchingScore.tier}
+                        breakdown={matchingScore.breakdown}
+                        strengths={matchingScore.strengths}
+                        concerns={matchingScore.concerns}
+                      />
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="text-center">
+                          <h3 className="font-semibold mb-2">Điểm phù hợp</h3>
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Tính điểm phù hợp giữa CV của bạn và công việc này
+                          </p>
+                        </div>
+                        <Button
+                          onClick={handleCalculateMatchingScore}
+                          disabled={calculatingScore}
+                          className="w-full gap-2"
+                          variant="default"
+                        >
+                          {calculatingScore ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Đang tính...
+                            </>
+                          ) : (
+                            <>
+                              <TrendingUp className="w-4 h-4" />
+                              Tính điểm phù hợp
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
               <Card>
                 <CardContent className="p-6 space-y-3">
                   <h3 className="font-semibold">Thông tin chung</h3>
@@ -504,6 +993,59 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
                       {job.experience}
                     </div>
                   )}
+                </CardContent>
+              </Card>
+
+              {/* Tạo lộ trình học tập */}
+              <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-blue-50/50">
+                <CardContent className="p-6 space-y-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <GraduationCap className="w-5 h-5 text-primary" />
+                    <h3 className="font-semibold">Lộ trình học tập</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Tạo lộ trình học tập cá nhân hóa dựa trên yêu cầu của công việc này để phát triển kỹ năng cần thiết.
+                  </p>
+                  <Button 
+                    type="button"
+                    onClick={(e) => {
+                      console.log('🔴 Button onClick fired (section 3)', { e, type: e.type, target: e.target });
+                      e.preventDefault();
+                      e.stopPropagation();
+                      e.nativeEvent?.stopImmediatePropagation?.();
+                      handleGenerateRoadmap(e);
+                      return false;
+                    }}
+                    onMouseDown={(e) => {
+                      console.log('🟡 Button onMouseDown fired (section 3)');
+                      e.preventDefault();
+                      e.stopPropagation();
+                      return false;
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleGenerateRoadmap(e as any);
+                      }
+                    }}
+                    disabled={isGeneratingRoadmap}
+                    className="w-full gap-2"
+                    variant="default"
+                    style={{ pointerEvents: isGeneratingRoadmap ? 'none' : 'auto' }}
+                  >
+                    {isGeneratingRoadmap ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Đang tạo lộ trình...
+                      </>
+                    ) : (
+                      <>
+                        <GraduationCap className="w-4 h-4" />
+                        Tạo lộ trình học tập
+                      </>
+                    )}
+                  </Button>
                 </CardContent>
               </Card>
 

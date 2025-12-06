@@ -23,7 +23,8 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { api } from "@/lib/api";
+import { api, nlpService } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 
 type RoadmapDifficulty = "beginner" | "intermediate" | "advanced" | "mixed";
 
@@ -271,48 +272,42 @@ const MOCK_ROADMAPS: Roadmap[] = [
 export default function SkillRoadmapsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useAuth();
 
   const [roadmaps, setRoadmaps] = useState<RoadmapListItem[]>([]);
+  const [popularRoadmaps, setPopularRoadmaps] = useState<RoadmapListItem[]>([]);
   const [selectedRoadmap, setSelectedRoadmap] = useState<Roadmap | null>(null);
   const [loadingList, setLoadingList] = useState(false);
+  const [loadingPopular, setLoadingPopular] = useState(false);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"my" | "popular">("my");
 
   const selectedIdFromUrl = searchParams.get("id");
 
+  // Fetch my roadmaps
   useEffect(() => {
-    const fetchRoadmaps = async () => {
+    if (!user) return;
+    
+    const fetchMyRoadmaps = async () => {
       try {
         setLoadingList(true);
         setError(null);
-        // Backend route: GET /api/roadmaps
-        const res = await api.client.get("/roadmaps");
-        const items: any[] = res.data?.data || res.data || [];
+        // Use NLP API: GET /api/nlp/my-roadmaps
+        const response = await nlpService.getMyRoadmaps();
+        const items: any[] = response.data || [];
 
         if (!items || items.length === 0) {
-          // Nếu backend chưa có dữ liệu: dùng MOCK để xem UI
-          setRoadmaps(
-            MOCK_ROADMAPS.map((rm) => ({
-              _id: rm._id,
-              targetJobTitle: rm.targetRole,
-              duration: rm.duration,
-              difficulty: rm.difficulty,
-              progress: 0,
-            }))
-          );
-          setSelectedRoadmap(MOCK_ROADMAPS[0]);
+          setRoadmaps([]);
         } else {
           setRoadmaps(
             items.map((rm) => ({
               _id: rm._id,
               targetJobTitle: rm.targetJobId?.title || rm.targetRole,
               targetRole: rm.targetRole,
-              duration:
-                rm.totalDuration && typeof rm.totalDuration === "string"
-                  ? parseInt(rm.totalDuration)
-                  : rm.duration || 12,
-              difficulty: rm.difficulty || "intermediate",
-              progress: rm.progress?.overallProgress ?? 0,
+              duration: rm.timeframe || 12,
+              difficulty: (rm.difficulty || "intermediate") as RoadmapDifficulty,
+              progress: rm.progress?.overall || 0,
               createdAt: rm.createdAt,
             }))
           );
@@ -322,26 +317,48 @@ export default function SkillRoadmapsPage() {
           }
         }
       } catch (e: any) {
-        // Nếu lỗi API: fallback mock để demo UI
-        console.error("Failed to load roadmaps, using mock:", e);
-        setRoadmaps(
-          MOCK_ROADMAPS.map((rm) => ({
-            _id: rm._id,
-            targetJobTitle: rm.targetRole,
-            duration: rm.duration,
-            difficulty: rm.difficulty,
-            progress: 0,
-          }))
-        );
-        setSelectedRoadmap(MOCK_ROADMAPS[0]);
-        setError(null);
+        console.error("Failed to load my roadmaps:", e);
+        setRoadmaps([]);
+        setError("Không thể tải danh sách lộ trình của bạn.");
       } finally {
         setLoadingList(false);
       }
     };
 
-    fetchRoadmaps();
+    fetchMyRoadmaps();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  // Fetch popular roadmaps
+  useEffect(() => {
+    const fetchPopularRoadmaps = async () => {
+      try {
+        setLoadingPopular(true);
+        const response = await nlpService.getPopularRoadmaps(10);
+        const items: any[] = response.data || [];
+
+        if (items.length > 0) {
+          setPopularRoadmaps(
+            items.map((rm) => ({
+              _id: rm._id,
+              targetJobTitle: rm.targetJobId?.title || rm.targetRole,
+              targetRole: rm.targetRole,
+              duration: rm.timeframe || 12,
+              difficulty: (rm.difficulty || "intermediate") as RoadmapDifficulty,
+              progress: rm.progress?.overall || 0,
+              createdAt: rm.createdAt,
+            }))
+          );
+        }
+      } catch (e: any) {
+        console.error("Failed to load popular roadmaps:", e);
+        // Don't show error for popular roadmaps, just leave empty
+      } finally {
+        setLoadingPopular(false);
+      }
+    };
+
+    fetchPopularRoadmaps();
   }, []);
 
   useEffect(() => {
@@ -350,6 +367,46 @@ export default function SkillRoadmapsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedIdFromUrl]);
+
+  // Helper function to transform skillGaps from array format to object format
+  const transformSkillGaps = (skillGaps: any): { critical: string[]; important: string[]; optional: string[] } | undefined => {
+    if (!skillGaps) return undefined;
+    
+    // If already in object format, return as is
+    if (skillGaps.critical || skillGaps.important || skillGaps.optional) {
+      return {
+        critical: skillGaps.critical || [],
+        important: skillGaps.important || [],
+        optional: skillGaps.optional || [],
+      };
+    }
+    
+    // If it's an array, transform it
+    if (Array.isArray(skillGaps)) {
+      const result = {
+        critical: [] as string[],
+        important: [] as string[],
+        optional: [] as string[],
+      };
+      
+      skillGaps.forEach((gap: any) => {
+        const skillName = gap.skill || gap.skillName || gap;
+        const priority = gap.priority?.toLowerCase() || 'medium';
+        
+        if (priority === 'critical' || priority === 'high') {
+          result.critical.push(skillName);
+        } else if (priority === 'important' || priority === 'medium') {
+          result.important.push(skillName);
+        } else {
+          result.optional.push(skillName);
+        }
+      });
+      
+      return result;
+    }
+    
+    return undefined;
+  };
 
   const handleSelectRoadmap = async (id: string, updateUrl = true) => {
     try {
@@ -363,6 +420,12 @@ export default function SkillRoadmapsPage() {
 
       const res = await api.client.get(`/roadmaps/${id}`);
       const roadmap: Roadmap = res.data?.data || res.data;
+      
+      // Transform skillGaps if needed
+      if (roadmap) {
+        roadmap.skillGaps = transformSkillGaps(roadmap.skillGaps);
+      }
+      
       setSelectedRoadmap(roadmap);
     } catch (e: any) {
       setError(
@@ -547,31 +610,48 @@ export default function SkillRoadmapsPage() {
             {/* Left: list of roadmaps */}
             <Card className="lg:col-span-1 border-slate-200/80 bg-white/80 backdrop-blur-xl shadow-[0_18px_45px_rgba(15,23,42,0.06)]">
               <CardHeader className="pb-3">
+                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "my" | "popular")} className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 mb-3">
+                    <TabsTrigger value="my" className="text-xs">
+                      Của tôi
+                    </TabsTrigger>
+                    <TabsTrigger value="popular" className="text-xs">
+                      Phổ biến
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
                 <CardTitle className="flex items-center justify-between text-sm">
                   <span className="font-semibold text-slate-900">
-                    Lộ trình của bạn
+                    {activeTab === "my" ? "Lộ trình của bạn" : "Lộ trình phổ biến"}
                   </span>
                   <Badge variant="outline" className="text-[10px]">
-                    {roadmaps.length} lộ trình
+                    {activeTab === "my" ? roadmaps.length : popularRoadmaps.length} lộ trình
                   </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                {loadingList && (
-                  <p className="text-xs text-slate-500 py-4">
-                    Đang tải danh sách lộ trình...
-                  </p>
-                )}
-                {!loadingList && roadmaps.length === 0 && (
-                  <p className="text-xs text-slate-500 py-4">
-                    Bạn chưa có lộ trình nào. Hãy tạo lộ trình từ công việc mơ
-                    ước của bạn.
-                  </p>
-                )}
-                {!loadingList && roadmaps.length > 0 && (
-                  <ScrollArea className="h-[420px] pr-2">
-                    <div className="space-y-3">
-                      {roadmaps.map((rm) => {
+                {activeTab === "my" ? (
+                  <>
+                    {loadingList && (
+                      <p className="text-xs text-slate-500 py-4">
+                        Đang tải danh sách lộ trình...
+                      </p>
+                    )}
+                    {!loadingList && !user && (
+                      <p className="text-xs text-slate-500 py-4">
+                        Đăng nhập để xem lộ trình của bạn.
+                      </p>
+                    )}
+                    {!loadingList && user && roadmaps.length === 0 && (
+                      <p className="text-xs text-slate-500 py-4">
+                        Bạn chưa có lộ trình nào. Hãy tạo lộ trình từ công việc mơ
+                        ước của bạn.
+                      </p>
+                    )}
+                    {!loadingList && roadmaps.length > 0 && (
+                      <ScrollArea className="h-[420px] pr-2">
+                        <div className="space-y-3">
+                          {roadmaps.map((rm) => {
                         const isActive = selectedRoadmap?._id === rm._id;
                         const progress = rm["progress"] ?? 0;
                         return (
@@ -619,9 +699,79 @@ export default function SkillRoadmapsPage() {
                             />
                           </button>
                         );
-                      })}
-                    </div>
-                  </ScrollArea>
+                          })}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {loadingPopular && (
+                      <p className="text-xs text-slate-500 py-4">
+                        Đang tải lộ trình phổ biến...
+                      </p>
+                    )}
+                    {!loadingPopular && popularRoadmaps.length === 0 && (
+                      <p className="text-xs text-slate-500 py-4">
+                        Chưa có lộ trình phổ biến.
+                      </p>
+                    )}
+                    {!loadingPopular && popularRoadmaps.length > 0 && (
+                      <ScrollArea className="h-[420px] pr-2">
+                        <div className="space-y-3">
+                          {popularRoadmaps.map((rm) => {
+                            const isActive = selectedRoadmap?._id === rm._id;
+                            const progress = rm["progress"] ?? 0;
+                            return (
+                              <button
+                                key={rm._id}
+                                onClick={() => handleSelectRoadmap(rm._id)}
+                                className={`w-full text-left rounded-2xl border px-3 py-3.5 transition-all duration-300 ${
+                                  isActive
+                                    ? "border-[oklch(0.60_0.12_195)] bg-[oklch(0.97_0.02_210)] shadow-sm"
+                                    : "border-slate-200/70 bg-white/80 hover:border-[oklch(0.60_0.12_195/.5)] hover:bg-[oklch(0.98_0.02_210)]"
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div>
+                                    <p className="text-xs font-semibold text-slate-900 mb-1 line-clamp-2">
+                                      {rm.targetJobTitle}
+                                    </p>
+                                    <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                                      <Badge
+                                        variant="outline"
+                                        className="border-slate-200 text-[10px] flex items-center gap-1"
+                                      >
+                                        <Clock className="w-3 h-3" />
+                                        {rm.duration} tuần
+                                      </Badge>
+                                      <Badge
+                                        variant="outline"
+                                        className={`text-[10px] border ${difficultyColor(
+                                          rm.difficulty as any
+                                        )}`}
+                                      >
+                                        {difficultyLabel(
+                                          rm.difficulty as any
+                                        ).toUpperCase()}
+                                      </Badge>
+                                    </div>
+                                  </div>
+                                  <span className="text-[10px] font-medium text-[oklch(0.55_0.12_195)]">
+                                    {progress}%
+                                  </span>
+                                </div>
+                                <Progress
+                                  value={progress}
+                                  className="h-1.5 mt-1.5 bg-slate-100"
+                                />
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -1018,8 +1168,7 @@ export default function SkillRoadmapsPage() {
                                   Kỹ năng quan trọng (Critical)
                                 </p>
                                 <div className="flex flex-wrap gap-1.5">
-                                  {selectedRoadmap.skillGaps.critical.length ===
-                                  0 ? (
+                                  {!selectedRoadmap.skillGaps.critical || selectedRoadmap.skillGaps.critical.length === 0 ? (
                                     <span className="text-[11px] text-slate-500">
                                       Không có kỹ năng critical.
                                     </span>
@@ -1042,8 +1191,7 @@ export default function SkillRoadmapsPage() {
                                   Kỹ năng nên có (Important)
                                 </p>
                                 <div className="flex flex-wrap gap-1.5">
-                                  {selectedRoadmap.skillGaps.important.length ===
-                                  0 ? (
+                                  {!selectedRoadmap.skillGaps.important || selectedRoadmap.skillGaps.important.length === 0 ? (
                                     <span className="text-[11px] text-slate-500">
                                       Không có kỹ năng important.
                                     </span>
@@ -1066,8 +1214,7 @@ export default function SkillRoadmapsPage() {
                                   Kỹ năng bổ sung (Optional)
                                 </p>
                                 <div className="flex flex-wrap gap-1.5">
-                                  {selectedRoadmap.skillGaps.optional.length ===
-                                  0 ? (
+                                  {!selectedRoadmap.skillGaps.optional || selectedRoadmap.skillGaps.optional.length === 0 ? (
                                     <span className="text-[11px] text-slate-500">
                                       Không có kỹ năng optional.
                                     </span>

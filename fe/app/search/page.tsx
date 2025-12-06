@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPin, Heart, MessageCircle, ChevronRight } from "lucide-react";
+import { MapPin, MessageCircle, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import { jobsAPI, JobItem } from "@/lib/api";
 import JobFilters, {
   JobFilters as JobFiltersType,
 } from "@/components/jobs/JobFilters";
+import { SaveJobButton } from "@/components/jobs/SaveJobButton";
 
 export default function JobSearchResults() {
   const router = useRouter();
@@ -326,7 +327,14 @@ export default function JobSearchResults() {
                               <Badge className="bg-primary/10 text-primary border-primary/20">
                                 {salary}
                               </Badge>
-                              <Heart className="w-5 h-5 text-muted-foreground cursor-pointer hover:text-destructive transition-colors duration-200" />
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <SaveJobButton
+                                  jobId={job.id}
+                                  variant="ghost"
+                                  size="sm"
+                                  showText={false}
+                                />
+                              </div>
                             </div>
                           </div>
                           <p className="text-muted-foreground mb-2 font-medium">

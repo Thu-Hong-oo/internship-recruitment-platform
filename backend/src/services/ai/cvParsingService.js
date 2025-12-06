@@ -81,16 +81,21 @@ class CVParsingService {
           const textForGemini = this.cleanExtractedText(truncatedText);
           
           // SEMANTIC AI PARSING: Hiểu ngữ nghĩa, không dựa vào format cứng nhắc
-          const prompt = `Bạn là chuyên gia phân tích CV. Hãy HIỂU NGỮ NGHĨA và trích xuất thông tin từ CV, bất kể format hay encoding.
+          const prompt = `Bạn là chuyên gia phân tích CV. Hãy HIỂU NGỮ NGHĨA và trích xuất ĐẦY ĐỦ thông tin từ CV, bất kể format hay encoding.
 
 **NGUYÊN TẮC QUAN TRỌNG:**
 1. ĐỌC HIỂU ngữ nghĩa, KHÔNG dựa vào vị trí hay format
 2. Tên người: Chỉ lấy họ tên thật (2-5 từ), BỎ QUA chức danh/công việc
-3. Học vấn: Tên trường + ngành học, BỎ QUA mô tả dài dòng
-4. Kinh nghiệm: Vị trí + công ty + thời gian, BỎ QUA mục tiêu nghề nghiệp
+3. Học vấn: Tên trường + ngành học + thời gian (nếu có), BỎ QUA mô tả dài dòng
+4. Kinh nghiệm: Vị trí + công ty + thời gian + MÔ TẢ ĐẦY ĐỦ (các bullet points)
 5. Kỹ năng: CHỈ kỹ năng kỹ thuật/công cụ (Java, Excel, Giao tiếp...), BỎ QUA câu mô tả
-6. Ngày tháng: Chuẩn hóa về DD/MM/YYYY
-7. Text đã được làm sạch encoding errors
+6. Mục tiêu nghề nghiệp: Extract cả mục tiêu ngắn hạn và dài hạn
+7. Chứng chỉ: Extract tất cả chứng chỉ (TOEIC, MOS, v.v.)
+8. Giải thưởng: Extract tất cả giải thưởng
+9. Hoạt động: Extract các hoạt động tình nguyện, câu lạc bộ, v.v.
+10. Người tham chiếu: Extract nếu có
+11. Ngày tháng: Chuẩn hóa về DD/MM/YYYY hoặc MM/YYYY
+12. Text đã được làm sạch encoding errors
 
 **CV CẦN PHÂN TÍCH:**
 ${textForGemini}
@@ -99,11 +104,12 @@ ${textForGemini}
 {
   "extractedData": {
     "personalInfo": {
-      "fullName": "[Chỉ họ tên - VD: Nguyễn Văn A]",
+      "fullName": "[Chỉ họ tên - VD: Nguyễn Thị Thu Hậu]",
       "email": "[Email nếu có]",
       "phone": "[Số điện thoại]",
       "address": "[Địa chỉ ngắn gọn]",
-      "dateOfBirth": "[DD/MM/YYYY hoặc null]"
+      "dateOfBirth": "[DD/MM/YYYY hoặc null]",
+      "summary": "[Mục tiêu nghề nghiệp ngắn hạn và dài hạn - gộp lại]"
     },
     "education": {
       "type": "university|college|highschool",
@@ -111,6 +117,9 @@ ${textForGemini}
       "degree": "[Bằng cấp]",
       "field": "[Ngành học]",
       "graduationYear": [Năm tốt nghiệp - số hoặc null],
+      "startYear": [Năm bắt đầu - số hoặc null],
+      "endYear": [Năm kết thúc - số hoặc null],
+      "duration": "[MM/YYYY - MM/YYYY hoặc null]",
       "gpa": [GPA - số hoặc null],
       "gradeText": "[Xếp loại: Giỏi/Khá... hoặc null]"
     },
@@ -122,7 +131,8 @@ ${textForGemini}
         "location": "[Địa điểm]",
         "startDate": "[MM/YYYY]",
         "endDate": "[MM/YYYY hoặc 'present']",
-        "description": "[Mô tả ngắn gọn]"
+        "duration": "[MM/YYYY - MM/YYYY]",
+        "description": "[Mô tả ĐẦY ĐỦ - bao gồm tất cả bullet points]"
       }
     ],
     "skills": [
@@ -132,7 +142,13 @@ ${textForGemini}
       {"name": "[Tên chứng chỉ]", "issuer": "[Tổ chức cấp]", "year": [Năm], "description": "[Mô tả]"}
     ],
     "awards": [
-      {"name": "[Tên giải thưởng]", "year": [Năm], "description": "[Mô tả]"}
+      {"name": "[Tên giải thưởng]", "year": [Năm hoặc range như '2023-2024'], "description": "[Mô tả]"}
+    ],
+    "activities": [
+      {"name": "[Tên hoạt động]", "organization": "[Tổ chức]", "duration": "[Năm hoặc range]", "description": "[Mô tả]"}
+    ],
+    "references": [
+      {"name": "[Tên người]", "position": "[Chức vụ]", "phone": "[Số điện thoại]", "email": "[Email nếu có]"}
     ]
   },
   "skills": ["[Danh sách tên kỹ năng]"],
@@ -142,7 +158,9 @@ ${textForGemini}
 **LƯU Ý:**
 - HIỂU NGỮ NGHĨA, không theo format cứng nhắc
 - Tên người: TỐI ĐA 5 từ, bỏ chức danh
-- Học vấn: Ngắn gọn, bỏ mô tả dài
+- Học vấn: Ngắn gọn, nhưng phải có thời gian nếu CV có
+- Kinh nghiệm: MÔ TẢ PHẢI ĐẦY ĐỦ, bao gồm tất cả bullet points
+- Extract TẤT CẢ thông tin có trong CV (certificates, awards, activities, references)
 - JSON thuần túy, null nếu không tìm thấy
 - Giữ dấu tiếng Việt chính xác
 `;
@@ -238,14 +256,37 @@ ${textForGemini}
             }
           }
 
-          // Parse JSON with retry logic
+          // Parse JSON with retry logic and better error handling
           let parsedData;
           let retryCount = 0;
-          const maxRetries = 2;
+          const maxRetries = 3;
           
           while (retryCount <= maxRetries) {
             try {
-              parsedData = JSON.parse(responseText);
+              // Try to fix common JSON issues before parsing
+              let jsonToParse = responseText;
+              
+              // Fix incomplete JSON (missing closing braces)
+              const openBraces = (jsonToParse.match(/\{/g) || []).length;
+              const closeBraces = (jsonToParse.match(/\}/g) || []).length;
+              if (openBraces > closeBraces) {
+                // Add missing closing braces
+                jsonToParse += '}'.repeat(openBraces - closeBraces);
+                console.log(`🔧 Fixed incomplete JSON: added ${openBraces - closeBraces} closing braces`);
+              }
+              
+              // Fix trailing commas
+              jsonToParse = jsonToParse.replace(/,(\s*[}\]])/g, '$1');
+              
+              // Fix unclosed strings
+              jsonToParse = jsonToParse.replace(/("(?:[^"\\]|\\.)*)(?:"|$)/g, (match, p1) => {
+                if (!match.endsWith('"')) {
+                  return p1 + '"';
+                }
+                return match;
+              });
+              
+              parsedData = JSON.parse(jsonToParse);
               
               // Validate structure
               if (!parsedData.extractedData) {
@@ -256,29 +297,45 @@ ${textForGemini}
                 throw new Error('Invalid response structure: missing personalInfo');
               }
               
+              console.log('✅ Successfully parsed Gemini JSON response');
               break;
             } catch (parseError) {
               retryCount++;
               
               if (retryCount > maxRetries) {
+                // Last attempt: try to extract partial JSON
+                console.warn('⚠️ JSON parsing failed, attempting to extract partial data');
                 const jsonMatch = responseText.match(/\{[\s\S]*\}/);
                 if (jsonMatch) {
                   try {
-                    parsedData = JSON.parse(jsonMatch[0]);
-                    console.log('✅ Successfully extracted JSON from markdown');
+                    // Try to fix and parse the matched JSON
+                    let partialJson = jsonMatch[0];
+                    const openBraces = (partialJson.match(/\{/g) || []).length;
+                    const closeBraces = (partialJson.match(/\}/g) || []).length;
+                    if (openBraces > closeBraces) {
+                      partialJson += '}'.repeat(openBraces - closeBraces);
+                    }
+                    partialJson = partialJson.replace(/,(\s*[}\]])/g, '$1');
+                    
+                    parsedData = JSON.parse(partialJson);
+                    console.log('✅ Successfully extracted partial JSON from response');
                     break;
                   } catch (e) {
-                    throw new Error(`Failed to parse AI response after ${maxRetries} retries. Please try again or contact support.`);
+                    console.error('❌ Failed to parse even partial JSON:', e.message);
+                    console.error('📄 Response preview:', responseText.substring(0, 500));
+                    throw new Error(`Failed to parse AI response after ${maxRetries} retries: ${parseError.message}. Please try again or contact support.`);
                   }
                 } else {
                   throw new Error(`Failed to parse AI response: ${parseError.message}. Please try again.`);
                 }
               } else {
+                // Try to fix common issues and retry
                 responseText = responseText
                   .replace(/```json\n?/g, '')
                   .replace(/```\n?/g, '')
                   .replace(/^[^{]*/, '')
                   .replace(/[^}]*$/, '}');
+                console.log(`⚠️ JSON parse attempt ${retryCount} failed, retrying with cleaned text...`);
               }
             }
           }
@@ -357,20 +414,27 @@ ${textForGemini}
    */
   async extractTextFromCV(fileBuffer, mimeType) {
     try {
-      let text = '';
+      // Validate mimeType
+      if (!mimeType || typeof mimeType !== 'string') {
+        logger.error('Invalid mimeType:', mimeType);
+        throw new Error('File type (mimeType) is required and must be a string');
+      }
 
-      if (mimeType === 'application/pdf') {
+      let text = '';
+      const normalizedMimeType = mimeType.toLowerCase();
+
+      if (normalizedMimeType === 'application/pdf') {
         const pdfParse = require('pdf-parse');
         const pdfData = await pdfParse(fileBuffer);
         text = pdfData.text;
-      } else if (mimeType.includes('word') || mimeType.includes('docx')) {
+      } else if (normalizedMimeType.includes('word') || normalizedMimeType.includes('docx') || normalizedMimeType.includes('msword') || normalizedMimeType.includes('officedocument.wordprocessingml')) {
         const mammoth = require('mammoth');
         const result = await mammoth.extractRawText({ buffer: fileBuffer });
         text = result.value;
-      } else if (mimeType.includes('text')) {
+      } else if (normalizedMimeType.includes('text') || normalizedMimeType.includes('plain')) {
         text = fileBuffer.toString('utf-8');
       } else {
-        throw new Error('Unsupported file type: ' + mimeType);
+        throw new Error(`Unsupported file type: ${mimeType}. Supported types: PDF, DOC, DOCX`);
       }
 
       // Clean and fix Vietnamese encoding
@@ -398,29 +462,34 @@ ${textForGemini}
     text = text.replace(/•/g, ' ');
     text = text.replace(/[\u2022\u2023\u25E6\u2043\u2219]/g, ' ');
 
-    // EXTRA: Remove 'Đỗ' xen kẽ bất thường (không phải họ tên thật)
-    // Chỉ giữ 'Đỗ' nếu nó đứng đầu dòng hoặc sau dấu xuống dòng (tức là họ thật)
-    text = text.replace(/(?<!^|\n)\s*Đỗ\s*/g, ' ');
-    // Nếu vẫn còn nhiều 'Đỗ' liền nhau, chỉ giữ 1
-    text = text.replace(/(Đỗ\s+){2,}/g, 'Đỗ ');
+    // STEP 1: AGGRESSIVE REMOVAL of corruption patterns
+    // Pattern: "NguyễnĐỗThịĐỗThuĐỗHậu" → "Nguyễn Thị Thu Hậu"
+    // Remove "Đỗ", "Ngô", "Đặng" when they appear between letters (corruption)
+    // But keep them if they're legitimate surnames at start of line
     
-    // STEP 1: Add spaces around "Đỗ", "Ngô", "Đặng" stuck to letters (CRITICAL FOR PDF CORRUPTION)
-    // Example: "NguyễnĐỗThịĐỗThu" → "Nguyễn Đỗ Thị Đỗ Thu"
-    // Pattern: Match ANY letter (Latin or Vietnamese, upper or lower) + "Đỗ"
-    text = text.replace(/([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])Đỗ/g, '$1 Đỗ ');
-    text = text.replace(/Đỗ([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, ' Đỗ $1');
-    text = text.replace(/([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])Ngô/g, '$1 Ngô ');
-    text = text.replace(/Ngô([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, ' Ngô $1');
-    text = text.replace(/([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])Đặng/g, '$1 Đặng ');
-    text = text.replace(/Đặng([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, ' Đặng $1');
+    // Remove "Đỗ" between letters (corruption) - AGGRESSIVE
+    text = text.replace(/([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])Đỗ([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '$1 $2');
+    text = text.replace(/([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])Ngô([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '$1 $2');
+    text = text.replace(/([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])Đặng([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '$1 $2');
     
-    // STEP 1.5: Add spaces around "Đỗ", "Ngô", "Đặng" stuck to NUMBERS (e.g., "Đỗ0397970553Đỗ")
-    text = text.replace(/(\d)Đỗ/g, '$1 Đỗ ');
-    text = text.replace(/Đỗ(\d)/g, ' Đỗ $1');
-    text = text.replace(/(\d)Ngô/g, '$1 Ngô ');
-    text = text.replace(/Ngô(\d)/g, ' Ngô $1');
-    text = text.replace(/(\d)Đặng/g, '$1 Đặng ');
-    text = text.replace(/Đặng(\d)/g, ' Đặng $1');
+    // Remove "Đỗ", "Ngô", "Đặng" between letters and numbers
+    text = text.replace(/([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])Đỗ(\d)/g, '$1 $2');
+    text = text.replace(/(\d)Đỗ([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '$1 $2');
+    text = text.replace(/([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])Ngô(\d)/g, '$1 $2');
+    text = text.replace(/(\d)Ngô([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '$1 $2');
+    text = text.replace(/([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])Đặng(\d)/g, '$1 $2');
+    text = text.replace(/(\d)Đặng([a-zA-ZáàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '$1 $2');
+    
+    // Remove standalone "Đỗ", "Ngô", "Đặng" that are not at start of line (corruption)
+    // Keep only if they appear at start of line (likely legitimate surname)
+    text = text.replace(/(?<!^|\n)\s+Đỗ\s+/g, ' ');
+    text = text.replace(/(?<!^|\n)\s+Ngô\s+/g, ' ');
+    text = text.replace(/(?<!^|\n)\s+Đặng\s+/g, ' ');
+    
+    // Remove multiple consecutive "Đỗ", "Ngô", "Đặng"
+    text = text.replace(/(Đỗ\s+){2,}/g, '');
+    text = text.replace(/(Ngô\s+){2,}/g, '');
+    text = text.replace(/(Đặng\s+){2,}/g, '');
     
     // DEBUG: Log AFTER adding spaces
     const afterSpaces = text.substring(0, 100);
@@ -533,6 +602,36 @@ ${textForGemini}
     
     // Final whitespace normalization
     text = text.replace(/\s+/g, ' ').trim();
+    
+    // FINAL STEP: Remove ALL standalone "Đỗ", "Ngô", "Đặng" that are corruption
+    // These should NOT appear in clean text (except as legitimate surnames at start)
+    // Remove all instances that are not at the very beginning of a line
+    text = text.split('\n').map((line, index) => {
+      // Keep "Đỗ", "Ngô", "Đặng" only if at start of line AND followed by capital letter (likely surname)
+      if (index === 0 && /^(Đỗ|Ngô|Đặng)\s+[A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ]/.test(line.trim())) {
+        return line; // Keep if it's a legitimate surname at start
+      }
+      // Remove all "Đỗ", "Ngô", "Đặng" from middle/end of lines
+      return line
+        .replace(/\s+Đỗ\s+/g, ' ')
+        .replace(/\s+Ngô\s+/g, ' ')
+        .replace(/\s+Đặng\s+/g, ' ')
+        .replace(/^Đỗ\s+/g, '')
+        .replace(/^Ngô\s+/g, '')
+        .replace(/^Đặng\s+/g, '')
+        .replace(/\s+Đỗ$/g, '')
+        .replace(/\s+Ngô$/g, '')
+        .replace(/\s+Đặng$/g, '');
+    }).join('\n');
+    
+    // Final cleanup: Remove any remaining corruption patterns
+    text = text.replace(/\bĐỗ\b(?![A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '');
+    text = text.replace(/\bNgô\b(?![A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '');
+    text = text.replace(/\bĐặng\b(?![A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ])/g, '');
+    
+    // Final whitespace normalization
+    text = text.replace(/\s+/g, ' ').trim();
+    text = text.replace(/^\s+|\s+$/gm, ''); // Trim each line
 
     return text;
   }
@@ -717,10 +816,21 @@ ${textForGemini}
   extractPersonalInfo(text) {
     const info = {};
 
-    // Vietnamese name pattern
+    // Vietnamese name pattern - improved to avoid matching job titles
+    // Pattern 1: Standard format with spaces
     let namePattern =
-      /(?:^|\n)\s*((?:Nguyễn|Trần|Lê|Phạm|Hoàng|Huỳnh|Phan|Vũ|Võ|Đặng|Bùi|Đỗ|Hồ|Ngô|Dương|Lý|Mai|Cao|Tạ|Lưu)\s+(?:Thị|Văn|Minh|Anh|Hoàng)?\s*[A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ][a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ]+(?:\s+[A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ][a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ]+)*)/m;
+      /(?:^|\n)\s*((?:Nguyễn|Trần|Lê|Phạm|Hoàng|Huỳnh|Phan|Vũ|Võ|Đặng|Bùi|Đỗ|Hồ|Ngô|Dương|Lý|Mai|Cao|Tạ|Lưu)\s+(?:Thị|Văn|Minh|Anh|Hoàng)?\s*[A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ][a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ]+(?:\s+[A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ][a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ]+)*)(?:\s|$)/m;
     let nameMatch = text.match(namePattern);
+    
+    // Validate: Name should NOT contain job title keywords
+    if (nameMatch) {
+      const nameText = nameMatch[1].toLowerCase();
+      const jobTitleKeywords = ['nhân viên', 'chứng từ', 'thực tập', 'intern', 'staff', 'chuyên viên', 'specialist', 'manager', 'quản lý'];
+      const hasJobTitle = jobTitleKeywords.some(keyword => nameText.includes(keyword));
+      if (hasJobTitle) {
+        nameMatch = null; // Reject if contains job title
+      }
+    }
     
     if (!nameMatch) {
       namePattern = /(?:^|\n)\s*((?:Nguyễn|Trần|Lê|Phạm|Hoàng|Huỳnh|Phan|Vũ|Võ|Đặng|Bùi|Đỗ|Hồ|Ngô|Dương|Lý|Mai|Cao|Tạ|Lưu)(?:Đỗ|Ngô|Thị|Văn|Minh|Anh|Hoàng)?[A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ][a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ]+(?:[A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ][a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ]+)*)/m;
@@ -747,6 +857,34 @@ ${textForGemini}
     } else {
       let name = nameMatch[1].trim();
       
+      // Remove corruption patterns
+      name = name.replace(/\s+Đỗ\s+/g, ' ').replace(/\s+Ngô\s+/g, ' ').replace(/\s+Đặng\s+/g, ' ');
+      
+      // Validate: Name should NOT contain job title keywords
+      const nameText = name.toLowerCase();
+      const jobTitleKeywords = ['nhân viên', 'chứng từ', 'thực tập', 'intern', 'staff', 'chuyên viên', 'specialist', 'manager', 'quản lý'];
+      const hasJobTitle = jobTitleKeywords.some(keyword => nameText.includes(keyword));
+      if (hasJobTitle) {
+        // Try to extract just the name part (before job title)
+        const nameParts = name.split(/\s+/);
+        const jobTitleIndex = nameParts.findIndex(part => 
+          jobTitleKeywords.some(keyword => part.toLowerCase().includes(keyword))
+        );
+        if (jobTitleIndex > 0) {
+          name = nameParts.slice(0, jobTitleIndex).join(' ');
+        } else {
+          // If job title is at start, try to find name in first few lines
+          const lines = text.split('\n').slice(0, 3);
+          for (const line of lines) {
+            const lineMatch = line.match(/^([A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ][a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ]+(?:\s+[A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ][a-záàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ]+){2,4})/);
+            if (lineMatch && !jobTitleKeywords.some(kw => lineMatch[1].toLowerCase().includes(kw))) {
+              name = lineMatch[1];
+              break;
+            }
+          }
+        }
+      }
+      
       // Validate: Name should be max 50 chars and max 5 words
       const words = name.split(/\s+/);
       if (words.length > 5 || name.length > 50) {
@@ -757,14 +895,27 @@ ${textForGemini}
         console.warn(`⚠️ Name truncated (too long): ${name}`);
       }
       
-      info.fullName = name;
+      info.fullName = name.trim();
     }
 
-    // Email
-    const emailMatch = text.match(
+    // Email - improved pattern to handle corruption
+    let emailMatch = text.match(
       /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/
     );
-    if (emailMatch) info.email = emailMatch[1];
+    if (!emailMatch) {
+      // Try pattern with corruption characters removed
+      const cleanedText = text.replace(/Đỗ|Ngô|Đặng/g, '');
+      emailMatch = cleanedText.match(
+        /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/
+      );
+    }
+    if (emailMatch) {
+      // Clean email - remove corruption characters from email
+      info.email = emailMatch[1]
+        .replace(/Đỗ|Ngô|Đặng/g, '')
+        .replace(/\s+/g, '')
+        .trim();
+    }
 
     // Phone (Vietnamese format)
     const phoneMatch = text.match(/((?:\+84|84|0)(?:3|5|7|8|9)\d{8})/);
@@ -801,7 +952,7 @@ ${textForGemini}
       gradeText: null,
     };
 
-    // University name
+    // University name - improved patterns
     let uniMatch = text.match(
       /(?:Đại học|University|College|Trường)\s+([^\n]{5,80})/i
     );
@@ -818,7 +969,20 @@ ${textForGemini}
         education.institution = uniName.trim();
       }
     } else {
-      education.institution = uniMatch[0].trim();
+      education.institution = uniMatch[1] ? uniMatch[1].trim() : uniMatch[0].trim();
+    }
+    
+    // Also try pattern: "Đại học Sài Gòn" (without space after "Đại học")
+    if (!education.institution) {
+      const uniMatch2 = text.match(/Đại học\s*([A-ZÁÀẢÃẠĂẮẰẲẴẶÂẤẦẨẪẬÉÈẺẼẸÊẾỀỂỄỆÍÌỈĨỊÓÒỎÕỌÔỐỒỔỖỘƠỚỜỞỠỢÚÙỦŨỤƯỨỪỬỮỰÝỲỶỸỴĐ][^\n]{3,50})/i);
+      if (uniMatch2) {
+        education.institution = uniMatch2[1]
+          .replace(/\s+Đỗ\s+/g, ' ')
+          .replace(/\s+Ngô\s+/g, ' ')
+          .replace(/\s+Đặng\s+/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      }
     }
     
     // Validate and clean institution field
@@ -930,12 +1094,32 @@ ${textForGemini}
     let currentExp = null;
 
     for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
+      let line = lines[i].trim();
+      
+      // Clean corruption patterns from line
+      line = line.replace(/\s+Đỗ\s+/g, ' ').replace(/\s+Ngô\s+/g, ' ').replace(/\s+Đặng\s+/g, ' ');
+      line = line.replace(/Đỗ(?=[a-zà-ỹ])/g, ' ').replace(/Ngô(?=[a-zà-ỹ])/g, ' ').replace(/Đặng(?=[a-zà-ỹ])/g, ' ');
+      line = line.replace(/\s+/g, ' ').trim();
+      
       const expPattern = /^(.*?)\s*(?:tại|at|@)\s*(.+)$/i;
+      // More flexible date pattern - handle corruption
       const datePattern =
         /(\d{1,2}\/\d{4})\s*[-–]\s*(\d{1,2}\/\d{4}|Hiện tại|Present|Current)/i;
+      
+      // Also try pattern without space before dash (corruption might remove space)
+      const datePatternNoSpace = /(\d{1,2}\/\d{4})\s*[-–](\d{1,2}\/\d{4})/i;
+      
+      // Also try pattern with corruption characters: "12/2024Đỗ-Đỗ04/2025"
+      const datePatternCorrupt = /(\d{1,2}\/\d{4})[ĐỗNgôĐặng\s]*[-–][ĐỗNgôĐặng\s]*(\d{1,2}\/\d{4})/i;
 
-      const dateMatch = line.match(datePattern);
+      let dateMatch = line.match(datePattern);
+      if (!dateMatch) {
+        dateMatch = line.match(datePatternNoSpace);
+      }
+      if (!dateMatch) {
+        dateMatch = line.match(datePatternCorrupt);
+      }
+      
       if (dateMatch) {
         if (currentExp) experiences.push(currentExp);
 
@@ -953,41 +1137,146 @@ ${textForGemini}
           location: null,
         };
 
-        const prevLine = i > 0 ? lines[i - 1].trim() : '';
-        const nextLine = i < lines.length - 1 ? lines[i + 1].trim() : '';
+        const prevLine = i > 0 ? lines[i - 1].trim().replace(/\s+Đỗ\s+/g, ' ').replace(/\s+Ngô\s+/g, ' ').replace(/\s+Đặng\s+/g, ' ') : '';
+        const nextLine = i < lines.length - 1 ? lines[i + 1].trim().replace(/\s+Đỗ\s+/g, ' ').replace(/\s+Ngô\s+/g, ' ').replace(/\s+Đặng\s+/g, ' ') : '';
         
-        const companyMatch = line.match(
-          /(?:tại|at|@|Công ty|Company)\s*:?\s*(.+?)(?:\s+\d{1,2}\/\d{4})/i
-        );
+        // Try multiple patterns for company
+        const companyPatterns = [
+          /(?:tại|at|@|Công ty|Company)\s*:?\s*(.+?)(?:\s+\d{1,2}\/\d{4})/i,
+          /(?:Công ty|Company)\s+(TNHH|LLC|Ltd|Co\.|Corp)[\s:]+(.+?)(?:\s+\d{1,2}\/\d{4})/i,
+          /(?:Công ty|Company)[\s:]+(.+?)(?:\s+\d{1,2}\/\d{4})/i,
+          // Pattern for "Công ty TNHH Dịch vụ giao nhận Vận tải Hoàng Phát" (on next line)
+          /Công ty\s+(?:TNHH\s+)?([^\n]{5,100})/i,
+        ];
+        
+        let companyMatch = null;
+        for (const pattern of companyPatterns) {
+          companyMatch = line.match(pattern);
+          if (companyMatch) break;
+        }
+        
         const companyMatchNext = nextLine.match(
           /(?:tại|at|@|Công ty|Company)\s*:?\s*(.+)/i
         );
+        
+        // Also check if nextLine contains company name directly
+        const companyMatchNext2 = nextLine.match(
+          /Công ty\s+(?:TNHH\s+)?([^\n]{5,100})/i
+        );
+        
+        // Try to find position patterns
+        const positionPatterns = [
+          /(?:Thực tập sinh|Intern|Nhân viên|Staff|Chuyên viên|Specialist|Trợ lý|Assistant|Manager|Quản lý)\s+(.+?)(?:\s+\d{1,2}\/\d{4})/i,
+          /(Thực tập sinh|Intern|Nhân viên|Staff|Chuyên viên|Specialist|Trợ lý|Assistant|Manager|Quản lý)/i,
+          // Pattern for "Thực tập sinh chứng từ" (position with description)
+          /(Thực tập sinh|Intern|Nhân viên|Staff|Chuyên viên|Specialist)\s+([^\n]{3,50})/i,
+        ];
 
         if (companyMatch) {
-          currentExp.company = companyMatch[1].trim();
+          currentExp.company = (companyMatch[2] || companyMatch[1]).trim()
+            .replace(/\s+Đỗ\s+/g, ' ')
+            .replace(/\s+Ngô\s+/g, ' ')
+            .replace(/\s+Đặng\s+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
           currentExp.position = prevLine || 'Not specified';
         } else if (companyMatchNext) {
-          currentExp.company = companyMatchNext[1].trim();
-          currentExp.position = line.replace(datePattern, '').trim() || prevLine || 'Not specified';
+          currentExp.company = companyMatchNext[1].trim()
+            .replace(/\s+Đỗ\s+/g, ' ')
+            .replace(/\s+Ngô\s+/g, ' ')
+            .replace(/\s+Đặng\s+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+          currentExp.position = line.replace(datePattern, '').replace(datePatternNoSpace, '').replace(datePatternCorrupt, '').trim() || prevLine || 'Not specified';
+        } else if (companyMatchNext2) {
+          currentExp.company = companyMatchNext2[1].trim()
+            .replace(/\s+Đỗ\s+/g, ' ')
+            .replace(/\s+Ngô\s+/g, ' ')
+            .replace(/\s+Đặng\s+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+          currentExp.position = prevLine || line.replace(datePattern, '').replace(datePatternNoSpace, '').replace(datePatternCorrupt, '').trim() || 'Not specified';
         } else if (prevLine && prevLine.length > 3 && prevLine.length < 100) {
-          currentExp.position = prevLine;
+          // Check if prevLine looks like a position
+          let positionMatch = null;
+          for (const pattern of positionPatterns) {
+            positionMatch = prevLine.match(pattern);
+            if (positionMatch) break;
+          }
+          currentExp.position = positionMatch ? (positionMatch[1] || positionMatch[0]).trim() : prevLine;
         } else {
-          const positionMatch = line.replace(datePattern, '').trim();
-          if (positionMatch && positionMatch.length > 3 && positionMatch.length < 100) {
-            currentExp.position = positionMatch;
+          // Try to extract position from current line
+          let positionMatch = null;
+          for (const pattern of positionPatterns) {
+            positionMatch = line.match(pattern);
+            if (positionMatch) break;
+          }
+          if (positionMatch) {
+            currentExp.position = (positionMatch[1] || positionMatch[0]).trim();
+          } else {
+            const positionText = line.replace(datePattern, '').replace(datePatternNoSpace, '').replace(datePatternCorrupt, '').trim();
+            if (positionText && positionText.length > 3 && positionText.length < 100) {
+              currentExp.position = positionText;
+            }
+          }
+        }
+        
+        // If position is still null, try to extract from prevLine
+        if (!currentExp.position && prevLine && prevLine.length > 3 && prevLine.length < 100) {
+          // Check if prevLine looks like a position (contains job title keywords)
+          if (/Thực tập sinh|Intern|Nhân viên|Staff|Chuyên viên|Specialist/i.test(prevLine)) {
+            currentExp.position = prevLine
+              .replace(/\s+Đỗ\s+/g, ' ')
+              .replace(/\s+Ngô\s+/g, ' ')
+              .replace(/\s+Đặng\s+/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim();
           }
         }
       }
-      else if (
-        (currentExp && line.startsWith('•')) ||
+      else if (currentExp && (
+        line.startsWith('•') ||
         line.startsWith('-') ||
-        line.startsWith('*')
-      ) {
-        currentExp.description += line.replace(/^[•\-*]\s*/, '') + '\n';
+        line.startsWith('*') ||
+        line.match(/^[•\-*○●]\s/)
+      )) {
+        const cleanedDesc = line.replace(/^[•\-*○●]\s*/, '').trim();
+        if (cleanedDesc) {
+          currentExp.description += cleanedDesc + '\n';
+        }
       }
     }
 
     if (currentExp) experiences.push(currentExp);
+    
+    // Clean up descriptions
+    experiences.forEach(exp => {
+      if (exp.description) {
+        exp.description = exp.description
+          .replace(/\s+Đỗ\s+/g, ' ')
+          .replace(/\s+Ngô\s+/g, ' ')
+          .replace(/\s+Đặng\s+/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      }
+      if (exp.position) {
+        exp.position = exp.position
+          .replace(/\s+Đỗ\s+/g, ' ')
+          .replace(/\s+Ngô\s+/g, ' ')
+          .replace(/\s+Đặng\s+/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      }
+      if (exp.company) {
+        exp.company = exp.company
+          .replace(/\s+Đỗ\s+/g, ' ')
+          .replace(/\s+Ngô\s+/g, ' ')
+          .replace(/\s+Đặng\s+/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      }
+    });
+    
     return experiences;
   }
 

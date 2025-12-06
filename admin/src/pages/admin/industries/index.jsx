@@ -101,25 +101,25 @@ const Industries = () => {
           <Tag color="gray">Không</Tag>
         ),
     },
-    {
-      title: "Thống kê",
-      key: "stats",
-      render: (_, record) => {
-        if (!includeStats || !record.stats) return "-";
-        return (
-          <div className="text-sm">
-            <div>
-              <FileTextOutlined className="mr-1" />
-              {record.stats.totalJobs || 0} việc làm
-            </div>
-            <div>
-              <UserOutlined className="mr-1" />
-              {record.stats.totalCandidates || 0} ứng viên
-            </div>
-          </div>
-        );
-      },
-    },
+    // {
+    //   title: "Thống kê",
+    //   key: "stats",
+    //   render: (_, record) => {
+    //     if (!includeStats || !record.stats) return "-";
+    //     return (
+    //       <div className="text-sm">
+    //         <div>
+    //           <FileTextOutlined className="mr-1" />
+    //           {record.stats.totalJobs || 0} việc làm
+    //         </div>
+    //         <div>
+    //           <UserOutlined className="mr-1" />
+    //           {record.stats.totalCandidates || 0} ứng viên
+    //         </div>
+    //       </div>
+    //     );
+    //   },
+    // },
     {
       title: "Trạng thái",
       dataIndex: "visible",
@@ -615,14 +615,14 @@ const Industries = () => {
               ))}
             </Select>
           </Form.Item>
-          <Form.Item label="Bao gồm thống kê">
+          {/* <Form.Item label="Bao gồm thống kê">
             <Switch
               checked={includeStats}
               onChange={(checked) => {
                 setIncludeStats(checked);
               }}
             />
-          </Form.Item>
+          </Form.Item> */}
           <Form.Item>
             <Space>
               <Button

@@ -14,13 +14,15 @@ const getRoadmaps = async (req, res) => {
     const { status, page = 1, limit = 10 } = req.query;
     const userId = req.user.id;
 
-    const query = { userId };
+    // Model uses candidateId, not userId
+    const query = { candidateId: userId };
     if (status) query.status = status;
 
     const skip = (page - 1) * limit;
 
     const roadmaps = await LearningRoadmap.find(query)
-      .populate('targetJobId', 'title')
+      .populate('targetJobId', 'title description requirements')
+      .populate('candidateId', 'fullName email')
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -42,6 +44,7 @@ const getRoadmaps = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Lỗi khi lấy danh sách roadmap',
+      error: error.message,
     });
   }
 };
@@ -62,7 +65,7 @@ const getRoadmap = async (req, res) => {
     }
 
     // Check ownership
-    if (roadmap.userId.toString() !== req.user.id) {
+    if (roadmap.candidateId.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: 'Không có quyền xem roadmap này',
@@ -87,8 +90,10 @@ const getRoadmap = async (req, res) => {
 // @access  Private
 const createRoadmap = async (req, res) => {
   try {
-    const roadmapData = req.body;
-    roadmapData.candidateId = req.user.id;
+    const roadmapData = {
+      ...req.body,
+      candidateId: req.user.id,
+    };
 
     const roadmap = await LearningRoadmap.create(roadmapData);
 
@@ -124,7 +129,7 @@ const updateRoadmap = async (req, res) => {
     }
 
     // Check ownership
-    if (roadmap.userId.toString() !== req.user.id) {
+    if (roadmap.candidateId.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: 'Không có quyền chỉnh sửa roadmap này',
@@ -169,7 +174,7 @@ const deleteRoadmap = async (req, res) => {
     }
 
     // Check ownership
-    if (roadmap.userId.toString() !== req.user.id) {
+    if (roadmap.candidateId.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: 'Không có quyền xóa roadmap này',
@@ -250,7 +255,7 @@ const updateProgress = async (req, res) => {
     }
 
     // Check ownership
-    if (roadmap.userId.toString() !== req.user.id) {
+    if (roadmap.candidateId.toString() !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: 'Không có quyền cập nhật roadmap này',
@@ -388,7 +393,7 @@ const generateRoadmapFromJob = async (req, res) => {
 
     // Create roadmap document
     const roadmapData = {
-      userId,
+      candidateId: userId,
       targetJobId: jobId,
       title: `Roadmap: ${job.title}`,
       description: `Lộ trình phát triển kỹ năng cho vị trí ${job.title}`,
