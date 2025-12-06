@@ -251,54 +251,10 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
       return;
     }
 
-    // Check if user has profile and CV before proceeding
-    try {
-      setRoadmapProgressMessage("Đang kiểm tra hồ sơ...");
-      setRoadmapProgress(10);
-      
-      const profileResponse = await candidateService.getProfile();
-      
-      if (!profileResponse.success || !profileResponse.data) {
-        toast({
-          title: "Chưa có hồ sơ",
-          description: "Vui lòng hoàn thiện hồ sơ hoặc tải CV lên trước khi tạo lộ trình học tập.",
-          variant: "destructive",
-        });
-        router.push("/my-cv");
-        return;
-      }
-
-      const profile = profileResponse.data;
-      
-      // Check if user has CV or profile data
-      const hasCV = profile.resume?.current;
-      const hasSkills = (profile.skills?.technical?.length || 0) + (profile.skills?.soft?.length || 0) > 0;
-      const hasExperience = (profile.experience?.internships?.length || 0) + 
-                           (profile.experience?.fulltime?.length || 0) + 
-                           (profile.experience?.projects?.length || 0) > 0;
-      const hasEducation = !!profile.education?.university || (profile.education?.certifications?.length || 0) > 0;
-
-      if (!hasCV && !hasSkills && !hasExperience && !hasEducation) {
-        toast({
-          title: "Chưa có thông tin hồ sơ",
-          description: "Vui lòng tải CV lên hoặc cập nhật thông tin (kỹ năng, kinh nghiệm, học vấn) trước khi tạo lộ trình học tập.",
-          variant: "destructive",
-        });
-        router.push("/my-cv");
-        return;
-      }
-
-      setRoadmapProgressMessage("Đang phân tích hồ sơ và công việc...");
-      setRoadmapProgress(20);
-    } catch (profileError: any) {
-      console.error("Error checking profile:", profileError);
-      toast({
-        title: "Lỗi kiểm tra hồ sơ",
-        description: profileError?.response?.data?.message || "Không thể kiểm tra hồ sơ. Vui lòng thử lại.",
-        variant: "destructive",
-      });
-      return;
-    }
+    // Note: We don't check profile here because the backend API has fallback logic
+    // to generate skill gaps even if profile is incomplete. Let the API handle it.
+    setRoadmapProgressMessage("Đang phân tích hồ sơ và công việc...");
+    setRoadmapProgress(20);
 
     setIsGeneratingRoadmap(true);
     setShowRoadmapProgress(true);
@@ -417,13 +373,17 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
       
       // Check if error is about missing profile/CV
       const errorMessage = error?.response?.data?.message || error?.message || "";
-      if (errorMessage.includes("profile") || errorMessage.includes("CV") || errorMessage.includes("complete")) {
+      if (errorMessage.includes("profile") || errorMessage.includes("CV") || errorMessage.includes("complete") || errorMessage.includes("Unable to identify skill gaps")) {
+        // Only show warning, don't auto-redirect
+        // Backend has fallback logic, so we let it handle incomplete profiles
         toast({
-          title: "Chưa có đủ thông tin",
-          description: errorMessage || "Vui lòng hoàn thiện hồ sơ hoặc tải CV lên trước khi tạo lộ trình học tập.",
+          title: "Thông tin hồ sơ chưa đầy đủ",
+          description: errorMessage || "Vui lòng cập nhật thông tin (kỹ năng, kinh nghiệm, học vấn) để tạo lộ trình học tập chính xác hơn.",
           variant: "destructive",
+          duration: 5000,
         });
-        router.push("/my-cv");
+        // Don't auto-redirect - let user decide if they want to update profile
+        // The backend will still try to generate a roadmap with fallback logic
       } else {
         toast({
           title: "Lỗi tạo lộ trình",
