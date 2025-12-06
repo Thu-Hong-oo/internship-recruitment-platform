@@ -119,6 +119,32 @@ export const useGoogleAuth = () => {
           saveUserData(result.user, true);
         }
 
+        // Fetch latest profile to ensure avatar is up-to-date
+        // This is important when user links Google account to existing email account
+        try {
+          const { getEmployerProfile } = await import("@/lib/api");
+          const profileResponse = await getEmployerProfile(result.token!);
+          const profile = profileResponse?.data || profileResponse?.profile || null;
+          
+          if (profile?.user) {
+            // Update user data with latest avatar from profile
+            const updatedUser = {
+              ...result.user,
+              avatar: profile.user.avatar || result.user.avatar,
+              fullName: profile.user.fullName || result.user.fullName,
+            };
+            saveUserData(updatedUser, true);
+          }
+        } catch (profileError) {
+          console.error("Failed to fetch profile after Google login:", profileError);
+          // Continue anyway, user data is already saved
+        }
+
+        // Dispatch custom event to notify AppHeader to reload user data
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event('user-login'));
+        }
+
         // Redirect to dashboard
         setTimeout(() => {
           router.push("/dashboard");

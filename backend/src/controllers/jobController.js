@@ -950,6 +950,12 @@ const applyForJob = async (req, res) => {
     // Update job stats
     await Job.findByIdAndUpdate(id, { $inc: { 'stats.applications': 1 } });
 
+    // Invalidate job cache so hasApplied will be updated on next request
+    const cacheService = getCacheService();
+    if (cacheService) {
+      await cacheService.invalidateJobCache(id);
+    }
+
     // Notify employer về application mới
     try {
       const NotificationService = require('../services/notification/notificationService');

@@ -25,7 +25,7 @@ def load_model():
         
         return tokenizer, model, label_mapping
     except Exception as e:
-        print(json.dumps({"error": f"Failed to load model: {str(e)}"}), file=sys.stderr)
+        print(json.dumps({"success": False, "error": f"Failed to load model: {str(e)}", "skills": [], "count": 0}), file=sys.stderr, flush=True)
         sys.exit(1)
 
 def extract_skills(text, tokenizer, model, label_mapping):
@@ -90,52 +90,89 @@ def extract_skills(text, tokenizer, model, label_mapping):
         return cleaned_skills
     
     except Exception as e:
-        print(json.dumps({"error": f"Extraction failed: {str(e)}"}), file=sys.stderr)
+        print(json.dumps({"success": False, "error": f"Extraction failed: {str(e)}", "skills": [], "count": 0}), file=sys.stderr, flush=True)
         return []
 
 def main():
     """Main function"""
-    # Check if --check flag is provided
-    if len(sys.argv) > 1 and sys.argv[1] == '--check':
-        # Return success for health check
+    try:
+        # Check if --check flag is provided
+        if len(sys.argv) > 1 and sys.argv[1] == '--check':
+            # Return success for health check
+            result = {
+                "success": True,
+                "skills": [],
+                "count": 0
+            }
+            print(json.dumps(result, ensure_ascii=False), flush=True)
+            return
+        
+        # Read text from stdin (not command line argument)
+        if sys.stdin.isatty():
+            error_result = {
+                "success": False,
+                "error": "No text provided in stdin",
+                "skills": [],
+                "count": 0
+            }
+            print(json.dumps(error_result, ensure_ascii=False), file=sys.stderr, flush=True)
+            sys.exit(1)
+        
+        text = sys.stdin.read().strip()
+        
+        if not text:
+            result = {
+                "success": True,
+                "skills": [],
+                "count": 0
+            }
+            print(json.dumps(result, ensure_ascii=False), flush=True)
+            return
+        
+        # Load model
+        try:
+            tokenizer, model, label_mapping = load_model()
+        except Exception as e:
+            error_result = {
+                "success": False,
+                "error": f"Failed to load model: {str(e)}",
+                "skills": [],
+                "count": 0
+            }
+            print(json.dumps(error_result, ensure_ascii=False), file=sys.stderr, flush=True)
+            sys.exit(1)
+        
+        # Extract skills
+        try:
+            skills = extract_skills(text, tokenizer, model, label_mapping)
+        except Exception as e:
+            error_result = {
+                "success": False,
+                "error": f"Extraction failed: {str(e)}",
+                "skills": [],
+                "count": 0
+            }
+            print(json.dumps(error_result, ensure_ascii=False), file=sys.stderr, flush=True)
+            sys.exit(1)
+        
+        # Output as JSON
         result = {
             "success": True,
+            "skills": skills,
+            "count": len(skills)
+        }
+        
+        print(json.dumps(result, ensure_ascii=False), flush=True)
+        
+    except Exception as e:
+        error_result = {
+            "success": False,
+            "error": f"Unexpected error: {str(e)}",
             "skills": [],
             "count": 0
         }
-        print(json.dumps(result, ensure_ascii=False))
-        return
-    
-    # Read text from stdin (not command line argument)
-    if sys.stdin.isatty():
-        print(json.dumps({"error": "No text provided in stdin"}), file=sys.stderr)
+        print(json.dumps(error_result, ensure_ascii=False), file=sys.stderr, flush=True)
         sys.exit(1)
-    
-    text = sys.stdin.read().strip()
-    
-    if not text:
-        result = {
-            "success": True,
-            "skills": [],
-            "count": 0
-        }
-        print(json.dumps(result, ensure_ascii=False))
-        return
-    
-    # Load model
-    tokenizer, model, label_mapping = load_model()
-    
-    # Extract skills
-    skills = extract_skills(text, tokenizer, model, label_mapping)
-    
-    # Output as JSON
-    result = {
-        "success": True,
-        "skills": skills,
-        "count": len(skills)
-    }
-    
-    print(json.dumps(result, ensure_ascii=False))
 
 if __name__ == '__main__':
     main()

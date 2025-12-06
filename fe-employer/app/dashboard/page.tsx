@@ -76,17 +76,33 @@ export default function DashboardPage() {
         if (!prev) {
           const userData = getUserData();
           if (!userData) return null;
-          return {
+          const updatedUser = {
             ...userData,
             fullName: profileUser.fullName || userData.fullName || "User",
             avatar: profileUser.avatar || userData.avatar,
           };
+          // Update localStorage to keep it in sync
+          try {
+            const { saveUserData } = require("@/lib/userStorage");
+            saveUserData(updatedUser, true);
+          } catch (err) {
+            console.error("Failed to update user in localStorage:", err);
+          }
+          return updatedUser;
         }
-        return {
+        const updatedUser = {
           ...prev,
           fullName: profileUser.fullName || prev.fullName,
           avatar: profileUser.avatar || prev.avatar,
         };
+        // Update localStorage to keep it in sync
+        try {
+          const { saveUserData } = require("@/lib/userStorage");
+          saveUserData(updatedUser, true);
+        } catch (err) {
+          console.error("Failed to update user in localStorage:", err);
+        }
+        return updatedUser;
       });
 
       // Map backend employer status (data.status) to local status state
