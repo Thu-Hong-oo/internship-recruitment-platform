@@ -28,6 +28,7 @@ import {
   Map,
   BarChart3,
   FileText,
+  LayoutDashboard,
 } from "lucide-react"; //icon
 import { Badge } from "@/components/ui/badge"; // bo tròn như badge
 import { Switch } from "@/components/ui/switch";
@@ -271,7 +272,7 @@ export default function Header() {
           {/* Logo */}
           <div className="flex items-center">
             <Link
-              href="/"
+              href="/home"
               className="text-2xl font-bold text-primary hover:text-primary/50 transition-colors duration-200 cursor-pointer"
               // transition-colors duration-200: khi hover thì màu chữ thành 50% màu gốc nhưng phải có transition-colors vì nếu không có thì màu chữ sẽ thay đổi ngay lập tức không mượt
             >
@@ -282,6 +283,15 @@ export default function Header() {
           {/* Navigation */}
           <nav className="hidden md:flex items-center space-x-8">
             {/* ẩn khi dùng màn nhỏ */}
+            {user && (
+              <Link
+                href="/"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 font-medium shadow-sm hover:shadow-md"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                Dashboard
+              </Link>
+            )}
             <div className="relative">
               <button
                 className="flex items-center text-foreground hover:text-primary transition-colors duration-200"
@@ -729,6 +739,13 @@ export default function Header() {
                       </div>
 
                       <div className="p-2">
+                        <Link
+                          href="/dashboard"
+                          className="flex items-center gap-2 w-full rounded-md px-3 py-2.5 mb-2 bg-primary/10 text-primary hover:bg-primary/20 transition-colors font-medium"
+                        >
+                          <LayoutDashboard className="w-4 h-4" />
+                          <span>Dashboard</span>
+                        </Link>
                         <Accordion
                           type="multiple"
                           defaultValue={["jobs", "cv"]}
@@ -741,7 +758,7 @@ export default function Header() {
                             <AccordionContent className="pt-1 pb-2">
                               <div className="space-y-1 text-sm text-muted-foreground">
                                 <Link
-                                  href="/saved-jobs"
+                                  href="/jobs/saved-jobs"
                                   className="flex items-center rounded-md px-2 py-2 hover:bg-muted hover:text-foreground"
                                 >
                                   <span>Việc làm đã lưu</span>
