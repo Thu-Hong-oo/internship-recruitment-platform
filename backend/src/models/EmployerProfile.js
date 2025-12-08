@@ -54,6 +54,7 @@ const EmployerProfileSchema = new mongoose.Schema(
     members: [
       {
         user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        email: { type: String, lowercase: true }, // Email for invitation (before user accepts)
         role: {
           type: String,
           enum: ['owner', 'admin', 'hr', 'recruiter', 'interviewer'],
@@ -99,6 +100,8 @@ const EmployerProfileSchema = new mongoose.Schema(
         },
         invitedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
         invitedAt: { type: Date, default: Date.now },
+        invitationToken: { type: String }, // Token for invitation acceptance
+        expiresAt: { type: Date }, // Invitation expiry date
         joinedAt: Date,
         lastActive: Date,
         activity: {

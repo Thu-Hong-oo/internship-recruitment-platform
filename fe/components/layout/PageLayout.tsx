@@ -38,3 +38,4 @@ export default function PageLayout({
     </div>
   );
 }
+PageLayout.displayName = "PageLayout";

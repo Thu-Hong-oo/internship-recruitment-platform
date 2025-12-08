@@ -1562,38 +1562,68 @@ class SelfSufficientAIService {
    * 
    * Uses: Gemini AI for intelligent analysis + Rule-based fallback
    */
-  async analyzeCVImprovements(cvData, cvText) {
+  async analyzeCVImprovements(cvData, cvText, targetJobId = null) {
     try {
-      logger.info('📝 Analyzing CV for improvements');
+      logger.info('📝 Analyzing CV for improvements', { targetJobId });
 
-      // Try AI-powered analysis first (if Gemini available)
-      if (this.geminiModel && cvText && cvText.length > 50) {
+      // Step 1: Try exact match (job-specific data)
+      if (targetJobId) {
         try {
-          logger.info('🤖 Using Gemini AI for intelligent CV improvements analysis');
-          const aiAnalysis = await this._analyzeCVWithAI(cvData, cvText);
-          if (aiAnalysis && aiAnalysis.specificImprovements && aiAnalysis.specificImprovements.length > 0) {
-            logger.info(`✅ AI analysis completed: ${aiAnalysis.specificImprovements.length} specific improvements found`);
-            return aiAnalysis;
+          const jobData = await this._getJobData(targetJobId);
+          const exactMatchData = await this._getSuccessfulCVsForJob(targetJobId);
+          
+          if (exactMatchData.count >= 5) {
+            logger.info(`✅ Using exact match data (${exactMatchData.count} successful CVs)`);
+            return await this._analyzeWithExactMatch(cvData, cvText, jobData, exactMatchData);
           }
-        } catch (aiError) {
-          logger.warn('⚠️ AI analysis failed, falling back to rule-based:', aiError.message);
+          
+          // Step 2: Try similar jobs
+          const similarJobs = await this._findSimilarJobs(targetJobId);
+          const similarJobsData = await this._getSuccessfulCVsForSimilarJobs(similarJobs);
+          
+          if (similarJobsData.count >= 5) {
+            logger.info(`⚠️ Using similar jobs data (${similarJobsData.count} CVs from ${similarJobs.length} similar jobs)`);
+            return await this._analyzeWithSimilarJobs(cvData, cvText, jobData, similarJobsData);
+          }
+        } catch (dataError) {
+          logger.warn('⚠️ Data-driven analysis failed, trying fallbacks:', dataError.message);
         }
       }
-
-      // Fallback to rule-based analysis
-      logger.info('📋 Using rule-based CV improvements analysis (fallback)');
-      return await this._analyzeCVWithRules(cvData, cvText);
+      
+      // Step 3: Try industry patterns
+      const industryCode = await this._getIndustryFromCV(cvData, targetJobId);
+      if (industryCode) {
+        try {
+          const industryData = await this._getIndustryPatterns(industryCode);
+          
+          if (industryData.count >= 10) {
+            logger.info(`⚠️ Using industry patterns (${industryData.count} CVs from industry ${industryCode})`);
+            return await this._analyzeWithIndustryPatterns(cvData, cvText, industryData);
+          }
+        } catch (industryError) {
+          logger.warn('⚠️ Industry patterns failed:', industryError.message);
+        }
+      }
+      
+      // Step 4: Try generic patterns (all industries)
+      try {
+        const genericData = await this._getGenericPatterns();
+        
+        if (genericData.count >= 20) {
+          logger.info(`⚠️ Using generic patterns (${genericData.count} CVs across all industries)`);
+          return await this._analyzeWithGenericPatterns(cvData, cvText, genericData);
+        }
+      } catch (genericError) {
+        logger.warn('⚠️ Generic patterns failed:', genericError.message);
+      }
+      
+      // Step 5: Final fallback - AI + Rules
+      logger.warn('⚠️ No sufficient data, using AI + Rules fallback');
+      return await this._analyzeWithAIFallback(cvData, cvText, targetJobId);
 
     } catch (error) {
       logger.error('❌ CV improvements analysis error:', error);
-      return {
-        overallScore: 0,
-        strengths: [],
-        weaknesses: [],
-        suggestions: { structure: [], content: [], writing: [], keywords: [] },
-        specificImprovements: [],
-        _method: 'error fallback'
-      };
+      return await this._analyzeWithAIFallback(cvData, cvText, targetJobId);
     }
   }
 
@@ -2073,6 +2103,30 @@ CHỈ TRẢ VỀ JSON, KHÔNG CÓ MARKDOWN HOẶC TEXT THÊM.`;
     const weaknesses = [];
     let score = 25;
 
+    // Normalize experience to array format
+    let experienceArray = [];
+    if (cvData.experience) {
+      if (Array.isArray(cvData.experience)) {
+        experienceArray = cvData.experience;
+      } else if (typeof cvData.experience === 'object') {
+        // Handle object format: { internships: [], fullTime: [], ... }
+        const allExp = [];
+        if (cvData.experience.internships && Array.isArray(cvData.experience.internships)) {
+          allExp.push(...cvData.experience.internships);
+        }
+        if (cvData.experience.fullTime && Array.isArray(cvData.experience.fullTime)) {
+          allExp.push(...cvData.experience.fullTime);
+        }
+        if (cvData.experience.partTime && Array.isArray(cvData.experience.partTime)) {
+          allExp.push(...cvData.experience.partTime);
+        }
+        if (cvData.experience.projects && Array.isArray(cvData.experience.projects)) {
+          allExp.push(...cvData.experience.projects);
+        }
+        experienceArray = allExp;
+      }
+    }
+
     // Analyze experience descriptions - check ACTUAL data
     if (experienceArray.length > 0) {
       experienceArray.forEach((exp, index) => {
@@ -2246,6 +2300,30 @@ CHỈ TRẢ VỀ JSON, KHÔNG CÓ MARKDOWN HOẶC TEXT THÊM.`;
     const improvements = [];
     const lines = cvText.split('\n');
 
+    // Normalize experience to array format
+    let experienceArray = [];
+    if (cvData.experience) {
+      if (Array.isArray(cvData.experience)) {
+        experienceArray = cvData.experience;
+      } else if (typeof cvData.experience === 'object') {
+        // Handle object format: { internships: [], fullTime: [], ... }
+        const allExp = [];
+        if (cvData.experience.internships && Array.isArray(cvData.experience.internships)) {
+          allExp.push(...cvData.experience.internships);
+        }
+        if (cvData.experience.fullTime && Array.isArray(cvData.experience.fullTime)) {
+          allExp.push(...cvData.experience.fullTime);
+        }
+        if (cvData.experience.partTime && Array.isArray(cvData.experience.partTime)) {
+          allExp.push(...cvData.experience.partTime);
+        }
+        if (cvData.experience.projects && Array.isArray(cvData.experience.projects)) {
+          allExp.push(...cvData.experience.projects);
+        }
+        experienceArray = allExp;
+      }
+    }
+
     // Helper function to find text position in CV
     const findTextPosition = (searchText, section = null) => {
       const lowerText = cvText.toLowerCase();
@@ -2407,6 +2485,1027 @@ CHỈ TRẢ VỀ JSON, KHÔNG CÓ MARKDOWN HOẶC TEXT THÊM.`;
       logger.error('❌ Learning roadmap error:', error);
       throw error;
     }
+  }
+
+  // ==================== CV Improvement - Data-Driven Methods ====================
+
+  /**
+   * Get job data by ID
+   * @private
+   */
+  async _getJobData(jobId) {
+    try {
+      const Job = require('../../models/Job');
+      const job = await Job.findById(jobId)
+        .select('title description requirements skills requiredSkills preferredSkills jobRequirements industryCode level jobType')
+        .lean();
+      
+      if (!job) return null;
+      
+      return {
+        title: job.title,
+        description: job.description,
+        requirements: job.requirements,
+        requiredSkills: job.requiredSkills || job.skills || [],
+        preferredSkills: job.preferredSkills || [],
+        minExperience: job.jobRequirements?.minExperience || 0,
+        industryCode: job.industryCode,
+        level: job.level,
+        jobType: job.jobType
+      };
+    } catch (error) {
+      logger.error('Error getting job data:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get successful CVs for a specific job
+   * @private
+   */
+  async _getSuccessfulCVsForJob(jobId) {
+    try {
+      const Application = require('../../models/Application');
+      const CandidateProfile = require('../../models/CandidateProfile');
+      const { APPLICATION_STATUS } = require('../../constants/common.constants');
+      
+      // Get successful applications
+      const successfulApps = await Application.find({
+        jobId: jobId,
+        status: { 
+          $in: [
+            APPLICATION_STATUS.SHORTLISTED,
+            APPLICATION_STATUS.INTERVIEW,
+            APPLICATION_STATUS.OFFER,
+            APPLICATION_STATUS.ACCEPTED
+          ]
+        },
+        'matchingScore.overall': { $gte: 75 }
+      })
+        .select('candidateId matchingScore status')
+        .sort({ 'matchingScore.overall': -1 })
+        .limit(50)
+        .lean();
+      
+      if (successfulApps.length === 0) {
+        return { count: 0 };
+      }
+      
+      // Get CV data
+      const candidateIds = [...new Set(successfulApps.map(app => app.candidateId))];
+      const candidates = await CandidateProfile.find({
+        _id: { $in: candidateIds }
+      })
+        .select('skills experience education resume.current.aiAnalysis.extractedData')
+        .lean();
+      
+      return this._aggregateCVMetrics(successfulApps, candidates);
+    } catch (error) {
+      logger.error('Error getting successful CVs for job:', error);
+      return { count: 0 };
+    }
+  }
+
+  /**
+   * Find similar jobs (same level, jobType, similar skills)
+   * @private
+   */
+  async _findSimilarJobs(targetJobId) {
+    try {
+      const Job = require('../../models/Job');
+      const Application = require('../../models/Application');
+      const { APPLICATION_STATUS } = require('../../constants/common.constants');
+      
+      const targetJob = await Job.findById(targetJobId)
+        .select('title level jobType industryCode skills requiredSkills')
+        .lean();
+      
+      if (!targetJob) return [];
+      
+      // Find similar jobs
+      const similarJobs = await Job.find({
+        _id: { $ne: targetJobId },
+        level: targetJob.level,
+        jobType: targetJob.jobType,
+        status: 'active',
+        $or: [
+          { requiredSkills: { $in: targetJob.requiredSkills || [] } },
+          { skills: { $in: targetJob.skills || [] } }
+        ]
+      })
+        .select('_id title industryCode')
+        .limit(10)
+        .lean();
+      
+      if (similarJobs.length === 0) return [];
+      
+      // Check which jobs have successful applications
+      const jobIds = similarJobs.map(job => job._id);
+      const jobsWithSuccess = await Application.aggregate([
+        {
+          $match: {
+            jobId: { $in: jobIds },
+            status: { 
+              $in: [
+                APPLICATION_STATUS.SHORTLISTED,
+                APPLICATION_STATUS.INTERVIEW,
+                APPLICATION_STATUS.OFFER
+              ]
+            },
+            'matchingScore.overall': { $gte: 75 }
+          }
+        },
+        {
+          $group: {
+            _id: '$jobId',
+            count: { $sum: 1 }
+          }
+        },
+        {
+          $match: {
+            count: { $gte: 3 } // At least 3 successful CVs
+          }
+        }
+      ]);
+      
+      const validJobIds = jobsWithSuccess.map(j => j._id);
+      return similarJobs.filter(job => validJobIds.includes(job._id));
+    } catch (error) {
+      logger.error('Error finding similar jobs:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get successful CVs from similar jobs
+   * @private
+   */
+  async _getSuccessfulCVsForSimilarJobs(similarJobs) {
+    if (similarJobs.length === 0) return { count: 0 };
+    
+    try {
+      const Application = require('../../models/Application');
+      const CandidateProfile = require('../../models/CandidateProfile');
+      const { APPLICATION_STATUS } = require('../../constants/common.constants');
+      
+      const jobIds = similarJobs.map(job => job._id);
+      
+      // Get successful applications from similar jobs
+      const successfulApps = await Application.find({
+        jobId: { $in: jobIds },
+        status: { 
+          $in: [
+            APPLICATION_STATUS.SHORTLISTED,
+            APPLICATION_STATUS.INTERVIEW,
+            APPLICATION_STATUS.OFFER
+          ]
+        },
+        'matchingScore.overall': { $gte: 75 }
+      })
+        .select('candidateId matchingScore jobId')
+        .lean();
+      
+      if (successfulApps.length === 0) return { count: 0 };
+      
+      // Get CV data
+      const candidateIds = [...new Set(successfulApps.map(app => app.candidateId))];
+      const candidates = await CandidateProfile.find({
+        _id: { $in: candidateIds }
+      })
+        .select('skills experience education resume.current.aiAnalysis.extractedData')
+        .lean();
+      
+      return this._aggregateCVMetrics(successfulApps, candidates);
+    } catch (error) {
+      logger.error('Error getting CVs from similar jobs:', error);
+      return { count: 0 };
+    }
+  }
+
+  /**
+   * Get industry patterns
+   * @private
+   */
+  async _getIndustryPatterns(industryCode) {
+    try {
+      const Application = require('../../models/Application');
+      const Job = require('../../models/Job');
+      const CandidateProfile = require('../../models/CandidateProfile');
+      const { APPLICATION_STATUS } = require('../../constants/common.constants');
+      
+      // Get all jobs in this industry
+      const industryJobs = await Job.find({
+        industryCode: industryCode,
+        status: 'active'
+      })
+        .select('_id')
+        .lean();
+      
+      if (industryJobs.length === 0) return { count: 0 };
+      
+      const jobIds = industryJobs.map(job => job._id);
+      
+      // Get successful applications in this industry
+      const successfulApps = await Application.find({
+        jobId: { $in: jobIds },
+        status: { 
+          $in: [
+            APPLICATION_STATUS.SHORTLISTED,
+            APPLICATION_STATUS.INTERVIEW,
+            APPLICATION_STATUS.OFFER
+          ]
+        },
+        'matchingScore.overall': { $gte: 75 }
+      })
+        .select('candidateId matchingScore')
+        .lean();
+      
+      if (successfulApps.length === 0) return { count: 0 };
+      
+      // Get CV data
+      const candidateIds = [...new Set(successfulApps.map(app => app.candidateId))];
+      const candidates = await CandidateProfile.find({
+        _id: { $in: candidateIds }
+      })
+        .select('skills experience education resume.current.aiAnalysis.extractedData')
+        .lean();
+      
+      return this._aggregateCVMetrics(successfulApps, candidates);
+    } catch (error) {
+      logger.error('Error getting industry patterns:', error);
+      return { count: 0 };
+    }
+  }
+
+  /**
+   * Get generic patterns (all industries)
+   * @private
+   */
+  async _getGenericPatterns() {
+    try {
+      const Application = require('../../models/Application');
+      const CandidateProfile = require('../../models/CandidateProfile');
+      const { APPLICATION_STATUS } = require('../../constants/common.constants');
+      
+      // Get top successful applications from ALL industries
+      const successfulApps = await Application.find({
+        status: { 
+          $in: [
+            APPLICATION_STATUS.SHORTLISTED,
+            APPLICATION_STATUS.INTERVIEW,
+            APPLICATION_STATUS.OFFER
+          ]
+        },
+        'matchingScore.overall': { $gte: 80 } // Only very good CVs
+      })
+        .select('candidateId matchingScore')
+        .sort({ 'matchingScore.overall': -1 })
+        .limit(100)
+        .lean();
+      
+      if (successfulApps.length === 0) return { count: 0 };
+      
+      // Get CV data
+      const candidateIds = [...new Set(successfulApps.map(app => app.candidateId))];
+      const candidates = await CandidateProfile.find({
+        _id: { $in: candidateIds }
+      })
+        .select('skills experience education resume.current.aiAnalysis.extractedData')
+        .lean();
+      
+      return this._aggregateGenericPatterns(successfulApps, candidates);
+    } catch (error) {
+      logger.error('Error getting generic patterns:', error);
+      return { count: 0 };
+    }
+  }
+
+  /**
+   * Get industry code from CV or job
+   * @private
+   */
+  async _getIndustryFromCV(cvData, targetJobId) {
+    try {
+      // Try to get from job first
+      if (targetJobId) {
+        const jobData = await this._getJobData(targetJobId);
+        if (jobData?.industryCode) {
+          return jobData.industryCode;
+        }
+      }
+      
+      // Try to get from candidate profile preferences
+      // This would need candidateId, which we don't have here
+      // So we'll return null if job doesn't have industry
+      return null;
+    } catch (error) {
+      logger.warn('Error getting industry from CV:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Aggregate CV metrics from successful applications
+   * @private
+   */
+  _aggregateCVMetrics(successfulApps, candidates) {
+    try {
+      if (successfulApps.length === 0 || candidates.length === 0) {
+        return { count: 0 };
+      }
+      
+      // Calculate average score
+      const scores = successfulApps.map(app => app.matchingScore?.overall || 0);
+      const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+      
+      // Extract common skills
+      const allSkills = [];
+      const cvDataMap = {};
+      
+      candidates.forEach(candidate => {
+        const skills = candidate.skills?.technical || [];
+        const extractedData = candidate.resume?.current?.aiAnalysis?.extractedData;
+        const extractedSkills = extractedData?.skills || [];
+        
+        // Combine skills from both sources
+        const combinedSkills = [
+          ...skills.map(s => typeof s === 'string' ? s.toLowerCase() : (s.name || '').toLowerCase()),
+          ...extractedSkills.map(s => typeof s === 'string' ? s.toLowerCase() : (s.name || '').toLowerCase())
+        ].filter(s => s && s.length > 0);
+        
+        allSkills.push(...combinedSkills);
+        
+        // Store CV data for later use
+        cvDataMap[candidate._id.toString()] = {
+          skills: combinedSkills,
+          experience: candidate.experience || {},
+          education: candidate.education || {}
+        };
+      });
+      
+      // Count skill frequency
+      const skillFrequency = {};
+      allSkills.forEach(skill => {
+        skillFrequency[skill] = (skillFrequency[skill] || 0) + 1;
+      });
+      
+      // Get common skills (appears in >= 50% of CVs)
+      const threshold = candidates.length * 0.5;
+      const commonSkills = Object.entries(skillFrequency)
+        .filter(([skill, count]) => count >= threshold)
+        .map(([skill, count]) => ({
+          name: skill,
+          frequency: count,
+          successRate: Math.round((count / candidates.length) * 100)
+        }))
+        .sort((a, b) => b.frequency - a.frequency);
+      
+      // Calculate average years of experience
+      const allYears = [];
+      candidates.forEach(candidate => {
+        const experience = candidate.experience || {};
+        const fullTime = experience.fullTime || [];
+        const internships = experience.internships || [];
+        const allExp = [...fullTime, ...internships];
+        
+        let totalYears = 0;
+        allExp.forEach(exp => {
+          if (exp.startDate && exp.endDate) {
+            const years = this._calculateYearsOfExperience(exp.startDate, exp.endDate);
+            totalYears += years;
+          } else if (exp.duration) {
+            // Try to parse duration string
+            const years = this._parseDurationToYears(exp.duration);
+            totalYears += years;
+          }
+        });
+        
+        if (totalYears > 0) {
+          allYears.push(totalYears);
+        }
+      });
+      
+      const avgYears = allYears.length > 0 
+        ? allYears.reduce((a, b) => a + b, 0) / allYears.length 
+        : 0;
+      
+      return {
+        count: successfulApps.length,
+        avgScore,
+        commonSkills,
+        avgYearsOfExperience: avgYears,
+        applications: successfulApps,
+        cvDataMap
+      };
+    } catch (error) {
+      logger.error('Error aggregating CV metrics:', error);
+      return { count: 0 };
+    }
+  }
+
+  /**
+   * Aggregate generic patterns (not industry-specific)
+   * @private
+   */
+  _aggregateGenericPatterns(successfulApps, candidates) {
+    try {
+      const baseMetrics = this._aggregateCVMetrics(successfulApps, candidates);
+      
+      if (baseMetrics.count === 0) {
+        return { count: 0 };
+      }
+      
+      // Add generic structure patterns
+      let hasSummaryCount = 0;
+      let hasSkillsCount = 0;
+      let hasExperienceCount = 0;
+      let hasEducationCount = 0;
+      let totalSections = 0;
+      let hasMetricsCount = 0;
+      let totalSkillsCount = 0;
+      
+      candidates.forEach(candidate => {
+        const extractedData = candidate.resume?.current?.aiAnalysis?.extractedData;
+        const personalInfo = extractedData?.personalInfo || candidate.personalInfo || {};
+        
+        if (personalInfo.summary) hasSummaryCount++;
+        if (candidate.skills?.technical?.length > 0 || extractedData?.skills?.length > 0) {
+          hasSkillsCount++;
+          totalSkillsCount += (candidate.skills?.technical?.length || 0) + (extractedData?.skills?.length || 0);
+        }
+        if (candidate.experience?.fullTime?.length > 0 || extractedData?.experience?.length > 0) {
+          hasExperienceCount++;
+        }
+        if (candidate.education?.university || extractedData?.education) {
+          hasEducationCount++;
+        }
+        
+        // Count sections
+        let sections = 0;
+        if (personalInfo.fullName) sections++;
+        if (personalInfo.summary) sections++;
+        if (candidate.skills) sections++;
+        if (candidate.experience) sections++;
+        if (candidate.education) sections++;
+        totalSections += sections;
+        
+        // Check for metrics (numbers in descriptions)
+        const allText = JSON.stringify(candidate).toLowerCase();
+        if (/\d+%|\d+\s*(triệu|nghìn|dự án|người|tháng|năm)/i.test(allText)) {
+          hasMetricsCount++;
+        }
+      });
+      
+      return {
+        ...baseMetrics,
+        structurePatterns: {
+          hasSummary: hasSummaryCount / candidates.length,
+          hasSkills: hasSkillsCount / candidates.length,
+          hasExperience: hasExperienceCount / candidates.length,
+          hasEducation: hasEducationCount / candidates.length,
+          avgSections: totalSections / candidates.length
+        },
+        contentPatterns: {
+          hasMetrics: hasMetricsCount / candidates.length,
+          avgSkillsCount: totalSkillsCount / candidates.length
+        }
+      };
+    } catch (error) {
+      logger.error('Error aggregating generic patterns:', error);
+      return { count: 0 };
+    }
+  }
+
+  /**
+   * Parse duration string to years
+   * @private
+   */
+  _parseDurationToYears(duration) {
+    if (!duration || typeof duration !== 'string') return 0;
+    
+    // Try to extract years from strings like "2020 - 2024", "2 years", "24 months"
+    const yearRange = duration.match(/(\d{4})\s*[-–]\s*(\d{4})/);
+    if (yearRange) {
+      const start = parseInt(yearRange[1]);
+      const end = parseInt(yearRange[2]);
+      return Math.max(0, end - start);
+    }
+    
+    const yearsMatch = duration.match(/(\d+)\s*(năm|year)/i);
+    if (yearsMatch) {
+      return parseInt(yearsMatch[1]);
+    }
+    
+    const monthsMatch = duration.match(/(\d+)\s*(tháng|month)/i);
+    if (monthsMatch) {
+      return parseInt(monthsMatch[1]) / 12;
+    }
+    
+    return 0;
+  }
+
+  /**
+   * Calculate years of experience from experience array
+   * @private
+   */
+  _calculateTotalYearsOfExperience(experience) {
+    if (!experience) return 0;
+    
+    let totalYears = 0;
+    const allExp = Array.isArray(experience) ? experience : 
+      (experience.fullTime || []).concat(experience.internships || []);
+    
+    allExp.forEach(exp => {
+      if (exp.startDate && exp.endDate) {
+        totalYears += this._calculateYearsOfExperience(exp.startDate, exp.endDate);
+      } else if (exp.duration) {
+        totalYears += this._parseDurationToYears(exp.duration);
+      }
+    });
+    
+    return totalYears;
+  }
+
+  /**
+   * Analyze CV with exact match data
+   * @private
+   */
+  async _analyzeWithExactMatch(cvData, cvText, jobData, successfulCVs) {
+    const gaps = await this._identifyGaps(cvData, jobData, successfulCVs);
+    const comparison = this._compareWithSuccessfulCVs(cvData, successfulCVs);
+    
+    return {
+      overallScore: comparison.score,
+      strengths: comparison.strengths,
+      weaknesses: gaps.map(g => g.issue || g.type),
+      suggestions: this._mapGapsToSuggestions(gaps),
+      specificImprovements: this._mapGapsToImprovements(gaps),
+      _dataSource: 'exact-match',
+      _confidence: 'high',
+      _benchmark: {
+        avgSuccessfulScore: successfulCVs.avgScore,
+        currentScore: comparison.score,
+        gap: comparison.score - successfulCVs.avgScore
+      }
+    };
+  }
+
+  /**
+   * Analyze CV with similar jobs data
+   * @private
+   */
+  async _analyzeWithSimilarJobs(cvData, cvText, jobData, similarJobsData) {
+    const gaps = await this._identifyGaps(cvData, jobData, similarJobsData);
+    const comparison = this._compareWithSuccessfulCVs(cvData, similarJobsData);
+    
+    return {
+      overallScore: comparison.score,
+      strengths: comparison.strengths,
+      weaknesses: gaps.map(g => g.issue || g.type),
+      suggestions: this._mapGapsToSuggestions(gaps),
+      specificImprovements: this._mapGapsToImprovements(gaps),
+      _dataSource: 'similar-jobs',
+      _confidence: 'high',
+      _disclaimer: 'Gợi ý dựa trên CV thành công từ jobs tương tự',
+      _benchmark: {
+        avgSuccessfulScore: similarJobsData.avgScore,
+        currentScore: comparison.score,
+        gap: comparison.score - similarJobsData.avgScore
+      }
+    };
+  }
+
+  /**
+   * Analyze CV with industry patterns
+   * @private
+   */
+  async _analyzeWithIndustryPatterns(cvData, cvText, industryData) {
+    const gaps = this._identifyGapsFromPatterns(cvData, cvText, industryData);
+    
+    return {
+      overallScore: this._calculateScoreFromGaps(gaps, industryData),
+      strengths: [],
+      weaknesses: gaps.map(g => g.issue || g.type),
+      suggestions: this._mapGapsToSuggestions(gaps),
+      specificImprovements: this._mapGapsToImprovements(gaps),
+      _dataSource: 'industry-patterns',
+      _confidence: 'medium-high',
+      _disclaimer: 'Gợi ý dựa trên patterns của ngành. Chưa có dữ liệu cụ thể cho job này.',
+      _benchmark: {
+        avgSuccessfulScore: industryData.avgScore,
+        sampleSize: industryData.count
+      }
+    };
+  }
+
+  /**
+   * Analyze CV with generic patterns
+   * @private
+   */
+  async _analyzeWithGenericPatterns(cvData, cvText, genericData) {
+    const gaps = this._identifyGapsFromGenericPatterns(cvData, cvText, genericData);
+    
+    return {
+      overallScore: this._calculateScoreFromGaps(gaps, genericData),
+      strengths: [],
+      weaknesses: gaps.map(g => g.issue || g.type),
+      suggestions: this._mapGapsToSuggestions(gaps),
+      specificImprovements: this._mapGapsToImprovements(gaps),
+      _dataSource: 'generic-patterns',
+      _confidence: 'medium',
+      _disclaimer: '⚠️ Gợi ý dựa trên patterns chung từ CV thành công (tất cả ngành). Chưa có đủ dữ liệu cho ngành/job này.',
+      _dataQuality: {
+        source: 'generic-patterns',
+        sampleSize: genericData.count,
+        targetIndustry: null // Will be set if available
+      }
+    };
+  }
+
+  /**
+   * AI fallback analysis
+   * @private
+   */
+  async _analyzeWithAIFallback(cvData, cvText, targetJobId) {
+    // Try AI analysis first (if Gemini available)
+    let aiAnalysis = null;
+    if (this.geminiModel && cvText && cvText.length > 50) {
+      try {
+        logger.info('🤖 Using Gemini AI for CV improvements analysis');
+        aiAnalysis = await this._analyzeCVWithAI(cvData, cvText);
+      } catch (aiError) {
+        logger.warn('⚠️ AI analysis failed:', aiError.message);
+      }
+    }
+    
+    // Always have rule-based fallback
+    const ruleAnalysis = await this._analyzeCVWithRules(cvData, cvText);
+    
+    // Combine with disclaimer
+    return {
+      overallScore: aiAnalysis?.overallScore || ruleAnalysis.overallScore,
+      strengths: aiAnalysis?.strengths || ruleAnalysis.strengths,
+      weaknesses: aiAnalysis?.weaknesses || ruleAnalysis.weaknesses,
+      suggestions: {
+        structure: [...(aiAnalysis?.suggestions?.structure || []), ...(ruleAnalysis.suggestions?.structure || [])],
+        content: [...(aiAnalysis?.suggestions?.content || []), ...(ruleAnalysis.suggestions?.content || [])],
+        writing: [...(aiAnalysis?.suggestions?.writing || []), ...(ruleAnalysis.suggestions?.writing || [])],
+        keywords: [...(aiAnalysis?.suggestions?.keywords || []), ...(ruleAnalysis.suggestions?.keywords || [])]
+      },
+      specificImprovements: [
+        ...(aiAnalysis?.specificImprovements || []),
+        ...(ruleAnalysis.specificImprovements || [])
+      ],
+      _dataSource: 'ai-rules-fallback',
+      _confidence: 'low-medium',
+      _disclaimer: '⚠️ Gợi ý dựa trên AI và best practices. Chưa có đủ dữ liệu thực tế cho ngành/job này.',
+      _method: aiAnalysis ? 'ai' : 'rules'
+    };
+  }
+
+  /**
+   * Identify gaps from CV data, job data, and successful CVs
+   * @private
+   */
+  async _identifyGaps(cvData, jobData, successfulCVs) {
+    const gaps = [];
+    
+    if (!jobData) {
+      return this._genericGapAnalysis(cvData);
+    }
+    
+    // 1. Skills gap
+    const requiredSkills = jobData.requiredSkills || [];
+    const currentSkills = this._extractSkillsFromCV(cvData);
+    const missingRequired = requiredSkills.filter(skill => 
+      !currentSkills.includes(skill.toLowerCase())
+    );
+    
+    if (missingRequired.length > 0) {
+      const successRate = this._calculateSkillSuccessRate(missingRequired, successfulCVs);
+      
+      gaps.push({
+        type: 'missing_required_skills',
+        skills: missingRequired,
+        impact: 'high',
+        evidence: `${successRate}% CV thành công cho job này có skills: ${missingRequired.join(', ')}`,
+        suggestion: `Thêm skills: ${missingRequired.join(', ')} (${successRate}% CV thành công có)`,
+        issue: `Thiếu skills bắt buộc: ${missingRequired.join(', ')}`
+      });
+    }
+    
+    // 2. Experience gap
+    if (jobData.minExperience) {
+      const currentYears = this._calculateTotalYearsOfExperience(cvData.experience);
+      if (currentYears < jobData.minExperience) {
+        gaps.push({
+          type: 'experience_gap',
+          current: currentYears,
+          required: jobData.minExperience,
+          impact: 'high',
+          evidence: `Job yêu cầu tối thiểu ${jobData.minExperience} năm, CV hiện tại có ${currentYears} năm`,
+          suggestion: `Highlight các dự án/kinh nghiệm liên quan để bù đắp gap kinh nghiệm`,
+          issue: `Kinh nghiệm chưa đủ: ${currentYears} năm (yêu cầu: ${jobData.minExperience} năm)`
+        });
+      }
+    }
+    
+    // 3. Common skills gap (from successful CVs)
+    if (successfulCVs.commonSkills && successfulCVs.commonSkills.length > 0) {
+      const missingCommon = successfulCVs.commonSkills
+        .filter(skill => !currentSkills.includes(skill.name.toLowerCase()))
+        .slice(0, 5); // Top 5 missing
+      
+      if (missingCommon.length > 0) {
+        gaps.push({
+          type: 'missing_common_skills',
+          skills: missingCommon.map(s => s.name),
+          impact: 'medium',
+          evidence: `${missingCommon[0].successRate}% CV thành công có ${missingCommon[0].name}`,
+          suggestion: `Thêm skills phổ biến: ${missingCommon.map(s => `${s.name} (${s.successRate}%)`).join(', ')}`,
+          issue: `Thiếu skills phổ biến: ${missingCommon.map(s => s.name).join(', ')}`
+        });
+      }
+    }
+    
+    return gaps;
+  }
+
+  /**
+   * Compare current CV with successful CVs
+   * @private
+   */
+  _compareWithSuccessfulCVs(currentCV, successfulCVs) {
+    const comparison = {
+      score: 0,
+      strengths: [],
+      weaknesses: [],
+      gaps: []
+    };
+    
+    // Compare skills
+    const currentSkills = this._extractSkillsFromCV(currentCV);
+    const commonSkills = successfulCVs.commonSkills || [];
+    const missingSkills = commonSkills.filter(skill => 
+      !currentSkills.includes(skill.name.toLowerCase())
+    );
+    
+    if (missingSkills.length > 0) {
+      comparison.gaps.push({
+        type: 'missing_skills',
+        items: missingSkills.map(s => s.name),
+        impact: 'high',
+        evidence: `${missingSkills[0].successRate}% CV thành công có skills này`
+      });
+    } else if (currentSkills.length > 0) {
+      comparison.strengths.push('CV có đầy đủ skills phổ biến');
+    }
+    
+    // Compare experience
+    const currentYears = this._calculateTotalYearsOfExperience(currentCV.experience);
+    if (successfulCVs.avgYearsOfExperience && currentYears < successfulCVs.avgYearsOfExperience * 0.7) {
+      comparison.gaps.push({
+        type: 'experience_gap',
+        current: currentYears,
+        required: successfulCVs.avgYearsOfExperience,
+        impact: 'medium',
+        evidence: `CV thành công có trung bình ${successfulCVs.avgYearsOfExperience.toFixed(1)} năm kinh nghiệm`
+      });
+    }
+    
+    // Calculate score
+    comparison.score = this._calculateScoreFromGaps(comparison.gaps, successfulCVs);
+    
+    return comparison;
+  }
+
+  /**
+   * Identify gaps from generic patterns
+   * @private
+   */
+  _identifyGapsFromGenericPatterns(cvData, cvText, genericData) {
+    const gaps = [];
+    
+    // Check structure patterns
+    const hasSummary = cvData.personalInfo?.summary || cvText.toLowerCase().includes('mục tiêu');
+    if (!hasSummary && genericData.structurePatterns?.hasSummary > 0.8) {
+      gaps.push({
+        type: 'missing_summary',
+        evidence: `${(genericData.structurePatterns.hasSummary * 100).toFixed(0)}% CV thành công có summary`,
+        suggestion: 'Thêm phần tóm tắt (95% CV thành công có)',
+        severity: 'high',
+        issue: 'Thiếu phần tóm tắt nghề nghiệp'
+      });
+    }
+    
+    // Check metrics
+    const hasMetrics = /\d+%|\d+\s*(triệu|nghìn|dự án|người|tháng|năm)/i.test(cvText);
+    if (!hasMetrics && genericData.contentPatterns?.hasMetrics > 0.7) {
+      gaps.push({
+        type: 'missing_metrics',
+        evidence: `${(genericData.contentPatterns.hasMetrics * 100).toFixed(0)}% CV thành công có số liệu cụ thể`,
+        suggestion: 'Thêm số liệu: "Tăng 30%", "Quản lý 5 dự án" (85% CV thành công có)',
+        severity: 'high',
+        issue: 'Thiếu số liệu cụ thể trong mô tả'
+      });
+    }
+    
+    // Check skills count
+    const skillsCount = this._extractSkillsFromCV(cvData).length;
+    const avgSkills = genericData.contentPatterns?.avgSkillsCount || 12;
+    if (skillsCount < avgSkills * 0.7) {
+      gaps.push({
+        type: 'insufficient_skills',
+        evidence: `CV thành công có trung bình ${avgSkills} skills, CV hiện tại có ${skillsCount}`,
+        suggestion: `Thêm thêm ${Math.ceil(avgSkills - skillsCount)} skills`,
+        severity: 'medium',
+        issue: `Số lượng skills chưa đủ (${skillsCount}/${avgSkills})`
+      });
+    }
+    
+    return gaps;
+  }
+
+  /**
+   * Identify gaps from patterns (industry or generic)
+   * @private
+   */
+  _identifyGapsFromPatterns(cvData, cvText, patternData) {
+    // Use generic patterns logic if structurePatterns exists
+    if (patternData.structurePatterns) {
+      return this._identifyGapsFromGenericPatterns(cvData, cvText, patternData);
+    }
+    
+    // Otherwise use common skills comparison
+    return this._identifyGapsFromCommonSkills(cvData, patternData);
+  }
+
+  /**
+   * Identify gaps from common skills
+   * @private
+   */
+  _identifyGapsFromCommonSkills(cvData, patternData) {
+    const gaps = [];
+    const currentSkills = this._extractSkillsFromCV(cvData);
+    const commonSkills = patternData.commonSkills || [];
+    
+    const missingSkills = commonSkills
+      .filter(skill => !currentSkills.includes(skill.name.toLowerCase()))
+      .slice(0, 5);
+    
+    if (missingSkills.length > 0) {
+      gaps.push({
+        type: 'missing_common_skills',
+        skills: missingSkills.map(s => s.name),
+        impact: 'medium',
+        evidence: `${missingSkills[0].successRate}% CV thành công có ${missingSkills[0].name}`,
+        suggestion: `Thêm skills: ${missingSkills.map(s => `${s.name} (${s.successRate}%)`).join(', ')}`,
+        issue: `Thiếu skills phổ biến: ${missingSkills.map(s => s.name).join(', ')}`
+      });
+    }
+    
+    return gaps;
+  }
+
+  /**
+   * Generic gap analysis (when no job data)
+   * @private
+   */
+  _genericGapAnalysis(cvData) {
+    const gaps = [];
+    
+    const hasSummary = cvData.personalInfo?.summary;
+    if (!hasSummary) {
+      gaps.push({
+        type: 'missing_summary',
+        issue: 'Thiếu phần tóm tắt nghề nghiệp',
+        suggestion: 'Thêm phần tóm tắt để thể hiện định hướng rõ ràng'
+      });
+    }
+    
+    const skillsCount = this._extractSkillsFromCV(cvData).length;
+    if (skillsCount < 5) {
+      gaps.push({
+        type: 'insufficient_skills',
+        issue: `Số lượng skills chưa đủ (${skillsCount})`,
+        suggestion: 'Nên có ít nhất 5-7 skills kỹ thuật'
+      });
+    }
+    
+    return gaps;
+  }
+
+  /**
+   * Extract skills from CV data
+   * @private
+   */
+  _extractSkillsFromCV(cvData) {
+    const skills = [];
+    
+    // From skills object
+    if (cvData.skills?.technical) {
+      skills.push(...cvData.skills.technical.map(s => 
+        typeof s === 'string' ? s.toLowerCase() : (s.name || '').toLowerCase()
+      ));
+    }
+    
+    // From extracted data
+    if (cvData.extractedData?.skills) {
+      skills.push(...cvData.extractedData.skills.map(s => 
+        typeof s === 'string' ? s.toLowerCase() : (s.name || '').toLowerCase()
+      ));
+    }
+    
+    return [...new Set(skills.filter(s => s && s.length > 0))];
+  }
+
+  /**
+   * Calculate skill success rate
+   * @private
+   */
+  _calculateSkillSuccessRate(skills, successfulCVs) {
+    if (!successfulCVs.cvDataMap || successfulCVs.count === 0) return 0;
+    
+    let totalWithSkill = 0;
+    const skillLower = skills.map(s => s.toLowerCase());
+    
+    Object.values(successfulCVs.cvDataMap).forEach(cvData => {
+      const cvSkills = cvData.skills || [];
+      if (skillLower.some(skill => cvSkills.includes(skill))) {
+        totalWithSkill++;
+      }
+    });
+    
+    return Math.round((totalWithSkill / successfulCVs.count) * 100);
+  }
+
+  /**
+   * Calculate score from gaps
+   * @private
+   */
+  _calculateScoreFromGaps(gaps, benchmarkData) {
+    let score = 100;
+    
+    gaps.forEach(gap => {
+      if (gap.impact === 'high' || gap.severity === 'high') {
+        score -= 15;
+      } else if (gap.impact === 'medium' || gap.severity === 'medium') {
+        score -= 10;
+      } else {
+        score -= 5;
+      }
+    });
+    
+    // Adjust based on benchmark
+    if (benchmarkData.avgScore) {
+      const gap = Math.abs(score - benchmarkData.avgScore);
+      if (gap > 20) {
+        score = Math.max(0, score - 10);
+      }
+    }
+    
+    return Math.max(0, Math.min(100, score));
+  }
+
+  /**
+   * Map gaps to suggestions
+   * @private
+   */
+  _mapGapsToSuggestions(gaps) {
+    const suggestions = {
+      structure: [],
+      content: [],
+      writing: [],
+      keywords: []
+    };
+    
+    gaps.forEach(gap => {
+      if (gap.suggestion) {
+        if (gap.type?.includes('structure') || gap.type?.includes('summary')) {
+          suggestions.structure.push(gap.suggestion);
+        } else if (gap.type?.includes('skills') || gap.type?.includes('experience')) {
+          suggestions.content.push(gap.suggestion);
+        } else {
+          suggestions.content.push(gap.suggestion);
+        }
+      }
+    });
+    
+    return suggestions;
+  }
+
+  /**
+   * Map gaps to improvements
+   * @private
+   */
+  _mapGapsToImprovements(gaps) {
+    return gaps.map(gap => ({
+      section: gap.type?.toUpperCase() || 'GENERAL',
+      issue: gap.issue || gap.type,
+      suggestion: gap.suggestion || gap.evidence,
+      severity: gap.severity || gap.impact || 'medium',
+      evidence: gap.evidence || ''
+    }));
   }
 }
 

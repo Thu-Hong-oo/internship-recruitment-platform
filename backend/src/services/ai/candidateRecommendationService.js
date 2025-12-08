@@ -19,6 +19,7 @@ const CandidateProfile = require('../../models/CandidateProfile');
 class CandidateRecommendationService {
   constructor() {
     this.jobMatcher = getJobMatchingService();
+    this.useRAG = process.env.ENABLE_RAG_RECOMMENDATIONS === 'true'; // Feature flag
   }
 
   /**
@@ -36,8 +37,29 @@ class CandidateRecommendationService {
         tierFilter = ['A', 'B', 'C'], // Only return A, B, C candidates (exclude D)
         includeSkillGap = true,
         filterByAvailability = true,
-        filterByLocation = false
+        filterByLocation = false,
+        useRAG = this.useRAG // Use RAG if enabled globally or explicitly requested
       } = options;
+
+      // Use RAG-enhanced recommendations if enabled
+      if (useRAG) {
+        try {
+          const { getRAGRecommendationService } = require('./ragRecommendationService');
+          const ragService = getRAGRecommendationService();
+          return await ragService.getCandidateRecommendations(job, {
+            limit,
+            minScore,
+            tierFilter,
+            includeSkillGap,
+            filterByAvailability,
+            filterByLocation,
+            useRAG: true
+          });
+        } catch (ragError) {
+          logger.warn('⚠️ RAG recommendation failed, falling back to weighted scoring:', ragError.message);
+          // Continue with weighted scoring below
+        }
+      }
 
       logger.info(`Finding candidates for job ${job._id || job.id}`);
 

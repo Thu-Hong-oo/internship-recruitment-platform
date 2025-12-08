@@ -652,6 +652,96 @@ class JobMatchingService {
 
     return results;
   }
+
+  /**
+   * Calculate semantic similarity between job and candidate using Sentence-BERT
+   * NEW: RAG-enhanced semantic matching
+   * 
+   * @param {Object} candidate - Candidate data
+   * @param {Object} job - Job posting data
+   * @returns {Promise<number>} Semantic similarity score (0-1)
+   */
+  async calculateSemanticSimilarity(candidate, job) {
+    try {
+      if (!this.sentenceBert || !this.sentenceBert.isAvailable) {
+        logger.warn('Sentence-BERT not available, returning 0.5 (neutral)');
+        return 0.5; // Neutral score if Sentence-BERT unavailable
+      }
+
+      // Build text representations
+      const jobText = this._buildJobTextForEmbedding(job);
+      const candidateText = this._buildCandidateTextForEmbedding(candidate);
+
+      // Generate embeddings
+      const jobEmbedding = await this.sentenceBert.encode(jobText);
+      const candidateEmbedding = await this.sentenceBert.encode(candidateText);
+
+      // Calculate cosine similarity
+      return this._cosineSimilarity(jobEmbedding, candidateEmbedding);
+    } catch (error) {
+      logger.error('Semantic similarity calculation error:', error);
+      return 0.5; // Fallback to neutral
+    }
+  }
+
+  /**
+   * Build text representation of job for embedding
+   */
+  _buildJobTextForEmbedding(job) {
+    const parts = [
+      job.title || '',
+      job.description || '',
+      job.requirements || '',
+      job.skills?.join(' ') || '',
+      job.industry || '',
+      job.level || ''
+    ].filter(p => p.length > 0);
+
+    return parts.join(' ').substring(0, 2000);
+  }
+
+  /**
+   * Build text representation of candidate for embedding
+   */
+  _buildCandidateTextForEmbedding(candidate) {
+    const cv = candidate.cv || candidate;
+    const parts = [
+      candidate.fullName || cv.fullName || '',
+      candidate.summary || cv.summary || '',
+      candidate.experience?.map(e => `${e.position} ${e.description || ''}`).join(' ') || 
+        cv.experience?.map(e => `${e.position} ${e.description || ''}`).join(' ') || '',
+      candidate.skills?.map(s => s.name || s).join(' ') || 
+        cv.skills?.map(s => s.name || s).join(' ') || '',
+      candidate.projects?.map(p => `${p.title} ${p.description || ''}`).join(' ') ||
+        cv.projects?.map(p => `${p.title} ${p.description || ''}`).join(' ') || ''
+    ].filter(p => p.length > 0);
+
+    return parts.join(' ').substring(0, 2000);
+  }
+
+  /**
+   * Calculate cosine similarity between two vectors
+   */
+  _cosineSimilarity(vecA, vecB) {
+    if (!vecA || !vecB || vecA.length !== vecB.length) {
+      return 0;
+    }
+
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+
+    for (let i = 0; i < vecA.length; i++) {
+      dotProduct += vecA[i] * vecB[i];
+      normA += vecA[i] * vecA[i];
+      normB += vecB[i] * vecB[i];
+    }
+
+    const denominator = Math.sqrt(normA) * Math.sqrt(normB);
+    if (denominator === 0) return 0;
+
+    return dotProduct / denominator;
+  }
 }
 
 // Singleton instance
