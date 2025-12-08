@@ -59,7 +59,7 @@ class VectorStoreService {
 
       // Check if collection exists
       const collections = await this.client.listCollections();
-      const existingCollection = collections.find(
+      let existingCollection = collections.find(
         (col) => col.name === this.collectionName
       );
 

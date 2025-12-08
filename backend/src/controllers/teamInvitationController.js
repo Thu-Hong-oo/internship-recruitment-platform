@@ -279,6 +279,57 @@ class TeamInvitationController {
   }
 
   /**
+   * GET /api/employers/team/me
+   * Lấy thông tin membership của user hiện tại trong team (role, permissions, company)
+   */
+  async getMyMembership(req, res) {
+    const userId = req.user.id;
+
+    // Tìm profile mà user là owner hoặc member
+    const profile = await EmployerProfile.findOne({
+      $or: [
+        { owner: userId },
+        { 'members.user': userId }
+      ]
+    }).lean();
+
+    if (!profile) {
+      throw new AppError('Employer profile or membership not found', 404);
+    }
+
+    // Owner => full quyền (admin)
+    if (profile.owner.toString() === userId.toString()) {
+      return ApiResponse.success(res, {
+        companyId: profile._id,
+        companyName: profile.company?.name,
+        role: 'admin',
+        isOwner: true,
+        permissions: this._getDefaultPermissions('admin')
+      });
+    }
+
+    // Member
+    const member = (profile.members || []).find(
+      m => m.user && m.user.toString() === userId.toString()
+    );
+
+    if (!member) {
+      throw new AppError('Membership not found', 404);
+    }
+
+    return ApiResponse.success(res, {
+      companyId: profile._id,
+      companyName: profile.company?.name,
+      role: member.role,
+      isOwner: false,
+      permissions: member.permissions || this._getDefaultPermissions(member.role),
+      status: member.status,
+      invitedAt: member.invitedAt,
+      joinedAt: member.joinedAt
+    });
+  }
+
+  /**
    * POST /api/employers/team/invitations/:invitationId/reject
    * Từ chối invitation
    */
@@ -684,5 +735,6 @@ module.exports = {
   updateMember: asyncHandler(controller.updateMember.bind(controller)),
   removeMember: asyncHandler(controller.removeMember.bind(controller)),
   verifyInvitationToken: asyncHandler(controller.verifyInvitationToken.bind(controller)),
+  getMyMembership: asyncHandler(controller.getMyMembership.bind(controller)),
 };
 

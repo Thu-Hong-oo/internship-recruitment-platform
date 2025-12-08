@@ -420,5 +420,4 @@ class CVBuilderController {
   });
 }
 
-module.exports = new CVBuilderController();</content>
-<parameter name="filePath">d:\KhoaLuan_Internship\internship-recruitment-platform\backend\src\controllers\cvBuilderController.js
+module.exports = new CVBuilderController();

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
 const cvBuilderController = require('../controllers/cvBuilderController');
-const auth = require('../middleware/auth');
+const { protect } = require('../middleware/auth');
 
 /**
  * @swagger
@@ -29,7 +29,7 @@ const auth = require('../middleware/auth');
  *       401:
  *         description: Unauthorized
  */
-router.get('/', auth(), cvBuilderController.getUserCVs);
+router.get('/', protect, cvBuilderController.getUserCVs);
 
 /**
  * @swagger
@@ -62,7 +62,7 @@ router.get('/', auth(), cvBuilderController.getUserCVs);
  *       401:
  *         description: Unauthorized
  */
-router.post('/create', auth(), [
+router.post('/create', protect, [
   body('templateId').notEmpty().withMessage('Template ID is required'),
   body('title').optional().isLength({ min: 1, max: 100 }).withMessage('Title must be 1-100 characters')
 ], cvBuilderController.createCV);
@@ -136,8 +136,8 @@ router.post('/create', auth(), [
  *       401:
  *         description: Unauthorized
  */
-router.get('/:id', auth(), cvBuilderController.getCV);
-router.put('/:id', auth(), cvBuilderController.updateCV);
+router.get('/:id', protect, cvBuilderController.getCV);
+router.put('/:id', protect, cvBuilderController.updateCV);
 
 /**
  * @swagger
@@ -180,7 +180,7 @@ router.put('/:id', auth(), cvBuilderController.updateCV);
  *       401:
  *         description: Unauthorized
  */
-router.post('/:id/sections', auth(), [
+router.post('/:id/sections', protect, [
   body('type').isIn(['experience', 'education', 'skills', 'projects', 'careerObjective']).withMessage('Invalid section type'),
   body('title').notEmpty().withMessage('Section title is required')
 ], cvBuilderController.addSection);
@@ -248,8 +248,8 @@ router.post('/:id/sections', auth(), [
  *       401:
  *         description: Unauthorized
  */
-router.put('/:id/sections/:sectionId', auth(), cvBuilderController.updateSection);
-router.delete('/:id/sections/:sectionId', auth(), cvBuilderController.deleteSection);
+router.put('/:id/sections/:sectionId', protect, cvBuilderController.updateSection);
+router.delete('/:id/sections/:sectionId', protect, cvBuilderController.deleteSection);
 
 /**
  * @swagger
@@ -287,7 +287,7 @@ router.delete('/:id/sections/:sectionId', auth(), cvBuilderController.deleteSect
  *       401:
  *         description: Unauthorized
  */
-router.post('/:id/ai-suggestions', auth(), [
+router.post('/:id/ai-suggestions', protect, [
   body('sectionType').isIn(['experience', 'education', 'skills', 'projects', 'careerObjective']).withMessage('Invalid section type')
 ], cvBuilderController.getAISuggestions);
 
@@ -319,7 +319,7 @@ router.post('/:id/ai-suggestions', auth(), [
  *       401:
  *         description: Unauthorized
  */
-router.get('/:id/preview', auth(), cvBuilderController.generatePreview);
+router.get('/:id/preview', protect, cvBuilderController.generatePreview);
 
 /**
  * @swagger
@@ -359,7 +359,7 @@ router.get('/:id/preview', auth(), cvBuilderController.generatePreview);
  *       401:
  *         description: Unauthorized
  */
-router.post('/:id/export', auth(), [
+router.post('/:id/export', protect, [
   body('format').isIn(['pdf', 'docx', 'html', 'json']).withMessage('Invalid export format')
 ], cvBuilderController.exportCV);
 
@@ -385,7 +385,7 @@ router.post('/:id/export', auth(), [
  *       401:
  *         description: Unauthorized
  */
-router.post('/:id/duplicate', auth(), cvBuilderController.duplicateCV);
+router.post('/:id/duplicate', protect, cvBuilderController.duplicateCV);
 
 /**
  * @swagger
@@ -422,9 +422,8 @@ router.post('/:id/duplicate', auth(), cvBuilderController.duplicateCV);
  *       401:
  *         description: Unauthorized
  */
-router.post('/:id/optimize', auth(), [
+router.post('/:id/optimize', protect, [
   body('jobDescription').notEmpty().withMessage('Job description is required')
 ], cvBuilderController.optimizeForJob);
 
-module.exports = router;</content>
-<parameter name="filePath">d:\KhoaLuan_Internship\internship-recruitment-platform\backend\src\routes\cvBuilder.js
+module.exports = router;

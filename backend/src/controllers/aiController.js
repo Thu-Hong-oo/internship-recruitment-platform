@@ -914,7 +914,7 @@ class AIController {
       }
 
       // Fallback: return mock coordinates (Gemini Vision is optional)
-      const coordinates = improvements.map((imp, idx) => ({
+      let coordinates = improvements.map((imp, idx) => ({
         index: idx,
         x: 50 + (idx % 3) * 200,
         y: 100 + Math.floor(idx / 3) * 150,

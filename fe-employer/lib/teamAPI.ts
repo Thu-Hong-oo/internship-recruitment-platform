@@ -205,14 +205,14 @@ export const acceptInvitation = async (
   invitationId: string,
   payload: AcceptInvitationPayload
 ): Promise<AcceptInvitationResponse> => {
-  const id = invitationId || "";
-  return apiCall<AcceptInvitationResponse>(
-    `/employers/team/invitations/${id}/accept`,
-    {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }
-  );
+  const endpoint = invitationId
+    ? `/employers/team/invitations/${invitationId}/accept`
+    : `/employers/team/invitations/accept`;
+
+  return apiCall<AcceptInvitationResponse>(endpoint, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 };
 
 /**
@@ -222,6 +222,10 @@ export const rejectInvitation = async (
   invitationId: string,
   token: string
 ): Promise<{ success: boolean; message: string }> => {
+  if (!invitationId) {
+    throw new Error("invitationId is required to reject invitation");
+  }
+
   return apiCall(`/employers/team/invitations/${invitationId}/reject`, {
     method: "POST",
     body: JSON.stringify({ token }),
@@ -259,6 +263,25 @@ export const updateMember = async (
     method: "PUT",
     body: JSON.stringify(payload),
   });
+};
+
+/**
+ * Get current user's membership in employer team
+ */
+export const getMyMembership = async (): Promise<{
+  success: boolean;
+  data?: {
+    companyId: string;
+    companyName?: string;
+    role: TeamRole;
+    permissions: TeamPermissions;
+    isOwner: boolean;
+    status?: MemberStatus;
+  };
+  message?: string;
+  error?: string;
+}> => {
+  return apiCall(`/employers/team/me`);
 };
 
 /**
