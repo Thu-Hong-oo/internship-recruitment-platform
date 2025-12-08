@@ -4,23 +4,13 @@ ARG APP_PATH=backend
 
 WORKDIR /app
 
-# Install build dependencies for native modules (canvas, sharp, etc.)
+# Install build dependencies for native modules (sharp, etc.)
+# Note: canvas has been removed from dependencies due to compilation issues
 # These are needed for node-gyp to compile native code
-# Also install runtime dependencies for canvas
 RUN apk add --no-cache \
     python3 \
     make \
     g++ \
-    cairo-dev \
-    cairo \
-    jpeg-dev \
-    jpeg \
-    pango-dev \
-    pango \
-    giflib-dev \
-    giflib \
-    pixman-dev \
-    pixman \
     && ln -sf python3 /usr/bin/python
 
 # Copy package files (default path backend, override by setting APP_PATH build-arg)
@@ -35,8 +25,7 @@ RUN if [ -f package-lock.json ]; then \
       npm install --only=production --legacy-peer-deps; \
     fi
 
-# Remove build dependencies to reduce image size (keep runtime dependencies for canvas)
-# Note: Keep cairo, jpeg, pango, giflib, pixman as they are runtime dependencies for canvas
+# Remove build dependencies to reduce image size
 RUN apk del make g++
 
 # Copy application files
