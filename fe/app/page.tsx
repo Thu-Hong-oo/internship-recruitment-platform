@@ -219,7 +219,10 @@ export default function HomePage({ onSearch }: HomePageProps) {
                       Khám phá cơ hội nghề nghiệp phù hợp với bạn
                     </p>
                   </div>
-                  <div className="flex items-center space-x-2 text-[oklch(0.60_0.12_195)] hover:text-[oklch(0.55_0.12_195)] cursor-pointer transition-all duration-300 group">
+                  <div 
+                    onClick={() => router.push("/search")}
+                    className="flex items-center space-x-2 text-[oklch(0.60_0.12_195)] hover:text-[oklch(0.55_0.12_195)] cursor-pointer transition-all duration-300 group"
+                  >
                     <span className="text-sm font-semibold">Xem tất cả</span>
                     <ChevronRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform duration-300" />
                   </div>

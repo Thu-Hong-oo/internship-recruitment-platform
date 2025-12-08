@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Bookmark, BookmarkCheck, Loader2 } from "lucide-react";
-import { savedJobService } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
+import { useSavedJobs } from "@/contexts/SavedJobsContext";
 
 interface SaveJobButtonProps {
   jobId: string;
@@ -24,38 +24,11 @@ export function SaveJobButton({
 }: SaveJobButtonProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const [isSaved, setIsSaved] = useState(false);
+  const { isJobSaved, saveJob, unsaveJob, isLoading: contextLoading, savedJobIds } = useSavedJobs();
   const [isLoading, setIsLoading] = useState(false);
-  const [isChecking, setIsChecking] = useState(true);
 
-  // Check if job is saved on mount
-  useEffect(() => {
-    const checkSaved = async () => {
-      if (!jobId) {
-        setIsChecking(false);
-        return;
-      }
-
-      try {
-        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-        if (!token) {
-          setIsChecking(false);
-          return;
-        }
-
-        const response = await savedJobService.checkJobSaved(jobId);
-        if (response.success) {
-          setIsSaved(response.data.isSaved);
-        }
-      } catch (error) {
-        console.error("Failed to check saved status:", error);
-      } finally {
-        setIsChecking(false);
-      }
-    };
-
-    checkSaved();
-  }, [jobId]);
+  // Check if job is saved (local check, no API call)
+  const isSaved = isJobSaved(jobId);
 
   const handleToggleSave = async () => {
     // Check authentication
@@ -74,28 +47,18 @@ export function SaveJobButton({
     try {
       if (isSaved) {
         // Remove saved job
-        const response = await savedJobService.removeSavedJobByJobId(jobId);
-        if (response.success) {
-          setIsSaved(false);
-          toast({
-            title: "Đã bỏ lưu",
-            description: "Việc làm đã được xóa khỏi danh sách đã lưu",
-          });
-        } else {
-          throw new Error(response.message || "Không thể bỏ lưu việc làm");
-        }
+        await unsaveJob(jobId);
+        toast({
+          title: "Đã bỏ lưu",
+          description: "Việc làm đã được xóa khỏi danh sách đã lưu",
+        });
       } else {
         // Save job
-        const response = await savedJobService.saveJob(jobId);
-        if (response.success) {
-          setIsSaved(true);
-          toast({
-            title: "Đã lưu việc làm",
-            description: "Việc làm đã được thêm vào danh sách đã lưu",
-          });
-        } else {
-          throw new Error(response.message || "Không thể lưu việc làm");
-        }
+        await saveJob(jobId);
+        toast({
+          title: "Đã lưu việc làm",
+          description: "Việc làm đã được thêm vào danh sách đã lưu",
+        });
       }
     } catch (error: any) {
       console.error("Error toggling save:", error);
@@ -109,7 +72,9 @@ export function SaveJobButton({
     }
   };
 
-  if (isChecking) {
+  // Show loading state only when context is initially loading (first time)
+  // After that, we can show the button immediately since we have cached data
+  if (contextLoading && savedJobIds.size === 0) {
     return (
       <Button
         variant={variant}
@@ -118,7 +83,7 @@ export function SaveJobButton({
         disabled
       >
         <Loader2 className="w-4 h-4 animate-spin mr-2" />
-        {showText && "Đang kiểm tra..."}
+        {showText && "Đang tải..."}
       </Button>
     );
   }
