@@ -104,6 +104,7 @@ router.post('/analyze-cv-text', aiController.analyzeCVText);
  *         description: Missing CV data or text
  */
 router.post('/analyze-cv-improvements', protect, aiController.analyzeCVImprovements);
+router.post('/cv-improvements/coordinates', protect, aiController.detectCVImprovementCoordinates);
 
 // ============================================
 // JOB & CAREER AI ROUTES
@@ -259,43 +260,6 @@ router.get('/job-suggestions/:userId', async (req, res, next) => {
  */
 router.post('/analyze-job-posting', aiController.analyzeJobPosting);
 
-/**
- * @swagger
- * /api/ai/candidate-recommendations:
- *   post:
- *     summary: Get candidate recommendations for a job (Employer only)
- *     tags: [AI - Candidates]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - jobId
- *             properties:
- *               jobId:
- *                 type: string
- *                 description: Job ID to get recommendations for
- *               limit:
- *                 type: integer
- *                 default: 10
- *                 description: Number of recommendations to return
- *               minScore:
- *                 type: integer
- *                 default: 60
- *                 description: Minimum match score threshold
- *     responses:
- *       200:
- *         description: List of candidate recommendations with match scores
- *       403:
- *         description: Not authorized to view recommendations for this job
- *       404:
- *         description: Job not found
- */
-router.post('/candidate-recommendations', aiController.getCandidateRecommendations);
 
 /**
  * @swagger
