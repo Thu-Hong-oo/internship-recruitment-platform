@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -19,14 +19,85 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
-import { jobsAPI, api } from "@/lib/api";
+import { Loader2, Upload, FileText, Monitor } from "lucide-react";
+import { jobsAPI, api, candidateService } from "@/lib/api";
 import type { ApplyToJobRequest } from "@/lib/api/types";
+import { exportCVOnlineToPDF, validateFile } from "@/utils/cvExport";
+import type { CVData } from "@/lib/mocks/cvSamples";
+
+const TEMPLATE_ID_MAP: Record<string, number> = {
+  modern: 1,
+  minimal: 2,
+};
+
+const normalizeContentToCVData = (
+  content: any,
+  templateKey: string
+): CVData => {
+  const templateNum = TEMPLATE_ID_MAP[templateKey] || 1;
+
+  if (content?.personal && typeof content.personal === "object") {
+    return {
+      ...(content as CVData),
+      templateId: content.templateId ?? templateNum,
+    };
+  }
+
+  const personalInfo = content?.personalInfo || {};
+  return {
+    personal: {
+      name: personalInfo.fullName || "",
+      email: personalInfo.email || "",
+      phone: personalInfo.phone || "",
+      address:
+        typeof personalInfo.address === "string"
+          ? personalInfo.address
+          : personalInfo.address?.street || "",
+      summary: content?.summary || personalInfo.bio || "",
+      avatar: personalInfo.avatar || undefined,
+    },
+    experience: (content?.experience || []).map((exp: any) => ({
+      company: exp.company || "",
+      role: exp.position || "",
+      startDate: exp.startDate || "",
+      endDate: exp.endDate || "",
+      description: exp.description || "",
+    })),
+    education: (content?.education || []).map((edu: any) => ({
+      school: edu.institution || edu.school || "",
+      degree: edu.degree || "",
+      startDate: edu.startYear || edu.startDate || "",
+      endDate: edu.endYear || edu.endDate || "",
+    })),
+    skills: (content?.skills?.technical || []).map((skill: any) =>
+      typeof skill === "string" ? skill : skill.name || ""
+    ),
+    templateId: templateNum,
+    projects: (content?.projects || []).map((proj: any) => ({
+      title: proj.title || "",
+      description: proj.description || "",
+    })),
+    languages: (content?.skills?.languages || []).map((lang: any) => ({
+      name: typeof lang === "string" ? lang : lang.language || lang.name || "",
+      level: lang.level || "",
+    })),
+    certifications: (content?.certifications || []).map((cert: any) => ({
+      name: cert.name || "",
+      issuer: cert.issuer || "",
+      year: cert.issueDate || cert.year || "",
+    })),
+  };
+};
 
 interface ResumeOption {
   id: string;
   label: string;
+  type: "uploaded" | "online" | "file";
   isCurrent?: boolean;
+  templateId?: string;
+  resumeId?: string;
+  templateName?: string;
+  file?: File;
 }
 
 interface ApplyJobModalProps {
@@ -49,7 +120,11 @@ export function ApplyJobModal({
   const [error, setError] = useState<string | null>(null);
   const [resumeOptions, setResumeOptions] = useState<ResumeOption[]>([]);
   const [showResumeSelect, setShowResumeSelect] = useState(false);
-  const [selectedResume, setSelectedResume] = useState<ResumeOption | null>(null);
+  const [selectedResume, setSelectedResume] = useState<ResumeOption | null>(
+    null
+  );
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<ApplyToJobRequest>({
     coverLetter: "",
     resumeId: "current",
@@ -75,7 +150,11 @@ export function ApplyJobModal({
       // Reset when modal closes
       setShowResumeSelect(false);
       setSelectedResume(null);
+      setUploadedFile(null);
       setError(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -103,51 +182,94 @@ export function ApplyJobModal({
   const loadResumes = async () => {
     try {
       setLoadingResumes(true);
-      const resumesRes = await api.candidateCV.getResumesAll();
+      const options: ResumeOption[] = [];
 
+      // Load uploaded CVs
+      const resumesRes = await api.candidateCV.getResumesAll();
       if (resumesRes?.success && resumesRes.data) {
-        const options: ResumeOption[] = [];
-        
-        // Get current CV - current doesn't have _id, it's identified by "current"
         const current = (resumesRes.data as any).current;
         let currentOption: ResumeOption | null = null;
-        
+
         if (current && (current.url || current.filename)) {
           currentOption = {
             id: "current",
             label: current.displayName || current.filename || "CV hiện tại",
+            type: "uploaded",
             isCurrent: true,
           };
           options.push(currentOption);
         }
 
-        // Add history CVs - these have _id
         const history = (resumesRes.data as any).history ?? [];
         history.forEach((cv: any) => {
           if (cv._id) {
             options.push({
               id: cv._id,
               label: cv.displayName || cv.filename || "CV không tên",
+              type: "uploaded",
             });
           }
         });
+      }
 
-        setResumeOptions(options);
-        
-        // Set default to current CV if available
-        if (currentOption) {
-          setSelectedResume(currentOption);
-          setFormData((prev) => ({ ...prev, resumeId: "current" }));
-        } else if (options.length > 0) {
-          // If no current, use first available CV from history
-          setSelectedResume(options[0]);
-          setFormData((prev) => ({ ...prev, resumeId: options[0].id }));
+      // Load online CVs
+      try {
+        const templateMapRes = await api.candidateCV.getTemplateResumeMap();
+        if (templateMapRes?.success && templateMapRes.data?.map) {
+          const map = templateMapRes.data.map;
+          const templatesRes = await api.candidateCV.getTemplates();
+
+          const templateNameMap: Record<string, string> = {};
+          if (templatesRes?.success && templatesRes.data?.templates) {
+            templatesRes.data.templates.forEach((t: any) => {
+              templateNameMap[t.id] = t.name || t.id;
+            });
+          }
+
+          Object.entries(map).forEach(([templateId, resumeId]) => {
+            options.push({
+              id: `online-${resumeId}`,
+              label: `${templateNameMap[templateId] || templateId} (CV Online)`,
+              type: "online",
+              templateId,
+              resumeId: resumeId as string,
+              templateName: templateNameMap[templateId] || templateId,
+            });
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load online CVs:", err);
+      }
+
+      // Add file upload option
+      options.push({
+        id: "file-upload",
+        label: "Tải CV từ máy",
+        type: "file",
+      });
+
+      setResumeOptions(options);
+
+      // Set default to current CV if available
+      const currentOption = options.find((opt) => opt.isCurrent);
+      if (currentOption) {
+        setSelectedResume(currentOption);
+        setFormData((prev) => ({ ...prev, resumeId: "current" }));
+      } else if (options.length > 0) {
+        const firstUploaded = options.find((opt) => opt.type === "uploaded");
+        if (firstUploaded) {
+          setSelectedResume(firstUploaded);
+          setFormData((prev) => ({ ...prev, resumeId: firstUploaded.id }));
         }
       }
     } catch (err: any) {
       console.error("Failed to load resumes:", err);
-      // Don't show error, just use "current" as fallback
-      const fallbackOption = { id: "current", label: "CV hiện tại", isCurrent: true };
+      const fallbackOption: ResumeOption = {
+        id: "current",
+        label: "CV hiện tại",
+        type: "uploaded",
+        isCurrent: true,
+      };
       setResumeOptions([fallbackOption]);
       setSelectedResume(fallbackOption);
       setFormData((prev) => ({ ...prev, resumeId: "current" }));
@@ -160,9 +282,35 @@ export function ApplyJobModal({
     const selected = resumeOptions.find((opt) => opt.id === resumeId);
     if (selected) {
       setSelectedResume(selected);
-      setFormData((prev) => ({ ...prev, resumeId: selected.id }));
-      setShowResumeSelect(false);
+      if (selected.type === "file") {
+        // Trigger file input
+        fileInputRef.current?.click();
+      } else {
+        setFormData((prev) => ({ ...prev, resumeId: selected.id }));
+        setShowResumeSelect(false);
+      }
     }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      setError(validation.error || "File không hợp lệ");
+      return;
+    }
+
+    setUploadedFile(file);
+    setSelectedResume({
+      id: "file-upload",
+      label: file.name,
+      type: "file",
+      file,
+    });
+    setShowResumeSelect(false);
+    setError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -171,10 +319,81 @@ export function ApplyJobModal({
     setError(null);
 
     try {
+      let finalResumeId = formData.resumeId || "current";
+
+      // Xử lý file upload
+      if (selectedResume?.type === "file" && selectedResume.file) {
+        try {
+          const formDataUpload = new FormData();
+          formDataUpload.append("file", selectedResume.file);
+          // Note: uploadCV sẽ tự động append "action": "upload"
+
+          const uploadRes = await api.candidateCV.uploadCV(formDataUpload);
+          if (uploadRes?.success) {
+            // Sau khi upload, CV mới sẽ trở thành current
+            finalResumeId = "current";
+          } else {
+            throw new Error("Không thể tải lên CV");
+          }
+        } catch (uploadErr: any) {
+          setError(uploadErr?.message || "Không thể tải lên CV");
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Xử lý CV online - export PDF rồi upload
+      if (
+        selectedResume?.type === "online" &&
+        selectedResume.resumeId &&
+        selectedResume.templateId
+      ) {
+        try {
+          // Fetch CV data
+          const resumeRes = await candidateService.getResumeById(
+            selectedResume.resumeId
+          );
+          if (!resumeRes?.success || !resumeRes.data?.content) {
+            throw new Error("Không thể tải dữ liệu CV online");
+          }
+
+          // Normalize CV data
+          const cvData = normalizeContentToCVData(
+            resumeRes.data.content,
+            selectedResume.templateId
+          );
+
+          // Export to PDF
+          const pdfFile = await exportCVOnlineToPDF(
+            cvData,
+            selectedResume.templateId,
+            `cv-${selectedResume.templateId}-${Date.now()}.pdf`
+          );
+
+          // Upload PDF
+          const formDataUpload = new FormData();
+          formDataUpload.append("file", pdfFile);
+          // Note: uploadCV sẽ tự động append "action": "upload"
+
+          const uploadRes = await api.candidateCV.uploadCV(formDataUpload);
+          if (uploadRes?.success) {
+            finalResumeId = "current";
+          } else {
+            throw new Error("Không thể tải lên CV đã export");
+          }
+        } catch (exportErr: any) {
+          setError(
+            exportErr?.message || "Không thể export và tải lên CV online"
+          );
+          setLoading(false);
+          return;
+        }
+      }
+
       // Clean up form data - remove empty fields
       const cleanedData: ApplyToJobRequest = {
         coverLetter: formData.coverLetter?.trim() || undefined,
-        resumeId: formData.resumeId || "current", // Default to "current" if not set
+        resumeId: finalResumeId,
         additionalInfo: formData.additionalInfo
           ? {
               availableStartDate:
@@ -213,6 +432,7 @@ export function ApplyJobModal({
           },
         });
         setShowResumeSelect(false);
+        setUploadedFile(null);
         // Reset selected resume will be handled by useEffect when modal closes
       } else {
         setError(response.message || response.error || "Không thể ứng tuyển");
@@ -250,28 +470,97 @@ export function ApplyJobModal({
                 Đang tải danh sách CV...
               </div>
             ) : showResumeSelect ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Select
-                  value={formData.resumeId || "current"}
+                  value={selectedResume?.id || formData.resumeId || "current"}
                   onValueChange={handleResumeChange}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Chọn CV" />
                   </SelectTrigger>
                   <SelectContent>
-                    {resumeOptions.map((option) => (
-                      <SelectItem key={option.id} value={option.id}>
-                        {option.isCurrent && "⭐ "}
-                        {option.label}
-                      </SelectItem>
-                    ))}
+                    {/* CV Tải Lên */}
+                    {resumeOptions.filter((opt) => opt.type === "uploaded")
+                      .length > 0 && (
+                      <>
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                          📁 CV Tải Lên
+                        </div>
+                        {resumeOptions
+                          .filter((opt) => opt.type === "uploaded")
+                          .map((option) => (
+                            <SelectItem key={option.id} value={option.id}>
+                              {option.isCurrent && "⭐ "}
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                      </>
+                    )}
+
+                    {/* CV Online */}
+                    {resumeOptions.filter((opt) => opt.type === "online")
+                      .length > 0 && (
+                      <>
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                          💻 CV Online
+                        </div>
+                        {resumeOptions
+                          .filter((opt) => opt.type === "online")
+                          .map((option) => (
+                            <SelectItem key={option.id} value={option.id}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                      </>
+                    )}
+
+                    {/* Tải CV từ máy */}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                      📤 Tải CV từ máy
+                    </div>
+                    <SelectItem value="file-upload">
+                      <div className="flex items-center gap-2">
+                        <Upload className="w-4 h-4" />
+                        Chọn file từ máy tính
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                {uploadedFile && (
+                  <div className="flex items-center gap-2 rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
+                    <FileText className="w-4 h-4" />
+                    <span className="flex-1 truncate">{uploadedFile.name}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setUploadedFile(null);
+                        setSelectedResume(null);
+                        fileInputRef.current!.value = "";
+                      }}
+                      className="h-6 w-6 p-0"
+                    >
+                      ×
+                    </Button>
+                  </div>
+                )}
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={() => setShowResumeSelect(false)}
+                  onClick={() => {
+                    setShowResumeSelect(false);
+                    setUploadedFile(null);
+                    fileInputRef.current!.value = "";
+                  }}
                   className="text-xs"
                 >
                   Hủy
@@ -282,6 +571,12 @@ export function ApplyJobModal({
                 <div className="flex-1 rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
                   {selectedResume ? (
                     <span className="flex items-center gap-2">
+                      {selectedResume.type === "online" && (
+                        <Monitor className="w-4 h-4 text-blue-500" />
+                      )}
+                      {selectedResume.type === "file" && (
+                        <Upload className="w-4 h-4 text-green-500" />
+                      )}
                       {selectedResume.isCurrent && "⭐ "}
                       {selectedResume.label}
                     </span>
@@ -294,7 +589,10 @@ export function ApplyJobModal({
                   variant="outline"
                   size="sm"
                   onClick={() => setShowResumeSelect(true)}
-                  disabled={resumeOptions.length <= 1}
+                  disabled={
+                    resumeOptions.filter((opt) => opt.type !== "file").length <=
+                    1
+                  }
                 >
                   Đổi CV
                 </Button>
@@ -310,7 +608,8 @@ export function ApplyJobModal({
           {/* Cover Letter */}
           <div className="space-y-2">
             <Label htmlFor="coverLetter">
-              Thư xin việc <span className="text-muted-foreground">(Tùy chọn)</span>
+              Thư xin việc{" "}
+              <span className="text-muted-foreground">(Tùy chọn)</span>
             </Label>
             <Textarea
               id="coverLetter"
@@ -440,4 +739,3 @@ export function ApplyJobModal({
     </Dialog>
   );
 }
-

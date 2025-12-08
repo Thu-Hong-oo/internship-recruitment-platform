@@ -174,12 +174,6 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between gap-4">
             {/* Logo */}
             <Link href="/home" className="flex items-center gap-3">
-              <div
-                className="w-10 h-10 rounded-lg flex items-center justify-center shadow-lg"
-                style={{ background: primaryGradient }}
-              >
-                <Sparkles className="w-6 h-6 text-white" />
-              </div>
               <span className="text-xl font-bold text-slate-900">
                 InternBridge
               </span>
@@ -190,7 +184,7 @@ export default function DashboardPage() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
               <Input
                 type="text"
-                placeholder="Tìm kiếm việc làm..."
+                placeholder="Type vào hành động bạn muốn làm..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 pr-10 h-11 w-full bg-white/80 border-slate-200/60 backdrop-blur-sm"

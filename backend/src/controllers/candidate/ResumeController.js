@@ -141,9 +141,12 @@ class ResumeController {
           _id: new mongoose.Types.ObjectId(), // Ensure new history item has a unique ID
           uploadedAt: profile.resume.current.updatedAt || new Date(),
         });
-        logger.info('Added old resume to history (file preserved on Cloudinary)', {
-          publicId: profile.resume.current.publicId,
-        });
+        logger.info(
+          'Added old resume to history (file preserved on Cloudinary)',
+          {
+            publicId: profile.resume.current.publicId,
+          }
+        );
       }
 
       // 2. Delete old file from Cloudinary (CHỈ khi explicitly requested)
@@ -151,9 +154,12 @@ class ResumeController {
       // Chỉ xóa khi user xóa CV khỏi history hoặc khi thực sự cần thiết
       if (shouldDeleteOldFile && profile.resume.current.publicId) {
         try {
-          logger.info('Deleting old resume from Cloudinary (explicitly requested)', {
-            publicId: profile.resume.current.publicId,
-          });
+          logger.info(
+            'Deleting old resume from Cloudinary (explicitly requested)',
+            {
+              publicId: profile.resume.current.publicId,
+            }
+          );
           await uploadService.deleteFile(profile.resume.current.publicId);
           logger.info('Old resume deleted from Cloudinary');
         } catch (deleteError) {
@@ -163,9 +169,12 @@ class ResumeController {
           });
         }
       } else if (profile.resume.current.publicId) {
-        logger.info('Old resume file preserved on Cloudinary (available in history)', {
-          publicId: profile.resume.current.publicId,
-        });
+        logger.info(
+          'Old resume file preserved on Cloudinary (available in history)',
+          {
+            publicId: profile.resume.current.publicId,
+          }
+        );
       }
 
       // 3. Fix address field if it's a string but code expects object
@@ -526,16 +535,20 @@ class ResumeController {
       // Ưu tiên dùng URL gốc từ database (có version chính xác)
       // Nếu URL gốc không hợp lệ, mới generate từ publicId
       let accessibleUrl = null;
-      
+
       if (resumeToView.url) {
         // Dùng URL gốc từ database (đảm bảo version chính xác)
         accessibleUrl = resumeToView.url.replace('http://', 'https://');
         // Fix URL format cho PDF files nếu cần
         if (
           accessibleUrl.includes('/image/upload/') &&
-          (accessibleUrl.includes('.pdf') || resumeToView.mimeType === 'application/pdf')
+          (accessibleUrl.includes('.pdf') ||
+            resumeToView.mimeType === 'application/pdf')
         ) {
-          accessibleUrl = accessibleUrl.replace('/image/upload/', '/raw/upload/');
+          accessibleUrl = accessibleUrl.replace(
+            '/image/upload/',
+            '/raw/upload/'
+          );
         }
         logger.info('Using original URL from database', {
           url: accessibleUrl,
@@ -576,7 +589,7 @@ class ResumeController {
       // Fetch CV với timeout và fallback
       let response;
       let finalUrl = accessibleUrl;
-      
+
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
@@ -593,10 +606,13 @@ class ResumeController {
 
         // Nếu URL gốc trả về 404 và có publicId, thử generate URL mới (không version)
         if (!response.ok && response.status === 404 && resumeToView.publicId) {
-          logger.warn('Original URL returned 404, trying to generate from publicId', {
-            originalUrl: finalUrl,
-            publicId: resumeToView.publicId,
-          });
+          logger.warn(
+            'Original URL returned 404, trying to generate from publicId',
+            {
+              originalUrl: finalUrl,
+              publicId: resumeToView.publicId,
+            }
+          );
 
           try {
             const { cloudinary } = require('../../utils/cloudinary');
@@ -614,8 +630,11 @@ class ResumeController {
 
             // Thử lại với fallback URL
             const fallbackController = new AbortController();
-            const fallbackTimeoutId = setTimeout(() => fallbackController.abort(), 10000);
-            
+            const fallbackTimeoutId = setTimeout(
+              () => fallbackController.abort(),
+              10000
+            );
+
             response = await fetch(fallbackUrl, {
               method: 'GET',
               headers: {
@@ -645,26 +664,29 @@ class ResumeController {
             url: finalUrl,
             timeout: '10s',
           });
-          throw new AppError('CV fetch timeout. The file may be too large or the server is slow.', 504);
+          throw new AppError(
+            'CV fetch timeout. The file may be too large or the server is slow.',
+            504
+          );
         }
         logger.error('Failed to fetch CV from URL', {
           error: fetchError.message,
           url: finalUrl,
         });
-        throw new AppError(
-          `Failed to fetch CV: ${fetchError.message}`,
-          502
-        );
+        throw new AppError(`Failed to fetch CV: ${fetchError.message}`, 502);
       }
 
       if (!response.ok) {
-        logger.error('CV URL returned error (both original and fallback failed)', {
-          status: response.status,
-          statusText: response.statusText,
-          originalUrl: accessibleUrl,
-          finalUrl,
-          publicId: resumeToView.publicId,
-        });
+        logger.error(
+          'CV URL returned error (both original and fallback failed)',
+          {
+            status: response.status,
+            statusText: response.statusText,
+            originalUrl: accessibleUrl,
+            finalUrl,
+            publicId: resumeToView.publicId,
+          }
+        );
         throw new AppError(
           `Failed to fetch CV: ${response.status} ${response.statusText}. The file may have been deleted or moved.`,
           502
@@ -881,7 +903,7 @@ class ResumeController {
 
     const profile = await this.ensureCandidateProfile(req.user.id, req.user);
     let parseResult;
-    
+
     // Step 1: Parse CV (phần quan trọng nhất - cần trả về ngay)
     try {
       parseResult = await aiService.parseResumeFromBuffer(
@@ -891,17 +913,23 @@ class ResumeController {
       console.log('✅ Successfully parsed resume from buffer');
     } catch (parseError) {
       console.warn('❌ Failed to parse from buffer:', parseError.message);
-      
+
       // Fallback to rule-based parsing if AI fails
       if (process.env.ALLOW_RULE_BASED_FALLBACK === 'true') {
         console.log('🔄 Attempting rule-based parsing as fallback...');
         try {
           const ruleBasedParser = require('../../services/ai/ruleBasedCVParser');
-          parseResult = await ruleBasedParser.parseCV(req.file.buffer, req.file.mimetype);
+          parseResult = await ruleBasedParser.parseCV(
+            req.file.buffer,
+            req.file.mimetype
+          );
           console.log('✅ Rule-based parsing succeeded');
         } catch (ruleBasedError) {
-          console.error('❌ Rule-based parsing also failed:', ruleBasedError.message);
-      parseResult = null;
+          console.error(
+            '❌ Rule-based parsing also failed:',
+            ruleBasedError.message
+          );
+          parseResult = null;
         }
       } else {
         parseResult = null;
@@ -921,7 +949,8 @@ class ResumeController {
         : { error: 'Parsing failed', analyzedAt: new Date() },
       upload: {
         status: 'processing',
-        message: 'File is being uploaded in background. Use GET /api/candidates/me/resume to check upload status.',
+        message:
+          'File is being uploaded in background. Use GET /api/candidates/me/resume to check upload status.',
       },
     };
 
@@ -936,67 +965,75 @@ class ResumeController {
     setImmediate(async () => {
       try {
         console.log('📤 Starting background upload...');
-        
+
         // Upload file
-    const uploadResult = await uploadService.uploadFile({
-      file: req.file,
-      type: 'resume',
-      userId: req.user.id,
-      publicId: `resume_${req.user.id}_${Date.now()}`,
-    });
+        const uploadResult = await uploadService.uploadFile({
+          file: req.file,
+          type: 'resume',
+          userId: req.user.id,
+          publicId: `resume_${req.user.id}_${Date.now()}`,
+        });
         console.log('✅ File uploaded successfully (background)');
 
-    const newResumeEntry = this._createNewResumeEntry({
-      ...uploadResult,
-      filename: req.file.originalname,
-      displayName: req.file.originalname,
-      aiAnalysis: parseResult
-        ? {
-            extractedData: parseResult.extractedData || {},
-            skills: parseResult.skills || [],
-            suggestions: parseResult.suggestions || [],
-            analyzedAt: new Date(),
-          }
-        : { error: 'Parsing failed during upload', analyzedAt: new Date() },
-    });
+        const newResumeEntry = this._createNewResumeEntry({
+          ...uploadResult,
+          filename: req.file.originalname,
+          displayName: req.file.originalname,
+          aiAnalysis: parseResult
+            ? {
+                extractedData: parseResult.extractedData || {},
+                skills: parseResult.skills || [],
+                suggestions: parseResult.suggestions || [],
+                analyzedAt: new Date(),
+              }
+            : { error: 'Parsing failed during upload', analyzedAt: new Date() },
+        });
 
         // Update profile với resume mới
-    await this._updateResumeInProfile(profile, newResumeEntry, true, false);
+        await this._updateResumeInProfile(profile, newResumeEntry, true, false);
         console.log('✅ Profile update completed (background)');
 
         // Profile auto-fill
-    if (parseResult && parseResult.extractedData) {
+        if (parseResult && parseResult.extractedData) {
           try {
-            console.log('🚀 Triggering profile auto-fill from parsed data (background)...');
-      const profileController = new ProfileController();
-      await profileController.mapParsedCVToProfile(profile);
-      console.log('✅ Profile auto-fill process completed.');
+            console.log(
+              '🚀 Triggering profile auto-fill from parsed data (background)...'
+            );
+            const profileController = new ProfileController();
+            await profileController.mapParsedCVToProfile(profile);
+            console.log('✅ Profile auto-fill process completed.');
           } catch (error) {
             console.error('❌ Profile auto-fill FAILED:', error);
-            console.warn('⚠️ Profile auto-fill failed (non-blocking):', error.message);
+            console.warn(
+              '⚠️ Profile auto-fill failed (non-blocking):',
+              error.message
+            );
           }
         }
-      
+
         // Training data collection
         if (parseResult && parseResult.extractedData) {
-      try {
-        const TrainingData = require('../../models/TrainingData');
-        const trainingData = {
-          type: 'cv_parsing',
+          try {
+            const TrainingData = require('../../models/TrainingData');
+            const trainingData = {
+              type: 'cv_parsing',
               input: req.file.buffer.toString('utf-8'),
-          output: parseResult.extractedData || parseResult,
-          metadata: {
-            source: 'api_response',
-            timestamp: new Date(),
+              output: parseResult.extractedData || parseResult,
+              metadata: {
+                source: 'api_response',
+                timestamp: new Date(),
                 quality: 0.8,
-            verified: false,
-            userId: req.user.id,
-          }
-        };
+                verified: false,
+                userId: req.user.id,
+              },
+            };
             await TrainingData.create(trainingData);
             console.log('📊 CV parsing training data collected (background)');
           } catch (error) {
-            console.warn('⚠️ Training data collection failed (non-blocking):', error.message);
+            console.warn(
+              '⚠️ Training data collection failed (non-blocking):',
+              error.message
+            );
           }
         }
       } catch (error) {
