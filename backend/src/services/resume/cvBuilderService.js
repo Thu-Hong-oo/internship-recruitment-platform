@@ -341,5 +341,4 @@ class CVBuilderService {
   }
 }
 
-module.exports = new CVBuilderService();</content>
-<parameter name="filePath">d:\KhoaLuan_Internship\internship-recruitment-platform\backend\src\services\resume\cvBuilderService.js
+module.exports = new CVBuilderService();

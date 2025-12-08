@@ -1,5 +1,5 @@
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { logger } = require('../../utils/logger');
-// const OpenAI = require('openai'); // Uncomment when OpenAI is available
 
 /**
  * AI Content Service
@@ -8,10 +8,24 @@ const { logger } = require('../../utils/logger');
 
 class AIContentService {
   constructor() {
-    // this.openai = new OpenAI({
-    //   apiKey: process.env.OPENAI_API_KEY
-    // });
-    this.isAIEnabled = process.env.OPENAI_API_KEY && process.env.USE_AI_CONTENT === 'true';
+    // Initialize Gemini AI
+    this.geminiApiKey = process.env.GEMINI_API_KEY?.trim();
+    this.isAIEnabled = this.geminiApiKey && this.geminiApiKey.startsWith('AIzaSy') && process.env.USE_AI_CONTENT === 'true';
+
+    if (this.isAIEnabled) {
+      try {
+        const genAI = new GoogleGenerativeAI(this.geminiApiKey);
+        this.model = genAI.getGenerativeModel({
+          model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-lite'
+        });
+        logger.info('✅ AIContentService: Gemini model initialized');
+      } catch (error) {
+        logger.warn('⚠️ AIContentService: Failed to initialize Gemini model', error.message);
+        this.isAIEnabled = false;
+      }
+    } else {
+      logger.warn('⚠️ AIContentService: GEMINI_API_KEY not available or USE_AI_CONTENT not enabled');
+    }
   }
 
   /**
@@ -23,18 +37,39 @@ class AIContentService {
     }
 
     try {
-      // TODO: Implement OpenAI call
-      // const userProfile = await getUserProfile(userId);
-      // const suggestions = await this.openai.createCompletion({...});
+      const prompt = `Generate 4-6 helpful suggestions for someone creating their first professional CV.
+      Focus on:
+      - Career objective and summary
+      - Work experience descriptions
+      - Skills presentation
+      - Education and projects
+      - Overall CV structure
 
-      return [
-        "Add a compelling career objective that highlights your key strengths",
-        "Include specific achievements with metrics in your experience section",
-        "Tailor your skills section to match the job you're applying for",
-        "Add relevant projects that demonstrate your technical abilities"
-      ];
+      Return as a JSON array of strings, each suggestion should be actionable and specific.`;
+
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text().trim();
+
+      // Try to parse as JSON first
+      try {
+        const suggestions = JSON.parse(text);
+        if (Array.isArray(suggestions)) {
+          return suggestions;
+        }
+      } catch (parseError) {
+        // If not JSON, split by newlines and clean up
+        const suggestions = text.split('\n')
+          .filter(line => line.trim().length > 10)
+          .map(line => line.replace(/^[•\-\*\d]+\.?\s*/, '').trim())
+          .slice(0, 6);
+
+        return suggestions.length > 0 ? suggestions : this.getFallbackSuggestions();
+      }
+
+      return this.getFallbackSuggestions();
     } catch (error) {
-      logger.error('AI initial suggestions failed:', error.message);
+      logger.error('Error generating initial suggestions:', error);
       return this.getFallbackSuggestions();
     }
   }
@@ -72,24 +107,83 @@ class AIContentService {
   async generateSectionSpecificSuggestions(context) {
     const { sectionType, currentContent, targetJob, userProfile } = context;
 
-    switch (sectionType) {
-      case 'careerObjective':
-        return await this.generateObjectiveSuggestions(currentContent, targetJob, userProfile);
+    try {
+      let prompt = '';
 
-      case 'experience':
-        return await this.generateExperienceSuggestions(currentContent, targetJob);
+      switch (sectionType) {
+        case 'careerObjective':
+          prompt = `Generate 3-4 specific suggestions to improve this career objective for a CV.
+          Current content: "${currentContent || 'No content yet'}"
+          Target job: "${targetJob || 'General professional role'}"
+          User profile: ${JSON.stringify(userProfile || {})}
 
-      case 'skills':
-        return await this.generateSkillsSuggestions(currentContent, targetJob);
+          Return as JSON array with objects containing: type, title, description, example.
+          Focus on making it more specific, results-oriented, and tailored to the target job.`;
+          break;
 
-      case 'projects':
-        return await this.generateProjectSuggestions(currentContent, targetJob);
+        case 'experience':
+          prompt = `Analyze this work experience description and provide 3-4 specific improvements.
+          Current content: "${currentContent || 'No content yet'}"
+          Target job: "${targetJob || 'General professional role'}"
 
-      case 'education':
-        return await this.generateEducationSuggestions(currentContent);
+          Return as JSON array with objects containing: type, title, description, example.
+          Focus on: using action verbs, quantifying achievements, relevant keywords, and job-specific tailoring.`;
+          break;
 
-      default:
-        return ["Focus on quantifiable achievements", "Use action verbs", "Tailor content to the job description"];
+        case 'skills':
+          prompt = `Review these skills and suggest 3-4 improvements for a CV.
+          Current skills: "${currentContent || 'No skills listed'}"
+          Target job: "${targetJob || 'General professional role'}"
+
+          Return as JSON array with objects containing: type, title, description, example.
+          Focus on: relevant keywords, skill levels, organization, and job matching.`;
+          break;
+
+        case 'projects':
+          prompt = `Provide suggestions to improve this project description for a CV.
+          Current content: "${currentContent || 'No project details'}"
+          Target job: "${targetJob || 'General professional role'}"
+
+          Return as JSON array with objects containing: type, title, description, example.
+          Focus on: technical details, impact, technologies used, and relevance to target job.`;
+          break;
+
+        case 'education':
+          prompt = `Suggest improvements for this education section in a CV.
+          Current content: "${currentContent || 'No education details'}"
+
+          Return as JSON array with objects containing: type, title, description, example.
+          Focus on: relevance, achievements, GPA (if strong), and additional qualifications.`;
+          break;
+
+        default:
+          prompt = `Provide general CV content improvement suggestions for section type: ${sectionType}.
+          Current content: "${currentContent || 'No content'}"
+          Target job: "${targetJob || 'General professional role'}"
+
+          Return as JSON array with objects containing: type, title, description, example.`;
+      }
+
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text().trim();
+
+      // Try to parse as JSON
+      try {
+        const suggestions = JSON.parse(text);
+        if (Array.isArray(suggestions) && suggestions.length > 0) {
+          return suggestions;
+        }
+      } catch (parseError) {
+        logger.warn('Failed to parse Gemini response as JSON, using fallback');
+      }
+
+      // Fallback to default suggestions
+      return this.getFallbackSuggestionsForSection(sectionType);
+
+    } catch (error) {
+      logger.error(`Error generating ${sectionType} suggestions:`, error);
+      return this.getFallbackSuggestionsForSection(sectionType);
     }
   }
 
@@ -257,54 +351,65 @@ class AIContentService {
 
     try {
       const { jobDescription, jobTitle } = jobDetails;
-
-      // Extract job keywords
-      const jobKeywords = await this.extractJobKeywords(jobDescription);
-
-      // Analyze current CV content
       const cvText = this.extractCVText(cvData);
-      const cvKeywords = await this.extractKeywords(cvText);
 
-      // Find missing keywords
-      const missingKeywords = jobKeywords.filter(keyword =>
-        !cvKeywords.some(cvKeyword =>
-          cvKeyword.toLowerCase().includes(keyword.toLowerCase()) ||
-          keyword.toLowerCase().includes(cvKeyword.toLowerCase())
-        )
-      );
+      const prompt = `Analyze this CV and job description to provide optimization suggestions.
 
-      // Generate optimization suggestions
-      const suggestions = [];
+CV Content:
+${cvText}
 
-      if (missingKeywords.length > 0) {
-        suggestions.push({
-          type: 'keywords',
-          title: 'Add missing keywords',
-          description: `Consider adding these job-relevant keywords: ${missingKeywords.slice(0, 5).join(', ')}`,
-          keywords: missingKeywords
-        });
+Job Title: ${jobTitle || 'Not specified'}
+Job Description:
+${jobDescription}
+
+Please provide optimization suggestions in JSON format with this structure:
+{
+  "suggestions": [
+    {
+      "type": "keywords|relevance|structure|content",
+      "title": "Brief title",
+      "description": "Detailed explanation",
+      "priority": "high|medium|low",
+      "section": "experience|skills|summary|etc"
+    }
+  ],
+  "missingKeywords": ["keyword1", "keyword2"],
+  "relevanceScore": 0.0-1.0,
+  "strengths": ["strength1", "strength2"],
+  "weaknesses": ["weakness1", "weakness2"]
+}
+
+Focus on:
+1. Missing important keywords from job description
+2. Content relevance and tailoring
+3. Structure and presentation improvements
+4. Specific actionable suggestions`;
+
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text().trim();
+
+      // Try to parse JSON response
+      try {
+        const analysis = JSON.parse(text);
+        if (analysis.suggestions && Array.isArray(analysis.suggestions)) {
+          return {
+            suggestions: analysis.suggestions,
+            missingKeywords: analysis.missingKeywords || [],
+            relevanceScore: analysis.relevanceScore || 0.5,
+            strengths: analysis.strengths || [],
+            weaknesses: analysis.weaknesses || []
+          };
+        }
+      } catch (parseError) {
+        logger.warn('Failed to parse Gemini optimization response, using fallback');
       }
 
-      // Check content relevance
-      const relevanceScore = this.calculateRelevanceScore(cvKeywords, jobKeywords);
-      if (relevanceScore < 0.6) {
-        suggestions.push({
-          type: 'relevance',
-          title: 'Improve job relevance',
-          description: 'Your CV content may not strongly match this job. Consider tailoring your experience and skills sections.',
-          score: relevanceScore
-        });
-      }
-
-      return {
-        suggestions,
-        missingKeywords,
-        relevanceScore,
-        optimizedContent: cvData // TODO: Implement actual content optimization
-      };
+      // Fallback to basic analysis
+      return this.getFallbackOptimization(cvData, jobDetails);
 
     } catch (error) {
-      logger.error('AI job optimization failed:', error.message);
+      logger.error('Error optimizing CV for job:', error);
       return this.getFallbackOptimization(cvData, jobDetails);
     }
   }
@@ -315,14 +420,43 @@ class AIContentService {
   async extractKeywords(text) {
     if (!text) return [];
 
-    // Simple keyword extraction - split by common separators
+    try {
+      const prompt = `Extract the most relevant keywords from the following text. Focus on skills, technologies, qualifications, and key terms that would be important for a resume or job application. Return only a JSON array of keywords, no explanations.
+
+Text: ${text}
+
+Return format: ["keyword1", "keyword2", "keyword3", ...]`;
+
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const textResponse = response.text().trim();
+
+      // Parse JSON response
+      const keywords = JSON.parse(textResponse);
+
+      if (Array.isArray(keywords)) {
+        return keywords.slice(0, 20); // Limit to 20 keywords
+      }
+
+      // Fallback to simple extraction if parsing fails
+      return this.simpleKeywordExtraction(text);
+    } catch (error) {
+      logger.error('Error extracting keywords with Gemini:', error);
+      // Fallback to simple extraction
+      return this.simpleKeywordExtraction(text);
+    }
+  }
+
+  /**
+   * Simple keyword extraction fallback
+   */
+  simpleKeywordExtraction(text) {
     const words = text.toLowerCase()
       .replace(/[^\w\s]/g, ' ')
       .split(/\s+/)
       .filter(word => word.length > 2)
       .filter(word => !this.isStopWord(word));
 
-    // Count frequency and return top keywords
     const frequency = {};
     words.forEach(word => {
       frequency[word] = (frequency[word] || 0) + 1;
@@ -337,19 +471,58 @@ class AIContentService {
    * Extract job-specific keywords
    */
   async extractJobKeywords(jobDescription) {
-    // Focus on technical skills, requirements, and key terms
-    const techKeywords = [
-      'javascript', 'python', 'java', 'react', 'node', 'sql', 'mongodb',
-      'aws', 'docker', 'kubernetes', 'git', 'agile', 'scrum', 'api'
-    ];
+    if (!this.isAIEnabled) {
+      // Fallback: simple keyword extraction
+      const techKeywords = [
+        'javascript', 'python', 'java', 'react', 'node', 'sql', 'mongodb',
+        'aws', 'docker', 'kubernetes', 'git', 'agile', 'scrum', 'api'
+      ];
+      const words = jobDescription.toLowerCase().split(/\s+/);
+      return words.filter(word =>
+        techKeywords.includes(word) ||
+        word.includes('experience') ||
+        word.includes('skill') ||
+        word.length > 4
+      ).slice(0, 15);
+    }
 
-    const words = jobDescription.toLowerCase().split(/\s+/);
-    return words.filter(word =>
-      techKeywords.includes(word) ||
-      word.includes('experience') ||
-      word.includes('skill') ||
-      word.length > 4
-    ).slice(0, 15);
+    try {
+      const prompt = `Extract the most important keywords and skills from this job description.
+      Focus on technical skills, soft skills, tools, technologies, and key requirements.
+
+      Job Description:
+      ${jobDescription}
+
+      Return as JSON array of strings, maximum 20 keywords. Prioritize:
+      1. Technical skills and technologies
+      2. Programming languages and frameworks
+      3. Tools and platforms
+      4. Required experience level
+      5. Key responsibilities
+
+      Example: ["JavaScript", "React", "Node.js", "MongoDB", "AWS", "Agile"]`;
+
+      const result = await this.model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text().trim();
+
+      try {
+        const keywords = JSON.parse(text);
+        return Array.isArray(keywords) ? keywords.slice(0, 20) : [];
+      } catch (parseError) {
+        // Extract keywords from text response
+        const keywordMatches = text.match(/["']([^"']+)["']/g);
+        if (keywordMatches) {
+          return keywordMatches
+            .map(match => match.replace(/["']/g, ''))
+            .slice(0, 20);
+        }
+        return [];
+      }
+    } catch (error) {
+      logger.error('Error extracting job keywords:', error);
+      return [];
+    }
   }
 
   /**
@@ -466,5 +639,4 @@ class AIContentService {
   }
 }
 
-module.exports = new AIContentService();</content>
-<parameter name="filePath">d:\KhoaLuan_Internship\internship-recruitment-platform\backend\src\services\resume\aiContentService.js
+module.exports = new AIContentService();

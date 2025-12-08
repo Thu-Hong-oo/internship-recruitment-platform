@@ -41,6 +41,7 @@ const {
   updateMember,
   removeMember,
   verifyInvitationToken,
+  getMyMembership,
 } = require('../controllers/teamInvitationController');
 
 const router = express.Router();
@@ -271,6 +272,14 @@ router.get(
 router.get(
   '/team/invitations/verify/:token',
   verifyInvitationToken
+);
+
+// Get current user membership info
+router.get(
+  '/team/me',
+  protect,
+  authorize('employer'),
+  getMyMembership
 );
 
 // Accept invitation (public - token in body)

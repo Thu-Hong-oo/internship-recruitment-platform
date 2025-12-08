@@ -39,7 +39,8 @@ class RAGRecommendationService {
       topKForRerank: 100,        // Re-rank top 100 từ weighted scoring
       semanticThreshold: 0.70,   // Minimum semantic similarity
       enableCaching: true,       // Cache embeddings
-      cacheTTL: 3600 * 24        // 24 hours cache
+      cacheTTL: 3600 * 24,       // 24 hours cache
+      maxDataAgeDays: 90         // Freshness guardrail
     };
   }
 
@@ -58,18 +59,25 @@ class RAGRecommendationService {
         tierFilter = ['A', 'B', 'C'],
         includeSkillGap = true,
         filterByAvailability = true,
-        filterByLocation = false
+        filterByLocation = false,
+        filterByFreshness = true
       } = options;
 
       logger.info(`🔍 RAG: Finding candidates for job ${job._id || job.id}`);
 
       // STEP 1: Fast weighted scoring filter (existing algorithm)
-      const candidates = await this._getAllCandidates({
+      let candidates = await this._getAllCandidates({
         filterByAvailability,
         filterByLocation: filterByLocation ? job.location : null
       });
 
-      logger.info(`📊 RAG: Found ${candidates.length} active candidates`);
+      if (filterByFreshness) {
+        const before = candidates.length;
+        candidates = candidates.filter(c => this._isFreshCandidate(c));
+        logger.info(`📊 RAG: Freshness filter kept ${candidates.length}/${before} candidates (<= ${this.config.maxDataAgeDays}d)`);
+      } else {
+        logger.info(`📊 RAG: Found ${candidates.length} active candidates (freshness filter disabled)`);
+      }
 
       // Calculate weighted scores (fast)
       const weightedResults = await this.jobMatcher.batchCalculateScores(
@@ -171,7 +179,9 @@ class RAGRecommendationService {
           finalCount: enrichedRecommendations.length,
           avgSemanticScore: enrichedRecommendations.length > 0
             ? (enrichedRecommendations.reduce((sum, r) => sum + (r.semanticScore || 0), 0) / enrichedRecommendations.length).toFixed(3)
-            : 0
+            : 0,
+          semanticDropped: rerankedResults.filter(r => r._semanticDropped).length,
+          freshnessFilter: filterByFreshness ? `<= ${this.config.maxDataAgeDays}d` : 'disabled'
         },
         timestamp: new Date()
       };
@@ -197,19 +207,26 @@ class RAGRecommendationService {
       const {
         limit = 20,
         minScore = 60,
-        useRAG = true
+        useRAG = true,
+        filterByFreshness = true
       } = options;
 
       logger.info(`🔍 RAG: Finding jobs for candidate ${candidate._id || candidate.id}`);
 
       // Get all active jobs
-      const jobs = await Job.find({
+      let jobs = await Job.find({
         status: 'active',
         deadline: { $gte: new Date() }
       })
         .populate('postedBy', 'firstName lastName company')
         .limit(1000) // Limit for performance
         .lean();
+
+      if (filterByFreshness) {
+        const before = jobs.length;
+        jobs = jobs.filter(j => this._isFreshJob(j));
+        logger.info(`📊 RAG: Freshness filter kept ${jobs.length}/${before} jobs (<= ${this.config.maxDataAgeDays}d)`);
+      }
 
       if (jobs.length === 0) {
         return [];
@@ -309,12 +326,12 @@ class RAGRecommendationService {
           // Calculate semantic similarity
           const semanticScore = this._cosineSimilarity(jobEmbedding, candidateEmbedding);
 
-          // Skip if semantic similarity too low
+          // Drop if semantic similarity too low
           if (semanticScore < this.config.semanticThreshold) {
             return {
               ...result,
-              semanticScore: semanticScore,
-              matchScore: Math.round(result.matchScore * 0.9) // Penalize low semantic match
+              semanticScore,
+              _semanticDropped: true
             };
           }
 
@@ -347,10 +364,13 @@ class RAGRecommendationService {
         })
       );
 
-      // Sort by hybrid score descending
-      reranked.sort((a, b) => b.matchScore - a.matchScore);
+      // Keep only those not dropped
+      const kept = reranked.filter(r => !r._semanticDropped);
 
-      return reranked;
+      // Sort by hybrid score descending
+      kept.sort((a, b) => b.matchScore - a.matchScore);
+
+      return kept;
     } catch (error) {
       logger.error('Error in semantic re-ranking:', error);
       // Fallback to weighted results
@@ -377,12 +397,12 @@ class RAGRecommendationService {
           // Calculate semantic similarity
           const semanticScore = this._cosineSimilarity(jobEmbedding, candidateEmbedding);
 
-          // Skip if semantic similarity too low
+          // Drop if semantic similarity too low
           if (semanticScore < this.config.semanticThreshold) {
             return {
               ...result,
-              semanticScore: semanticScore,
-              matchScore: Math.round(result.matchScore * 0.9)
+              semanticScore,
+              _semanticDropped: true
             };
           }
 
@@ -413,9 +433,11 @@ class RAGRecommendationService {
         })
       );
 
-      reranked.sort((a, b) => b.matchScore - a.matchScore);
+      const kept = reranked.filter(r => !r._semanticDropped);
 
-      return reranked;
+      kept.sort((a, b) => b.matchScore - a.matchScore);
+
+      return kept;
     } catch (error) {
       logger.error('Error in job semantic re-ranking:', error);
       return weightedResults;
@@ -640,6 +662,26 @@ class RAGRecommendationService {
         ? 'Perfect match - no skill gaps'
         : `Missing ${missingSkills.length} skill(s). Consider training.`
     };
+  }
+
+  /**
+   * Freshness guardrail for candidates
+   */
+  _isFreshCandidate(candidate) {
+    const maxAgeMs = this.config.maxDataAgeDays * 24 * 60 * 60 * 1000;
+    const updated = candidate.updatedAt || candidate.cv?.updatedAt || candidate.cv?.lastUpdated;
+    if (!updated) return true; // keep if unknown
+    return Date.now() - new Date(updated).getTime() <= maxAgeMs;
+  }
+
+  /**
+   * Freshness guardrail for jobs
+   */
+  _isFreshJob(job) {
+    const maxAgeMs = this.config.maxDataAgeDays * 24 * 60 * 60 * 1000;
+    const created = job.createdAt;
+    if (!created) return true;
+    return Date.now() - new Date(created).getTime() <= maxAgeMs;
   }
 
   /**

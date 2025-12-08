@@ -44,6 +44,7 @@ import {
   type Notification,
 } from "@/lib/notificationAPI";
 import { io, Socket } from "socket.io-client";
+import { getMyMembership } from "@/lib/teamAPI";
 
 const HIDE_ON_PREFIXES = ["/register", "/auth/", "/email-verification"];
 const HIDE_ON_EXACT = ["/"]; // Exact match only for root (login page)
@@ -67,6 +68,8 @@ export default function AppHeader() {
     useState(false);
   const [socketConnected, setSocketConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
+  const [teamPermissions, setTeamPermissions] = useState<any>(null);
+  const [isOwner, setIsOwner] = useState<boolean>(false);
 
   const fetchUnreadCount = async () => {
     try {
@@ -313,6 +316,24 @@ export default function AppHeader() {
     };
   }, []);
 
+  // Fetch membership/permissions
+  useEffect(() => {
+    const fetchMembership = async () => {
+      try {
+        const token = getToken();
+        if (!token) return;
+        const res = await getMyMembership();
+        if (res.success && res.data) {
+          setTeamPermissions(res.data.permissions);
+          setIsOwner(!!res.data.isOwner);
+        }
+      } catch (err) {
+        // silent fail
+      }
+    };
+    fetchMembership();
+  }, []);
+
   const handleMarkAsRead = async (notificationId: string) => {
     try {
       const token = getToken();
@@ -394,6 +415,9 @@ export default function AppHeader() {
     return null;
   }
 
+  const can = (perm: keyof typeof teamPermissions) =>
+    isOwner || (teamPermissions && teamPermissions[perm]);
+
   return (
     <header className="bg-slate-800 text-white px-6 py-3">
       <div className="flex items-center justify-between max-w-7xl mx-auto">
@@ -419,35 +443,53 @@ export default function AppHeader() {
           >
             HR Insider
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-white hover:text-primary"
-            onClick={() => router.push("/jobs")}
-          >
-            Đăng tin
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-white hover:text-primary"
-          >
-            Tìm CV
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-white hover:text-primary"
-          >
-            Connect
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-white hover:text-primary"
-          >
-            Insights
-          </Button>
+          {can("canCreateJobs") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white hover:text-primary"
+              onClick={() => router.push("/jobs")}
+            >
+              Đăng tin
+            </Button>
+          )}
+          {can("canSearchCandidates") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white hover:text-primary"
+            >
+              Tìm CV
+            </Button>
+          )}
+          {can("canManageTeam") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white hover:text-primary"
+              onClick={() => router.push("/team")}
+            >
+              Team
+            </Button>
+          )}
+          {can("canContactCandidates") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white hover:text-primary"
+            >
+              Connect
+            </Button>
+          )}
+          {can("canViewAnalytics") && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-white hover:text-primary"
+            >
+              Insights
+            </Button>
+          )}
           <DropdownMenu
             open={notificationDropdownOpen}
             onOpenChange={setNotificationDropdownOpen}
@@ -460,10 +502,10 @@ export default function AppHeader() {
                     {unreadCount > 99 ? "99+" : unreadCount}
                   </Badge>
                 )}
-                {/* Socket connection indicator */}
+                {/* Socket connection indicator
                 {socketConnected && (
                   <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-slate-800 transform translate-x-1/2 translate-y-1/2"></div>
-                )}
+                )} */}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
