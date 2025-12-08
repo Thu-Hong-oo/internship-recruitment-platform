@@ -38,6 +38,7 @@ class CandidateController {
     this.viewCurrentCV = this.resumeController.viewCurrentCV;
     this.generateSmartResume = this.resumeController.generateSmartResume;
     this.generateTargetedResume = this.resumeController.generateTargetedResume;
+    this.exportResumeWithEdits = this.resumeController.exportResumeWithEdits;
 
     // Application management methods
     this.getApplications = this.applicationController.getApplications;

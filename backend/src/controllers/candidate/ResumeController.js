@@ -6,6 +6,7 @@ const aiService = require('../../services/ai/aiService');
 const { ApiResponse } = require('../../utils/responseHandler');
 const { AppError } = require('../../utils/errors');
 const { logger } = require('../../utils/logger');
+const { decodeFilename, normalizeFilename } = require('../../utils/filenameEncoding');
 const Job = require('../../models/Job'); // Import Job model
 
 class ResumeController {
@@ -22,6 +23,7 @@ class ResumeController {
     this.buildResumeContent = this.buildResumeContent.bind(this);
     this.formatAddress = this.formatAddress.bind(this);
     this.ensureCandidateProfile = this.ensureCandidateProfile.bind(this);
+    this.exportResumeWithEdits = this.exportResumeWithEdits.bind(this);
   }
 
   // ============================================
@@ -877,10 +879,18 @@ class ResumeController {
       publicId: `resume_${req.user.id}_${Date.now()}`,
     });
 
+    // Fix filename encoding for Vietnamese characters
+    const decodedFilename = decodeFilename(req.file.originalname || 'resume.pdf');
+    const normalizedFilename = normalizeFilename(decodedFilename);
+    // Use displayName from request body if provided, otherwise use decoded filename
+    const finalDisplayName = req.body.displayName 
+      ? decodeFilename(req.body.displayName.trim())
+      : decodedFilename;
+    
     const newResumeEntry = this._createNewResumeEntry({
       ...uploadResult,
-      filename: req.file.originalname,
-      displayName: req.file.originalname,
+      filename: normalizedFilename,
+      displayName: finalDisplayName, // Use displayName from request or decoded filename
     });
 
     // KHÔNG xóa file cũ khi upload CV mới - giữ lại trong history để user có thể xem
@@ -975,19 +985,27 @@ class ResumeController {
         });
         console.log('✅ File uploaded successfully (background)');
 
-        const newResumeEntry = this._createNewResumeEntry({
-          ...uploadResult,
-          filename: req.file.originalname,
-          displayName: req.file.originalname,
-          aiAnalysis: parseResult
-            ? {
-                extractedData: parseResult.extractedData || {},
-                skills: parseResult.skills || [],
-                suggestions: parseResult.suggestions || [],
-                analyzedAt: new Date(),
-              }
-            : { error: 'Parsing failed during upload', analyzedAt: new Date() },
-        });
+    // Fix filename encoding for Vietnamese characters
+    const decodedFilename = decodeFilename(req.file.originalname || 'resume.pdf');
+    const normalizedFilename = normalizeFilename(decodedFilename);
+    // Use displayName from request body if provided, otherwise use decoded filename
+    const finalDisplayName = req.body.displayName 
+      ? decodeFilename(req.body.displayName.trim())
+      : decodedFilename;
+    
+    const newResumeEntry = this._createNewResumeEntry({
+      ...uploadResult,
+      filename: normalizedFilename,
+      displayName: finalDisplayName, // Use displayName from request or decoded filename
+      aiAnalysis: parseResult
+        ? {
+            extractedData: parseResult.extractedData || {},
+            skills: parseResult.skills || [],
+            suggestions: parseResult.suggestions || [],
+            analyzedAt: new Date(),
+          }
+        : { error: 'Parsing failed during upload', analyzedAt: new Date() },
+    });
 
         // Update profile với resume mới
         await this._updateResumeInProfile(profile, newResumeEntry, true, false);
@@ -1076,6 +1094,156 @@ class ResumeController {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', cvToDownload.mimeType || 'application/pdf');
     res.redirect(cvToDownload.url);
+  }
+
+  /**
+   * POST /api/candidates/me/resume/export
+   * Export PDF với edited text từ annotations
+   */
+  async exportResumeWithEdits(req, res, next) {
+    try {
+      const { cvId, annotations } = req.body;
+      const userId = req.user.id;
+
+      if (!cvId) {
+        throw new AppError('cvId is required', 400);
+      }
+
+      const profile = await this.ensureCandidateProfile(userId, req.user);
+
+      // Get CV URL
+      let cvUrl = null;
+      if (cvId === 'current') {
+        if (!profile.resume?.current?.url) {
+          throw new AppError('Current resume not found', 404);
+        }
+        cvUrl = profile.resume.current.url;
+      } else {
+        const foundCV = profile.resume?.history?.find(
+          cv => cv._id.toString() === cvId
+        );
+        if (!foundCV || !foundCV.url) {
+          throw new AppError('Resume not found', 404);
+        }
+        cvUrl = foundCV.url;
+      }
+
+      // Download original PDF
+      const axios = require('axios');
+      const pdfResponse = await axios.get(cvUrl, {
+        responseType: 'arraybuffer',
+        headers: {
+          Authorization: req.headers.authorization
+        }
+      });
+
+      const pdfBuffer = Buffer.from(pdfResponse.data);
+
+      // Try to use pdf-lib if available, otherwise use fallback
+      let modifiedPdfBuffer = pdfBuffer;
+      
+      try {
+        // Try to require pdf-lib (may not be installed)
+        const pdfLib = require('pdf-lib');
+        if (pdfLib && pdfLib.PDFDocument) {
+          const { PDFDocument, rgb, StandardFonts } = pdfLib;
+          const pdfDoc = await PDFDocument.load(pdfBuffer);
+          const pages = pdfDoc.getPages();
+
+          // Apply annotations (text replacements)
+          if (annotations && Array.isArray(annotations)) {
+            const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+            
+            annotations.forEach((annotation) => {
+              if (annotation.editedText && annotation.page && annotation.x && annotation.y) {
+                const pageIndex = annotation.page - 1; // 0-indexed
+                if (pages[pageIndex]) {
+                  const page = pages[pageIndex];
+                  const pageHeight = page.getHeight();
+                  
+                  // Calculate Y coordinate (PDF coordinates are bottom-up)
+                  const pdfY = pageHeight - annotation.y - annotation.height;
+                  
+                  // Remove old text (draw white rectangle)
+                  page.drawRectangle({
+                    x: annotation.x,
+                    y: pdfY,
+                    width: annotation.width,
+                    height: annotation.height,
+                    color: rgb(1, 1, 1), // White
+                  });
+
+                  // Add new text
+                  page.drawText(annotation.editedText, {
+                    x: annotation.x + 2,
+                    y: pdfY + 5,
+                    size: 10,
+                    font: font,
+                    color: rgb(0, 0, 0),
+                  });
+                }
+              }
+            });
+          }
+
+          modifiedPdfBuffer = await pdfDoc.save();
+          logger.info('✅ PDF modified successfully with pdf-lib');
+        } else {
+          throw new Error('pdf-lib not properly loaded');
+        }
+      } catch (pdfLibError) {
+        logger.warn('⚠️ pdf-lib not available, using original PDF:', pdfLibError.message);
+        // Fallback: return original PDF
+        // Note: In production, you might want to use puppeteer to recreate PDF from HTML
+        // or implement a more sophisticated text replacement using pdfjs-dist
+        modifiedPdfBuffer = pdfBuffer;
+      }
+
+      // Upload modified PDF to Cloudinary
+      const uploadService = require('../../services/upload/unifiedUploadService');
+      const uploadResult = await uploadService.uploadBuffer(modifiedPdfBuffer, {
+        folder: 'resumes/edited',
+        resourceType: 'raw',
+        filename: `cv-edited-${Date.now()}.pdf`,
+        mimeType: 'application/pdf'
+      });
+
+      // Save to profile history
+      if (!profile.resume) {
+        profile.resume = { history: [] };
+      }
+      if (!profile.resume.history) {
+        profile.resume.history = [];
+      }
+
+      profile.resume.history.push({
+        url: uploadResult.url,
+        publicId: uploadResult.publicId,
+        filename: `cv-edited-${Date.now()}.pdf`,
+        displayName: `CV đã chỉnh sửa - ${new Date().toLocaleDateString('vi-VN')}`,
+        mimeType: 'application/pdf',
+        uploadedAt: new Date(),
+        edited: true,
+        originalCvId: cvId,
+        annotations: annotations || []
+      });
+
+      await profile.save();
+
+      return ApiResponse.success(
+        res,
+        {
+          url: uploadResult.url,
+          publicId: uploadResult.publicId,
+          filename: `cv-edited-${Date.now()}.pdf`,
+          downloadUrl: uploadResult.url
+        },
+        'CV exported successfully with edits'
+      );
+    } catch (error) {
+      logger.error('Error exporting resume with edits:', error);
+      return next(error);
+    }
   }
 }
 

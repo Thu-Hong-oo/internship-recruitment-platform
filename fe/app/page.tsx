@@ -297,64 +297,12 @@ export default function DashboardPage() {
                       Độ Phù Hợp
                     </p>
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* AI Analytics */}
-              <Card className="border-white/40 bg-white/70 backdrop-blur-xl shadow-[0_20px_50px_rgba(15,45,95,0.08)]">
-                <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold text-slate-900 mb-4">
-                    Tính năng AI hỗ trợ của InternBridge
-                  </h3>
-                  <div className="space-y-4">
-                    <Link
-                      href="/cv-analysis"
-                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-[oklch(0.60_0.12_195/.08)] transition-colors"
-                    >
-                      <BarChart3
-                        className="w-5 h-5"
-                        style={{ color: primaryColor }}
-                      />
-                      <span className="text-sm font-medium text-slate-700">
-                        Phân Tích CV
-                      </span>
-                    </Link>
-                    <Link
-                      href="/job-recommendations"
-                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-[oklch(0.60_0.12_195/.08)] transition-colors"
-                    >
-                      <TrendingUp
-                        className="w-5 h-5"
-                        style={{ color: primaryColor }}
-                      />
-                      <span className="text-sm font-medium text-slate-700">
-                        Gợi Ý Việc Làm AI
-                      </span>
-                    </Link>
-                    <Link
-                      href="/skill-gap-analysis"
-                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-[oklch(0.60_0.12_195/.08)] transition-colors"
-                    >
-                      <Target
-                        className="w-5 h-5"
-                        style={{ color: primaryColor }}
-                      />
-                      <span className="text-sm font-medium text-slate-700">
-                        Phân Tích Khoảng Cách Kỹ Năng
-                      </span>
-                    </Link>
-                    <Link
-                      href="/roadmaps"
-                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-[oklch(0.60_0.12_195/.08)] transition-colors"
-                    >
-                      <GraduationCap
-                        className="w-5 h-5"
-                        style={{ color: primaryColor }}
-                      />
-                      <span className="text-sm font-medium text-slate-700">
-                        Lộ Trình Học Tập
-                      </span>
-                    </Link>
+                  <div 
+                    onClick={() => router.push("/search")}
+                    className="flex items-center space-x-2 text-[oklch(0.60_0.12_195)] hover:text-[oklch(0.55_0.12_195)] cursor-pointer transition-all duration-300 group"
+                  >
+                    <span className="text-sm font-semibold">Xem tất cả</span>
+                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform duration-300" />
                   </div>
                 </CardContent>
               </Card>

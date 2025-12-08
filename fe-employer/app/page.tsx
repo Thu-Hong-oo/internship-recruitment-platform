@@ -201,14 +201,6 @@ export default function LoginPage() {
       {/* Left side - Login Form */}
       <div className="flex-1 flex flex-col justify-center px-8 lg:px-16">
         <div className="max-w-md mx-auto w-full">
-          {/* Logo */}
-          <div className="mb-8">
-            <div className="flex items-center gap-1">
-              <span className="text-2xl font-bold text-slate-800">top</span>
-              <span className="text-2xl font-bold text-primary">cv</span>
-              <span className="text-primary text-sm">®</span>
-            </div>
-          </div>
 
           {/* Welcome Message */}
           <div className="mb-8">

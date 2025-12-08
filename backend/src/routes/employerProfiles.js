@@ -32,6 +32,18 @@ const {
   getProfileCompletion,
 } = require('../controllers/employerProfileController');
 
+const {
+  inviteMember,
+  getInvitations,
+  acceptInvitation,
+  rejectInvitation,
+  cancelInvitation,
+  updateMember,
+  removeMember,
+  verifyInvitationToken,
+  getMyMembership,
+} = require('../controllers/teamInvitationController');
+
 const router = express.Router();
 
 // Configure multer for image uploads only
@@ -233,5 +245,81 @@ router.get(
 // router.get('/dashboard', protect, authorize('employer'), getDashboardStats);
 // DEPRECATED: updatePreferences not supported in schema
 // router.put('/preferences', protect, authorize('employer'), updatePreferences);
+
+// ============================================
+// TEAM INVITATION ROUTES
+// ============================================
+
+// Invite team member
+router.post(
+  '/team/invite',
+  protect,
+  authorize('employer'),
+  requireEmployerProfile,
+  inviteMember
+);
+
+// Get all invitations
+router.get(
+  '/team/invitations',
+  protect,
+  authorize('employer'),
+  requireEmployerProfile,
+  getInvitations
+);
+
+// Verify invitation token (public - no auth required)
+router.get(
+  '/team/invitations/verify/:token',
+  verifyInvitationToken
+);
+
+// Get current user membership info
+router.get(
+  '/team/me',
+  protect,
+  authorize('employer'),
+  getMyMembership
+);
+
+// Accept invitation (public - token in body)
+// Support both with invitationId and without (token-only)
+router.post(
+  '/team/invitations/:invitationId?/accept',
+  acceptInvitation
+);
+
+// Reject invitation (public - token in body)
+router.post(
+  '/team/invitations/:invitationId/reject',
+  rejectInvitation
+);
+
+// Cancel invitation (owner/admin only)
+router.delete(
+  '/team/invitations/:invitationId',
+  protect,
+  authorize('employer'),
+  requireEmployerProfile,
+  cancelInvitation
+);
+
+// Update member (role, permissions, status)
+router.put(
+  '/team/members/:memberId',
+  protect,
+  authorize('employer'),
+  requireEmployerProfile,
+  updateMember
+);
+
+// Remove member from team
+router.delete(
+  '/team/members/:memberId',
+  protect,
+  authorize('employer'),
+  requireEmployerProfile,
+  removeMember
+);
 
 module.exports = router;
