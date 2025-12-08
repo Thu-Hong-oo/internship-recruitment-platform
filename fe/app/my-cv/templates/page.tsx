@@ -1,6 +1,6 @@
 import { Sparkles, LayoutTemplate } from "lucide-react";
 import TemplateGallery from "@/components/cv/TemplateGallery";
-import PageLayout from "@/components/layout/page-layout";
+import PageLayout from "@/components/layout/PageLayout";
 
 export default function CVTemplatesPage() {
   return (

@@ -228,6 +228,8 @@ export const aiService = {
   async analyzeCVImprovements(params: {
     cvText?: string;
     cvData?: CVData;
+    cvId?: string;
+    targetJobId?: string;
   }): Promise<{
     success: boolean;
     data: {
@@ -247,7 +249,22 @@ export const aiService = {
         issue: string;
         suggestion: string;
         severity: "high" | "medium" | "low";
+        evidence?: string;
       }>;
+      _dataSource?: "exact-match" | "similar-jobs" | "industry-patterns" | "generic-patterns" | "ai-rules-fallback";
+      _confidence?: "high" | "medium-high" | "medium" | "low-medium";
+      _disclaimer?: string;
+      _benchmark?: {
+        avgSuccessfulScore: number;
+        currentScore: number;
+        gap: number;
+      };
+      _dataQuality?: {
+        source: string;
+        sampleSize: number;
+        targetIndustry?: string;
+        match?: boolean;
+      };
     };
   }> {
     return apiClient.post("/ai/analyze-cv-improvements", params);

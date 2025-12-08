@@ -38,10 +38,11 @@ import {
   Trash2,
   Upload,
   X,
+  Edit3,
 } from "lucide-react";
 import { api, type CandidateProfile } from "@/lib/api";
 import { apiClient } from "@/lib/api/client";
-import PageLayout from "@/components/layout/page-layout";
+import PageLayout from "@/components/layout/PageLayout";
 import UploadCVModal from "@/components/cv/UploadCVModal";
 import CVAnalysisModal from "@/components/cv/CVAnalysisModal";
 
@@ -337,9 +338,18 @@ export default function CVManagementPage() {
 
   const submitRename = async () => {
     try {
+      // Convert scope + index to id format
+      let cvId: string;
+      if (renameScope === "current") {
+        cvId = profile?.resume?.current?._id?.toString() || "current";
+      } else if (renameIndex !== undefined && profile?.resume?.history?.[renameIndex]) {
+        cvId = profile.resume.history[renameIndex]._id?.toString() || "";
+      } else {
+        throw new Error("Không tìm thấy CV để đổi tên");
+      }
+
       await api.candidateCV.renameCV({
-        scope: renameScope,
-        index: renameIndex,
+        id: cvId,
         displayName: renameValue.trim(),
       });
       setSuccess("Đổi tên CV thành công!");
@@ -469,6 +479,16 @@ export default function CVManagementPage() {
                       <span className="absolute inset-0 bg-white/10 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
                       <Sparkles className="mr-2 h-5 w-5" />
                       Phân tích CV
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        router.push(`/cv-edit?cvId=current`);
+                      }}
+                      variant="outline"
+                      className="group relative overflow-hidden rounded-2xl px-6 py-3 font-semibold border-2 border-[oklch(0.65_0.18_195)] text-[oklch(0.65_0.18_195)] bg-white/60 transition-all duration-500 hover:bg-[oklch(0.65_0.18_195)] hover:text-white"
+                    >
+                      <Edit3 className="mr-2 h-5 w-5" />
+                      Chỉnh sửa với gợi ý
                     </Button>
                   </>
                 )}
