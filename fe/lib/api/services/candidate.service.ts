@@ -129,15 +129,14 @@ class CandidateService {
   // Đổi tên CV (current hoặc history)
   async renameCV(
     params: {
-      scope: "current" | "history";
-      index?: number;
+      id: string;
       displayName: string;
     },
     userId?: string
   ): Promise<{ success: boolean; message?: string }> {
     const endpoint = userId
       ? `/candidates/${userId}/cv/rename`
-      : "/candidates/me/cv/rename";
+      : "/candidates/me/resume/rename";
     return apiClient.put(endpoint, params);
   }
 

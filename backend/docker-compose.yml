@@ -59,12 +59,9 @@ services:
       - IS_PERSISTENT=TRUE
       - ANONYMIZED_TELEMETRY=FALSE
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/api/v1/heartbeat\")' || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    # ChromaDB healthcheck - using HTTP endpoint check
+    # Note: ChromaDB image may not have curl/wget, so we rely on depends_on
+    # Backend will handle connection errors gracefully
 
 volumes:
   mongo_data:

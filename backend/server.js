@@ -343,6 +343,7 @@ app.use('/api/skills', skillRoutes);
 app.use('/api/skill-categories', skillCategoryRoutes);
 app.use('/api/industries', industryRoutes);
 app.use('/api/saved-jobs', require('./src/routes/savedJobs'));
+app.use('/api/cv-builder', require('./src/routes/cvBuilder'));
 
 // Roadmaps Routes (SkillRoadmap model - legacy/alternative to LearningRoadmap)
 // Note: LearningRoadmap is used in /api/nlp/learning-roadmap

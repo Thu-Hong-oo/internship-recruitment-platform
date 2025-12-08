@@ -258,11 +258,15 @@ class ResumeHelpers {
    * Prepare resume data for storage
    */
   static prepareResumeData(uploadResult, file) {
+    const { decodeFilename, normalizeFilename } = require('../../../utils/filenameEncoding');
+    const decodedFilename = decodeFilename(file?.originalname || 'resume.pdf');
+    const normalizedFilename = normalizeFilename(decodedFilename);
+    
     return {
       url: uploadResult.url,
       publicId: uploadResult.publicId,
-      filename: uploadResult.filename || file.originalname,
-      displayName: uploadResult.displayName || file.originalname,
+      filename: uploadResult.filename || normalizedFilename,
+      displayName: uploadResult.displayName || decodedFilename,
       format: uploadResult.format,
       size: uploadResult.size || file.size,
       mimeType: uploadResult.mimeType || file.mimetype,

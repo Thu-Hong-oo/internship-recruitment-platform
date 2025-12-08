@@ -147,6 +147,16 @@ router.put('/me/resume/set-current/:id', candidateController.setCurrentResume);
  */
 router.put('/me/resume/rename', candidateController.renameResume);
 
+/**
+ * @route   POST /api/candidates/me/resume/export
+ * @desc    Export PDF với edited text từ annotations
+ * @access  Private (Candidate only)
+ * @body    { cvId: string, annotations: Array }
+ * @example POST /api/candidates/me/resume/export
+ *          Body: { "cvId": "current", "annotations": [...] }
+ */
+router.post('/me/resume/export', apiRateLimit, candidateController.exportResumeWithEdits);
+
 // ============================================
 // PROFILE SECTIONS CRUD (4 endpoints pattern)
 // ============================================

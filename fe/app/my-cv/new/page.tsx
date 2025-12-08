@@ -7,7 +7,7 @@ import CVEditor from "../../../components/cv/CVEditor";
 import { type CVData, sampleCVs } from "../../../lib/mocks/cvSamples";
 import { templateLayouts } from "../../../lib/mocks/templateLayouts";
 import { candidateService } from "../../../lib/api/services/candidate.service";
-import PageLayout from "@/components/layout/page-layout";
+import PageLayout from "@/components/layout/PageLayout";
 
 const TEMPLATE_ID_MAP: Record<string, number> = {
   modern: 1,

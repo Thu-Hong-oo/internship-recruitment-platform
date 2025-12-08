@@ -33,6 +33,7 @@ interface CVAnalysisModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   cvId?: string;
+  targetJobId?: string;
 }
 
 interface CVImprovements {
@@ -48,16 +49,34 @@ interface CVImprovements {
   specificImprovements: Array<{
     section: string;
     item: string;
-    current: string;
+    current?: string;
     suggestion: string;
-    priority: "high" | "medium" | "low";
+    priority?: "high" | "medium" | "low";
+    severity?: "high" | "medium" | "low";
+    issue?: string;
+    evidence?: string;
   }>;
+  _dataSource?: "exact-match" | "similar-jobs" | "industry-patterns" | "generic-patterns" | "ai-rules-fallback";
+  _confidence?: "high" | "medium-high" | "medium" | "low-medium";
+  _disclaimer?: string;
+  _benchmark?: {
+    avgSuccessfulScore: number;
+    currentScore: number;
+    gap: number;
+  };
+  _dataQuality?: {
+    source: string;
+    sampleSize: number;
+    targetIndustry?: string;
+    match?: boolean;
+  };
 }
 
 export default function CVAnalysisModal({
   open,
   onOpenChange,
   cvId,
+  targetJobId,
 }: CVAnalysisModalProps) {
   const { toast } = useToast();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -87,6 +106,7 @@ export default function CVAnalysisModal({
         data: CVImprovements;
       }>("/ai/analyze-cv-improvements", {
         cvId,
+        targetJobId,
       });
 
       if (response.success && response.data) {
@@ -211,6 +231,73 @@ export default function CVAnalysisModal({
                 className="mt-4 h-3"
               />
             </div>
+
+            {/* Data Source & Confidence Info */}
+            {(analysis._dataSource || analysis._confidence || analysis._disclaimer) && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100">
+                    <FileText className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    {analysis._dataSource && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-blue-900">Nguồn dữ liệu:</span>
+                        <Badge variant="outline" className="text-xs">
+                          {analysis._dataSource === "exact-match" && "📊 Dữ liệu job chính xác"}
+                          {analysis._dataSource === "similar-jobs" && "🔗 Jobs tương tự"}
+                          {analysis._dataSource === "industry-patterns" && "🏭 Patterns ngành"}
+                          {analysis._dataSource === "generic-patterns" && "🌐 Patterns chung"}
+                          {analysis._dataSource === "ai-rules-fallback" && "🤖 AI + Best practices"}
+                        </Badge>
+                      </div>
+                    )}
+                    {analysis._confidence && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-blue-900">Độ tin cậy:</span>
+                        <Badge 
+                          variant="outline" 
+                          className={`text-xs ${
+                            analysis._confidence === "high" ? "bg-emerald-100 text-emerald-700 border-emerald-300" :
+                            analysis._confidence === "medium-high" ? "bg-blue-100 text-blue-700 border-blue-300" :
+                            analysis._confidence === "medium" ? "bg-amber-100 text-amber-700 border-amber-300" :
+                            "bg-gray-100 text-gray-700 border-gray-300"
+                          }`}
+                        >
+                          {analysis._confidence === "high" && "✅ Cao"}
+                          {analysis._confidence === "medium-high" && "🟢 Khá cao"}
+                          {analysis._confidence === "medium" && "🟡 Trung bình"}
+                          {analysis._confidence === "low-medium" && "🟠 Thấp-trung bình"}
+                        </Badge>
+                      </div>
+                    )}
+                    {analysis._disclaimer && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-2">
+                        <p className="text-xs text-amber-800">{analysis._disclaimer}</p>
+                      </div>
+                    )}
+                    {analysis._benchmark && (
+                      <div className="grid grid-cols-3 gap-2 rounded-lg border border-gray-200 bg-white p-2">
+                        <div className="text-center">
+                          <p className="text-xs text-gray-500">Điểm trung bình</p>
+                          <p className="text-sm font-semibold text-gray-900">{Math.round(analysis._benchmark.avgSuccessfulScore)}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-gray-500">Điểm hiện tại</p>
+                          <p className="text-sm font-semibold text-gray-900">{Math.round(analysis._benchmark.currentScore)}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-gray-500">Chênh lệch</p>
+                          <p className={`text-sm font-semibold ${analysis._benchmark.gap >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                            {analysis._benchmark.gap >= 0 ? "+" : ""}{Math.round(analysis._benchmark.gap)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Strengths & Weaknesses */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -389,12 +476,12 @@ export default function CVAnalysisModal({
                           <div className="flex items-center gap-2 mb-1">
                             <Badge
                               className={`${getPriorityColor(
-                                improvement.priority
+                                improvement.priority || improvement.severity || "medium"
                               )} text-xs font-semibold`}
                             >
-                              {improvement.priority === "high"
+                              {(improvement.priority || improvement.severity) === "high"
                                 ? "Ưu tiên cao"
-                                : improvement.priority === "medium"
+                                : (improvement.priority || improvement.severity) === "medium"
                                 ? "Ưu tiên trung bình"
                                 : "Ưu tiên thấp"}
                             </Badge>
@@ -405,12 +492,24 @@ export default function CVAnalysisModal({
                               - {improvement.item}
                             </span>
                           </div>
-                          <p className="text-xs text-gray-500 mb-2">
-                            Hiện tại: {improvement.current}
-                          </p>
-                          <p className="text-sm text-gray-700">
+                          {improvement.current && (
+                            <p className="text-xs text-gray-500 mb-2">
+                              Hiện tại: {improvement.current}
+                            </p>
+                          )}
+                          {improvement.issue && (
+                            <p className="text-xs text-red-600 mb-2 font-medium">
+                              Vấn đề: {improvement.issue}
+                            </p>
+                          )}
+                          <p className="text-sm text-gray-700 mb-2">
                             {improvement.suggestion}
                           </p>
+                          {improvement.evidence && (
+                            <p className="text-xs text-blue-600 italic">
+                              💡 {improvement.evidence}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>

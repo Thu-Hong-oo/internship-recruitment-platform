@@ -4,6 +4,15 @@ ARG APP_PATH=backend
 
 WORKDIR /app
 
+# Install build dependencies for native modules (sharp, etc.)
+# Note: canvas has been removed from dependencies due to compilation issues
+# These are needed for node-gyp to compile native code
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    && ln -sf python3 /usr/bin/python
+
 # Copy package files (default path backend, override by setting APP_PATH build-arg)
 COPY ${APP_PATH}/package*.json ./
 
@@ -15,6 +24,9 @@ RUN if [ -f package-lock.json ]; then \
     else \
       npm install --only=production --legacy-peer-deps; \
     fi
+
+# Remove build dependencies to reduce image size
+RUN apk del make g++
 
 # Copy application files
 # Copy application files

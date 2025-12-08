@@ -648,8 +648,13 @@ PHOBERT_MODEL_PATH=./models/phobert-cv-ner-final
 # Sentence-BERT Model
 SBERT_MODEL_NAME=paraphrase-multilingual-mpnet-base-v2
 
-# ChromaDB
-CHROMADB_PATH=./data/chromadb
+# ChromaDB (Vector Database)
+# For Docker: Use http://chromadb:8000 (service name in docker-compose)
+# For Local: Use http://localhost:8000
+CHROMA_URL=http://localhost:8000
+CHROMADB_URL=http://localhost:8000
+CHROMA_COLLECTION_NAME=learning-resources
+CHROMADB_PATH=./data/chromadb  # Only for embedded mode (not used in Docker)
 ```
 
 **⚠️ Important:** `GEMINI_API_KEY` is **optional**. System works without it.
@@ -746,42 +751,35 @@ docker build -t recruitment-backend:latest .
 
 **Step 2: Run with Docker Compose**
 
-```yaml
-# docker-compose.yml
-version: '3.8'
-
-services:
-  backend:
-    image: recruitment-backend:latest
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - DB_HOST=postgres
-      - DB_NAME=recruitment_platform
-      - DB_USER=postgres
-      - DB_PASSWORD=secure_password
-    volumes:
-      - ./models:/app/models
-      - ./uploads:/app/uploads
-    depends_on:
-      - postgres
-
-  postgres:
-    image: postgres:14-alpine
-    environment:
-      - POSTGRES_DB=recruitment_platform
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=secure_password
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-volumes:
-  postgres_data:
-```
+The `docker-compose.yml` file includes all required services:
+- **Backend**: Node.js application
+- **MongoDB**: Database
+- **Redis**: Caching
+- **ChromaDB**: Vector database for RAG (Learning Roadmap)
 
 ```bash
+# Start all services
 docker-compose up -d
+
+# Check service status
+docker-compose ps
+
+# View logs
+docker-compose logs -f backend
+docker-compose logs -f chromadb
+```
+
+**ChromaDB Configuration:**
+- ChromaDB runs on port `8000`
+- Data is persisted in `chromadb_data` volume
+- Backend connects via `http://chromadb:8000` (internal Docker network)
+- Collection name: `learning-resources`
+
+**Environment Variables for ChromaDB:**
+```bash
+CHROMA_URL=http://chromadb:8000
+CHROMADB_URL=http://chromadb:8000
+CHROMA_COLLECTION_NAME=learning-resources
 ```
 
 ### Manual Deployment (VPS/Cloud)
