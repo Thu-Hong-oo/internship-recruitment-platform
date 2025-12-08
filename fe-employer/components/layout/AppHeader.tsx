@@ -45,7 +45,8 @@ import {
 } from "@/lib/notificationAPI";
 import { io, Socket } from "socket.io-client";
 
-const HIDE_ON_PREFIXES = ["/login", "/register", "/auth/"];
+const HIDE_ON_PREFIXES = ["/register", "/auth/", "/email-verification"];
+const HIDE_ON_EXACT = ["/"]; // Exact match only for root (login page)
 
 // Get socket URL (remove /api from API_BASE_URL)
 const getSocketUrl = (): string => {
@@ -384,7 +385,12 @@ export default function AppHeader() {
     }
   }, [notificationDropdownOpen]);
 
-  if (HIDE_ON_PREFIXES.some((p) => pathname === p || pathname?.startsWith(p))) {
+  // Hide on exact matches or prefix matches
+  const shouldHide = 
+    HIDE_ON_EXACT.includes(pathname || "") ||
+    HIDE_ON_PREFIXES.some((p) => pathname === p || pathname?.startsWith(p));
+  
+  if (shouldHide) {
     return null;
   }
 
