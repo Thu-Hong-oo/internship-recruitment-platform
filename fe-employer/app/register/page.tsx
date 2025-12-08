@@ -106,14 +106,6 @@ export default function EmployerRegisterPage() {
       {/* Left - Form */}
       <div className="flex-1 flex flex-col justify-center px-8 lg:px-16">
         <div className="max-w-2xl mx-auto w-full">
-          {/* Header */}
-          <div className="mb-6">
-            <div className="flex items-center gap-1">
-              <span className="text-2xl font-bold text-slate-800">top</span>
-              <span className="text-2xl font-bold text-primary">cv</span>
-              <span className="text-primary text-sm">®</span>
-            </div>
-          </div>
 
           <h1 className="text-2xl font-bold text-slate-800 mb-1">
             Đăng ký nhà tuyển dụng
