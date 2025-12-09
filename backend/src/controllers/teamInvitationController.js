@@ -186,6 +186,86 @@ class TeamInvitationController {
   }
 
   /**
+   * GET /api/employers/team/stats
+   * Thống kê nhanh team
+   */
+  async getTeamStats(req, res) {
+    const userId = req.user.id;
+
+    const profile = await EmployerProfile.findOne({ owner: userId }).lean();
+    if (!profile) {
+      throw new AppError('Employer profile not found', 404);
+    }
+
+    const members = profile.members || [];
+    const total = members.length;
+    const active = members.filter(m => m.status === 'active').length;
+    const pending = members.filter(m => m.status === 'pending').length;
+    const suspended = members.filter(m => m.status === 'suspended').length;
+
+    const now = Date.now();
+    const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+    const invitesLast7d = members.filter(m => m.invitedAt && m.invitedAt.getTime() >= sevenDaysAgo).length;
+    const joinsLast7d = members.filter(m => m.joinedAt && m.joinedAt.getTime() >= sevenDaysAgo).length;
+
+    return ApiResponse.success(res, {
+      total,
+      active,
+      pending,
+      suspended,
+      invitesLast7d,
+      joinsLast7d,
+      companyName: profile.company?.name,
+    });
+  }
+
+  /**
+   * GET /api/employers/team/activity
+   * Activity feed dựa trên lời mời & join
+   */
+  async getTeamActivity(req, res) {
+    const userId = req.user.id;
+
+    const profile = await EmployerProfile.findOne({ owner: userId }).lean();
+    if (!profile) {
+      throw new AppError('Employer profile not found', 404);
+    }
+
+    const members = profile.members || [];
+
+    // Build activities từ invitedAt và joinedAt
+    const activities = [];
+    members.forEach((m) => {
+      if (m.invitedAt) {
+        activities.push({
+          type: 'invite',
+          email: m.email,
+          role: m.role,
+          at: m.invitedAt,
+          status: m.status,
+        });
+      }
+      if (m.joinedAt) {
+        activities.push({
+          type: 'join',
+          email: m.email,
+          role: m.role,
+          at: m.joinedAt,
+          status: m.status,
+        });
+      }
+    });
+
+    // Sort desc
+    activities.sort((a, b) => new Date(b.at) - new Date(a.at));
+
+    return ApiResponse.success(res, {
+      activities,
+      companyName: profile.company?.name,
+    });
+  }
+
+  /**
    * POST /api/employers/team/invitations/:invitationId/accept
    * Chấp nhận invitation (public endpoint - không cần auth)
    * 
@@ -736,5 +816,7 @@ module.exports = {
   removeMember: asyncHandler(controller.removeMember.bind(controller)),
   verifyInvitationToken: asyncHandler(controller.verifyInvitationToken.bind(controller)),
   getMyMembership: asyncHandler(controller.getMyMembership.bind(controller)),
+  getTeamStats: asyncHandler(controller.getTeamStats.bind(controller)),
+  getTeamActivity: asyncHandler(controller.getTeamActivity.bind(controller)),
 };
 

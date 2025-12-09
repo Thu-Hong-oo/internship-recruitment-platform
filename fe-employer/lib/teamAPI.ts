@@ -284,6 +284,41 @@ export const getMyMembership = async (): Promise<{
   return apiCall(`/employers/team/me`);
 };
 
+export const getTeamStats = async (): Promise<{
+  success: boolean;
+  data?: {
+    total: number;
+    active: number;
+    pending: number;
+    suspended: number;
+    invitesLast7d: number;
+    joinsLast7d: number;
+    companyName?: string;
+  };
+  message?: string;
+  error?: string;
+}> => {
+  return apiCall(`/employers/team/stats`);
+};
+
+export const getTeamActivity = async (): Promise<{
+  success: boolean;
+  data?: {
+    activities: Array<{
+      type: "invite" | "join";
+      email?: string;
+      role?: string;
+      at: string;
+      status?: string;
+    }>;
+    companyName?: string;
+  };
+  message?: string;
+  error?: string;
+}> => {
+  return apiCall(`/employers/team/activity`);
+};
+
 /**
  * Remove member from team
  */
