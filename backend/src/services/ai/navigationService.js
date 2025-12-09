@@ -80,9 +80,10 @@ class NavigationService {
         queryParams.set('location', mappedLocation);
       }
       
-      // Search query/keyword
-      if (finalParams.job_title || finalParams.keyword || finalParams.q) {
-        queryParams.set('q', finalParams.job_title || finalParams.keyword || finalParams.q);
+      // Search query/keyword - ưu tiên keyword, sau đó job_title, cuối cùng q
+      const searchQuery = finalParams.keyword || finalParams.job_title || finalParams.q;
+      if (searchQuery && String(searchQuery).trim().length > 0) {
+        queryParams.set('q', String(searchQuery).trim());
       }
       
       // Skills

@@ -49,6 +49,7 @@
   "description": "AI-powered internship recruitment platform with NLP analysis and personalized skill roadmaps",
   "dependencies": {
     "@chroma-core/default-embed": "^0.1.9",
+    "@google-cloud/dialogflow": "^7.4.0",
     "@google-cloud/dialogflow-cx": "^5.5.0",
     "@google/generative-ai": "^0.24.1",
     "@huggingface/inference": "^4.13.4",

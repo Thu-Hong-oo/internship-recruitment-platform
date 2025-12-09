@@ -14,6 +14,11 @@ const { logger } = require('../utils/logger');
 const { ApiResponse } = require('../utils/responseHandler');
 const { AppError } = require('../utils/errors');
 
+// Pre-load Dialogflow services để đảm bảo initialization khi server start
+// Thay vì lazy loading trong recognizeNavigationIntent
+const dialogflowIntentService = require('../services/ai/dialogflowIntentService');
+const navigationService = require('../services/ai/navigationService');
+
 // ============================================
 // MULTER CONFIGURATION FOR CV UPLOAD
 // ============================================
@@ -2118,10 +2123,8 @@ class AIController {
     }
 
     try {
-      const dialogflowIntentService = require('../services/ai/dialogflowIntentService');
-      const navigationService = require('../services/ai/navigationService');
-
       // Recognize intent với Dialogflow (hoặc fallback)
+      // Services đã được require ở top level để đảm bảo initialization khi server start
       const intentResult = await dialogflowIntentService.recognizeIntent(
         input.trim(),
         frontend,

@@ -201,3 +201,5 @@ src/research/datasets/processed/*.jsonl
 # Test outputs
 tests/outputs/
 tests/__pycache__/
+
+dialogflow-key.json
