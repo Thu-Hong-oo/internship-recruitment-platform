@@ -1,200 +1,246 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/hooks/useAuth";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
-  MapPin,
-  DollarSign,
-  Clock,
-  Building2,
-  ChevronRight,
+  Search,
+  Settings,
+  CheckCircle2,
+  FileText,
+  BarChart3,
+  User,
+  Bell,
+  Heart,
+  Briefcase,
+  Circle,
   Sparkles,
+  Bookmark,
   TrendingUp,
+  Target,
+  GraduationCap,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useRouter, useSearchParams } from "next/navigation";
-import { PageLayout } from "@/components/layout";
-import Link from "next/link";
-import HeroSection from "@/components/layout/hero-section";
-import { useEffect, useState } from "react";
-import { jobsAPI, JobItem } from "@/lib/api";
-import { Row, Col } from "antd";
-import { JobFilters as JobFiltersType } from "@/components/jobs/JobFilters";
-import { SaveJobButton } from "@/components/jobs/SaveJobButton";
-interface HomePageProps {
-  onSearch?: (keyword: string) => void;
-}
+import { Input } from "@/components/ui/input";
+import { api } from "@/lib/api";
+import { savedJobService } from "@/lib/api";
+import type { SavedJob } from "@/lib/api/services/savedJob.service";
+import { getNotifications } from "@/lib/notificationAPI";
 
-export default function HomePage({ onSearch }: HomePageProps) {
+export default function DashboardPage() {
   const router = useRouter();
-  const [jobs, setJobs] = useState<JobItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(9);
-  const [totalJobs, setTotalJobs] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
-  const [filters, setFilters] = useState<JobFiltersType>({});
-  const searchParams = useSearchParams();
+  const { user } = useAuth();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [matchRate, setMatchRate] = useState(75);
+  const [cvCount, setCvCount] = useState(2);
+  const [appliedJobsCount, setAppliedJobsCount] = useState(3);
+  const [submittedCvsCount, setSubmittedCvsCount] = useState(2);
+  const [unreadNotifications, setUnreadNotifications] = useState(4);
+  const [savedJobsCount, setSavedJobsCount] = useState(0);
+  const [savedJobsList, setSavedJobsList] = useState<SavedJob[]>([]);
+  const [onlineCvs, setOnlineCvs] = useState<
+    Array<{ templateId: string; resumeId: string; templateName: string }>
+  >([]);
+  const [loading, setLoading] = useState(true);
 
-  const buildFiltersFromSearchParams = () => {
-    if (!searchParams) return undefined as any;
-    const get = (k: string) => searchParams.get(k) || undefined;
-    const getList = (k: string) => {
-      const v = searchParams.get(k);
-      return v
-        ? v
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)
-        : undefined;
-    };
-    const getNumber = (k: string) => {
-      const v = get(k);
-      return v ? Number(v) : undefined;
-    };
-    const filters: any = {
-      q: get("q") || get("search"), // Support both 'q' and 'search'
-      location: get("location"),
-      city: get("city"),
-      district: get("district"),
-      skills: getList("skills"),
-      employer: get("employer"),
-      status: get("status") || "active", // Default to active for public
-      jobType: get("jobType"),
-      level: get("level"),
-      workingMode: get("workingMode"),
-      employmentType: get("employmentType"), // New
-      experienceLevel: get("experienceLevel"), // New
-      industry: get("industry"),
-      industryCode: get("industryCode"), // New - preferred over industry
-      subIndustryCode: get("subIndustryCode"),
-      category: get("category"),
-      salaryMin: getNumber("salaryMin") || getNumber("minSalary"), // Support both
-      salaryMax: getNumber("salaryMax") || getNumber("maxSalary"), // Support both
-      minSalary: getNumber("minSalary") || getNumber("salaryMin"), // Support both
-      maxSalary: getNumber("maxSalary") || getNumber("salaryMax"), // Support both
-      salaryRange: get("salaryRange"),
-      createdFrom: get("createdFrom"),
-      createdTo: get("createdTo"),
-      deadlineFrom: get("deadlineFrom"),
-      deadlineTo: get("deadlineTo"),
-      isUrgent: get("isUrgent") === "true",
-      tags: getList("tags"),
-      sortBy: get("sortBy") || "createdAt",
-      sortOrder: (get("sortOrder") as any) || "desc",
-    };
-    // remove undefined keys
-    Object.keys(filters).forEach((k) => {
-      if (filters[k] === undefined) delete filters[k];
-    });
-    return Object.keys(filters).length ? filters : undefined;
-  };
-
-  const handleSearch = (keyword: string) => {
-    if (onSearch) {
-      onSearch(keyword);
-    } else {
-      const qs = new URLSearchParams();
-      if (keyword) qs.set("q", keyword);
-      router.push(`/search?${qs.toString()}`);
+  useEffect(() => {
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (!token) {
+      router.push("/login");
+      return;
     }
-  };
 
-  const handleFiltersChange = (newFilters: JobFiltersType) => {
-    setFilters(newFilters);
-    // Update URL params
-    const qs = new URLSearchParams();
-    if (newFilters.q) qs.set("q", newFilters.q);
-    if (newFilters.location) qs.set("location", newFilters.location);
-    if (newFilters.city) qs.set("city", newFilters.city);
-    if (newFilters.district) qs.set("district", newFilters.district);
-    if (newFilters.jobType) qs.set("jobType", newFilters.jobType);
-    if (newFilters.level) qs.set("level", newFilters.level);
-    if (newFilters.workingMode) qs.set("workingMode", newFilters.workingMode);
-    if (newFilters.industryCode)
-      qs.set("industryCode", newFilters.industryCode);
-    if (newFilters.subIndustryCode)
-      qs.set("subIndustryCode", newFilters.subIndustryCode);
-    if (newFilters.skills && newFilters.skills.length > 0)
-      qs.set("skills", newFilters.skills.join(","));
-    if (newFilters.salaryMin) qs.set("salaryMin", String(newFilters.salaryMin));
-    if (newFilters.salaryMax) qs.set("salaryMax", String(newFilters.salaryMax));
-    if (newFilters.salaryRange) qs.set("salaryRange", newFilters.salaryRange);
-    if (newFilters.createdFrom) qs.set("createdFrom", newFilters.createdFrom);
-    if (newFilters.createdTo) qs.set("createdTo", newFilters.createdTo);
-    if (newFilters.deadlineFrom)
-      qs.set("deadlineFrom", newFilters.deadlineFrom);
-    if (newFilters.deadlineTo) qs.set("deadlineTo", newFilters.deadlineTo);
-    if (newFilters.isUrgent) qs.set("isUrgent", "true");
-    if (newFilters.sortBy) qs.set("sortBy", newFilters.sortBy);
-    if (newFilters.sortOrder) qs.set("sortOrder", newFilters.sortOrder);
+    // Fetch dashboard data
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
 
-    // Navigate to search page with filters
-    const newUrl = qs.toString() ? `/search?${qs.toString()}` : "/search";
-    router.push(newUrl);
-  };
+        // Fetch CVs count
+        const resumesRes = await api.candidateCV.getResumesAll();
+        if (resumesRes?.success && resumesRes.data) {
+          const current = (resumesRes.data as any).current;
+          const history = (resumesRes.data as any).history || [];
+          const totalCvs = (current ? 1 : 0) + history.length;
+          setCvCount(totalCvs);
+        }
 
-  const handleFiltersReset = () => {
-    setFilters({});
-    router.push("/search");
-  };
-  const fetchJobs = async (page = currentPage, limit = pageSize) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await jobsAPI.getJobs(
-        page,
-        limit,
-        buildFiltersFromSearchParams()
-      );
-      if (res.success) {
-        setJobs(res.data || []);
-        setTotalJobs(res.pagination?.total || 0);
-        setTotalPages(res.pagination?.pages || 0);
-      } else {
-        setError("Không thể tải danh sách việc làm");
+        // Fetch applied jobs count
+        const applicationsRes = await api.candidateCV.getApplications({
+          page: 1,
+          limit: 1,
+        });
+        if (applicationsRes?.success && applicationsRes.data) {
+          setAppliedJobsCount(applicationsRes.data.pagination?.total || 0);
+        }
+
+        // Fetch notifications count
+        const notificationsRes = await getNotifications(token, {
+          page: 1,
+          limit: 1,
+        });
+        if (notificationsRes?.success) {
+          setUnreadNotifications(notificationsRes.unreadCount || 0);
+        }
+
+        // Fetch saved jobs (3 latest)
+        const savedJobsRes = await api.savedJobs.getSavedJobs({ limit: 3 });
+        if (savedJobsRes?.success) {
+          if (savedJobsRes.pagination) {
+            setSavedJobsCount(savedJobsRes.pagination.total || 0);
+          }
+          if (savedJobsRes.data) {
+            setSavedJobsList(savedJobsRes.data.slice(0, 3));
+          }
+        }
+
+        // Fetch CV online (ResumeBuilder CVs)
+        const templateMapRes = await api.candidateCV.getTemplateResumeMap();
+        if (templateMapRes?.success && templateMapRes.data?.map) {
+          const map = templateMapRes.data.map;
+          const templatesRes = await api.candidateCV.getTemplates();
+
+          const cvList: Array<{
+            templateId: string;
+            resumeId: string;
+            templateName: string;
+          }> = [];
+
+          if (templatesRes?.success && templatesRes.data?.templates) {
+            // Lấy tên template từ danh sách templates
+            const templateNameMap: Record<string, string> = {};
+            templatesRes.data.templates.forEach((t: any) => {
+              templateNameMap[t.id] = t.name || t.id;
+            });
+
+            // Tạo danh sách CV online từ map
+            Object.entries(map).forEach(([templateId, resumeId]) => {
+              cvList.push({
+                templateId,
+                resumeId: resumeId as string,
+                templateName: templateNameMap[templateId] || templateId,
+              });
+            });
+          } else {
+            // Nếu không lấy được templates, dùng templateId làm tên
+            Object.entries(map).forEach(([templateId, resumeId]) => {
+              cvList.push({
+                templateId,
+                resumeId: resumeId as string,
+                templateName: templateId,
+              });
+            });
+          }
+
+          setOnlineCvs(cvList.slice(0, 3)); // Hiển thị tối đa 3 CV
+        }
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      } finally {
+        setLoading(false);
       }
-    } catch (e: any) {
-      setError(e?.message || "Có lỗi xảy ra");
-    } finally {
-      setLoading(false);
+    };
+
+    fetchDashboardData();
+  }, [router]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    } else {
+      router.push("/search");
     }
   };
 
-  // Sync filters from URL params on mount and when URL changes
-  useEffect(() => {
-    const urlFilters = buildFiltersFromSearchParams();
-    if (urlFilters) {
-      setFilters(urlFilters);
-    }
-  }, [searchParams]);
+  const userName = user?.fullName || user?.firstName || "Ứng Viên";
 
-  useEffect(() => {
-    // re-fetch when URL filters change
-    setCurrentPage(1);
-    fetchJobs(1, pageSize);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  // Calculate progress circle
+  const radius = 50;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (matchRate / 100) * circumference;
 
-  const handlePageChange = (page: number, size?: number) => {
-    setCurrentPage(page);
-    if (size && size !== pageSize) {
-      setPageSize(size);
-      setCurrentPage(1); // Reset to first page when changing page size
-    }
-    fetchJobs(page, size || pageSize);
-  };
+  const primaryColor = "oklch(0.60 0.12 195)";
+  const primaryGradient = `linear-gradient(135deg, ${primaryColor} 0%, oklch(0.72 0.08 210) 55%, oklch(0.88 0.03 195) 100%)`;
+
   return (
-    <PageLayout>
-      <HeroSection
-        onSearch={handleSearch}
-        onFiltersChange={handleFiltersChange}
-        filters={filters}
-      />
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,oklch(0.97_0.02_210)_0%,white_30%)]">
+      {/* Header */}
+      <header className="bg-white/80 backdrop-blur-sm border-b border-white/40 sticky top-0 z-50 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between gap-4">
+            {/* Logo */}
+            <Link href="/home" className="flex items-center gap-3">
+              <span className="text-xl font-bold text-slate-900">
+                InternBridge
+              </span>
+            </Link>
+
+            {/* Search Bar */}
+            <form onSubmit={handleSearch} className="flex-1 max-w-2xl relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <Input
+                type="text"
+                placeholder="Type vào hành động bạn muốn làm..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-10 h-11 w-full bg-white/80 border-slate-200/60 backdrop-blur-sm"
+              />
+            </form>
+
+            {/* Settings Icon */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="w-10 h-10"
+              onClick={() => router.push("/profile")}
+            >
+              <Settings className="w-5 h-5" style={{ color: primaryColor }} />
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Welcome Banner */}
+      <div
+        className="relative overflow-hidden"
+        style={{ background: primaryGradient }}
+      >
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,oklch(0.60_0.12_195/.2)_0%,transparent_70%)]" />
+        <div
+          className="pointer-events-none absolute -left-32 top-16 h-96 w-96 rounded-full bg-[radial-gradient(circle,oklch(0.60_0.12_195/.25),transparent_70%)] blur-3xl"
+          style={{ animation: "float 20s ease-in-out infinite" }}
+        />
+        <div
+          className="pointer-events-none absolute right-[-120px] bottom-20 h-96 w-96 rounded-full bg-[radial-gradient(circle,oklch(0.72_0.08_210/.2),transparent_75%)] blur-3xl"
+          style={{ animation: "float 25s ease-in-out infinite reverse" }}
+        />
+        <div className="relative z-10 max-w-7xl mx-auto px-4 py-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2 drop-shadow-lg">
+                Chào mừng, {userName}
+              </h1>
+              <p className="text-white/95 font-medium">
+                Quản lý hồ sơ và theo dõi ứng tuyển của bạn
+              </p>
+            </div>
+            <Button
+              onClick={() => router.push("/home")}
+              className="bg-white text-[oklch(0.60_0.12_195)] hover:bg-white/95 font-semibold shadow-lg"
+            >
+              Đến trang chủ
+            </Button>
+          </div>
+        </div>
+      </div>
 
       {/* Main Content */}
-      <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,oklch(0.97_0.02_210)_0%,white_30%)] pb-20">
+      <div className="relative min-h-screen overflow-hidden pb-20">
         <div
           className="pointer-events-none absolute -left-32 top-16 h-72 w-72 rounded-full bg-[radial-gradient(circle,oklch(0.70_0.12_195/.15),transparent_70%)] blur-3xl"
           style={{ animation: "float 20s ease-in-out infinite" }}
@@ -203,20 +249,53 @@ export default function HomePage({ onSearch }: HomePageProps) {
           className="pointer-events-none absolute right-[-120px] top-80 h-96 w-96 rounded-full bg-[radial-gradient(circle,oklch(0.75_0.08_210/.12),transparent_75%)] blur-3xl"
           style={{ animation: "float 25s ease-in-out infinite reverse" }}
         />
-
-        <div className="relative z-10 max-w-7xl mx-auto px-4 py-12">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            {/* Main Content */}
-            <div className="lg:col-span-3">
-              {/* Featured Jobs (from API) */}
-              <div className="mb-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-3xl font-bold text-slate-900 mb-2">
-                      Việc làm từ InternBridge
-                    </h2>
-                    <p className="text-sm text-slate-600">
-                      Khám phá cơ hội nghề nghiệp phù hợp với bạn
+        <div className="relative z-10 max-w-7xl mx-auto px-4 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left Column - AI Profile Overview & Analytics */}
+            <div className="lg:col-span-3 space-y-6">
+              {/* AI Profile Overview */}
+              <Card className="border-white/40 bg-white/70 backdrop-blur-xl shadow-[0_20px_50px_rgba(15,45,95,0.08)]">
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                    Tổng Quan Hồ Sơ AI
+                  </h3>
+                  <div className="flex flex-col items-center justify-center">
+                    <div className="relative w-32 h-32 mb-4">
+                      <svg
+                        className="transform -rotate-90 w-32 h-32"
+                        viewBox="0 0 120 120"
+                      >
+                        <circle
+                          cx="60"
+                          cy="60"
+                          r={radius}
+                          stroke="currentColor"
+                          strokeWidth="12"
+                          fill="none"
+                          className="text-slate-200"
+                        />
+                        <circle
+                          cx="60"
+                          cy="60"
+                          r={radius}
+                          stroke="currentColor"
+                          strokeWidth="12"
+                          fill="none"
+                          strokeDasharray={circumference}
+                          strokeDashoffset={offset}
+                          strokeLinecap="round"
+                          style={{ color: primaryColor }}
+                          className="transition-all duration-500"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-2xl font-bold text-slate-900">
+                          {matchRate}%
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-sm font-medium text-slate-600">
+                      Độ Phù Hợp
                     </p>
                   </div>
                   <div 
@@ -226,259 +305,244 @@ export default function HomePage({ onSearch }: HomePageProps) {
                     <span className="text-sm font-semibold">Xem tất cả</span>
                     <ChevronRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform duration-300" />
                   </div>
-                </div>
+                </CardContent>
+              </Card>
+            </div>
 
-                <div>
-                  {loading && (
-                    <Card className="border-border">
-                      <CardContent className="p-6 text-sm text-muted-foreground">
-                        Đang tải việc làm...
-                      </CardContent>
-                    </Card>
-                  )}
-                  {error && !loading && (
-                    <Card className="border-destructive">
-                      <CardContent className="p-6 text-sm text-destructive">
-                        {error}
-                      </CardContent>
-                    </Card>
-                  )}
-                  {!loading && !error && jobs.length === 0 && (
-                    <Card className="border-border">
-                      <CardContent className="p-6 text-sm text-muted-foreground">
-                        Chưa có việc làm để hiển thị.
-                      </CardContent>
-                    </Card>
-                  )}
-                  {!loading && !error && jobs.length > 0 && (
-                    <>
-                      <Row gutter={[20, 20]}>
-                        {jobs.map((job) => {
-                          const primaryGradient = `linear-gradient(135deg, oklch(0.60 0.12 195) 0%, oklch(0.72 0.08 210) 55%, oklch(0.88 0.03 195) 100%)`;
-                          const glassSurfaceGradient = `linear-gradient(140deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.75) 100%)`;
-                          const highlightOverlay = `linear-gradient(135deg, oklch(0.60 0.12 195 / 0.08) 0%, transparent 70%)`;
-                          const cardAuraGradient = `radial-gradient(circle at top, oklch(0.60 0.12 195 / 0.25) 0%, transparent 65%)`;
-
-                          return (
-                            <Col xs={24} sm={12} lg={8} key={job.id}>
-                              <div
-                                className="group relative overflow-hidden rounded-3xl border border-slate-200/60 bg-white/80 p-6 shadow-[0_20px_50px_rgba(15,45,95,0.08)] backdrop-blur-xl transition-all duration-700 ease-out hover:-translate-y-2 hover:shadow-[0_28px_65px_rgba(15,45,95,0.15)] hover:border-[oklch(0.60_0.12_195/.3)] cursor-pointer h-full"
-                                style={{ background: glassSurfaceGradient }}
-                                onClick={() => router.push(`/jobs/${job.id}`)}
-                              >
-                                <span
-                                  className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-700 group-hover:opacity-100"
-                                  style={{ background: highlightOverlay }}
+            {/* Middle Column - Job Applications & Submitted CVs */}
+            <div className="lg:col-span-6 space-y-6">
+              {/* Saved Jobs Waiting */}
+              <Card className="border-white/40 bg-white/70 backdrop-blur-xl shadow-[0_20px_50px_rgba(15,45,95,0.08)]">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-slate-900">
+                      Có {savedJobsCount} việc làm đã lưu đang đợi bạn ứng tuyển
+                    </h3>
+                    <Link href="/jobs/saved-jobs">
+                      <Button variant="ghost" size="sm">
+                        Xem tất cả
+                      </Button>
+                    </Link>
+                  </div>
+                  <div className="space-y-3">
+                    {loading ? (
+                      <div className="text-center py-4 text-slate-500">
+                        Đang tải...
+                      </div>
+                    ) : savedJobsList.length > 0 ? (
+                      savedJobsList.map((savedJob) => {
+                        const job = savedJob.jobId;
+                        if (!job) return null;
+                        const companyName =
+                          job.employer?.company?.name || "Nhà tuyển dụng";
+                        const location = job.address?.city || "Không xác định";
+                        return (
+                          <Link
+                            key={savedJob._id}
+                            href={`/jobs/${job._id}`}
+                            className="block"
+                          >
+                            <div
+                              className="flex items-center justify-between p-3 rounded-lg transition-colors hover:shadow-md"
+                              style={{
+                                background:
+                                  "linear-gradient(135deg, oklch(0.60 0.12 195 / 0.08) 0%, transparent 70%)",
+                              }}
+                            >
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <Heart
+                                  className="w-5 h-5 flex-shrink-0"
+                                  style={{ color: primaryColor }}
                                 />
-                                <span
-                                  className="pointer-events-none absolute -top-32 left-1/2 h-52 w-52 -translate-x-1/2 rounded-full blur-3xl opacity-0 group-hover:opacity-30 transition-opacity duration-700"
-                                  style={{ background: cardAuraGradient }}
-                                />
-
-                                <div className="relative">
-                                  {/* Top section with logo and badges */}
-                                  <div className="flex items-start justify-between mb-4">
-                                    <div className="relative">
-                                      <div className="w-14 h-14 rounded-2xl bg-white/80 flex items-center justify-center overflow-hidden border-2 border-white/60 shadow-lg backdrop-blur-sm">
-                                        {job.companyId?.logo?.url ? (
-                                          <img
-                                            src={job.companyId.logo.url}
-                                            alt={job.companyId?.name || "logo"}
-                                            className="w-full h-full object-contain p-1"
-                                          />
-                                        ) : (
-                                          <Building2 className="w-6 h-6 text-[oklch(0.60_0.12_195)] transition-colors duration-300 group-hover:text-[oklch(0.55_0.12_195)]" />
-                                        )}
-                                      </div>
-                                      {job.isUrgent && (
-                                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-full flex items-center justify-center shadow-md ring-2 ring-white/50">
-                                          <div className="w-2.5 h-2.5 bg-white rounded-full"></div>
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="flex flex-col gap-1.5">
-                                      {job.isFeatured && (
-                                        <Badge className="bg-gradient-to-r from-amber-500/90 to-orange-500/90 text-white border-none text-xs px-3 py-1.5 shadow-sm font-semibold flex items-center gap-1">
-                                          <Sparkles className="w-3 h-3" />
-                                          NỔI BẬT
-                                        </Badge>
-                                      )}
-                                      {job.isUrgent && (
-                                        <Badge className="bg-gradient-to-r from-emerald-500/90 to-emerald-600/90 text-white border-none text-xs px-3 py-1.5 shadow-sm font-semibold flex items-center gap-1">
-                                          <TrendingUp className="w-3 h-3" />
-                                          TOP
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  {/* Job title and company */}
-                                  <div className="mb-4">
-                                    <h3 className="font-bold text-slate-900 group-hover:text-[oklch(0.60_0.12_195)] cursor-pointer line-clamp-2 text-base mb-2 transition-colors duration-300">
-                                      <Link
-                                        href={`/jobs/${job.id}`}
-                                        className="hover:underline decoration-2 underline-offset-2"
-                                      >
-                                        {job.title}
-                                      </Link>
-                                    </h3>
-                                    <p className="text-sm font-medium text-slate-600 line-clamp-1">
-                                      {job.companyId?.name || "Nhà tuyển dụng"}
-                                    </p>
-                                  </div>
-
-                                  {/* Salary and location tags */}
-                                  <div className="flex flex-wrap gap-2 mb-4">
-                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200/60 backdrop-blur-sm transition-all duration-300 group-hover:bg-[oklch(0.60_0.12_195/.08)] group-hover:border-[oklch(0.60_0.12_195/.2)] group-hover:text-[oklch(0.50_0.12_195)]">
-                                      <DollarSign className="w-3.5 h-3.5" />
-                                      {job.salaryRange || "Thỏa thuận"}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-slate-900 truncate">
+                                    {job.title}
+                                  </p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-xs text-slate-600 truncate">
+                                      {companyName}
                                     </span>
-                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200/60 backdrop-blur-sm transition-all duration-300 group-hover:bg-[oklch(0.60_0.12_195/.08)] group-hover:border-[oklch(0.60_0.12_195/.2)] group-hover:text-[oklch(0.50_0.12_195)]">
-                                      <MapPin className="w-3.5 h-3.5" />
-                                      {job.city || "Đang cập nhật"}
+                                    <span className="text-xs text-slate-400">
+                                      •
                                     </span>
-                                  </div>
-
-                                  {/* Bottom section with save button */}
-                                  <div className="flex justify-end pt-3 border-t border-slate-200/50">
-                                    <div onClick={(e) => e.stopPropagation()}>
-                                      <SaveJobButton
-                                        jobId={job.id}
-                                        variant="ghost"
-                                        size="sm"
-                                        showText={false}
-                                        className="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200/60 hover:bg-[oklch(0.60_0.12_195/.1)] hover:border-[oklch(0.60_0.12_195/.3)] transition-all duration-300 hover:scale-110 shadow-sm"
-                                      />
-                                    </div>
+                                    <span className="text-xs text-slate-600 truncate">
+                                      {location}
+                                    </span>
                                   </div>
                                 </div>
                               </div>
-                            </Col>
-                          );
-                        })}
-                      </Row>
-
-                      {/* Pagination */}
-                      <div className="mt-10 flex justify-center items-center gap-4">
-                        <button
-                          onClick={() => handlePageChange(currentPage - 1)}
-                          disabled={currentPage === 1}
-                          className="w-10 h-10 rounded-xl bg-white/80 border border-slate-200/60 backdrop-blur-sm flex items-center justify-center hover:bg-white hover:border-[oklch(0.60_0.12_195/.3)] hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-300 hover:scale-105 shadow-sm"
-                        >
-                          <svg
-                            className="w-5 h-5 text-[oklch(0.60_0.12_195)]"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15 19l-7-7 7-7"
-                            />
-                          </svg>
-                        </button>
-
-                        <div className="px-6 py-2 rounded-xl bg-white/80 border border-slate-200/60 backdrop-blur-sm shadow-sm">
-                          <span className="text-sm font-semibold text-slate-700">
-                            Trang {currentPage} / {totalPages}
-                          </span>
-                        </div>
-
-                        <button
-                          onClick={() => handlePageChange(currentPage + 1)}
-                          disabled={currentPage >= totalPages}
-                          className="w-10 h-10 rounded-xl bg-white/80 border border-slate-200/60 backdrop-blur-sm flex items-center justify-center hover:bg-white hover:border-[oklch(0.60_0.12_195/.3)] hover:shadow-md disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-300 hover:scale-105 shadow-sm"
-                        >
-                          <svg
-                            className="w-5 h-5 text-[oklch(0.60_0.12_195)]"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M9 5l7 7-7 7"
-                            />
-                          </svg>
-                        </button>
+                              <Badge
+                                className="border-none flex-shrink-0"
+                                style={{
+                                  background: `oklch(0.60 0.12 195 / 0.15)`,
+                                  color: primaryColor,
+                                }}
+                              >
+                                Đã lưu
+                              </Badge>
+                            </div>
+                          </Link>
+                        );
+                      })
+                    ) : (
+                      <div className="text-center py-4 text-slate-500">
+                        Chưa có việc làm đã lưu
                       </div>
-                    </>
-                  )}
-                </div>
-              </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* CV Online */}
+              <Card className="border-white/40 bg-white/70 backdrop-blur-xl shadow-[0_20px_50px_rgba(15,45,95,0.08)]">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-slate-900">
+                      CV Online ({onlineCvs.length})
+                    </h3>
+                    <Link href="/my-cv/templates">
+                      <Button variant="ghost" size="sm">
+                        Xem tất cả
+                      </Button>
+                    </Link>
+                  </div>
+                  <div className="space-y-3">
+                    {loading ? (
+                      <div className="text-center py-4 text-slate-500">
+                        Đang tải...
+                      </div>
+                    ) : onlineCvs.length > 0 ? (
+                      onlineCvs.map((cv) => (
+                        <Link
+                          key={cv.resumeId}
+                          href={`/my-cv/new?template=${cv.templateId}&resumeId=${cv.resumeId}`}
+                          className="block"
+                        >
+                          <div
+                            className="flex items-center justify-between p-3 rounded-lg transition-colors hover:shadow-md"
+                            style={{
+                              background:
+                                "linear-gradient(135deg, oklch(0.60 0.12 195 / 0.08) 0%, transparent 70%)",
+                            }}
+                          >
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <FileText
+                                className="w-5 h-5 flex-shrink-0"
+                                style={{ color: primaryColor }}
+                              />
+                              <span className="text-sm font-medium text-slate-700 truncate">
+                                {cv.templateName}
+                              </span>
+                            </div>
+                            <Badge
+                              className="border-none flex-shrink-0"
+                              style={{
+                                background: `oklch(0.60 0.12 195 / 0.15)`,
+                                color: primaryColor,
+                              }}
+                            >
+                              Online
+                            </Badge>
+                          </div>
+                        </Link>
+                      ))
+                    ) : (
+                      <div className="text-center py-4 text-slate-500">
+                        Chưa có CV online.{" "}
+                        <Link
+                          href="/my-cv/templates"
+                          className="hover:underline"
+                          style={{ color: primaryColor }}
+                        >
+                          Tạo CV mới
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
-            {/* Right Sidebar */}
-            <div className="lg:col-span-1">
-              {/* Ads */}
-              <div className="space-y-6">
-                <div className="group relative overflow-hidden rounded-3xl border border-slate-200/60 bg-white/80 shadow-[0_20px_50px_rgba(15,45,95,0.08)] backdrop-blur-xl transition-all duration-700 ease-out hover:-translate-y-1.5 hover:shadow-[0_28px_65px_rgba(15,45,95,0.12)] hover:border-[oklch(0.60_0.12_195/.2)]">
-                  <div className="p-4">
-                    <img
-                      src="/job-recruitment-celebration.png"
-                      alt="Job advertisement"
-                      className="w-full rounded-2xl"
-                    />
-                  </div>
-                </div>
-
-                <div className="group relative overflow-hidden rounded-3xl border border-slate-200/60 bg-white/80 shadow-[0_20px_50px_rgba(15,45,95,0.08)] backdrop-blur-xl transition-all duration-700 ease-out hover:-translate-y-1.5 hover:shadow-[0_28px_65px_rgba(15,45,95,0.12)] hover:border-[oklch(0.60_0.12_195/.2)]">
-                  <div className="p-4">
-                    <img
-                      src="/hr-recruitment-banner.png"
-                      alt="HR recruitment"
-                      className="w-full rounded-2xl"
-                    />
-                  </div>
-                </div>
-
-                {/* Job Stats */}
-                <div className="relative overflow-hidden rounded-3xl border border-slate-200/60 shadow-[0_25px_60px_rgba(16,60,120,0.15)] backdrop-blur-xl transition-all duration-700 hover:shadow-[0_30px_70px_rgba(16,60,120,0.2)]">
-                  <div
-                    className="p-8 text-center text-white relative"
-                    style={{
-                      background: `linear-gradient(135deg, oklch(0.60 0.12 195) 0%, oklch(0.72 0.08 210) 55%, oklch(0.88 0.03 195) 100%)`,
-                    }}
-                  >
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,oklch(0.60_0.12_195/.2)_0%,transparent_70%)]" />
-                    <div className="relative">
-                      <div className="text-5xl font-bold mb-3 drop-shadow-lg">
-                        500+
-                      </div>
-                      <div className="text-base mb-8 opacity-95 font-medium">
-                        VIỆC LÀM PHÙ HỢP
-                        <br />
-                        THU NHẬP CAO TẠI ĐÂY
-                      </div>
-                      <div className="space-y-3 text-sm mb-8 text-left">
-                        <div className="flex items-center">
-                          <span className="mr-3 text-xl">✓</span>
-                          <span>Nhận việc phù hợp qua email</span>
-                        </div>
-                        <div className="flex items-center">
-                          <span className="mr-3 text-xl">✓</span>
-                          <span>Nhận thông báo nhà tuyển dụng xem hồ sơ</span>
-                        </div>
-                        <div className="flex items-center">
-                          <span className="mr-3 text-xl">✓</span>
-                          <span>Nhận việc làm vip</span>
-                        </div>
-                      </div>
-                      <Button className="bg-white text-[oklch(0.60_0.12_195)] hover:bg-white/95 font-bold w-full transition-all duration-300 hover:scale-[1.02] hover:shadow-xl shadow-lg rounded-xl py-6 text-base">
-                        NHẬN PHÍA NGAY
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            {/* Right Column - Sidebar Navigation */}
+            <div className="lg:col-span-3">
+              <Card className="border-white/40 bg-white/70 backdrop-blur-xl shadow-[0_20px_50px_rgba(15,45,95,0.08)]">
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                    Quản Lý Chung
+                  </h3>
+                  <nav className="space-y-2">
+                    <Link
+                      href="/profile"
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-[oklch(0.60_0.12_195/.08)] transition-colors"
+                    >
+                      <User
+                        className="w-5 h-5"
+                        style={{ color: primaryColor }}
+                      />
+                      <span className="text-sm font-medium text-slate-700">
+                        Quản Lý Thông Tin
+                      </span>
+                    </Link>
+                    <Link
+                      href="/my-cv"
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-[oklch(0.60_0.12_195/.08)] transition-colors"
+                    >
+                      <FileText
+                        className="w-5 h-5"
+                        style={{ color: primaryColor }}
+                      />
+                      <span className="text-sm font-medium text-slate-700">
+                        Quản Lý CV
+                      </span>
+                    </Link>
+                    <Link
+                      href="/notifications"
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-[oklch(0.60_0.12_195/.08)] transition-colors relative"
+                    >
+                      <Bell
+                        className="w-5 h-5"
+                        style={{ color: primaryColor }}
+                      />
+                      <span className="text-sm font-medium text-slate-700">
+                        Quản Lý Thông Báo
+                      </span>
+                      {unreadNotifications > 0 && (
+                        <span className="ml-auto w-6 h-6 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-semibold">
+                          {unreadNotifications}
+                        </span>
+                      )}
+                    </Link>
+                    <Link
+                      href="/applied-jobs"
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-[oklch(0.60_0.12_195/.08)] transition-colors"
+                    >
+                      <CheckCircle2
+                        className="w-5 h-5"
+                        style={{ color: primaryColor }}
+                      />
+                      <span className="text-sm font-medium text-slate-700">
+                        Việc Làm Đã Ứng Tuyển
+                      </span>
+                    </Link>
+                    <Link
+                      href="/profile"
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-[oklch(0.60_0.12_195/.08)] transition-colors"
+                    >
+                      <Settings
+                        className="w-5 h-5"
+                        style={{ color: primaryColor }}
+                      />
+                      <span className="text-sm font-medium text-slate-700">
+                        Quản Lý Thông Tin Tài Khoản
+                      </span>
+                    </Link>
+                  </nav>
+                </CardContent>
+              </Card>
             </div>
           </div>
         </div>
       </div>
-    </PageLayout>
+    </div>
   );
 }

@@ -83,9 +83,9 @@ class CandidateService {
   // Upload CV (without parsing)
   async uploadCV(formData: FormData, userId?: string): Promise<CVResponse> {
     const endpoint = userId
-      ? `/candidates/${userId}/resume`
-      : "/candidates/me/resume";
-    // Add action to formData
+      ? `/candidates/${userId}/resume?action=upload`
+      : "/candidates/me/resume?action=upload";
+    // Add action to formData as well (for multer to read from req.body)
     formData.append("action", "upload");
     return apiClient.post<CVResponse>(endpoint, formData);
   }
@@ -96,9 +96,9 @@ class CandidateService {
     userId?: string
   ): Promise<CVResponse> {
     const endpoint = userId
-      ? `/candidates/${userId}/resume`
-      : "/candidates/me/resume";
-    // Add action to formData
+      ? `/candidates/${userId}/resume?action=parse`
+      : "/candidates/me/resume?action=parse";
+    // Add action to formData as well (for multer to read from req.body)
     formData.append("action", "parse");
     return apiClient.post<CVResponse>(endpoint, formData);
   }
