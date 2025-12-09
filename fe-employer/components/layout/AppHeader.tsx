@@ -415,8 +415,9 @@ export default function AppHeader() {
     return null;
   }
 
+  // If không lấy được permissions (lỗi mạng/endpoint), mặc định không chặn UI để tránh ẩn nhầm.
   const can = (perm: keyof typeof teamPermissions) =>
-    isOwner || (teamPermissions && teamPermissions[perm]);
+    isOwner || teamPermissions == null || teamPermissions[perm];
 
   return (
     <header className="bg-slate-800 text-white px-6 py-3">

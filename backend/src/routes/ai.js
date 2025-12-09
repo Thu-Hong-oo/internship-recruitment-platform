@@ -657,4 +657,38 @@ router.post(
  */
 router.post('/batch-analyze', aiController.batchAnalyzeApplications);
 
+// ============================================
+// NAVIGATION INTENT RECOGNITION (DIALOGFLOW)
+// ============================================
+
+/**
+ * @swagger
+ * /api/ai/navigate-intent:
+ *   post:
+ *     summary: Recognize navigation intent from natural language using Dialogflow
+ *     tags: [AI - Navigation]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - input
+ *             properties:
+ *               input:
+ *                 type: string
+ *                 example: "tôi muốn tìm các job ở sài gòn"
+ *               frontend:
+ *                 type: string
+ *                 enum: [fe, fe-employer]
+ *                 default: fe
+ *     responses:
+ *       200:
+ *         description: Intent recognized successfully
+ */
+router.post('/navigate-intent', aiController.recognizeNavigationIntent);
+
 module.exports = router;

@@ -42,12 +42,24 @@ import {
   cancelInvitation,
   removeMember,
   updateMember,
+  getTeamStats,
+  getTeamActivity,
   TeamMember,
   TeamRole,
   MemberStatus,
 } from "@/lib/teamAPI";
 import { useToast } from "@/hooks/use-toast";
-import { MoreHorizontal, UserPlus, Mail, CheckCircle, XCircle } from "lucide-react";
+import {
+  MoreHorizontal,
+  UserPlus,
+  Mail,
+  CheckCircle,
+  XCircle,
+  Activity,
+  Users,
+  Clock3,
+  UserCheck,
+} from "lucide-react";
 
 const ROLE_LABELS: Record<TeamRole, string> = {
   admin: "Admin",
@@ -76,6 +88,18 @@ export default function TeamMembersPage() {
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
+  const [stats, setStats] = useState<{
+    total: number;
+    active: number;
+    pending: number;
+    suspended: number;
+    invitesLast7d: number;
+    joinsLast7d: number;
+    companyName?: string;
+  } | null>(null);
+  const [activities, setActivities] = useState<
+    Array<{ type: string; email?: string; role?: string; at: string; status?: string }>
+  >([]);
   const { toast } = useToast();
 
   const loadMembers = async () => {
@@ -98,8 +122,23 @@ export default function TeamMembersPage() {
     }
   };
 
+  const loadStatsAndActivity = async () => {
+    try {
+      const [statsRes, activityRes] = await Promise.all([getTeamStats(), getTeamActivity()]);
+      if (statsRes.success && statsRes.data) {
+        setStats(statsRes.data);
+      }
+      if (activityRes.success && activityRes.data) {
+        setActivities(activityRes.data.activities || []);
+      }
+    } catch {
+      // silent fail
+    }
+  };
+
   useEffect(() => {
     loadMembers();
+    loadStatsAndActivity();
   }, []);
 
   const handleCancelInvitation = async (member: TeamMember) => {
@@ -178,8 +217,9 @@ export default function TeamMembersPage() {
     });
   };
 
-  const pendingCount = members.filter((m) => m.status === "pending").length;
-  const activeCount = members.filter((m) => m.status === "active").length;
+  const pendingCount = stats?.pending ?? members.filter((m) => m.status === "pending").length;
+  const activeCount = stats?.active ?? members.filter((m) => m.status === "active").length;
+  const totalCount = stats?.total ?? members.length;
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -196,11 +236,14 @@ export default function TeamMembersPage() {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3 mb-6">
+      <div className="grid gap-4 md:grid-cols-4 mb-6">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription>Tổng thành viên</CardDescription>
-            <CardTitle className="text-3xl">{members.length}</CardTitle>
+            <CardTitle className="text-3xl flex items-center gap-2">
+              <Users className="h-5 w-5 text-slate-500" />
+              {totalCount}
+            </CardTitle>
           </CardHeader>
         </Card>
         <Card>
@@ -213,6 +256,19 @@ export default function TeamMembersPage() {
           <CardHeader className="pb-2">
             <CardDescription>Chờ chấp nhận</CardDescription>
             <CardTitle className="text-3xl text-yellow-600">{pendingCount}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Tuần này</CardDescription>
+            <CardTitle className="text-lg flex flex-col gap-1">
+              <span className="text-sm text-slate-600 flex items-center gap-2">
+                <Mail className="h-4 w-4" /> Mời: {stats?.invitesLast7d ?? "-"}
+              </span>
+              <span className="text-sm text-slate-600 flex items-center gap-2">
+                <UserCheck className="h-4 w-4" /> Tham gia: {stats?.joinsLast7d ?? "-"}
+              </span>
+            </CardTitle>
           </CardHeader>
         </Card>
       </div>
@@ -362,6 +418,45 @@ export default function TeamMembersPage() {
           )}
         </CardContent>
       </Card>
+
+      <div className="grid gap-4 md:grid-cols-2 mt-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Hoạt động gần đây</CardTitle>
+            <CardDescription>Các sự kiện mời / tham gia</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {activities.length === 0 ? (
+              <div className="text-sm text-muted-foreground">Chưa có hoạt động.</div>
+            ) : (
+              <ul className="space-y-3">
+                {activities.slice(0, 10).map((act, idx) => (
+                  <li key={idx} className="flex items-start gap-3">
+                    <div className="mt-0.5">
+                      {act.type === "invite" ? (
+                        <Mail className="h-4 w-4 text-blue-500" />
+                      ) : (
+                        <UserCheck className="h-4 w-4 text-green-600" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-sm">
+                        {act.type === "invite" ? "Mời" : "Tham gia"}:{" "}
+                        <span className="font-medium">{act.email || "N/A"}</span>{" "}
+                        {act.role && <Badge variant="outline">{act.role}</Badge>}
+                      </div>
+                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock3 className="h-3 w-3" />
+                        {formatDate(act.at)}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <InviteMemberModal
         open={inviteModalOpen}
