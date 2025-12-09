@@ -87,6 +87,9 @@ class AIController {
 
     // Batch Operations
     this.batchAnalyzeApplications = this.batchAnalyzeApplications.bind(this);
+    
+    // Navigation Intent Recognition (Dialogflow)
+    this.recognizeNavigationIntent = this.recognizeNavigationIntent.bind(this);
   }
 
   // ========================================
@@ -2063,6 +2066,109 @@ class AIController {
     if (education?.highSchool) allEdu.push(education.highSchool);
     return allEdu;
   }
+
+  // ========================================
+  // NAVIGATION INTENT RECOGNITION (DIALOGFLOW)
+  // ========================================
+
+  /**
+   * Recognize navigation intent từ natural language input
+   * Sử dụng Dialogflow CX với fallback rule-based
+   * 
+   * @swagger
+   * /api/ai/navigate-intent:
+   *   post:
+   *     summary: Recognize navigation intent from natural language (Dialogflow)
+   *     tags: [AI - Navigation]
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - input
+   *             properties:
+   *               input:
+   *                 type: string
+   *                 example: "tôi muốn tìm các job ở sài gòn"
+   *               frontend:
+   *                 type: string
+   *                 enum: [fe, fe-employer]
+   *                 default: fe
+   *               sessionId:
+   *                 type: string
+   *                 description: Optional session ID for Dialogflow context
+   *     responses:
+   *       200:
+   *         description: Intent recognized successfully
+   *       400:
+   *         description: Invalid input
+   */
+  recognizeNavigationIntent = asyncHandler(async (req, res) => {
+    const { input, frontend = 'fe', sessionId } = req.body;
+
+    if (!input || typeof input !== 'string' || input.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Input is required and must be a non-empty string'
+      });
+    }
+
+    try {
+      const dialogflowIntentService = require('../services/ai/dialogflowIntentService');
+      const navigationService = require('../services/ai/navigationService');
+
+      // Recognize intent với Dialogflow (hoặc fallback)
+      const intentResult = await dialogflowIntentService.recognizeIntent(
+        input.trim(),
+        frontend,
+        sessionId || `session-${req.user?.id || 'anonymous'}-${Date.now()}`
+      );
+
+      if (!intentResult.success) {
+        return res.status(200).json({
+          success: false,
+          error: intentResult.error || 'Could not recognize intent',
+          suggestions: intentResult.suggestions || [
+            'Tìm việc làm',
+            'Tạo CV online',
+            'Xem thông tin cá nhân',
+            'Về trang chủ'
+          ],
+          originalInput: input
+        });
+      }
+
+      // Build navigation URL từ intent + parameters
+      const navigation = navigationService.buildNavigationUrl(
+        intentResult.intent,
+        intentResult.parameters || {},
+        frontend
+      );
+
+      res.json({
+        success: true,
+        intent: intentResult.intent,
+        route: navigation.route,
+        url: navigation.url,
+        params: navigation.params,
+        confidence: intentResult.confidence || 0.8,
+        method: intentResult.method || 'unknown',
+        fulfillmentText: intentResult.fulfillmentText,
+        originalInput: input
+      });
+    } catch (error) {
+      logger.error('❌ Navigation intent recognition error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+        message: error.message
+      });
+    }
+  });
 }
 
 module.exports = new AIController();

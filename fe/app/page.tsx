@@ -30,11 +30,11 @@ import { api } from "@/lib/api";
 import { savedJobService } from "@/lib/api";
 import type { SavedJob } from "@/lib/api/services/savedJob.service";
 import { getNotifications } from "@/lib/notificationAPI";
+import { AINavigationInput } from "@/components/ai/AINavigationInput";
 
 export default function DashboardPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const [searchQuery, setSearchQuery] = useState("");
   const [matchRate, setMatchRate] = useState(75);
   const [cvCount, setCvCount] = useState(2);
   const [appliedJobsCount, setAppliedJobsCount] = useState(3);
@@ -148,15 +148,6 @@ export default function DashboardPage() {
     fetchDashboardData();
   }, [router]);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-    } else {
-      router.push("/search");
-    }
-  };
-
   const userName = user?.fullName || user?.firstName || "Ứng Viên";
 
   // Calculate progress circle
@@ -180,17 +171,14 @@ export default function DashboardPage() {
               </span>
             </Link>
 
-            {/* Search Bar */}
-            <form onSubmit={handleSearch} className="flex-1 max-w-2xl relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-              <Input
-                type="text"
-                placeholder="Type vào hành động bạn muốn làm..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-10 h-11 w-full bg-white/80 border-slate-200/60 backdrop-blur-sm"
+            {/* AI Navigation Input */}
+            <div className="flex-1 max-w-2xl">
+              <AINavigationInput
+                frontend="fe"
+                placeholder="Nhập hoặc nói điều bạn muốn làm... (ví dụ: tìm việc IT ở Sài Gòn, về trang chủ)"
+                className="w-full"
               />
-            </form>
+            </div>
 
             {/* Settings Icon */}
             <Button
@@ -298,7 +286,7 @@ export default function DashboardPage() {
                       Độ Phù Hợp
                     </p>
                   </div>
-                  <div 
+                  <div
                     onClick={() => router.push("/search")}
                     className="flex items-center space-x-2 text-[oklch(0.60_0.12_195)] hover:text-[oklch(0.55_0.12_195)] cursor-pointer transition-all duration-300 group"
                   >
@@ -311,6 +299,7 @@ export default function DashboardPage() {
 
             {/* Middle Column - Job Applications & Submitted CVs */}
             <div className="lg:col-span-6 space-y-6">
+
               {/* Saved Jobs Waiting */}
               <Card className="border-white/40 bg-white/70 backdrop-blur-xl shadow-[0_20px_50px_rgba(15,45,95,0.08)]">
                 <CardContent className="p-6">
