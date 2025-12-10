@@ -32,6 +32,14 @@ class SentenceBertService {
    */
   async _checkAvailability() {
     try {
+      // Check if Python script exists first
+      const fs = require('fs');
+      if (!fs.existsSync(this.pythonScript)) {
+        logger.warn(`⚠️ Sentence-BERT script not found: ${this.pythonScript}`);
+        this.isAvailable = false;
+        return;
+      }
+
       const result = await this._runPython(['--check']);
       this.isAvailable = result.success;
       
@@ -198,11 +206,31 @@ class SentenceBertService {
    */
   _runPython(args) {
     return new Promise((resolve, reject) => {
-      // Try python3 first, then python
-      // In Alpine Linux (Docker), python3 is available
-      const pythonCmd = process.env.PYTHON_CMD || 'python3';
+      // Check if Python script exists
+      const fs = require('fs');
+      if (!fs.existsSync(this.pythonScript)) {
+        logger.error(`❌ Python script not found: ${this.pythonScript}`);
+        return reject(new Error(`Python script not found: ${this.pythonScript}`));
+      }
+
+      // Detect Python command based on OS
+      // Windows: try 'python' or 'py', Linux/Mac: try 'python3' then 'python'
+      let pythonCmd = process.env.PYTHON_CMD;
+      if (!pythonCmd) {
+        if (process.platform === 'win32') {
+          // Windows: try 'python' first, then 'py' launcher
+          pythonCmd = 'python';
+        } else {
+          // Linux/Mac: try 'python3' first
+          pythonCmd = 'python3';
+        }
+      }
+      
+      logger.debug(`🔍 Running: ${pythonCmd} ${this.pythonScript} ${args.join(' ')}`);
+      
       const pythonProcess = spawn(pythonCmd, [this.pythonScript, ...args], {
-        env: { ...process.env, PYTHONUNBUFFERED: '1' }
+        env: { ...process.env, PYTHONUNBUFFERED: '1' },
+        shell: process.platform === 'win32' // Use shell on Windows for better command resolution
       });
       
       let stdout = '';
@@ -216,44 +244,63 @@ class SentenceBertService {
         stderr += data.toString();
       });
 
-      pythonProcess.on('close', (code) => {
-        if (code !== 0) {
-          // Don't log full error if it's just Python not found
-          if (code === 127 || stderr.includes('command not found') || stderr.includes('ENOENT')) {
-            logger.warn('⚠️ Python not found. Sentence-BERT will be unavailable.');
-          } else {
-            logger.error('Python script error:', stderr.substring(0, 200)); // Limit error length
-          }
-          return reject(new Error(stderr || `Python script exited with code ${code}`));
-        }
-
-        try {
-          const result = JSON.parse(stdout);
-          resolve(result);
-        } catch (error) {
-          reject(new Error(`Failed to parse Python output: ${stdout.substring(0, 200)}`));
-        }
-      });
-
-      pythonProcess.on('error', (error) => {
-        // Don't log full error if Python not found
-        if (error.code === 'ENOENT') {
-          logger.warn('⚠️ Python not found. Sentence-BERT will be unavailable.');
-        } else {
-          logger.error('❌ Python process error:', error.message);
-        }
-        reject(new Error(`Failed to start Python process: ${error.message}`));
-      });
-
       // Timeout after 30 seconds (model is pre-warmed)
       const timeoutId = setTimeout(() => {
         pythonProcess.kill('SIGKILL');
         logger.error('⏱️ Sentence-BERT timeout after 30s');
         reject(new Error('Sentence-BERT timeout (30s)'));
       }, 30000);
-      
-      pythonProcess.on('close', () => {
+
+      pythonProcess.on('close', (code) => {
         clearTimeout(timeoutId);
+        
+        if (code !== 0) {
+          // Windows exit code 9009 = command not found
+          // Linux/Mac exit code 127 = command not found
+          const isCommandNotFound = code === 127 || code === 9009 || 
+            stderr.includes('command not found') || 
+            stderr.includes('ENOENT') ||
+            stderr.includes('is not recognized') ||
+            stderr.includes('cannot find');
+            
+          if (isCommandNotFound) {
+            logger.warn(`⚠️ Python not found (code ${code}, command: ${pythonCmd}). Sentence-BERT will be unavailable.`);
+            if (process.platform === 'win32' && pythonCmd === 'python') {
+              logger.info(`💡 Tip: Try installing Python or use 'py' launcher. Set PYTHON_CMD environment variable if Python is installed.`);
+            }
+          } else {
+            // Log more details for debugging
+            const errorMsg = stderr || stdout || `Python script exited with code ${code}`;
+            logger.error(`❌ Python script error (code ${code}):`, errorMsg.substring(0, 500));
+            logger.error(`   Command: ${pythonCmd} ${this.pythonScript} ${args.join(' ')}`);
+            logger.error(`   Script path: ${this.pythonScript}`);
+            logger.error(`   Script exists: ${fs.existsSync(this.pythonScript)}`);
+            if (stdout) logger.error(`   stdout: ${stdout.substring(0, 200)}`);
+          }
+          return reject(new Error(stderr || stdout || `Python script exited with code ${code}`));
+        }
+
+        try {
+          const result = JSON.parse(stdout);
+          resolve(result);
+        } catch (error) {
+          logger.error(`❌ Failed to parse Python output. stdout: ${stdout.substring(0, 200)}`);
+          logger.error(`   stderr: ${stderr.substring(0, 200)}`);
+          reject(new Error(`Failed to parse Python output: ${stdout.substring(0, 200)}`));
+        }
+      });
+
+      pythonProcess.on('error', (error) => {
+        clearTimeout(timeoutId);
+        // Don't log full error if Python not found
+        if (error.code === 'ENOENT') {
+          logger.warn(`⚠️ Python not found (${pythonCmd}). Sentence-BERT will be unavailable.`);
+        } else {
+          logger.error(`❌ Python process error: ${error.message}`);
+          logger.error(`   Command: ${pythonCmd}`);
+          logger.error(`   Script: ${this.pythonScript}`);
+        }
+        reject(new Error(`Failed to start Python process: ${error.message}`));
       });
     });
   }
