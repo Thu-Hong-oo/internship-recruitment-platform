@@ -46,9 +46,15 @@ class SentenceBertService {
         }
       } else {
         logger.warn('⚠️ Sentence-BERT model not available. Run: pip install sentence-transformers');
+        this.isAvailable = false;
       }
     } catch (error) {
-      logger.error('❌ Sentence-BERT check failed:', error.message);
+      // Don't log full error if Python not found (expected on some systems)
+      if (error.message.includes('ENOENT') || error.message.includes('command not found') || error.message.includes('Failed to start Python')) {
+        logger.warn('⚠️ Sentence-BERT unavailable (Python not found). System will use fallback methods.');
+      } else {
+        logger.warn('⚠️ Sentence-BERT check failed:', error.message.substring(0, 100));
+      }
       this.isAvailable = false;
     }
   }
@@ -63,6 +69,10 @@ class SentenceBertService {
       throw new Error('Invalid text input');
     }
 
+    if (!this.isAvailable) {
+      throw new Error('Sentence-BERT not available');
+    }
+
     try {
       const result = await this._runPython(['--encode', text]);
       
@@ -72,7 +82,7 @@ class SentenceBertService {
 
       return result.embedding; // Array of 768 floats
     } catch (error) {
-      logger.error('❌ Sentence-BERT encoding error:', error.message);
+      logger.warn('⚠️ Sentence-BERT encoding error:', error.message.substring(0, 100));
       throw error;
     }
   }
@@ -188,7 +198,12 @@ class SentenceBertService {
    */
   _runPython(args) {
     return new Promise((resolve, reject) => {
-      const pythonProcess = spawn('python', [this.pythonScript, ...args]);
+      // Try python3 first, then python
+      // In Alpine Linux (Docker), python3 is available
+      const pythonCmd = process.env.PYTHON_CMD || 'python3';
+      const pythonProcess = spawn(pythonCmd, [this.pythonScript, ...args], {
+        env: { ...process.env, PYTHONUNBUFFERED: '1' }
+      });
       
       let stdout = '';
       let stderr = '';
@@ -203,7 +218,12 @@ class SentenceBertService {
 
       pythonProcess.on('close', (code) => {
         if (code !== 0) {
-          logger.error('Python script error:', stderr);
+          // Don't log full error if it's just Python not found
+          if (code === 127 || stderr.includes('command not found') || stderr.includes('ENOENT')) {
+            logger.warn('⚠️ Python not found. Sentence-BERT will be unavailable.');
+          } else {
+            logger.error('Python script error:', stderr.substring(0, 200)); // Limit error length
+          }
           return reject(new Error(stderr || `Python script exited with code ${code}`));
         }
 
@@ -211,12 +231,17 @@ class SentenceBertService {
           const result = JSON.parse(stdout);
           resolve(result);
         } catch (error) {
-          reject(new Error(`Failed to parse Python output: ${stdout}`));
+          reject(new Error(`Failed to parse Python output: ${stdout.substring(0, 200)}`));
         }
       });
 
       pythonProcess.on('error', (error) => {
-        logger.error('❌ Python process error:', error.message);
+        // Don't log full error if Python not found
+        if (error.code === 'ENOENT') {
+          logger.warn('⚠️ Python not found. Sentence-BERT will be unavailable.');
+        } else {
+          logger.error('❌ Python process error:', error.message);
+        }
         reject(new Error(`Failed to start Python process: ${error.message}`));
       });
 

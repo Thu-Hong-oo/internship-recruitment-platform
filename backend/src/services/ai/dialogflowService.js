@@ -99,21 +99,30 @@ class DialogflowService {
       if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
         const credentialsValue = process.env.GOOGLE_APPLICATION_CREDENTIALS.trim();
         
-        // Check if it's JSON content (starts with {)
-        if (credentialsValue.startsWith('{')) {
+        // Check if it's JSON content (starts with { after trimming)
+        const trimmedValue = credentialsValue.replace(/^\s+|\s+$/g, '');
+        const isJsonContent = trimmedValue.startsWith('{') && trimmedValue.endsWith('}');
+        
+        if (isJsonContent) {
           try {
             // It's JSON content, parse and create temp file
             const fs = require('fs');
             const path = require('path');
             const os = require('os');
             
-            // Validate JSON
-            JSON.parse(credentialsValue);
+            // Validate and parse JSON (handle newlines, spaces, etc.)
+            const parsedJson = JSON.parse(trimmedValue);
+            
+            // Validate it's a service account JSON
+            if (!parsedJson.type || parsedJson.type !== 'service_account') {
+              throw new Error('Invalid service account JSON format');
+            }
             
             const tempDir = os.tmpdir();
-            const tempCredentialsPath = path.join(tempDir, 'google-credentials.json');
+            const tempCredentialsPath = path.join(tempDir, `google-credentials-${Date.now()}.json`);
             
-            fs.writeFileSync(tempCredentialsPath, credentialsValue, 'utf8');
+            // Write JSON to temp file (pretty print for readability)
+            fs.writeFileSync(tempCredentialsPath, JSON.stringify(parsedJson, null, 2), 'utf8');
             
             this.client = new SessionsClient({
               keyFilename: tempCredentialsPath
