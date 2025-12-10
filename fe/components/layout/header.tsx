@@ -116,17 +116,23 @@ export default function Header() {
   // Fetch industries on mount
   useEffect(() => {
     const fetchIndustries = async () => {
+      // Chỉ fetch khi đã ở client-side
+      if (typeof window === "undefined") return;
+      
       try {
         setLoadingPositions(true);
         const data = await industriesAPI.getRootIndustries();
         setJobPositions(data);
       } catch (error) {
-        console.error("Failed to fetch industries:", error);
+        // Chỉ log error, không throw để tránh crash app
+        console.warn("Failed to fetch industries:", error);
         setJobPositions([]);
       } finally {
         setLoadingPositions(false);
       }
     };
+    
+    // Chỉ fetch khi component đã mount trên client
     fetchIndustries();
   }, []);
 
