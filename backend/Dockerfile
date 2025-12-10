@@ -7,11 +7,14 @@ WORKDIR /app
 # Install build dependencies for native modules (sharp, etc.)
 # Note: canvas has been removed from dependencies due to compilation issues
 # These are needed for node-gyp to compile native code
+# Also install Python and pip for Sentence-BERT service
 RUN apk add --no-cache \
     python3 \
+    py3-pip \
     make \
     g++ \
-    && ln -sf python3 /usr/bin/python
+    && ln -sf python3 /usr/bin/python \
+    && ln -sf pip3 /usr/bin/pip
 
 # Copy package files (default path backend, override by setting APP_PATH build-arg)
 COPY ${APP_PATH}/package*.json ./
@@ -25,10 +28,19 @@ RUN if [ -f package-lock.json ]; then \
       npm install --only=production --legacy-peer-deps; \
     fi
 
-# Remove build dependencies to reduce image size
+# Install Python dependencies for Sentence-BERT
+# sentence-transformers is required for RAG recommendations
+# Note: This may take a few minutes to download the model on first build
+# Using CPU-only torch to reduce image size
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir \
+    sentence-transformers \
+    numpy \
+    || (echo "⚠️ Python dependencies installation failed, Sentence-BERT may be unavailable" && exit 0)
+
+# Remove build dependencies to reduce image size (keep python3 and pip)
 RUN apk del make g++
 
-# Copy application files
 # Copy application files
 COPY ${APP_PATH}/. .
 
