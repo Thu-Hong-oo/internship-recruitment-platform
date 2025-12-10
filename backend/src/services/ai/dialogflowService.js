@@ -93,14 +93,68 @@ class DialogflowService {
         );
         return;
       }
-      if (!this.projectId || !this.agentId) {
-        logger.warn(
-          '⚠️ Dialogflow CX not configured: DIALOGFLOW_PROJECT_ID or DIALOGFLOW_AGENT_ID missing'
-        );
-        logger.info(
-          'ℹ️ System will use rule-based fallback for intent recognition'
-        );
-        return;
+      
+      // Initialize client with credentials
+      // Option 1: Use JSON credentials from environment variable (for Koyeb, local .env, etc.)
+      if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+        const credentialsValue = process.env.GOOGLE_APPLICATION_CREDENTIALS.trim();
+        
+        // Check if it's JSON content (starts with {)
+        if (credentialsValue.startsWith('{')) {
+          try {
+            // It's JSON content, parse and create temp file
+            const fs = require('fs');
+            const path = require('path');
+            const os = require('os');
+            
+            // Validate JSON
+            JSON.parse(credentialsValue);
+            
+            const tempDir = os.tmpdir();
+            const tempCredentialsPath = path.join(tempDir, 'google-credentials.json');
+            
+            fs.writeFileSync(tempCredentialsPath, credentialsValue, 'utf8');
+            
+            this.client = new SessionsClient({
+              keyFilename: tempCredentialsPath
+            });
+            
+            logger.info('✅ Dialogflow credentials loaded from GOOGLE_APPLICATION_CREDENTIALS (JSON content)');
+          } catch (error) {
+            logger.error('❌ Failed to parse GOOGLE_APPLICATION_CREDENTIALS as JSON:', error.message);
+            logger.warn('⚠️ Falling back to default credentials');
+            this.client = new SessionsClient();
+          }
+        } else {
+          // It's a file path
+          // Validate path (should not be empty)
+          if (!credentialsValue || credentialsValue.length < 3) {
+            logger.warn('⚠️ Invalid GOOGLE_APPLICATION_CREDENTIALS path. Using default credentials.');
+            this.client = new SessionsClient();
+          } else {
+            // Check if file exists
+            const fs = require('fs');
+            try {
+              if (fs.existsSync(credentialsValue)) {
+                this.client = new SessionsClient({
+                  keyFilename: credentialsValue
+                });
+                logger.info(`✅ Dialogflow credentials loaded from file: ${credentialsValue}`);
+              } else {
+                logger.warn(`⚠️ Credentials file not found: ${credentialsValue}. Using default credentials.`);
+                this.client = new SessionsClient();
+              }
+            } catch (error) {
+              logger.warn(`⚠️ Error checking credentials file: ${error.message}. Using default credentials.`);
+              this.client = new SessionsClient();
+            }
+          }
+        }
+      } 
+      // Option 2: Use default credentials (for Cloud Run, GCE, etc.)
+      else {
+        this.client = new SessionsClient();
+        logger.info('ℹ️ Using default Google Cloud credentials');
       }
       this.client = process.env.GOOGLE_APPLICATION_CREDENTIALS
         ? new SessionsClientCX({
@@ -205,11 +259,17 @@ class DialogflowService {
 
       return result;
     } catch (error) {
-      logger.error('❌ Dialogflow API error:', error);
+      // Don't log full error if it's just a file not found (credentials issue)
+      if (error.code === 'ENOENT') {
+        logger.warn('⚠️ Dialogflow credentials file not found. Check GOOGLE_APPLICATION_CREDENTIALS path.');
+        logger.info('ℹ️ System will use rule-based fallback for intent recognition');
+      } else {
+        logger.error('❌ Dialogflow API error:', error.message);
+      }
       return {
         success: false,
         error: error.message || 'Dialogflow API error',
-        details: error,
+        details: error.code === 'ENOENT' ? 'Credentials file not found' : error
       };
     }
   }
