@@ -1,5 +1,6 @@
 const { spawn } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 const { logger } = require('../utils/logger');
 
 /**
@@ -19,6 +20,23 @@ class MultilingualNERService {
     this.isReady = false;
     this.pendingRequests = new Map();
     this.requestId = 0;
+    this.isEnabled = process.env.ENABLE_MULTILINGUAL_NER !== 'false'; // Default: enabled
+    this.maxRestartAttempts = 5;
+    this.restartAttempts = 0;
+
+    // Check if service should be enabled
+    if (!this.isEnabled) {
+      logger.info('ℹ️ Multilingual NER service disabled (ENABLE_MULTILINGUAL_NER=false)');
+      return;
+    }
+
+    // Check if Python script exists
+    if (!fs.existsSync(this.pythonScript)) {
+      logger.warn(`⚠️ Multilingual NER Python script not found: ${this.pythonScript}`);
+      logger.warn('ℹ️ Multilingual NER service will be disabled. System will use fallback methods.');
+      this.isEnabled = false;
+      return;
+    }
 
     // Start persistent process immediately
     this.startPersistentProcess();
@@ -28,15 +46,33 @@ class MultilingualNERService {
    * Start persistent Python process
    */
   startPersistentProcess() {
+    if (!this.isEnabled) {
+      return;
+    }
+
     if (this.pythonProcess) {
       logger.warn('Multilingual NER process already running');
       return;
     }
 
-    logger.info('🚀 Starting Multilingual NER server (dslim/bert-base-NER)...');
+    // Check restart attempts
+    if (this.restartAttempts >= this.maxRestartAttempts) {
+      logger.error(`❌ Multilingual NER failed to start after ${this.maxRestartAttempts} attempts. Disabling service.`);
+      this.isEnabled = false;
+      return;
+    }
+
+    this.restartAttempts++;
+
+    logger.info(`🚀 Starting Multilingual NER server (dslim/bert-base-NER)... (attempt ${this.restartAttempts}/${this.maxRestartAttempts})`);
 
     try {
-      this.pythonProcess = spawn('python', [this.pythonScript]);
+      // Try python3 first, then python
+      const pythonCmd = process.env.PYTHON_CMD || 'python3';
+      this.pythonProcess = spawn(pythonCmd, [this.pythonScript], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env }
+      });
 
       let buffer = '';
 
@@ -97,16 +133,30 @@ class MultilingualNERService {
         });
         this.pendingRequests.clear();
 
-        // Auto-restart after 2 seconds
-        setTimeout(() => {
-          logger.info('♻️ Auto-restarting Multilingual NER server...');
-          this.startPersistentProcess();
-        }, 2000);
+        // Auto-restart after 2 seconds (only if enabled and within max attempts)
+        if (this.isEnabled && this.restartAttempts < this.maxRestartAttempts) {
+          setTimeout(() => {
+            logger.info('♻️ Auto-restarting Multilingual NER server...');
+            this.startPersistentProcess();
+          }, 2000);
+        } else if (this.restartAttempts >= this.maxRestartAttempts) {
+          logger.error(`❌ Multilingual NER failed after ${this.maxRestartAttempts} attempts. Service disabled.`);
+          logger.warn('ℹ️ System will use fallback methods for entity extraction.');
+          this.isEnabled = false;
+        }
       });
 
       this.pythonProcess.on('error', (error) => {
         logger.error('Failed to start Multilingual NER process:', error.message);
         this.isReady = false;
+        this.pythonProcess = null;
+        
+        // If Python not found, disable service
+        if (error.code === 'ENOENT') {
+          logger.error('❌ Python not found. Please install Python 3.7+ or set PYTHON_CMD environment variable.');
+          logger.warn('ℹ️ Multilingual NER service disabled. System will use fallback methods.');
+          this.isEnabled = false;
+        }
       });
 
     } catch (error) {
@@ -122,11 +172,16 @@ class MultilingualNERService {
    * @returns {Promise<Array>} - Extracted entities
    */
   async extractEntities(text, options = {}) {
+    // If service is disabled, return empty array
+    if (!this.isEnabled) {
+      return [];
+    }
+
     if (!this.isReady) {
       logger.warn('Multilingual NER server not ready yet, waiting...');
       await this.waitForReady(60000); // Wait up to 60s (model download may take time)
       if (!this.isReady) {
-        logger.error('Multilingual NER server failed to start');
+        logger.warn('Multilingual NER server not available, using fallback');
         return [];
       }
     }

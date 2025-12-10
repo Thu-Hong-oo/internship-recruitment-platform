@@ -18,6 +18,8 @@
 const { getJobMatchingService } = require('./jobMatchingService');
 const { getSentenceBertService } = require('./sentenceBertService');
 const { getEmbeddingCacheService } = require('./embeddingCacheService');
+const { getJobVectorIndexService } = require('./jobVectorIndexService');
+const { getCandidateVectorIndexService } = require('./candidateVectorIndexService');
 const { logger } = require('../../utils/logger');
 const CandidateProfile = require('../../models/CandidateProfile');
 const Job = require('../../models/Job');
@@ -27,6 +29,9 @@ class RAGRecommendationService {
     this.jobMatcher = getJobMatchingService();
     this.sentenceBert = getSentenceBertService();
     this.embeddingCache = getEmbeddingCacheService();
+    this.metricsService = getRAGMetricsService();
+    this.jobIndexService = getJobVectorIndexService();
+    this.candidateIndexService = getCandidateVectorIndexService();
     
     // Hybrid score weights
     this.hybridWeights = {
@@ -38,9 +43,22 @@ class RAGRecommendationService {
     this.config = {
       topKForRerank: 100,        // Re-rank top 100 từ weighted scoring
       semanticThreshold: 0.70,   // Minimum semantic similarity
-      enableCaching: true,       // Cache embeddings
+      enableCaching: true,        // Cache embeddings
       cacheTTL: 3600 * 24,       // 24 hours cache
-      maxDataAgeDays: 90         // Freshness guardrail
+      maxDataAgeDays: 90,        // Freshness guardrail
+      useChromaDB: process.env.USE_CHROMADB_FOR_RECOMMENDATIONS === 'true', // Feature flag
+      batchSize: 20              // Batch size for embedding generation
+    };
+
+    // Legacy metrics (for backward compatibility)
+    this.metrics = {
+      totalRequests: 0,
+      cacheHits: 0,
+      cacheMisses: 0,
+      chromaDBHits: 0,
+      chromaDBMisses: 0,
+      avgResponseTime: 0,
+      errors: 0
     };
   }
 
@@ -109,11 +127,19 @@ class RAGRecommendationService {
       }
 
       // STEP 2: RAG re-rank với semantic similarity
+      const startTime = Date.now();
       const rerankedResults = await this._rerankWithSemanticSimilarity(
         topK,
         candidates,
         job
       );
+      const responseTime = Date.now() - startTime;
+      
+      // Track metrics
+      this.metricsService.trackRecommendation('candidate', 'rag-hybrid', responseTime, {
+        recommendations: enrichedRecommendations,
+        totalCandidates: candidates.length
+      });
 
       // STEP 3: Filter và limit final results
       const finalRecommendations = rerankedResults
@@ -191,6 +217,8 @@ class RAGRecommendationService {
       return result;
     } catch (error) {
       logger.error('❌ RAG recommendation error:', error);
+      this.metrics.errors++;
+      this.metricsService.trackError('fallback', error);
       throw error;
     }
   }
@@ -262,10 +290,18 @@ class RAGRecommendationService {
       }
 
       // STEP 2: RAG re-rank với semantic similarity
+      const startTime = Date.now();
       const rerankedResults = await this._rerankJobsWithSemanticSimilarity(
         topK,
         candidate
       );
+      const responseTime = Date.now() - startTime;
+      
+      // Track metrics
+      this.metricsService.trackRecommendation('job', 'rag-hybrid', responseTime, {
+        recommendations: recommendations,
+        totalJobs: jobs.length
+      });
 
       // STEP 3: Format và return
       const recommendations = rerankedResults
@@ -302,67 +338,89 @@ class RAGRecommendationService {
 
   /**
    * Re-rank candidates với semantic similarity
+   * Optimized với batch processing và ChromaDB support
    */
   async _rerankWithSemanticSimilarity(weightedResults, candidates, job) {
     try {
       // Get or generate job embedding
       const jobEmbedding = await this._getJobEmbedding(job);
 
-      // Batch process candidates
-      const reranked = await Promise.all(
-        weightedResults.map(async (result) => {
-          const candidate = candidates.find(c => 
-            (c._id && c._id.toString() === result.candidateId.toString()) ||
-            (c.id && c.id.toString() === result.candidateId.toString())
+      // Try ChromaDB vector search first (if enabled and available)
+      if (this.config.useChromaDB) {
+        try {
+          const vectorSearchResults = await this.candidateIndexService.searchSimilarCandidates(
+            jobEmbedding,
+            {
+              topK: this.config.topKForRerank,
+              filters: {
+                availability: ['available', 'open_to_opportunities']
+              },
+              minScore: this.config.semanticThreshold
+            }
           );
 
-          if (!candidate) {
-            return result;
+          if (vectorSearchResults.length > 0) {
+            this.metrics.chromaDBHits++;
+            this.metricsService.trackChromaDB(true);
+            logger.debug(`✅ ChromaDB vector search found ${vectorSearchResults.length} candidates`);
+
+            // Map vector search results to weighted results
+            const vectorSearchMap = new Map();
+            vectorSearchResults.forEach(vs => {
+              vectorSearchMap.set(vs.candidateId, vs.similarity);
+            });
+
+            // Merge with weighted results
+            const reranked = weightedResults.map(result => {
+              const candidateId = result.candidateId.toString();
+              const semanticScore = vectorSearchMap.get(candidateId);
+
+              if (!semanticScore || semanticScore < this.config.semanticThreshold) {
+                return {
+                  ...result,
+                  semanticScore: semanticScore || 0,
+                  _semanticDropped: !semanticScore || semanticScore < this.config.semanticThreshold
+                };
+              }
+
+              // Hybrid score
+              const weightedScoreNormalized = result.matchScore / 100;
+              const hybridScore = (
+                weightedScoreNormalized * this.hybridWeights.weighted +
+                semanticScore * this.hybridWeights.semantic
+              );
+
+              return {
+                ...result,
+                matchScore: Math.round(hybridScore * 100),
+                tier: this._calculateTier(hybridScore),
+                semanticScore: semanticScore,
+                weightedScore: result.matchScore,
+                explanation: this._generateHybridExplanation(result, semanticScore, hybridScore),
+                isHiddenGem: semanticScore > weightedScoreNormalized + 0.1,
+                _fromChromaDB: true
+              };
+            });
+
+            const kept = reranked.filter(r => !r._semanticDropped);
+            kept.sort((a, b) => b.matchScore - a.matchScore);
+            return kept;
+          } else {
+            this.metrics.chromaDBMisses++;
+            this.metricsService.trackChromaDB(false);
+            logger.debug('⚠️ ChromaDB search returned no results, falling back to realtime embedding');
           }
+        } catch (chromaError) {
+          logger.warn('⚠️ ChromaDB search failed, falling back to realtime embedding:', chromaError.message);
+          this.metrics.chromaDBMisses++;
+          this.metricsService.trackChromaDB(false);
+          this.metricsService.trackError('chromaDB', chromaError);
+        }
+      }
 
-          // Get or generate candidate embedding
-          const candidateEmbedding = await this._getCandidateEmbedding(candidate);
-
-          // Calculate semantic similarity
-          const semanticScore = this._cosineSimilarity(jobEmbedding, candidateEmbedding);
-
-          // Drop if semantic similarity too low
-          if (semanticScore < this.config.semanticThreshold) {
-            return {
-              ...result,
-              semanticScore,
-              _semanticDropped: true
-            };
-          }
-
-          // Hybrid score: 60% weighted + 40% semantic
-          const weightedScoreNormalized = result.matchScore / 100; // 0-1
-          const hybridScore = (
-            weightedScoreNormalized * this.hybridWeights.weighted +
-            semanticScore * this.hybridWeights.semantic
-          );
-
-          // Re-calculate tier based on hybrid score
-          const newTier = this._calculateTier(hybridScore);
-
-          // Generate enhanced explanation
-          const explanation = this._generateHybridExplanation(
-            result,
-            semanticScore,
-            hybridScore
-          );
-
-          return {
-            ...result,
-            matchScore: Math.round(hybridScore * 100),
-            tier: newTier,
-            semanticScore: semanticScore,
-            weightedScore: result.matchScore, // Keep original for reference
-            explanation: explanation,
-            isHiddenGem: semanticScore > weightedScoreNormalized + 0.1 // Hidden gem detection
-          };
-        })
-      );
+      // Fallback: Realtime embedding (original method)
+      // Batch process candidates for better performance
+      const reranked = await this._batchRerankCandidates(weightedResults, candidates, job, jobEmbedding);
 
       // Keep only those not dropped
       const kept = reranked.filter(r => !r._semanticDropped);
@@ -373,87 +431,268 @@ class RAGRecommendationService {
       return kept;
     } catch (error) {
       logger.error('Error in semantic re-ranking:', error);
+      this.metrics.errors++;
       // Fallback to weighted results
       return weightedResults;
     }
   }
 
   /**
+   * Batch rerank candidates với optimized embedding generation
+   */
+  async _batchRerankCandidates(weightedResults, candidates, job, jobEmbedding) {
+    const reranked = [];
+    const batchSize = this.config.batchSize;
+
+    // Process in batches
+    for (let i = 0; i < weightedResults.length; i += batchSize) {
+      const batch = weightedResults.slice(i, i + batchSize);
+
+      // Generate embeddings in parallel for batch
+      const embeddingPromises = batch.map(async (result) => {
+        const candidate = candidates.find(c => 
+          (c._id && c._id.toString() === result.candidateId.toString()) ||
+          (c.id && c.id.toString() === result.candidateId.toString())
+        );
+
+        if (!candidate) {
+          return { result, embedding: null };
+        }
+
+        const candidateEmbedding = await this._getCandidateEmbedding(candidate);
+        return { result, candidate, embedding: candidateEmbedding };
+      });
+
+      const batchResults = await Promise.all(embeddingPromises);
+
+      // Process batch results
+      for (const { result, candidate, embedding } of batchResults) {
+        if (!embedding) {
+          reranked.push(result);
+          continue;
+        }
+
+        // Calculate semantic similarity
+        const semanticScore = this._cosineSimilarity(jobEmbedding, embedding);
+
+        // Drop if semantic similarity too low
+        if (semanticScore < this.config.semanticThreshold) {
+          reranked.push({
+            ...result,
+            semanticScore,
+            _semanticDropped: true
+          });
+          continue;
+        }
+
+        // Hybrid score: 60% weighted + 40% semantic
+        const weightedScoreNormalized = result.matchScore / 100;
+        const hybridScore = (
+          weightedScoreNormalized * this.hybridWeights.weighted +
+          semanticScore * this.hybridWeights.semantic
+        );
+
+        reranked.push({
+          ...result,
+          matchScore: Math.round(hybridScore * 100),
+          tier: this._calculateTier(hybridScore),
+          semanticScore: semanticScore,
+          weightedScore: result.matchScore,
+          explanation: this._generateHybridExplanation(result, semanticScore, hybridScore),
+          isHiddenGem: semanticScore > weightedScoreNormalized + 0.1
+        });
+      }
+    }
+
+    return reranked;
+  }
+
+  /**
    * Re-rank jobs với semantic similarity
+   * Optimized với ChromaDB support
    */
   async _rerankJobsWithSemanticSimilarity(weightedResults, candidate) {
     try {
       // Get or generate candidate embedding
       const candidateEmbedding = await this._getCandidateEmbedding(candidate);
 
-      // Batch process jobs
-      const reranked = await Promise.all(
-        weightedResults.map(async (result) => {
-          const job = result.job;
+      // Try ChromaDB vector search first (if enabled and available)
+      if (this.config.useChromaDB) {
+        try {
+          const vectorSearchResults = await this.jobIndexService.searchSimilarJobs(
+            candidateEmbedding,
+            {
+              topK: this.config.topKForRerank,
+              filters: {
+                status: 'active'
+              },
+              minScore: this.config.semanticThreshold
+            }
+          );
 
-          // Get or generate job embedding
-          const jobEmbedding = await this._getJobEmbedding(job);
+          if (vectorSearchResults.length > 0) {
+            this.metrics.chromaDBHits++;
+            this.metricsService.trackChromaDB(true);
+            logger.debug(`✅ ChromaDB vector search found ${vectorSearchResults.length} jobs`);
 
-          // Calculate semantic similarity
-          const semanticScore = this._cosineSimilarity(jobEmbedding, candidateEmbedding);
+            // Map vector search results to weighted results
+            const vectorSearchMap = new Map();
+            vectorSearchResults.forEach(vs => {
+              vectorSearchMap.set(vs.jobId, vs.similarity);
+            });
 
-          // Drop if semantic similarity too low
-          if (semanticScore < this.config.semanticThreshold) {
-            return {
-              ...result,
-              semanticScore,
-              _semanticDropped: true
-            };
+            // Merge with weighted results
+            const reranked = weightedResults.map(result => {
+              const jobId = result.job._id?.toString() || result.job.id?.toString();
+              const semanticScore = vectorSearchMap.get(jobId);
+
+              if (!semanticScore || semanticScore < this.config.semanticThreshold) {
+                return {
+                  ...result,
+                  semanticScore: semanticScore || 0,
+                  _semanticDropped: !semanticScore || semanticScore < this.config.semanticThreshold
+                };
+              }
+
+              // Hybrid score
+              const weightedScoreNormalized = result.matchScore / 100;
+              const hybridScore = (
+                weightedScoreNormalized * this.hybridWeights.weighted +
+                semanticScore * this.hybridWeights.semantic
+              );
+
+              return {
+                ...result,
+                matchScore: Math.round(hybridScore * 100),
+                tier: this._calculateTier(hybridScore),
+                semanticScore: semanticScore,
+                weightedScore: result.matchScore,
+                explanation: this._generateHybridExplanation(result, semanticScore, hybridScore),
+                isHiddenGem: semanticScore > weightedScoreNormalized + 0.1,
+                _fromChromaDB: true
+              };
+            });
+
+            const kept = reranked.filter(r => !r._semanticDropped);
+            kept.sort((a, b) => b.matchScore - a.matchScore);
+            return kept;
+          } else {
+            this.metrics.chromaDBMisses++;
+            this.metricsService.trackChromaDB(false);
+            logger.debug('⚠️ ChromaDB search returned no results, falling back to realtime embedding');
           }
+        } catch (chromaError) {
+          logger.warn('⚠️ ChromaDB search failed, falling back to realtime embedding:', chromaError.message);
+          this.metrics.chromaDBMisses++;
+          this.metricsService.trackChromaDB(false);
+          this.metricsService.trackError('chromaDB', chromaError);
+        }
+      }
 
-          // Hybrid score
-          const weightedScoreNormalized = result.matchScore / 100;
-          const hybridScore = (
-            weightedScoreNormalized * this.hybridWeights.weighted +
-            semanticScore * this.hybridWeights.semantic
-          );
-
-          const newTier = this._calculateTier(hybridScore);
-
-          const explanation = this._generateHybridExplanation(
-            result,
-            semanticScore,
-            hybridScore
-          );
-
-          return {
-            ...result,
-            matchScore: Math.round(hybridScore * 100),
-            tier: newTier,
-            semanticScore: semanticScore,
-            weightedScore: result.matchScore,
-            explanation: explanation,
-            isHiddenGem: semanticScore > weightedScoreNormalized + 0.1
-          };
-        })
-      );
+      // Fallback: Realtime embedding (original method)
+      const reranked = await this._batchRerankJobs(weightedResults, candidate, candidateEmbedding);
 
       const kept = reranked.filter(r => !r._semanticDropped);
-
       kept.sort((a, b) => b.matchScore - a.matchScore);
 
       return kept;
     } catch (error) {
       logger.error('Error in job semantic re-ranking:', error);
+      this.metrics.errors++;
       return weightedResults;
     }
   }
 
   /**
-   * Get or generate job embedding (with caching)
+   * Batch rerank jobs với optimized embedding generation
+   */
+  async _batchRerankJobs(weightedResults, candidate, candidateEmbedding) {
+    const reranked = [];
+    const batchSize = this.config.batchSize;
+
+    // Process in batches
+    for (let i = 0; i < weightedResults.length; i += batchSize) {
+      const batch = weightedResults.slice(i, i + batchSize);
+
+      // Generate embeddings in parallel for batch
+      const embeddingPromises = batch.map(async (result) => {
+        const job = result.job;
+        const jobEmbedding = await this._getJobEmbedding(job);
+        return { result, job, embedding: jobEmbedding };
+      });
+
+      const batchResults = await Promise.all(embeddingPromises);
+
+      // Process batch results
+      for (const { result, job, embedding } of batchResults) {
+        if (!embedding) {
+          reranked.push(result);
+          continue;
+        }
+
+        // Calculate semantic similarity
+        const semanticScore = this._cosineSimilarity(embedding, candidateEmbedding);
+
+        // Drop if semantic similarity too low
+        if (semanticScore < this.config.semanticThreshold) {
+          reranked.push({
+            ...result,
+            semanticScore,
+            _semanticDropped: true
+          });
+          continue;
+        }
+
+        // Hybrid score
+        const weightedScoreNormalized = result.matchScore / 100;
+        const hybridScore = (
+          weightedScoreNormalized * this.hybridWeights.weighted +
+          semanticScore * this.hybridWeights.semantic
+        );
+
+        reranked.push({
+          ...result,
+          matchScore: Math.round(hybridScore * 100),
+          tier: this._calculateTier(hybridScore),
+          semanticScore: semanticScore,
+          weightedScore: result.matchScore,
+          explanation: this._generateHybridExplanation(result, semanticScore, hybridScore),
+          isHiddenGem: semanticScore > weightedScoreNormalized + 0.1
+        });
+      }
+    }
+
+    return reranked;
+  }
+
+  /**
+   * Get or generate job embedding (with caching and ChromaDB support)
    */
   async _getJobEmbedding(job) {
     const cacheKey = `job:${job._id || job.id}`;
     
+    // Check cache first
     if (this.config.enableCaching) {
       const cached = await this.embeddingCache.get(cacheKey);
       if (cached) {
+        this.metrics.cacheHits++;
+        this.metricsService.trackCache(true);
         return cached;
+      }
+      this.metrics.cacheMisses++;
+      this.metricsService.trackCache(false);
+    }
+
+    // Try to get from ChromaDB index if available
+    if (this.config.useChromaDB) {
+      try {
+        const stats = await this.jobIndexService.getStats();
+        if (stats.initialized) {
+          // ChromaDB has the embedding, but we need to generate it for this query
+          // In future, we could retrieve from ChromaDB directly
+        }
+      } catch (error) {
+        // Ignore, fall through to generation
       }
     }
 
@@ -470,17 +709,22 @@ class RAGRecommendationService {
   }
 
   /**
-   * Get or generate candidate embedding (with caching)
+   * Get or generate candidate embedding (with caching and ChromaDB support)
    */
   async _getCandidateEmbedding(candidate) {
     const candidateId = candidate._id || candidate.id;
     const cacheKey = `candidate:${candidateId}`;
     
+    // Check cache first
     if (this.config.enableCaching) {
       const cached = await this.embeddingCache.get(cacheKey);
       if (cached) {
+        this.metrics.cacheHits++;
+        this.metricsService.trackCache(true);
         return cached;
       }
+      this.metrics.cacheMisses++;
+      this.metricsService.trackCache(false);
     }
 
     // Generate embedding
@@ -682,6 +926,57 @@ class RAGRecommendationService {
     const created = job.createdAt;
     if (!created) return true;
     return Date.now() - new Date(created).getTime() <= maxAgeMs;
+  }
+
+  /**
+   * Update metrics
+   */
+  _updateMetrics(operation, responseTime) {
+    this.metrics.totalRequests++;
+    this.metrics.avgResponseTime = (
+      (this.metrics.avgResponseTime * (this.metrics.totalRequests - 1) + responseTime) / 
+      this.metrics.totalRequests
+    );
+    
+    // Also track in metrics service
+    const type = operation.includes('candidate') ? 'candidate' : 'job';
+    const method = 'rag-hybrid';
+    this.metricsService.trackRecommendation(type, method, responseTime, null);
+  }
+
+  /**
+   * Get metrics
+   */
+  getMetrics() {
+    const cacheHitRate = (this.metrics.cacheHits + this.metrics.cacheMisses) > 0
+      ? (this.metrics.cacheHits / (this.metrics.cacheHits + this.metrics.cacheMisses) * 100).toFixed(2)
+      : 0;
+
+    const chromaDBHitRate = (this.metrics.chromaDBHits + this.metrics.chromaDBMisses) > 0
+      ? (this.metrics.chromaDBHits / (this.metrics.chromaDBHits + this.metrics.chromaDBMisses) * 100).toFixed(2)
+      : 0;
+
+    return {
+      ...this.metrics,
+      cacheHitRate: `${cacheHitRate}%`,
+      chromaDBHitRate: `${chromaDBHitRate}%`,
+      avgResponseTime: Math.round(this.metrics.avgResponseTime)
+    };
+  }
+
+  /**
+   * Reset metrics
+   */
+  resetMetrics() {
+    this.metrics = {
+      totalRequests: 0,
+      cacheHits: 0,
+      cacheMisses: 0,
+      chromaDBHits: 0,
+      chromaDBMisses: 0,
+      avgResponseTime: 0,
+      errors: 0
+    };
   }
 
   /**

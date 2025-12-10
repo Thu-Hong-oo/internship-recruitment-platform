@@ -55,9 +55,29 @@ class DialogflowService {
       // Initialize client with credentials
       // Option 1: Use service account key file
       if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-        this.client = new SessionsClient({
-          keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS
-        });
+        const credentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS.trim();
+        
+        // Validate path (should not be empty or just '{')
+        if (!credentialsPath || credentialsPath === '{' || credentialsPath.length < 3) {
+          logger.warn('⚠️ Invalid GOOGLE_APPLICATION_CREDENTIALS path. Using default credentials.');
+          this.client = new SessionsClient();
+        } else {
+          // Check if file exists
+          const fs = require('fs');
+          try {
+            if (fs.existsSync(credentialsPath)) {
+              this.client = new SessionsClient({
+                keyFilename: credentialsPath
+              });
+            } else {
+              logger.warn(`⚠️ Credentials file not found: ${credentialsPath}. Using default credentials.`);
+              this.client = new SessionsClient();
+            }
+          } catch (error) {
+            logger.warn(`⚠️ Error checking credentials file: ${error.message}. Using default credentials.`);
+            this.client = new SessionsClient();
+          }
+        }
       } 
       // Option 2: Use default credentials (for Cloud Run, GCE, etc.)
       else {
@@ -149,11 +169,17 @@ class DialogflowService {
       
       return result;
     } catch (error) {
-      logger.error('❌ Dialogflow API error:', error);
+      // Don't log full error if it's just a file not found (credentials issue)
+      if (error.code === 'ENOENT') {
+        logger.warn('⚠️ Dialogflow credentials file not found. Check GOOGLE_APPLICATION_CREDENTIALS path.');
+        logger.info('ℹ️ System will use rule-based fallback for intent recognition');
+      } else {
+        logger.error('❌ Dialogflow API error:', error.message);
+      }
       return {
         success: false,
         error: error.message || 'Dialogflow API error',
-        details: error
+        details: error.code === 'ENOENT' ? 'Credentials file not found' : error
       };
     }
   }
