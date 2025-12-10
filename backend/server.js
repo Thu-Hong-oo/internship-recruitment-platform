@@ -336,6 +336,7 @@ app.use('/api/applications', applicationRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/nlp', advancedNLPRoutes);
 app.use('/api/translate', translateRoutes);
+app.use('/api/rag', require('./src/routes/rag'));
 
 // Safe Additional Routes (confirmed models exist)
 app.use('/api/notifications', notificationRoutes);
@@ -395,6 +396,21 @@ if (process.env.ENABLE_TRAINING_DATA_COLLECTION !== 'false') {
   }
 } else {
   logger.info('Scheduled training data collection disabled (ENABLE_TRAINING_DATA_COLLECTION=false)');
+}
+
+// Initialize RAG sync service (if enabled)
+if (process.env.ENABLE_RAG_SYNC !== 'false') {
+  try {
+    const { getRAGSyncService } = require('./src/services/ai/ragSyncService');
+    const ragSyncService = getRAGSyncService();
+    ragSyncService.start();
+    logger.info('✅ RAG sync service enabled');
+  } catch (error) {
+    logger.warn('⚠️ Failed to start RAG sync service:', error.message);
+    // Don't fail server startup if RAG sync fails
+  }
+} else {
+  logger.info('RAG sync service disabled (ENABLE_RAG_SYNC=false)');
 }
 
 // Graceful shutdown

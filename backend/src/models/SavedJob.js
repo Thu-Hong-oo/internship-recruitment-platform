@@ -10,14 +10,14 @@ const savedJobSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'CandidateProfile',
       required: true,
-      index: true,
+      // Index defined below in compound index
     },
 
     jobId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Job',
       required: true,
-      index: true,
+      // Index defined below in compound index
     },
 
     savedAt: {
