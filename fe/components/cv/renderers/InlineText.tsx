@@ -85,19 +85,27 @@ export default function InlineText({
     ...((isEmpty && !isFocused && placeholder)
       ? { color: style?.color || "#9ca3af", fontStyle: style?.fontStyle || "italic" }
       : { color: style?.color || "#333333" }),
-    // Add border when focused and editable
-    ...(isFocused && editable ? {
-      border: "1px solid #d4d4d4",
-      borderRadius: "4px",
-      padding: "2px 6px",
-      outline: "none",
-      transition: "all 0.2s ease-in-out",
-    } : {
-      border: "1px solid transparent",
-      borderRadius: "4px",
-      padding: "2px 6px",
-      transition: "all 0.2s ease-in-out",
-    }),
+    // Border/padding: only show when editable & focused. Otherwise no border to avoid boxes in export
+    ...(editable && isFocused
+      ? {
+          border: "1px solid #d4d4d4",
+          borderRadius: "4px",
+          padding: "2px 6px",
+          outline: "none",
+          transition: "all 0.2s ease-in-out",
+        }
+      : editable
+      ? {
+          border: "1px solid transparent",
+          borderRadius: "4px",
+          padding: "2px 6px",
+          transition: "all 0.2s ease-in-out",
+        }
+      : {
+          border: "none",
+          padding: 0,
+          background: "transparent",
+        }),
   };
   
   return (

@@ -28,6 +28,36 @@ const normalizeContentToCVData = (
   }
 
   const personalInfo = content?.personalInfo || {};
+  const skillsRaw = content?.skills || [];
+  const skillsFlattened: string[] = [];
+  const languagesFlattened =
+    Array.isArray(content?.skills?.languages) &&
+    content.skills.languages.map((lang: any) =>
+      typeof lang === "string" ? lang : lang.language || lang.name || ""
+    );
+
+  const addSkills = (arr: any[]) => {
+    if (!Array.isArray(arr)) return;
+    arr.forEach((s) => {
+      if (typeof s === "string") {
+        skillsFlattened.push(s);
+      } else if (s?.name) {
+        skillsFlattened.push(s.name);
+      }
+    });
+  };
+  if (Array.isArray(skillsRaw)) {
+    skillsRaw.forEach((item: any) => {
+      addSkills(item?.technical || []);
+      addSkills(item?.soft || []);
+      addSkills(item?.languages || []);
+    });
+  } else if (skillsRaw) {
+    addSkills(skillsRaw.technical || []);
+    addSkills(skillsRaw.soft || []);
+    addSkills(skillsRaw.languages || []);
+  }
+
   return {
     personal: {
       name: personalInfo.fullName || "",
@@ -37,9 +67,27 @@ const normalizeContentToCVData = (
         typeof personalInfo.address === "string"
           ? personalInfo.address
           : personalInfo.address?.street || "",
-      summary: content?.summary || personalInfo.bio || "",
+      summary:
+        content?.summary ||
+        personalInfo.summary ||
+        personalInfo.bio ||
+        personalInfo.objective ||
+        "",
       avatar: personalInfo.avatar || undefined,
-      // jobTitle: personalInfo.jobTitle || "",
+      jobTitle:
+        personalInfo.jobTitle ||
+        personalInfo.position ||
+        personalInfo.title ||
+        personalInfo.targetRole ||
+        "",
+      website:
+        personalInfo.website ||
+        personalInfo.portfolio ||
+        personalInfo.personalWebsite ||
+        personalInfo.linkedin ||
+        personalInfo.github ||
+        personalInfo.link ||
+        "",
     },
     experience: (content?.experience || []).map((exp: any) => ({
       company: exp.company || "",
@@ -54,18 +102,22 @@ const normalizeContentToCVData = (
       startDate: edu.startYear || edu.startDate || "",
       endDate: edu.endYear || edu.endDate || "",
     })),
-    skills: (content?.skills?.technical || []).map((skill: any) =>
-      typeof skill === "string" ? skill : skill.name || ""
-    ),
+    skills: skillsFlattened,
     templateId: templateNum,
     projects: (content?.projects || []).map((proj: any) => ({
       title: proj.title || "",
       description: proj.description || "",
     })),
-    languages: (content?.skills?.languages || []).map((lang: any) => ({
-      name: typeof lang === "string" ? lang : lang.language || lang.name || "",
-      level: lang.level || "",
-    })),
+    languages:
+      languagesFlattened && Array.isArray(content?.skills?.languages)
+        ? (content.skills.languages as any[]).map((lang: any) => ({
+            name:
+              typeof lang === "string"
+                ? lang
+                : lang.language || lang.name || "",
+            level: lang.level || "",
+          }))
+        : [],
     certifications: (content?.certifications || []).map((cert: any) => ({
       name: cert.name || "",
       issuer: cert.issuer || "",

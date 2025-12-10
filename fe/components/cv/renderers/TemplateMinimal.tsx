@@ -1,4 +1,4 @@
- import InlineText from "./InlineText";
+import InlineText from "./InlineText";
 import type { CVData } from "../../../lib/mocks/cvSamples";
 import React, { useState, useRef, useEffect } from "react";
 
@@ -294,6 +294,66 @@ export default function TemplateMinimalRenderer({
   getSectionTitle,
   onAvatarChange,
 }: Props) {
+  // Normalize personal info (handle personalInfo vs personal)
+  const personalRaw =
+    (data as any).personal ||
+    (data as any).personalInfo ||
+    (data as any).profile ||
+    {};
+  const personal = {
+    name:
+      personalRaw.name || personalRaw.fullName || personalRaw.fullname || "",
+    jobTitle:
+      personalRaw.jobTitle ||
+      personalRaw.position ||
+      personalRaw.title ||
+      personalRaw.targetRole ||
+      "",
+    summary:
+      personalRaw.summary ||
+      personalRaw.bio ||
+      personalRaw.objective ||
+      (data as any).summary ||
+      "",
+    phone: personalRaw.phone || "",
+    email: personalRaw.email || "",
+    website:
+      personalRaw.website ||
+      personalRaw.portfolio ||
+      personalRaw.personalWebsite ||
+      personalRaw.linkedin ||
+      personalRaw.github ||
+      personalRaw.link ||
+      "",
+    address: personalRaw.address || "",
+    avatar: personalRaw.avatar,
+  };
+
+  // Normalize skills (support technical/soft/languages objects)
+  const skillsNormalized: string[] = (() => {
+    const rawBase = (data as any).skills;
+    const raw = Array.isArray(rawBase) ? rawBase : rawBase ? [rawBase] : [];
+    const names: string[] = [];
+    raw.forEach((item: any) => {
+      if (typeof item === "string") {
+        names.push(item);
+      } else if (item?.name) {
+        names.push(item.name);
+      } else {
+        if (Array.isArray(item?.technical)) {
+          item.technical.forEach((t: any) => t?.name && names.push(t.name));
+        }
+        if (Array.isArray(item?.soft)) {
+          item.soft.forEach((t: any) => t?.name && names.push(t.name));
+        }
+        if (Array.isArray(item?.languages)) {
+          item.languages.forEach((t: any) => t?.name && names.push(t.name));
+        }
+      }
+    });
+    return names;
+  })();
+
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [focusedItem, setFocusedItem] = useState<string | null>(null);
   const [isAvatarHovered, setIsAvatarHovered] = useState(false);
@@ -311,16 +371,16 @@ export default function TemplateMinimalRenderer({
   }, []);
 
   const initials =
-    data.personal.name
+    personal.name
       ?.split(" ")
-      .map((w) => w[0])
+      .map((w: string) => w[0])
       .join("")
       .slice(0, 2)
       .toUpperCase() || "NV";
 
   const [previewAvatar, setPreviewAvatar] = useState<string | null>(null);
   const defaultAvatarUrl = "/images/avatar_trang.jpg";
-  const dataAvatar = (data.personal as any).avatar;
+  const dataAvatar = personal.avatar;
   const avatarUrl = previewAvatar || dataAvatar || defaultAvatarUrl;
 
   useEffect(() => {
@@ -497,7 +557,7 @@ export default function TemplateMinimalRenderer({
                   </svg>
                   <InlineText
                     path={["personal", "phone"]}
-                    value={data.personal.phone || ""}
+                    value={personal.phone || ""}
                     placeholder="0123456789"
                     editable={editable}
                     onChangeText={onChangeText}
@@ -527,7 +587,7 @@ export default function TemplateMinimalRenderer({
                   </svg>
                   <InlineText
                     path={["personal", "email"]}
-                    value={data.personal.email}
+                    value={personal.email}
                     placeholder="email@example.com"
                     editable={editable}
                     onChangeText={onChangeText}
@@ -558,7 +618,7 @@ export default function TemplateMinimalRenderer({
                   </svg>
                   <InlineText
                     path={["personal", "website"]}
-                    value={(data.personal as any).website || ""}
+                    value={personal.website || ""}
                     placeholder="Website/Portfolio"
                     editable={editable}
                     onChangeText={onChangeText}
@@ -588,7 +648,7 @@ export default function TemplateMinimalRenderer({
                   </svg>
                   <InlineText
                     path={["personal", "address"]}
-                    value={data.personal.address || ""}
+                    value={personal.address || ""}
                     placeholder="Địa chỉ"
                     editable={editable}
                     onChangeText={onChangeText}
@@ -741,7 +801,7 @@ export default function TemplateMinimalRenderer({
                 getSectionTitle={getSectionTitle}
               >
                 <div className="flex flex-col gap-2.5">
-                  {(data.skills.length > 0 ? data.skills : [""]).map(
+                  {(skillsNormalized.length > 0 ? skillsNormalized : [""]).map(
                     (skill, idx) => {
                       const isActive = isItemActive("skills", idx);
                       return (
@@ -756,7 +816,7 @@ export default function TemplateMinimalRenderer({
                           <ItemControls
                             section="skills"
                             index={idx}
-                            totalItems={data.skills.length}
+                            totalItems={skillsNormalized.length}
                             editable={editable}
                             onDeleteItem={onDeleteItem}
                             onAddItem={onAddItem}
@@ -957,7 +1017,7 @@ export default function TemplateMinimalRenderer({
             <div className="mb-1 pb-4 border-b" style={{ borderColor: BORDER }}>
               <InlineText
                 path={["personal", "name"]}
-                value={data.personal.name}
+                value={personal.name}
                 placeholder="Họ và tên"
                 editable={editable}
                 onChangeText={onChangeText}
@@ -969,7 +1029,7 @@ export default function TemplateMinimalRenderer({
               />
               <InlineText
                 path={["personal", "jobTitle"]}
-                value={(data.personal as any).jobTitle || ""}
+                value={personal.jobTitle || ""}
                 placeholder="Vị trí công việc"
                 editable={editable}
                 onChangeText={onChangeText}
@@ -991,7 +1051,7 @@ export default function TemplateMinimalRenderer({
             >
               <InlineText
                 path={["personal", "summary"]}
-                value={data.personal.summary || ""}
+                value={personal.summary || ""}
                 placeholder="Trình bày mục tiêu nghề nghiệp..."
                 editable={editable}
                 onChangeText={onChangeText}

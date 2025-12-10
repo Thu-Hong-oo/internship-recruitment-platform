@@ -14,16 +14,126 @@ import {
   Heart,
   Bookmark,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { api } from "@/lib/api";
+import CVPreview from "@/components/cv/CVPreview";
+import { api, candidateService } from "@/lib/api";
 import { savedJobService } from "@/lib/api";
 import type { SavedJob } from "@/lib/api/services/savedJob.service";
+import type { CVData } from "@/lib/mocks/cvSamples";
 import { getNotifications } from "@/lib/notificationAPI";
 import { AINavigationInput } from "@/components/ai/AINavigationInput";
+import { useToast } from "@/components/ui/use-toast";
+import { ToastAction } from "@/components/ui/toast";
+
+const TEMPLATE_ID_MAP: Record<string, number> = {
+  modern: 1,
+  minimal: 2,
+};
+
+const normalizeContentToCVData = (
+  content: any,
+  templateKey: string
+): CVData => {
+  const templateNum = TEMPLATE_ID_MAP[templateKey] || 1;
+
+  if (content?.personal && typeof content.personal === "object") {
+    return {
+      ...(content as CVData),
+      templateId: content.templateId ?? templateNum,
+    };
+  }
+
+  const personalInfo = content?.personalInfo || {};
+  const skillsRaw = content?.skills || [];
+  const skillsFlattened: string[] = [];
+  const addSkills = (arr: any[]) => {
+    if (!Array.isArray(arr)) return;
+    arr.forEach((s) => {
+      if (typeof s === "string") {
+        skillsFlattened.push(s);
+      } else if (s?.name) {
+        skillsFlattened.push(s.name);
+      }
+    });
+  };
+  if (Array.isArray(skillsRaw)) {
+    skillsRaw.forEach((item: any) => {
+      addSkills(item?.technical || []);
+      addSkills(item?.soft || []);
+      addSkills(item?.languages || []);
+    });
+  } else if (skillsRaw) {
+    addSkills(skillsRaw.technical || []);
+    addSkills(skillsRaw.soft || []);
+    addSkills(skillsRaw.languages || []);
+  }
+
+  return {
+    personal: {
+      name: personalInfo.fullName || "",
+      email: personalInfo.email || "",
+      phone: personalInfo.phone || "",
+      address:
+        typeof personalInfo.address === "string"
+          ? personalInfo.address
+          : personalInfo.address?.street || "",
+      summary:
+        content?.summary ||
+        personalInfo.summary ||
+        personalInfo.bio ||
+        personalInfo.objective ||
+        "",
+      avatar: personalInfo.avatar || undefined,
+      jobTitle:
+        personalInfo.jobTitle ||
+        personalInfo.position ||
+        personalInfo.title ||
+        personalInfo.targetRole ||
+        "",
+      website:
+        personalInfo.website ||
+        personalInfo.portfolio ||
+        personalInfo.personalWebsite ||
+        personalInfo.linkedin ||
+        personalInfo.github ||
+        personalInfo.link ||
+        "",
+    },
+    experience: (content?.experience || []).map((exp: any) => ({
+      company: exp.company || "",
+      role: exp.position || "",
+      startDate: exp.startDate || "",
+      endDate: exp.endDate || "",
+      description: exp.description || "",
+    })),
+    education: (content?.education || []).map((edu: any) => ({
+      school: edu.institution || edu.school || "",
+      degree: edu.degree || "",
+      startDate: edu.startYear || edu.startDate || "",
+      endDate: edu.endYear || edu.endDate || "",
+    })),
+    skills: skillsFlattened,
+    templateId: templateNum,
+    projects: (content?.projects || []).map((proj: any) => ({
+      title: proj.title || "",
+      description: proj.description || "",
+    })),
+    languages: (content?.skills?.languages || []).map((lang: any) => ({
+      name: typeof lang === "string" ? lang : lang.language || lang.name || "",
+      level: lang.level || "",
+    })),
+    certifications: (content?.certifications || []).map((cert: any) => ({
+      name: cert.name || "",
+      issuer: cert.issuer || "",
+      year: cert.issueDate || cert.year || "",
+    })),
+  };
+};
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -36,9 +146,13 @@ export default function DashboardPage() {
   const [onlineCvs, setOnlineCvs] = useState<
     Array<{ templateId: string; resumeId: string; templateName: string }>
   >([]);
+  const [cvDataMap, setCvDataMap] = useState<Record<string, CVData>>({});
+  const [loadingCVs, setLoadingCVs] = useState(false);
   const [loading, setLoading] = useState(true);
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [upcomingDeadlines, setUpcomingDeadlines] = useState<SavedJob[]>([]);
+  const [prevUnreadCount, setPrevUnreadCount] = useState<number | null>(null);
+  const { toast } = useToast();
 
   // Kiểm tra token ngay lập tức khi component mount
   useEffect(() => {
@@ -82,7 +196,32 @@ export default function DashboardPage() {
           limit: 1,
         });
         if (notificationsRes?.success) {
-          setUnreadNotifications(notificationsRes.unreadCount || 0);
+          const newUnread = notificationsRes.unreadCount || 0;
+          setUnreadNotifications(newUnread);
+
+          const hasInitial = prevUnreadCount !== null;
+          if (hasInitial && newUnread > (prevUnreadCount ?? 0)) {
+            const latestUnread =
+              notificationsRes.data?.find((n: any) => !n.isRead) ||
+              notificationsRes.data?.[0];
+
+            toast({
+              title: "Có thông báo mới",
+              description:
+                latestUnread?.title ||
+                `Bạn có ${newUnread} thông báo chưa đọc.`,
+              action: (
+                <ToastAction
+                  altText="Xem thông báo"
+                  onClick={() => router.push("/notifications")}
+                >
+                  Xem
+                </ToastAction>
+              ),
+            });
+          }
+
+          setPrevUnreadCount(newUnread);
         }
 
         // Fetch saved jobs (3 latest)
@@ -166,6 +305,45 @@ export default function DashboardPage() {
           }
 
           setOnlineCvs(cvList.slice(0, 3)); // Hiển thị tối đa 3 CV
+
+          // Nạp dữ liệu CV để hiển thị preview
+          if (cvList.length > 0) {
+            setLoadingCVs(true);
+            try {
+              const previewPromises = cvList
+                .slice(0, 3)
+                .map(async ({ resumeId, templateId }) => {
+                  try {
+                    const resumeRes = await candidateService.getResumeById(
+                      resumeId
+                    );
+                    if (resumeRes?.success && resumeRes.data?.content) {
+                      return {
+                        resumeId,
+                        data: normalizeContentToCVData(
+                          resumeRes.data.content,
+                          templateId
+                        ),
+                      };
+                    }
+                  } catch (err) {
+                    console.error(`Không thể tải dữ liệu CV ${resumeId}:`, err);
+                  }
+                  return null;
+                });
+
+              const previewResults = await Promise.all(previewPromises);
+              const newMap: Record<string, CVData> = {};
+              previewResults.forEach((result) => {
+                if (result) {
+                  newMap[result.resumeId] = result.data;
+                }
+              });
+              setCvDataMap(newMap);
+            } finally {
+              setLoadingCVs(false);
+            }
+          }
         }
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -484,46 +662,80 @@ export default function DashboardPage() {
                       </Button>
                     </Link>
                   </div>
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {loading ? (
                       <div className="text-center py-4 text-slate-500">
                         Đang tải...
                       </div>
                     ) : onlineCvs.length > 0 ? (
-                      onlineCvs.map((cv) => (
-                        <Link
-                          key={cv.resumeId}
-                          href={`/my-cv/new?template=${cv.templateId}&resumeId=${cv.resumeId}`}
-                          className="block"
-                        >
-                          <div
-                            className="flex items-center justify-between p-3 rounded-lg transition-colors hover:shadow-md"
-                            style={{
-                              background:
-                                "linear-gradient(135deg, oklch(0.60 0.12 195 / 0.08) 0%, transparent 70%)",
-                            }}
-                          >
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <FileText
-                                className="w-5 h-5 flex-shrink-0"
-                                style={{ color: primaryColor }}
-                              />
-                              <span className="text-sm font-medium text-slate-700 truncate">
-                                {cv.templateName}
-                              </span>
-                            </div>
-                            <Badge
-                              className="border-none flex-shrink-0"
-                              style={{
-                                background: `oklch(0.60 0.12 195 / 0.15)`,
-                                color: primaryColor,
-                              }}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {onlineCvs.map((cv) => {
+                          const cvData = cvDataMap[cv.resumeId];
+                          const hasPreview = !!cvData;
+
+                          return (
+                            <Link
+                              key={cv.resumeId}
+                              href={`/my-cv/new?template=${cv.templateId}&resumeId=${cv.resumeId}`}
+                              className="block group"
                             >
-                              Online
-                            </Badge>
-                          </div>
-                        </Link>
-                      ))
+                              <div className="overflow-hidden rounded-xl border border-slate-200/70 bg-white/80 transition-all duration-300 hover:shadow-lg hover:border-primary/40">
+                                <div className="relative w-full aspect-[3/4] bg-muted/40 overflow-hidden">
+                                  {hasPreview ? (
+                                    <div className="w-full h-full overflow-hidden bg-white relative">
+                                      <CVPreview
+                                        data={cvData}
+                                        templateId={cv.templateId}
+                                      />
+                                      <div className="absolute top-3 left-3">
+                                        <Badge className="bg-emerald-600/90 text-white border-none px-2.5 py-1 text-[11px] font-medium backdrop-blur">
+                                          CV của bạn
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                  ) : loadingCVs ? (
+                                    <div className="flex h-full items-center justify-center text-slate-500">
+                                      <Loader2 className="h-6 w-6 animate-spin" />
+                                    </div>
+                                  ) : (
+                                    <div className="flex h-full flex-col items-center justify-center gap-2 text-slate-500">
+                                      <FileText
+                                        className="w-8 h-8"
+                                        style={{ color: primaryColor }}
+                                      />
+                                      <span className="text-sm">
+                                        {cv.templateName}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="p-3">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <div className="font-semibold text-sm text-slate-900 truncate">
+                                        {cv.templateName}
+                                      </div>
+                                      <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                                        InternBridge · CV Builder
+                                      </p>
+                                    </div>
+                                    <Badge
+                                      className="border-none flex-shrink-0"
+                                      style={{
+                                        background: `oklch(0.60 0.12 195 / 0.15)`,
+                                        color: primaryColor,
+                                      }}
+                                    >
+                                      Online
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </div>
+                            </Link>
+                          );
+                        })}
+                      </div>
                     ) : (
                       <div className="text-center py-4 text-slate-500">
                         Chưa có CV online.{" "}
