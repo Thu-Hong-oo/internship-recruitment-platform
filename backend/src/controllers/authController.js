@@ -247,6 +247,21 @@ const login = asyncHandler(async (req, res) => {
   user.lastLogin = new Date();
   await user.save({ validateBeforeSave: false });
 
+  // Auto-link with accepted invitation if user is employer
+  if (user.role === 'employer') {
+    const TeamInvitationController = require('./teamInvitationController');
+    try {
+      await TeamInvitationController.linkUserWithInvitation(user._id, user.email);
+    } catch (linkError) {
+      logger.error('Failed to auto-link invitation after login', {
+        error: linkError.message,
+        userId: user._id,
+        email: user.email,
+      });
+      // Don't fail the request, just log the error
+    }
+  }
+
   // Create token
   const token = user.getSignedJwtToken();
 
@@ -520,10 +535,25 @@ const loginWithGoogle = asyncHandler(async (req, res) => {
     // Update last login
     result.user.lastLogin = new Date();
     await result.user.save({ validateBeforeSave: false });
-    
+
+    // Auto-link with accepted invitation if user is employer
+    if (result.user.role === 'employer') {
+      const TeamInvitationController = require('./teamInvitationController');
+      try {
+        await TeamInvitationController.linkUserWithInvitation(result.user._id, result.user.email);
+      } catch (linkError) {
+        logger.error('Failed to auto-link invitation after Google login', {
+          error: linkError.message,
+          userId: result.user._id,
+          email: result.user.email,
+        });
+        // Don't fail the request, just log the error
+      }
+    }
+
     // Generate JWT token
     const token = result.user.getSignedJwtToken();
-    
+
     logger.info(`Google OAuth successful: ${result.user.email}`, {
       userId: result.user._id,
       isNew: result.isNew,
@@ -703,6 +733,21 @@ const verifyEmail = asyncHandler(async (req, res) => {
 
     // Clean up Redis data
     await otpService.delete(`user_registration:${email}`);
+
+    // Auto-link with accepted invitation if user is employer
+    if (user.role === 'employer') {
+      const TeamInvitationController = require('./teamInvitationController');
+      try {
+        await TeamInvitationController.linkUserWithInvitation(user._id, user.email);
+      } catch (linkError) {
+        logger.error('Failed to auto-link invitation after registration', {
+          error: linkError.message,
+          userId: user._id,
+          email: user.email,
+        });
+        // Don't fail the request, just log the error
+      }
+    }
 
     logger.info(
       `New user registered and verified: ${email}, role: ${user.role}`

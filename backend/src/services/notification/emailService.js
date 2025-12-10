@@ -8,9 +8,19 @@ class EmailService {
   }
 
   createTransporter() {
+    // Check if SMTP is configured
+    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      logger.warn('⚠️ SMTP not configured. Email sending will fail.', {
+        hasHost: !!process.env.SMTP_HOST,
+        hasUser: !!process.env.SMTP_USER,
+        hasPass: !!process.env.SMTP_PASS,
+      });
+      return null;
+    }
+
     return nodemailer.createTransport({
       host: process.env.SMTP_HOST,
-      port: process.env.SMTP_PORT,
+      port: process.env.SMTP_PORT || 587,
       secure: process.env.SMTP_SECURE === 'true', // Sử dụng biến môi trường
       auth: {
         user: process.env.SMTP_USER,
@@ -20,13 +30,39 @@ class EmailService {
   }
 
   async sendMail(options) {
+    // Check if transporter is available
+    if (!this.transporter) {
+      const error = new Error('SMTP not configured. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS environment variables.');
+      logger.error('Email sending failed: SMTP not configured', {
+        to: options.to,
+        subject: options.subject,
+      });
+      throw error;
+    }
+
     try {
-      await this.transporter.sendMail(options);
+      const result = await this.transporter.sendMail({
+        from: options.from || `"${process.env.EMAIL_FROM_NAME || 'InternBridge'}" <${process.env.EMAIL_FROM_ADDRESS || process.env.SMTP_USER}>`,
+        to: options.to,
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+      });
+      
+      logger.info('✅ Email sent successfully', {
+        to: options.to,
+        subject: options.subject,
+        messageId: result.messageId,
+      });
+      
       return true;
     } catch (error) {
-      logger.error('Email sending failed', {
+      logger.error('❌ Email sending failed', {
         error: error.message,
+        errorCode: error.code,
         to: options.to,
+        subject: options.subject,
+        stack: error.stack,
       });
       throw error;
     }

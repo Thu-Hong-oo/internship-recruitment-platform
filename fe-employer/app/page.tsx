@@ -12,7 +12,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { saveUserData, saveToken, getToken } from "@/lib/userStorage";
 import { useGoogleAuth } from "@/hooks/useGoogleAuth";
 import {
@@ -27,6 +27,7 @@ import {
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { 
     handleGoogleSignIn, 
     renderGoogleButton, 
@@ -50,6 +51,19 @@ export default function LoginPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [showRoleMismatchModal, setShowRoleMismatchModal] = useState(false);
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
+  
+  // Check for email from invitation
+  useEffect(() => {
+    const emailParam = searchParams?.get("email");
+    const fromInvitation = searchParams?.get("fromInvitation");
+    
+    if (emailParam) {
+      setEmail(emailParam);
+      if (fromInvitation === "true") {
+        setSuccess("Vui lòng đăng nhập để hoàn tất việc tham gia team.");
+      }
+    }
+  }, [searchParams]);
 
   // Render Google button when component mounts and Google script is loaded
   useEffect(() => {
