@@ -8,10 +8,10 @@ const { logger } = require('../utils/logger');
  * Using dslim/bert-base-NER-uncased for entity extraction
  * Supports English + Vietnamese (multilingual understanding)
  *
- * Better than PhoBERT for:
- * - Mixed language CVs (English + Vietnamese)
- * - English-only CVs
- * - General entity recognition (not just skills)
+ * STATUS: DISABLED BY DEFAULT
+ * - Requires Python and dependencies
+ * - Can be enabled with ENABLE_MULTILINGUAL_NER=true
+ * - Currently not used in production (fallback to rule-based)
  */
 class MultilingualNERService {
   constructor() {
@@ -20,7 +20,7 @@ class MultilingualNERService {
     this.isReady = false;
     this.pendingRequests = new Map();
     this.requestId = 0;
-    this.isEnabled = process.env.ENABLE_MULTILINGUAL_NER !== 'false'; // Default: enabled
+    this.isEnabled = process.env.ENABLE_MULTILINGUAL_NER === 'true'; // Default: disabled
     this.maxRestartAttempts = 5;
     this.restartAttempts = 0;
 

@@ -1,23 +1,24 @@
 const { logger } = require('../../utils/logger');
 const ruleBasedParser = require('./ruleBasedCVParser');
-const { getMultilingualNERService } = require('../multilingualNERService');
+// Multilingual NER disabled - service removed
+// const { getMultilingualNERService } = require('../multilingualNERService');
 
 /**
  * Hybrid Skill Extraction Service
  *
- * Optimal strategy for multilingual CVs (Vietnamese + English):
- * 1. Rule-based (300+ patterns) - Primary for Vietnamese (100% recall)
- * 2. Multilingual NER (dslim/bert-base-NER) - Primary for English (90% recall)
- * 3. Combine both for mixed-language CVs
+ * Strategy for multilingual CVs (Vietnamese + English):
+ * - Rule-based (300+ patterns) - Used for all languages
+ * - Multilingual NER disabled (removed due to Python dependency issues)
  *
  * Performance:
  * - Pure Vietnamese CV: 100% recall (rule-based)
- * - Pure English CV: 90% recall (multilingual NER)
- * - Mixed CV: ~95% recall (combined)
+ * - Pure English CV: ~70% recall (rule-based)
+ * - Mixed CV: ~85% recall (rule-based)
  */
 class HybridSkillExtractionService {
   constructor() {
-    this.multilingualNER = getMultilingualNERService();
+    // Multilingual NER disabled - service removed
+    // this.multilingualNER = getMultilingualNERService();
     this.cache = new Map();
   }
 
@@ -91,76 +92,32 @@ class HybridSkillExtractionService {
       }
 
       // Strategy 2: Pure English (<20% Vietnamese)
+      // Multilingual NER disabled - using rule-based only
       if (langRatio.vietnamese < 0.2) {
-        logger.info('🇬🇧 Using multilingual NER (English text)');
+        logger.info('🇬🇧 Using rule-based extraction (English text - Multilingual NER disabled)');
 
-        // Wait for NER to be ready
-        if (!this.multilingualNER.isReady) {
-          logger.warn('Multilingual NER not ready, falling back to rule-based');
-          const skills = ruleBasedParser.extractSkills(text);
-          return this._formatSkills(skills, 'rule-based-fallback', langRatio);
-        }
-
-        const entities = await this.multilingualNER.extractEntities(text, {
-          minScore: 0.7,
-          timeout: 10000
-        });
-
-        // Convert entities to skills format
-        const nerSkills = entities
-          .filter(e => e.type === 'MISC' || e.type === 'ORG')
-          .map(e => ({
-            name: this._capitalizeSkill(e.text),
-            type: 'technical',
-            confidence: e.score,
-            source: 'multilingual-ner'
-          }));
-
-        // Also run rule-based as supplement (for skills NER might miss)
-        const ruleSkills = ruleBasedParser.extractSkills(text);
-        const ruleFormatted = this._formatSkills(ruleSkills, 'rule-based', langRatio);
-
-        // Combine and deduplicate
-        const combined = this._combineSkills(nerSkills, ruleFormatted);
+        const skills = ruleBasedParser.extractSkills(text);
+        const result = this._formatSkills(skills, 'rule-based', langRatio);
 
         // Cache result
-        if (useCache) this.cache.set(cacheKey, combined);
+        if (useCache) this.cache.set(cacheKey, result);
 
-        logger.info(`✅ Extracted ${combined.length} skills in ${Date.now() - startTime}ms (NER + rule-based)`);
-        return combined;
+        logger.info(`✅ Extracted ${result.length} skills in ${Date.now() - startTime}ms (rule-based only)`);
+        return result;
       }
 
       // Strategy 3: Mixed language (20-80% Vietnamese)
-      logger.info('🌐 Using hybrid extraction (mixed language)');
+      // Multilingual NER disabled - using rule-based only
+      logger.info('🌐 Using rule-based extraction (mixed language - Multilingual NER disabled)');
 
-      // Run both methods in parallel
-      const [nerEntities, ruleSkills] = await Promise.all([
-        this.multilingualNER.isReady
-          ? this.multilingualNER.extractEntities(text, { minScore: 0.7, timeout: 10000 })
-          : Promise.resolve([]),
-        Promise.resolve(ruleBasedParser.extractSkills(text))
-      ]);
-
-      // Convert NER entities to skills
-      const nerSkills = nerEntities
-        .filter(e => e.type === 'MISC' || e.type === 'ORG')
-        .map(e => ({
-          name: this._capitalizeSkill(e.text),
-          type: 'technical',
-          confidence: e.score,
-          source: 'multilingual-ner'
-        }));
-
-      const ruleFormatted = this._formatSkills(ruleSkills, 'rule-based', langRatio);
-
-      // Combine and deduplicate (prioritize higher confidence)
-      const combined = this._combineSkills(nerSkills, ruleFormatted);
+      const skills = ruleBasedParser.extractSkills(text);
+      const result = this._formatSkills(skills, 'rule-based', langRatio);
 
       // Cache result
-      if (useCache) this.cache.set(cacheKey, combined);
+      if (useCache) this.cache.set(cacheKey, result);
 
-      logger.info(`✅ Extracted ${combined.length} skills in ${Date.now() - startTime}ms (hybrid)`);
-      return combined;
+      logger.info(`✅ Extracted ${result.length} skills in ${Date.now() - startTime}ms (rule-based only)`);
+      return result;
 
     } catch (error) {
       logger.error('Hybrid extraction error:', error.message);
@@ -279,16 +236,17 @@ class HybridSkillExtractionService {
       name: 'Hybrid Skill Extraction',
       strategies: {
         vietnamese: 'Rule-based (300+ patterns, 100% recall)',
-        english: 'Multilingual NER (dslim/bert-base-NER, 90% recall)',
-        mixed: 'Combined (both methods, ~95% recall)'
+        english: 'Rule-based (300+ patterns, ~70% recall) - Multilingual NER disabled',
+        mixed: 'Rule-based (300+ patterns, ~85% recall) - Multilingual NER disabled'
       },
       models: {
         ruleBased: {
           patterns: '300+',
           languages: ['Vietnamese', 'English'],
           performance: '< 50ms'
-        },
-        multilingualNER: this.multilingualNER.getModelInfo()
+        }
+        // Multilingual NER disabled
+        // multilingualNER: this.multilingualNER.getModelInfo()
       }
     };
   }
