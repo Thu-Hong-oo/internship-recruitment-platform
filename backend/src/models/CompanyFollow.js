@@ -6,13 +6,13 @@ const CompanyFollowSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'CandidateProfile',
       required: true,
-      index: true,
+      // Index defined below in compound index
     },
     employerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'EmployerProfile',
       required: true,
-      index: true,
+      // Index defined below in compound index
     },
     createdAt: { type: Date, default: Date.now },
     deletedAt: { type: Date, default: null },

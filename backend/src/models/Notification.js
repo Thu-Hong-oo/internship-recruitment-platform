@@ -70,7 +70,7 @@ const NotificationSchema = new mongoose.Schema(
     readAt: Date,
     archivedAt: Date,
     actionRequired: { type: Boolean, default: false },
-    dedupeKey: { type: String, index: true },
+    dedupeKey: { type: String }, // Index defined below
     templateKey: String,
     locale: { type: String, default: 'vi' },
     error: {

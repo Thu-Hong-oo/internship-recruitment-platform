@@ -14,7 +14,7 @@ const FeedbackSchema = new mongoose.Schema({
     type: String,
     enum: ['cv_parsing', 'job_matching', 'skill_extraction', 'roadmap_generation', 'experience_classification'],
     required: true,
-    index: true
+    // Index defined below in compound index
   },
   input: {
     type: mongoose.Schema.Types.Mixed,
@@ -32,7 +32,7 @@ const FeedbackSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
-    index: true
+    // Index defined below in compound index
   },
   modelId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -52,7 +52,7 @@ const FeedbackSchema = new mongoose.Schema({
   isSignificant: {
     type: Boolean,
     default: false,
-    index: true
+    // Index defined below in compound index
   },
   addedToTraining: {
     type: Boolean,
@@ -61,7 +61,7 @@ const FeedbackSchema = new mongoose.Schema({
   timestamp: {
     type: Date,
     default: Date.now,
-    index: true
+    // Index defined below in compound index
   }
 });
 

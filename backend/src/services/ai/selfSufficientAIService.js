@@ -3805,10 +3805,10 @@ CHỈ TRẢ VỀ JSON, KHÔNG CÓ MARKDOWN HOẶC TEXT THÊM.`;
       }
       
       return {
-        section: gap.type?.toUpperCase() || 'GENERAL',
-        issue: gap.issue || gap.type,
-        suggestion: gap.suggestion || gap.evidence,
-        severity: gap.severity || gap.impact || 'medium',
+      section: gap.type?.toUpperCase() || 'GENERAL',
+      issue: gap.issue || gap.type,
+      suggestion: gap.suggestion || gap.evidence,
+      severity: gap.severity || gap.impact || 'medium',
         evidence: evidence,
         priority: gap.impact === 'high' || gap.severity === 'high' ? 'high' : 
                   gap.impact === 'medium' || gap.severity === 'medium' ? 'medium' : 'low',

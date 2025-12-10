@@ -74,15 +74,77 @@ class DialogflowService {
           );
           return;
         }
-        this.client = process.env.GOOGLE_APPLICATION_CREDENTIALS
-          ? new SessionsClientES({
-              keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-            })
-          : new SessionsClientES();
+        
+        // Handle credentials: Support multiple methods
+        // Method 1: Separate env vars (DIALOGFLOW_CLIENT_EMAIL + DIALOGFLOW_PRIVATE_KEY) - RECOMMENDED for Koyeb
+        // Method 2: JSON content in GOOGLE_APPLICATION_CREDENTIALS
+        // Method 3: File path in GOOGLE_APPLICATION_CREDENTIALS
+        // Method 4: Default credentials
+        let clientConfig = {};
+        
+        if (process.env.DIALOGFLOW_CLIENT_EMAIL && process.env.DIALOGFLOW_PRIVATE_KEY) {
+          // Method 1: Direct credentials object (RECOMMENDED - No temp files needed)
+          try {
+            const privateKey = process.env.DIALOGFLOW_PRIVATE_KEY.replace(/\\n/g, '\n');
+            
+            clientConfig = {
+              projectId: this.projectId || process.env.DIALOGFLOW_PROJECT_ID || 'intern-bridge-dialogflowe-emed',
+              credentials: {
+                client_email: process.env.DIALOGFLOW_CLIENT_EMAIL,
+                private_key: privateKey,
+              },
+            };
+            
+            logger.info('✅ Dialogflow ES credentials loaded from separate env vars (DIALOGFLOW_CLIENT_EMAIL + DIALOGFLOW_PRIVATE_KEY)');
+          } catch (error) {
+            logger.error('❌ Dialogflow ES: Failed to build credentials from env vars:', error.message);
+            logger.info('ℹ️ Falling back to default credentials');
+            clientConfig = {};
+          }
+        } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+          const credentialsValue = process.env.GOOGLE_APPLICATION_CREDENTIALS.trim();
+          const trimmedValue = credentialsValue.replace(/^\s+|\s+$/g, '');
+          const isJsonContent = trimmedValue.startsWith('{') && trimmedValue.endsWith('}');
+          
+          if (isJsonContent) {
+            try {
+              // Method 2: JSON content - parse and use directly
+              const parsedJson = JSON.parse(trimmedValue);
+              
+              if (!parsedJson.type || parsedJson.type !== 'service_account') {
+                throw new Error('Invalid service account JSON format');
+              }
+              
+              clientConfig = {
+                projectId: parsedJson.project_id || this.projectId,
+                credentials: {
+                  client_email: parsedJson.client_email,
+                  private_key: parsedJson.private_key,
+                },
+              };
+              
+              logger.info('✅ Dialogflow ES credentials loaded from GOOGLE_APPLICATION_CREDENTIALS (JSON content)');
+            } catch (error) {
+              logger.error('❌ Dialogflow ES: Failed to parse JSON credentials:', error.message);
+              logger.info('ℹ️ Falling back to default credentials');
+              clientConfig = {};
+            }
+          } else {
+            // Method 3: File path
+            clientConfig = { keyFilename: credentialsValue };
+            logger.info('✅ Dialogflow ES credentials loaded from file path');
+          }
+        } else {
+          // Method 4: Default credentials
+          logger.info('ℹ️ Using default Google Cloud credentials for Dialogflow ES');
+          clientConfig = {};
+        }
+        
+        this.client = new SessionsClientES(clientConfig);
         this.isES = true;
         this.isInitialized = true;
         logger.info('✅ Dialogflow ES client initialized');
-        logger.info(`   Project: ${this.projectId}, Mode: ES`);
+        logger.info(`   Project: ${this.projectId || process.env.DIALOGFLOW_PROJECT_ID || 'intern-bridge-dialogflowe-emed'}, Mode: ES`);
         return;
       }
 
@@ -95,81 +157,89 @@ class DialogflowService {
       }
       
       // Initialize client with credentials
-      // Option 1: Use JSON credentials from environment variable (for Koyeb, local .env, etc.)
-      if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      // Support multiple methods (same as ES mode):
+      // Method 1: Separate env vars (DIALOGFLOW_CLIENT_EMAIL + DIALOGFLOW_PRIVATE_KEY) - RECOMMENDED for Koyeb
+      // Method 2: JSON content in GOOGLE_APPLICATION_CREDENTIALS
+      // Method 3: File path in GOOGLE_APPLICATION_CREDENTIALS
+      // Method 4: Default credentials
+      let clientConfig = {};
+      
+      if (process.env.DIALOGFLOW_CLIENT_EMAIL && process.env.DIALOGFLOW_PRIVATE_KEY) {
+        // Method 1: Direct credentials object (RECOMMENDED - No temp files needed)
+        try {
+          const privateKey = process.env.DIALOGFLOW_PRIVATE_KEY.replace(/\\n/g, '\n');
+          
+          clientConfig = {
+            projectId: this.projectId || process.env.DIALOGFLOW_PROJECT_ID || 'intern-bridge-dialogflowe-emed',
+            credentials: {
+              client_email: process.env.DIALOGFLOW_CLIENT_EMAIL,
+              private_key: privateKey,
+            },
+          };
+          
+          logger.info('✅ Dialogflow CX credentials loaded from separate env vars (DIALOGFLOW_CLIENT_EMAIL + DIALOGFLOW_PRIVATE_KEY)');
+        } catch (error) {
+          logger.error('❌ Dialogflow CX: Failed to build credentials from env vars:', error.message);
+          logger.warn('⚠️ Falling back to default credentials');
+          clientConfig = {};
+        }
+      } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
         const credentialsValue = process.env.GOOGLE_APPLICATION_CREDENTIALS.trim();
-        
-        // Check if it's JSON content (starts with { after trimming)
         const trimmedValue = credentialsValue.replace(/^\s+|\s+$/g, '');
         const isJsonContent = trimmedValue.startsWith('{') && trimmedValue.endsWith('}');
         
         if (isJsonContent) {
           try {
-            // It's JSON content, parse and create temp file
-            const fs = require('fs');
-            const path = require('path');
-            const os = require('os');
-            
-            // Validate and parse JSON (handle newlines, spaces, etc.)
+            // Method 2: JSON content - parse and use directly
             const parsedJson = JSON.parse(trimmedValue);
             
-            // Validate it's a service account JSON
             if (!parsedJson.type || parsedJson.type !== 'service_account') {
               throw new Error('Invalid service account JSON format');
             }
             
-            const tempDir = os.tmpdir();
-            const tempCredentialsPath = path.join(tempDir, `google-credentials-${Date.now()}.json`);
+            clientConfig = {
+              projectId: parsedJson.project_id || this.projectId,
+              credentials: {
+                client_email: parsedJson.client_email,
+                private_key: parsedJson.private_key,
+              },
+            };
             
-            // Write JSON to temp file (pretty print for readability)
-            fs.writeFileSync(tempCredentialsPath, JSON.stringify(parsedJson, null, 2), 'utf8');
-            
-            this.client = new SessionsClient({
-              keyFilename: tempCredentialsPath
-            });
-            
-            logger.info('✅ Dialogflow credentials loaded from GOOGLE_APPLICATION_CREDENTIALS (JSON content)');
+            logger.info('✅ Dialogflow CX credentials loaded from GOOGLE_APPLICATION_CREDENTIALS (JSON content)');
           } catch (error) {
             logger.error('❌ Failed to parse GOOGLE_APPLICATION_CREDENTIALS as JSON:', error.message);
             logger.warn('⚠️ Falling back to default credentials');
-            this.client = new SessionsClient();
+            clientConfig = {};
           }
         } else {
-          // It's a file path
-          // Validate path (should not be empty)
+          // Method 3: File path
           if (!credentialsValue || credentialsValue.length < 3) {
             logger.warn('⚠️ Invalid GOOGLE_APPLICATION_CREDENTIALS path. Using default credentials.');
-            this.client = new SessionsClient();
+            clientConfig = {};
           } else {
-            // Check if file exists
             const fs = require('fs');
             try {
               if (fs.existsSync(credentialsValue)) {
-                this.client = new SessionsClient({
-                  keyFilename: credentialsValue
-                });
-                logger.info(`✅ Dialogflow credentials loaded from file: ${credentialsValue}`);
+                clientConfig = { keyFilename: credentialsValue };
+                logger.info(`✅ Dialogflow CX credentials loaded from file: ${credentialsValue}`);
               } else {
                 logger.warn(`⚠️ Credentials file not found: ${credentialsValue}. Using default credentials.`);
-                this.client = new SessionsClient();
+                clientConfig = {};
               }
             } catch (error) {
               logger.warn(`⚠️ Error checking credentials file: ${error.message}. Using default credentials.`);
-              this.client = new SessionsClient();
+              clientConfig = {};
             }
           }
         }
-      } 
-      // Option 2: Use default credentials (for Cloud Run, GCE, etc.)
-      else {
-        this.client = new SessionsClient();
-        logger.info('ℹ️ Using default Google Cloud credentials');
+      } else {
+        // Method 4: Default credentials
+        logger.info('ℹ️ Using default Google Cloud credentials for Dialogflow CX');
+        clientConfig = {};
       }
-      this.client = process.env.GOOGLE_APPLICATION_CREDENTIALS
-        ? new SessionsClientCX({
-            keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-          })
-        : new SessionsClientCX();
+      
+      this.client = new SessionsClientCX(clientConfig);
+      
       this.isInitialized = true;
       logger.info('✅ Dialogflow CX client initialized');
       logger.info(
@@ -177,7 +247,10 @@ class DialogflowService {
       );
     } catch (error) {
       logger.error('❌ Failed to initialize Dialogflow client:', error.message);
+      logger.error('   Error details:', error.stack?.substring(0, 500));
       this.isInitialized = false;
+      this.client = null;
+      // Don't throw - allow app to continue with fallback methods
     }
   }
 
