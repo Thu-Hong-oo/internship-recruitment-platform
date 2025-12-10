@@ -922,79 +922,6 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
                   </div>
                 </CardContent>
               </Card>
-              <Card>
-                <CardContent className="p-6 flex items-center gap-3">
-                  {job.postedBy?.avatar ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={job.postedBy.avatar}
-                      alt={job.postedBy.fullName || "Người đăng"}
-                      className="w-12 h-12 rounded-full border"
-                    />
-                  ) : (
-                    <UserCircle2 className="w-12 h-12 text-muted-foreground" />
-                  )}
-                  <div className="text-sm">
-                    <div className="font-medium text-foreground">
-                      {job.postedBy?.fullName || "Người đăng"}
-                    </div>
-                    {job.postedBy?.email && (
-                      <a
-                        className="text-xs text-primary hover:underline"
-                        href={`mailto:${job.postedBy.email}`}
-                      >
-                        {job.postedBy.email}
-                      </a>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6 space-y-2">
-                  <h3 className="font-semibold">Thống kê</h3>
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="p-3 rounded bg-muted">
-                      <div className="text-lg font-bold">
-                        {job.stats?.applications ?? 0}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Ứng tuyển
-                      </div>
-                    </div>
-                    <div className="p-3 rounded bg-muted">
-                      <div className="text-lg font-bold">
-                        {job.stats?.interviews ?? 0}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        Phỏng vấn
-                      </div>
-                    </div>
-                    <div className="p-3 rounded bg-muted">
-                      <div className="text-lg font-bold">
-                        {job.stats?.offers ?? 0}
-                      </div>
-                      <div className="text-xs text-muted-foreground">Offer</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6 space-y-2">
-                  <h3 className="font-semibold">Thông tin khác</h3>
-                  {job.education && (
-                    <div className="text-sm">
-                      <span className="font-medium">Học vấn: </span>
-                      {job.education}
-                    </div>
-                  )}
-                  {job.experience && (
-                    <div className="text-sm">
-                      <span className="font-medium">Kinh nghiệm: </span>
-                      {job.experience}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
 
               {/* Tạo lộ trình học tập */}
               <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-blue-50/50">
@@ -1116,7 +1043,7 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Chưa có gợi ý. Hãy đăng nhập và cập nhật hồ sơ để nhận đề xuất phù hợp.
+              Chưa có gợi ý. Cần cập nhật hồ sơ để nhận đề xuất phù hợp.
             </p>
           )}
         </section>

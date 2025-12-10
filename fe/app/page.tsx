@@ -9,17 +9,10 @@ import {
   Settings,
   CheckCircle2,
   FileText,
-  BarChart3,
   User,
   Bell,
   Heart,
-  Briefcase,
-  Circle,
-  Sparkles,
   Bookmark,
-  TrendingUp,
-  Target,
-  GraduationCap,
   ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,10 +29,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user } = useAuth();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [matchRate, setMatchRate] = useState(75);
-  const [cvCount, setCvCount] = useState(2);
   const [appliedJobsCount, setAppliedJobsCount] = useState(3);
-  const [submittedCvsCount, setSubmittedCvsCount] = useState(2);
   const [unreadNotifications, setUnreadNotifications] = useState(4);
   const [savedJobsCount, setSavedJobsCount] = useState(0);
   const [savedJobsList, setSavedJobsList] = useState<SavedJob[]>([]);
@@ -47,6 +37,8 @@ export default function DashboardPage() {
     Array<{ templateId: string; resumeId: string; templateName: string }>
   >([]);
   const [loading, setLoading] = useState(true);
+  const [profileCompletion, setProfileCompletion] = useState(0);
+  const [upcomingDeadlines, setUpcomingDeadlines] = useState<SavedJob[]>([]);
 
   // Kiểm tra token ngay lập tức khi component mount
   useEffect(() => {
@@ -75,15 +67,6 @@ export default function DashboardPage() {
       try {
         setLoading(true);
 
-        // Fetch CVs count
-        const resumesRes = await api.candidateCV.getResumesAll();
-        if (resumesRes?.success && resumesRes.data) {
-          const current = (resumesRes.data as any).current;
-          const history = (resumesRes.data as any).history || [];
-          const totalCvs = (current ? 1 : 0) + history.length;
-          setCvCount(totalCvs);
-        }
-
         // Fetch applied jobs count
         const applicationsRes = await api.candidateCV.getApplications({
           page: 1,
@@ -111,6 +94,37 @@ export default function DashboardPage() {
           if (savedJobsRes.data) {
             setSavedJobsList(savedJobsRes.data.slice(0, 3));
           }
+        }
+
+        // Fetch profile completion
+        const profileRes = await api.candidateCV.getMeRaw();
+        if (profileRes?.success && profileRes.data) {
+          const completion = profileRes.data.progress?.profileCompletion || 0;
+          setProfileCompletion(completion);
+        }
+
+        // Filter saved jobs with upcoming deadlines (within 7 days)
+        if (savedJobsRes?.success && savedJobsRes.data) {
+          const now = new Date();
+          const sevenDaysLater = new Date(
+            now.getTime() + 7 * 24 * 60 * 60 * 1000
+          );
+
+          const upcoming = savedJobsRes.data.filter((savedJob) => {
+            const deadline = savedJob.jobId?.deadline;
+            if (!deadline) return false;
+            const deadlineDate = new Date(deadline);
+            return deadlineDate >= now && deadlineDate <= sevenDaysLater;
+          });
+
+          // Sort by deadline (soonest first)
+          upcoming.sort((a, b) => {
+            const dateA = new Date(a.jobId?.deadline || 0).getTime();
+            const dateB = new Date(b.jobId?.deadline || 0).getTime();
+            return dateA - dateB;
+          });
+
+          setUpcomingDeadlines(upcoming.slice(0, 5)); // Top 5
         }
 
         // Fetch CV online (ResumeBuilder CVs)
@@ -169,11 +183,6 @@ export default function DashboardPage() {
   }
 
   const userName = user?.fullName || user?.firstName || "Ứng Viên";
-
-  // Calculate progress circle
-  const radius = 50;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (matchRate / 100) * circumference;
 
   const primaryColor = "oklch(0.60 0.12 195)";
   const primaryGradient = `linear-gradient(135deg, ${primaryColor} 0%, oklch(0.72 0.08 210) 55%, oklch(0.88 0.03 195) 100%)`;
@@ -234,67 +243,152 @@ export default function DashboardPage() {
           style={{ animation: "float 25s ease-in-out infinite reverse" }}
         />
         <div className="relative z-10 max-w-7xl mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left Column - AI Profile Overview & Analytics */}
-            <div className="lg:col-span-3 space-y-6">
-              {/* AI Profile Overview */}
-              <Card className="border-white/40 bg-white/70 backdrop-blur-xl shadow-[0_20px_50px_rgba(15,45,95,0.08)]">
-                <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold text-slate-900 mb-4">
-                    Tổng Quan Hồ Sơ AI
+          {/* Profile Completion */}
+          {profileCompletion > 0 && profileCompletion < 100 && (
+            <Card className="border-white/40 bg-white/70 backdrop-blur-xl shadow-[0_20px_50px_rgba(15,45,95,0.08)] mb-6">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-slate-900">
+                    Hoàn thiện hồ sơ
                   </h3>
-                  <div className="flex flex-col items-center justify-center">
-                    <div className="relative w-32 h-32 mb-4">
-                      <svg
-                        className="transform -rotate-90 w-32 h-32"
-                        viewBox="0 0 120 120"
-                      >
-                        <circle
-                          cx="60"
-                          cy="60"
-                          r={radius}
-                          stroke="currentColor"
-                          strokeWidth="12"
-                          fill="none"
-                          className="text-slate-200"
-                        />
-                        <circle
-                          cx="60"
-                          cy="60"
-                          r={radius}
-                          stroke="currentColor"
-                          strokeWidth="12"
-                          fill="none"
-                          strokeDasharray={circumference}
-                          strokeDashoffset={offset}
-                          strokeLinecap="round"
-                          style={{ color: primaryColor }}
-                          className="transition-all duration-500"
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-2xl font-bold text-slate-900">
-                          {matchRate}%
-                        </span>
-                      </div>
-                    </div>
-                    <p className="text-sm font-medium text-slate-600">
-                      Độ Phù Hợp
-                    </p>
-                  </div>
+                  <span className="text-sm font-semibold text-slate-600">
+                    {profileCompletion}%
+                  </span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
                   <div
-                    onClick={() => router.push("/search")}
-                    className="flex items-center space-x-2 text-[oklch(0.60_0.12_195)] hover:text-[oklch(0.55_0.12_195)] cursor-pointer transition-all duration-300 group"
-                  >
-                    <span className="text-sm font-semibold">Xem tất cả</span>
-                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform duration-300" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${profileCompletion}%`,
+                      background: primaryGradient,
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  Hoàn thiện hồ sơ để tăng cơ hội được nhà tuyển dụng chú ý
+                </p>
+                <Button
+                  onClick={() => router.push("/profile")}
+                  variant="ghost"
+                  size="sm"
+                  className="mt-3 text-xs"
+                  style={{ color: primaryColor }}
+                >
+                  Hoàn thiện ngay →
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Middle Column - Job Applications & Submitted CVs */}
-            <div className="lg:col-span-6 space-y-6">
+            <div className="lg:col-span-8 space-y-6">
+              {/* Upcoming Deadlines */}
+              {upcomingDeadlines.length > 0 && (
+                <Card className="border-white/40 bg-white/70 backdrop-blur-xl shadow-[0_20px_50px_rgba(15,45,95,0.08)]">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-slate-900">
+                        Deadline sắp đến
+                      </h3>
+                      <Badge
+                        className="border-none"
+                        style={{
+                          background: `oklch(0.60 0.12 195 / 0.15)`,
+                          color: primaryColor,
+                        }}
+                      >
+                        {upcomingDeadlines.length} việc
+                      </Badge>
+                    </div>
+                    <div className="space-y-3">
+                      {upcomingDeadlines.map((savedJob) => {
+                        const job = savedJob.jobId;
+                        if (!job) return null;
+                        const deadline = job.deadline
+                          ? new Date(job.deadline)
+                          : null;
+                        const now = new Date();
+                        const daysLeft = deadline
+                          ? Math.ceil(
+                              (deadline.getTime() - now.getTime()) /
+                                (1000 * 60 * 60 * 24)
+                            )
+                          : null;
+                        const isUrgent = daysLeft !== null && daysLeft < 3;
+
+                        return (
+                          <Link
+                            key={savedJob._id}
+                            href={`/jobs/${job._id}`}
+                            className="block"
+                          >
+                            <div
+                              className={`flex items-center justify-between p-3 rounded-lg transition-colors hover:shadow-md ${
+                                isUrgent
+                                  ? "bg-red-50 border border-red-200"
+                                  : "bg-orange-50 border border-orange-200"
+                              }`}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-slate-900 truncate">
+                                  {job.title}
+                                </p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-xs text-slate-600">
+                                    {job.employer?.company?.name ||
+                                      "Nhà tuyển dụng"}
+                                  </span>
+                                  {deadline && (
+                                    <>
+                                      <span className="text-xs text-slate-400">
+                                        •
+                                      </span>
+                                      <span
+                                        className={`text-xs font-semibold ${
+                                          isUrgent
+                                            ? "text-red-600"
+                                            : "text-orange-600"
+                                        }`}
+                                      >
+                                        {daysLeft === 0
+                                          ? "Hôm nay"
+                                          : daysLeft === 1
+                                          ? "Ngày mai"
+                                          : `${daysLeft} ngày nữa`}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <Badge
+                                className={`border-none flex-shrink-0 ${
+                                  isUrgent
+                                    ? "bg-red-500 text-white"
+                                    : "bg-orange-500 text-white"
+                                }`}
+                              >
+                                {isUrgent ? "Gấp" : "Sắp đến"}
+                              </Badge>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                    <Link href="/jobs/saved-jobs">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full mt-4"
+                        style={{ color: primaryColor }}
+                      >
+                        Xem tất cả →
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Saved Jobs Waiting */}
               <Card className="border-white/40 bg-white/70 backdrop-blur-xl shadow-[0_20px_50px_rgba(15,45,95,0.08)]">
                 <CardContent className="p-6">
@@ -448,7 +542,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Right Column - Sidebar Navigation */}
-            <div className="lg:col-span-3">
+            <div className="lg:col-span-4">
               <Card className="border-white/40 bg-white/70 backdrop-blur-xl shadow-[0_20px_50px_rgba(15,45,95,0.08)]">
                 <CardContent className="p-6">
                   <h3 className="text-lg font-semibold text-slate-900 mb-4">
@@ -498,7 +592,7 @@ export default function DashboardPage() {
                     </Link>
                     <Link
                       href="/applied-jobs"
-                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-[oklch(0.60_0.12_195/.08)] transition-colors"
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-[oklch(0.60_0.12_195/.08)] transition-colors relative"
                     >
                       <CheckCircle2
                         className="w-5 h-5"
@@ -507,6 +601,11 @@ export default function DashboardPage() {
                       <span className="text-sm font-medium text-slate-700">
                         Việc Làm Đã Ứng Tuyển
                       </span>
+                      {appliedJobsCount > 0 && (
+                        <span className="ml-auto w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center font-semibold">
+                          {appliedJobsCount > 99 ? "99+" : appliedJobsCount}
+                        </span>
+                      )}
                     </Link>
                     <Link
                       href="/profile"
