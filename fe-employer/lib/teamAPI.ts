@@ -105,6 +105,9 @@ export interface AcceptInvitationResponse {
     email: string;
     role: TeamRole;
     status: MemberStatus;
+    hasAccount?: boolean;
+    needsLogin?: boolean;
+    needsRegister?: boolean;
   };
   error?: string;
 }
@@ -240,6 +243,30 @@ export const cancelInvitation = async (
 ): Promise<{ success: boolean; message: string }> => {
   return apiCall(`/employers/team/invitations/${invitationId}`, {
     method: "DELETE",
+  });
+};
+
+/**
+ * Resend invitation email (owner/admin only)
+ */
+export const resendInvitationEmail = async (
+  invitationId: string
+): Promise<{
+  success: boolean;
+  message: string;
+  data?: {
+    invitationId: string;
+    email: string;
+    role: TeamRole;
+    status: MemberStatus;
+    expiresAt: string;
+    emailSent: boolean;
+    emailWarning?: string;
+  };
+  error?: string;
+}> => {
+  return apiCall(`/employers/team/invitations/${invitationId}/resend`, {
+    method: "POST",
   });
 };
 

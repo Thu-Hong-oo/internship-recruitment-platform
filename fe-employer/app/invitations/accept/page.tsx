@@ -82,15 +82,43 @@ export default function AcceptInvitationPage() {
       // For now, we'll use a workaround - accept endpoint should handle token lookup
       const response = await acceptInvitation("", { token });
       
-      if (response.success) {
+      if (response.success && response.data) {
+        const { email, role, needsLogin, needsRegister } = response.data;
+        
+        // Store invitation role for registration
+        if (role && typeof window !== "undefined") {
+          localStorage.setItem("invitationRole", role);
+        }
+        
         toast({
           title: "Thành công",
           description: "Bạn đã chấp nhận lời mời thành công!",
         });
-        // Redirect to login or dashboard
-        setTimeout(() => {
-          router.push("/dashboard");
-        }, 2000);
+        
+        // Check if user needs to login or register
+        const token = localStorage.getItem("token");
+        
+        if (token) {
+          // User is already logged in, redirect to dashboard
+          setTimeout(() => {
+            router.push("/dashboard");
+          }, 1500);
+        } else if (needsLogin) {
+          // User has account but not logged in, redirect to login with email
+          setTimeout(() => {
+            router.push(`/?email=${encodeURIComponent(email)}&fromInvitation=true`);
+          }, 1500);
+        } else if (needsRegister) {
+          // User doesn't have account, redirect to register with email and role
+          setTimeout(() => {
+            router.push(`/register?email=${encodeURIComponent(email)}&fromInvitation=true&role=${encodeURIComponent(role)}`);
+          }, 1500);
+        } else {
+          // Fallback: redirect to login
+          setTimeout(() => {
+            router.push(`/?email=${encodeURIComponent(email)}&fromInvitation=true`);
+          }, 1500);
+        }
       } else {
         throw new Error(response.error || "Không thể chấp nhận lời mời");
       }

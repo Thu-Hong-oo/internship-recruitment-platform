@@ -247,6 +247,21 @@ const login = asyncHandler(async (req, res) => {
   user.lastLogin = new Date();
   await user.save({ validateBeforeSave: false });
 
+  // Auto-link with accepted invitation if user is employer
+  if (user.role === 'employer') {
+    const TeamInvitationController = require('./teamInvitationController');
+    try {
+      await TeamInvitationController.linkUserWithInvitation(user._id, user.email);
+    } catch (linkError) {
+      logger.error('Failed to auto-link invitation after login', {
+        error: linkError.message,
+        userId: user._id,
+        email: user.email,
+      });
+      // Don't fail the request, just log the error
+    }
+  }
+
   // Create token
   const token = user.getSignedJwtToken();
 
@@ -520,10 +535,25 @@ const loginWithGoogle = asyncHandler(async (req, res) => {
     // Update last login
     result.user.lastLogin = new Date();
     await result.user.save({ validateBeforeSave: false });
-    
+
+    // Auto-link with accepted invitation if user is employer
+    if (result.user.role === 'employer') {
+      const TeamInvitationController = require('./teamInvitationController');
+      try {
+        await TeamInvitationController.linkUserWithInvitation(result.user._id, result.user.email);
+      } catch (linkError) {
+        logger.error('Failed to auto-link invitation after Google login', {
+          error: linkError.message,
+          userId: result.user._id,
+          email: result.user.email,
+        });
+        // Don't fail the request, just log the error
+      }
+    }
+
     // Generate JWT token
     const token = result.user.getSignedJwtToken();
-    
+
     logger.info(`Google OAuth successful: ${result.user.email}`, {
       userId: result.user._id,
       isNew: result.isNew,
@@ -644,61 +674,133 @@ const verifyEmail = asyncHandler(async (req, res) => {
       await user.save();
     } else if (user.role === 'employer') {
       const EmployerProfile = require('../models/EmployerProfile');
+      const TeamInvitationController = require('./teamInvitationController');
       
-      // Create valid default data
-      const timestamp = Date.now().toString().slice(-6);
-      const tempTaxId = `123456${timestamp}`;
-      const companyEmail = `company_${user._id}@company.com`;
-      
-      const employerProfile = await EmployerProfile.create({
-        owner: user._id,
-        company: {
-          name: 'Chưa cập nhật',
-          industry: 'technology',
-          size: 'small',
-          email: companyEmail,
-        },
-        position: {
-          title: 'Chưa cập nhật',
-          level: 'junior',
-          department: 'Chưa cập nhật',
-        },
-        contact: {
-          name: user.fullName || 'Chưa cập nhật',
-          phone: '0123456789',
+      // Check if user has accepted invitation first
+      // If yes, they're a member, not owner - don't create profile
+      try {
+        const linked = await TeamInvitationController.linkUserWithInvitation(user._id, user.email);
+        
+        if (!linked) {
+          // User is NOT a member, create employer profile as owner
+          // Create valid default data
+          const timestamp = Date.now().toString().slice(-6);
+          const tempTaxId = `123456${timestamp}`;
+          const companyEmail = `company_${user._id}@company.com`;
+          
+          const employerProfile = await EmployerProfile.create({
+            owner: user._id,
+            company: {
+              name: 'Chưa cập nhật',
+              industry: 'technology',
+              size: 'small',
+              email: companyEmail,
+            },
+            position: {
+              title: 'Chưa cập nhật',
+              level: 'junior',
+              department: 'Chưa cập nhật',
+            },
+            contact: {
+              name: user.fullName || 'Chưa cập nhật',
+              phone: '0123456789',
+              email: user.email,
+            },
+            legalRepresentative: {
+              fullName: user.fullName || 'Chưa cập nhật',
+              position: 'Chưa cập nhật',
+              phone: '0123456789',
+              email: user.email,
+            },
+            businessInfo: {
+              registrationNumber: `temp_${user._id}`,
+              taxId: tempTaxId,
+              issueDate: new Date(),
+              issuePlace: 'Chưa cập nhật',
+              address: {
+                street: 'Chưa cập nhật',
+                ward: 'Chưa cập nhật',
+                district: 'Chưa cập nhật',
+                city: 'Chưa cập nhật',
+                country: 'Vietnam',
+              },
+            },
+            verification: {
+              isVerified: false,
+              steps: {
+                businessInfo: false,
+                documents: false,
+              },
+              documents: [],
+            },
+            status: 'pending',
+          });
+          user.employerProfile = employerProfile._id;
+          await user.save();
+        } else {
+          logger.info(`User ${user._id} is a team member, skipping employer profile creation`);
+        }
+      } catch (linkError) {
+        logger.error('Failed to check/link invitation after registration', {
+          error: linkError.message,
+          userId: user._id,
           email: user.email,
-        },
-        legalRepresentative: {
-          fullName: user.fullName || 'Chưa cập nhật',
-          position: 'Chưa cập nhật',
-          phone: '0123456789',
-          email: user.email,
-        },
-        businessInfo: {
-          registrationNumber: `temp_${user._id}`,
-          taxId: tempTaxId,
-          issueDate: new Date(),
-          issuePlace: 'Chưa cập nhật',
-          address: {
-            street: 'Chưa cập nhật',
-            ward: 'Chưa cập nhật',
-            district: 'Chưa cập nhật',
-            city: 'Chưa cập nhật',
-            country: 'Vietnam',
+        });
+        // If error, still create profile as fallback (user might be owner)
+        const timestamp = Date.now().toString().slice(-6);
+        const tempTaxId = `123456${timestamp}`;
+        const companyEmail = `company_${user._id}@company.com`;
+        
+        const employerProfile = await EmployerProfile.create({
+          owner: user._id,
+          company: {
+            name: 'Chưa cập nhật',
+            industry: 'technology',
+            size: 'small',
+            email: companyEmail,
           },
-        },
-        verification: {
-          isVerified: false,
-          steps: {
-            businessInfo: false,
-            documents: false,
+          position: {
+            title: 'Chưa cập nhật',
+            level: 'junior',
+            department: 'Chưa cập nhật',
           },
-          documents: [],
-        },
-        status: 'pending',
-      });
-      user.employerProfile = employerProfile._id;
-      await user.save();
+          contact: {
+            name: user.fullName || 'Chưa cập nhật',
+            phone: '0123456789',
+            email: user.email,
+          },
+          legalRepresentative: {
+            fullName: user.fullName || 'Chưa cập nhật',
+            position: 'Chưa cập nhật',
+            phone: '0123456789',
+            email: user.email,
+          },
+          businessInfo: {
+            registrationNumber: `temp_${user._id}`,
+            taxId: tempTaxId,
+            issueDate: new Date(),
+            issuePlace: 'Chưa cập nhật',
+            address: {
+              street: 'Chưa cập nhật',
+              ward: 'Chưa cập nhật',
+              district: 'Chưa cập nhật',
+              city: 'Chưa cập nhật',
+              country: 'Vietnam',
+            },
+          },
+          verification: {
+            isVerified: false,
+            steps: {
+              businessInfo: false,
+              documents: false,
+            },
+            documents: [],
+          },
+          status: 'pending',
+        });
+        user.employerProfile = employerProfile._id;
+        await user.save();
+      }
     }
 
     // Clean up Redis data

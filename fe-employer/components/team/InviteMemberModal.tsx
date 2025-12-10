@@ -104,7 +104,25 @@ export default function InviteMemberModal({
         onOpenChange(false);
         onSuccess?.();
       } else {
-        throw new Error(response.error || "Không thể gửi lời mời");
+        // Check if it's an "already invited" error
+        const errorMessage = response.error || "Không thể gửi lời mời";
+        const isAlreadyInvited = 
+          errorMessage.toLowerCase().includes("already been invited") ||
+          errorMessage.toLowerCase().includes("already a member");
+
+        if (isAlreadyInvited) {
+          // Show friendly info message instead of error
+          toast({
+            title: "Thông tin",
+            description: "Email này đã được mời hoặc đã là thành viên của team",
+          });
+          setEmail("");
+          onOpenChange(false);
+          onSuccess?.(); // Refresh the list to show the existing member
+        } else {
+          // Other errors show as destructive
+          throw new Error(errorMessage);
+        }
       }
     } catch (error: any) {
       toast({
