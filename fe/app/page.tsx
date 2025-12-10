@@ -35,6 +35,7 @@ import { AINavigationInput } from "@/components/ai/AINavigationInput";
 export default function DashboardPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [matchRate, setMatchRate] = useState(75);
   const [cvCount, setCvCount] = useState(2);
   const [appliedJobsCount, setAppliedJobsCount] = useState(3);
@@ -47,7 +48,21 @@ export default function DashboardPage() {
   >([]);
   const [loading, setLoading] = useState(true);
 
+  // Kiểm tra token ngay lập tức khi component mount
   useEffect(() => {
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (!token) {
+      router.push("/home");
+      return;
+    }
+    setIsAuthenticated(true);
+  }, [router]);
+
+  useEffect(() => {
+    // Chỉ fetch data khi đã xác thực
+    if (!isAuthenticated) return;
+
     const token =
       typeof window !== "undefined" ? localStorage.getItem("token") : null;
     if (!token) {
@@ -146,7 +161,12 @@ export default function DashboardPage() {
     };
 
     fetchDashboardData();
-  }, [router]);
+  }, [router, isAuthenticated]);
+
+  // Không render nếu chưa xác thực
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const userName = user?.fullName || user?.firstName || "Ứng Viên";
 
@@ -160,39 +180,6 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,oklch(0.97_0.02_210)_0%,white_30%)]">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-white/40 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between gap-4">
-            {/* Logo */}
-            <Link href="/home" className="flex items-center gap-3">
-              <span className="text-xl font-bold text-slate-900">
-                InternBridge
-              </span>
-            </Link>
-
-            {/* AI Navigation Input */}
-            <div className="flex-1 max-w-2xl">
-              <AINavigationInput
-                frontend="fe"
-                placeholder="Nhập hoặc nói điều bạn muốn làm... (ví dụ: tìm việc IT ở Sài Gòn, về trang chủ)"
-                className="w-full"
-              />
-            </div>
-
-            {/* Settings Icon */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="w-10 h-10"
-              onClick={() => router.push("/profile")}
-            >
-              <Settings className="w-5 h-5" style={{ color: primaryColor }} />
-            </Button>
-          </div>
-        </div>
-      </header>
-
       {/* Welcome Banner */}
       <div
         className="relative overflow-hidden"
@@ -216,6 +203,15 @@ export default function DashboardPage() {
               <p className="text-white/95 font-medium">
                 Quản lý hồ sơ và theo dõi ứng tuyển của bạn
               </p>
+            </div>
+            {/* AI Navigation Input */}
+            <div className="flex-1 max-w-2xl">
+              <AINavigationInput
+                frontend="fe"
+                placeholder="Nhập hoặc nói điều bạn muốn làm... (ví dụ: tìm việc IT ở Sài Gòn, về trang chủ)"
+                className="w-full"
+                variant="banner"
+              />
             </div>
             <Button
               onClick={() => router.push("/home")}
@@ -299,7 +295,6 @@ export default function DashboardPage() {
 
             {/* Middle Column - Job Applications & Submitted CVs */}
             <div className="lg:col-span-6 space-y-6">
-
               {/* Saved Jobs Waiting */}
               <Card className="border-white/40 bg-white/70 backdrop-blur-xl shadow-[0_20px_50px_rgba(15,45,95,0.08)]">
                 <CardContent className="p-6">
