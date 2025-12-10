@@ -40,6 +40,7 @@ import InviteMemberModal from "@/components/team/InviteMemberModal";
 import {
   getInvitations,
   cancelInvitation,
+  resendInvitationEmail,
   removeMember,
   updateMember,
   getTeamStats,
@@ -58,6 +59,7 @@ import {
   Activity,
   Users,
   Clock3,
+  Send,
   UserCheck,
 } from "lucide-react";
 
@@ -139,6 +141,14 @@ export default function TeamMembersPage() {
   useEffect(() => {
     loadMembers();
     loadStatsAndActivity();
+    
+    // Auto-refresh every 30 seconds to catch new acceptances
+    const interval = setInterval(() => {
+      loadMembers();
+      loadStatsAndActivity();
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const handleCancelInvitation = async (member: TeamMember) => {
@@ -157,6 +167,35 @@ export default function TeamMembersPage() {
       toast({
         title: "Lỗi",
         description: error.message || "Không thể hủy lời mời",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleResendEmail = async (member: TeamMember) => {
+    try {
+      const response = await resendInvitationEmail(member._id);
+      if (response.success) {
+        if (response.data?.emailSent) {
+          toast({
+            title: "Thành công",
+            description: `Đã gửi lại email đến ${member.email}`,
+          });
+        } else {
+          toast({
+            title: "Cảnh báo",
+            description: response.data?.emailWarning || "Email không được gửi. Vui lòng kiểm tra cấu hình SMTP.",
+            variant: "destructive",
+          });
+        }
+        loadMembers();
+      } else {
+        throw new Error(response.error || "Không thể gửi lại email");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Lỗi",
+        description: error.message || "Không thể gửi lại email",
         variant: "destructive",
       });
     }
@@ -354,15 +393,25 @@ export default function TeamMembersPage() {
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
+                          <button
+                            type="button"
+                            className="inline-flex items-center justify-center h-8 w-8 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
+                          >
                             <MoreHorizontal className="h-4 w-4" />
-                          </Button>
+                          </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Thao tác</DropdownMenuLabel>
                           <DropdownMenuSeparator />
                           {member.status === "pending" && (
                             <>
+                              <DropdownMenuItem
+                                onClick={() => handleResendEmail(member)}
+                              >
+                                <Send className="mr-2 h-4 w-4" />
+                                Gửi lại email
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 onClick={() => handleCancelInvitation(member)}
                               >

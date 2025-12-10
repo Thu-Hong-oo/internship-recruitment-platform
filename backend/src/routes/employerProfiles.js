@@ -38,6 +38,7 @@ const {
   acceptInvitation,
   rejectInvitation,
   cancelInvitation,
+  resendInvitationEmail,
   updateMember,
   removeMember,
   verifyInvitationToken,
@@ -320,6 +321,15 @@ router.delete(
   authorize('employer'),
   requireEmployerProfile,
   cancelInvitation
+);
+
+// Resend invitation email (owner/admin only)
+router.post(
+  '/team/invitations/:invitationId/resend',
+  protect,
+  authorize('employer'),
+  requireEmployerProfile,
+  resendInvitationEmail
 );
 
 // Update member (role, permissions, status)

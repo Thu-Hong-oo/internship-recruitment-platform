@@ -1,0 +1,150 @@
+@startuml Database Schema Simplified
+!define MONGO(entity) entity entity #LightBlue
+!define EMBEDDED(entity) entity entity #LightGreen
+!define REFERENCE(entity) entity entity #LightYellow
+
+' Main Entities
+MONGO(User) {
+  + _id: ObjectId
+  + email: String
+  + password: String
+  + role: String
+  + profile: ObjectId
+  + preferences: Object
+  + createdAt: Date
+  + updatedAt: Date
+}
+
+MONGO(CandidateProfile) {
+  + _id: ObjectId
+  + userId: ObjectId
+  + personalInfo: Object
+  + skills: Array<Skill>
+  + education: Array<Education>
+  + experience: Array<Experience>
+  + projects: Array<Project>
+  + aiAnalysis: Object
+  + embedding: Array<Number>
+}
+
+MONGO(EmployerProfile) {
+  + _id: ObjectId
+  + userId: ObjectId
+  + companyInfo: Object
+  + teamMembers: Array<TeamMember>
+  + verificationStatus: String
+  + analytics: Object
+}
+
+MONGO(Job) {
+  + _id: ObjectId
+  + employerId: ObjectId
+  + title: String
+  + description: String
+  + requirements: Object
+  + skills: Array<String>
+  + aiAnalysis: Object
+  + matchingPool: Array<ObjectId>
+  + suggestedCandidates: Array<ObjectId>
+}
+
+MONGO(Application) {
+  + _id: ObjectId
+  + candidateId: ObjectId
+  + jobId: ObjectId
+  + status: String
+  + interviews: Array<Interview>
+  + timeline: Array<TimelineEvent>
+  + aiAnalysis: Object
+}
+
+MONGO(Skill) {
+  + _id: ObjectId
+  + name: String
+  + category: String
+  + embedding: Array<Number>
+  + demandScore: Number
+  + createdAt: Date
+}
+
+MONGO(Industry) {
+  + _id: ObjectId
+  + name: String
+  + parentId: ObjectId
+  + level: Number
+  + createdAt: Date
+}
+
+' Supporting Entities
+MONGO(ResumeBuilder) {
+  + _id: ObjectId
+  + userId: ObjectId
+  + currentVersion: Object
+  + versions: Array<Version>
+  + exports: Array<Export>
+}
+
+MONGO(Notification) {
+  + _id: ObjectId
+  + recipientId: ObjectId
+  + type: String
+  + content: Object
+  + deliveryStatus: String
+  + createdAt: Date
+}
+
+MONGO(SavedJob) {
+  + _id: ObjectId
+  + userId: ObjectId
+  + jobId: ObjectId
+  + savedAt: Date
+}
+
+MONGO(CompanyFollow) {
+  + _id: ObjectId
+  + userId: ObjectId
+  + employerId: ObjectId
+  + followedAt: Date
+}
+
+MONGO(LearningRoadmap) {
+  + _id: ObjectId
+  + userId: ObjectId
+  + skillGaps: Array<SkillGap>
+  + weeklyPlan: Array<Week>
+  + resources: Array<Resource>
+  + progress: Object
+}
+
+MONGO(CVMatchingScore) {
+  + _id: ObjectId
+  + candidateId: ObjectId
+  + jobId: ObjectId
+  + scores: Object
+  + totalScore: Number
+  + tier: String
+  + createdAt: Date
+}
+
+' Relationships
+User ||--o{ CandidateProfile : has
+User ||--o{ EmployerProfile : has
+User ||--o{ ResumeBuilder : has
+User ||--o{ SavedJob : saves
+User ||--o{ CompanyFollow : follows
+User ||--o{ LearningRoadmap : has
+User ||--o{ Notification : receives
+
+EmployerProfile ||--o{ Job : posts
+Job ||--o{ Application : receives
+Job ||--o{ CVMatchingScore : has scores for
+
+CandidateProfile ||--o{ Application : submits
+CandidateProfile ||--o{ CVMatchingScore : has scores for
+
+Industry ||--o{ Industry : parent
+
+Skill ||--o{ CandidateProfile : used in
+Skill ||--o{ Job : required by
+
+@enduml

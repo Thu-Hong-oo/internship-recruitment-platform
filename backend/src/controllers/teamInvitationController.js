@@ -86,26 +86,51 @@ class TeamInvitationController {
     await profile.save();
 
     // Send invitation email
+    let emailSent = false;
+    let emailError = null;
     try {
       const invitationLink = `${process.env.FRONTEND_EMPLOYER_URL || 'http://localhost:3002'}/invitations/accept?token=${invitationToken}`;
       await this._sendInvitationEmail(email, role, invitationLink, profile.company.name);
-    } catch (emailError) {
-      logger.warn('Failed to send invitation email:', emailError.message);
-      // Don't fail the request if email fails
+      emailSent = true;
+      logger.info(`✅ Team invitation email sent successfully: ${email} as ${role} by ${userId}`);
+    } catch (err) {
+      emailError = err;
+      logger.error('❌ Failed to send invitation email', {
+        email,
+        role,
+        error: err.message,
+        errorCode: err.code,
+        stack: err.stack,
+      });
+      // Don't fail the request if email fails, but log it clearly
     }
 
-    logger.info(`Team invitation sent: ${email} as ${role} by ${userId}`);
+    logger.info(`Team invitation created: ${email} as ${role} by ${userId}`, {
+      emailSent,
+      emailError: emailError ? emailError.message : null,
+    });
+
+    // Include email status in response
+    const responseData = {
+      invitationId: newMember._id,
+      email: email,
+      role: role,
+      status: 'pending',
+      expiresAt: expiresAt,
+      emailSent: emailSent,
+    };
+
+    if (!emailSent && emailError) {
+      // Add warning if email failed
+      responseData.emailWarning = emailError.message.includes('SMTP not configured')
+        ? 'Email không được gửi vì SMTP chưa được cấu hình. Vui lòng liên hệ admin.'
+        : `Email không được gửi: ${emailError.message}`;
+    }
 
     return ApiResponse.success(
       res,
-      {
-        invitationId: newMember._id,
-        email: email,
-        role: role,
-        status: 'pending',
-        expiresAt: expiresAt,
-      },
-      'Invitation sent successfully'
+      responseData,
+      emailSent ? 'Invitation sent successfully' : 'Invitation created but email sending failed'
     );
   }
 
@@ -333,26 +358,36 @@ class TeamInvitationController {
       }
     }
 
+    // Check if user account exists
+    const existingUser = await User.findOne({ email: member.email.toLowerCase() });
+    const hasAccount = !!existingUser;
+    
     // Update member status
     member.status = 'active';
     member.joinedAt = new Date();
     if (userId) {
       member.user = userId;
+    } else if (existingUser) {
+      // Link to existing user account if found
+      member.user = existingUser._id;
     }
     // Remove token after acceptance
     member.invitationToken = undefined;
 
     await profile.save();
 
-    logger.info(`Invitation accepted: ${member.email} (${invitationId})`);
+    logger.info(`Invitation accepted: ${member.email} (${invitationId}), hasAccount: ${hasAccount}, userId: ${userId || member.user || 'none'}`);
 
     return ApiResponse.success(
       res,
       {
-        invitationId: invitationId,
+        invitationId: invitationId || member._id.toString(),
         email: member.email,
         role: member.role,
         status: 'active',
+        hasAccount: hasAccount,
+        needsLogin: !req.user && hasAccount,
+        needsRegister: !req.user && !hasAccount,
       },
       'Invitation accepted successfully'
     );
@@ -658,6 +693,58 @@ class TeamInvitationController {
   // ============================================
 
   /**
+   * Auto-link user with accepted invitation by email
+   * Called after user registration/login
+   * @param {string} userId - User ID
+   * @param {string} email - User email
+   * @returns {Promise<boolean>} - Returns true if linked successfully
+   */
+  static async linkUserWithInvitation(userId, email) {
+    try {
+      const EmployerProfile = require('../models/EmployerProfile');
+      
+      // Find profile with accepted invitation for this email but no user linked
+      const profile = await EmployerProfile.findOne({
+        'members.email': email.toLowerCase(),
+        'members.status': 'active',
+        $or: [
+          { 'members.user': { $exists: false } },
+          { 'members.user': null }
+        ]
+      });
+
+      if (!profile) {
+        return false;
+      }
+
+      // Find the member
+      const member = profile.members.find(
+        m => m.email?.toLowerCase() === email.toLowerCase() 
+          && m.status === 'active' 
+          && (!m.user || !m.user.toString())
+      );
+
+      if (!member) {
+        return false;
+      }
+
+      // Link user to invitation
+      member.user = userId;
+      await profile.save();
+
+      logger.info(`Auto-linked user ${userId} with invitation for ${email}`);
+      return true;
+    } catch (error) {
+      logger.error('Failed to auto-link user with invitation', {
+        error: error.message,
+        userId,
+        email,
+      });
+      return false;
+    }
+  }
+
+  /**
    * Check if user has permission
    */
   _checkPermission(profile, userId, permission) {
@@ -773,6 +860,94 @@ class TeamInvitationController {
   }
 
   /**
+   * POST /api/employers/team/invitations/:invitationId/resend
+   * Gửi lại email invitation
+   */
+  async resendInvitationEmail(req, res) {
+    const { invitationId } = req.params;
+    const userId = req.user.id;
+
+    const profile = await EmployerProfile.findOne({ owner: userId });
+    if (!profile) {
+      throw new AppError('Employer profile not found', 404);
+    }
+
+    // Check permission
+    const canManageTeam = this._checkPermission(profile, userId, 'canManageTeam');
+    if (!canManageTeam && profile.owner.toString() !== userId.toString()) {
+      throw new AppError('You do not have permission to resend invitations', 403);
+    }
+
+    const member = profile.members.id(invitationId);
+    if (!member) {
+      throw new AppError('Invitation not found', 404);
+    }
+
+    // Only resend for pending invitations
+    if (member.status !== 'pending') {
+      throw new AppError('Can only resend email for pending invitations', 400);
+    }
+
+    // Check if invitation is expired, regenerate token if needed
+    const now = new Date();
+    let invitationToken = member.invitationToken;
+    let expiresAt = member.expiresAt;
+
+    if (!invitationToken || !expiresAt || expiresAt < now) {
+      // Regenerate token if expired or missing
+      invitationToken = crypto.randomBytes(32).toString('hex');
+      expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
+      
+      member.invitationToken = invitationToken;
+      member.expiresAt = expiresAt;
+      await profile.save();
+      
+      logger.info(`Regenerated invitation token for ${member.email} (${invitationId})`);
+    }
+
+    // Send invitation email
+    let emailSent = false;
+    let emailError = null;
+    try {
+      const invitationLink = `${process.env.FRONTEND_EMPLOYER_URL || 'http://localhost:3002'}/invitations/accept?token=${invitationToken}`;
+      await this._sendInvitationEmail(member.email, member.role, invitationLink, profile.company.name);
+      emailSent = true;
+      logger.info(`✅ Resent invitation email successfully: ${member.email} (${invitationId}) by ${userId}`);
+    } catch (err) {
+      emailError = err;
+      logger.error('❌ Failed to resend invitation email', {
+        email: member.email,
+        invitationId,
+        error: err.message,
+        errorCode: err.code,
+        stack: err.stack,
+      });
+    }
+
+    const responseData = {
+      invitationId: member._id,
+      email: member.email,
+      role: member.role,
+      status: member.status,
+      expiresAt: member.expiresAt,
+      emailSent: emailSent,
+    };
+
+    if (!emailSent && emailError) {
+      responseData.emailWarning = emailError.message.includes('SMTP not configured')
+        ? 'Email không được gửi vì SMTP chưa được cấu hình. Vui lòng liên hệ admin.'
+        : `Email không được gửi: ${emailError.message}`;
+    }
+
+    return ApiResponse.success(
+      res,
+      responseData,
+      emailSent ? 'Invitation email resent successfully' : 'Failed to resend invitation email'
+    );
+  }
+
+  /**
    * Send invitation email
    */
   async _sendInvitationEmail(email, role, invitationLink, companyName) {
@@ -812,11 +987,14 @@ module.exports = {
   acceptInvitation: asyncHandler(controller.acceptInvitation.bind(controller)),
   rejectInvitation: asyncHandler(controller.rejectInvitation.bind(controller)),
   cancelInvitation: asyncHandler(controller.cancelInvitation.bind(controller)),
+  resendInvitationEmail: asyncHandler(controller.resendInvitationEmail.bind(controller)),
   updateMember: asyncHandler(controller.updateMember.bind(controller)),
   removeMember: asyncHandler(controller.removeMember.bind(controller)),
   verifyInvitationToken: asyncHandler(controller.verifyInvitationToken.bind(controller)),
   getMyMembership: asyncHandler(controller.getMyMembership.bind(controller)),
   getTeamStats: asyncHandler(controller.getTeamStats.bind(controller)),
   getTeamActivity: asyncHandler(controller.getTeamActivity.bind(controller)),
+  // Static method for auto-linking invitations
+  linkUserWithInvitation: TeamInvitationController.linkUserWithInvitation,
 };
 

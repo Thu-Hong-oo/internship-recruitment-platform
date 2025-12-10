@@ -1,0 +1,657 @@
+@startuml Internship Recruitment Platform - Complete MongoDB Schema
+
+' ===== CORE ENTITIES =====
+
+entity "User" as User {
+  * _id: ObjectId [PK]
+  --
+  * email: String [unique]
+  * password: String
+  * authMethod: String [local/google/hybrid]
+  * role: String [candidate/employer]
+  * fullName: String
+  --
+  googleId: String
+  googleEmail: String
+  avatar: String
+  --
+  candidateProfile: ObjectId [FK->CandidateProfile]
+  employerProfile: ObjectId [FK->EmployerProfile]
+  --
+  isEmailVerified: Boolean
+  isActive: Boolean
+  status: String
+  lastLogin: Date
+  --
+  preferences: {
+    + privacySettings: Object
+    + notifications: Object
+    + language: String
+    + timezone: String
+  }
+  --
+  + createdAt: Date
+  + updatedAt: Date
+}
+
+entity "CandidateProfile" as CandidateProfile {
+  * _id: ObjectId [PK]
+  --
+  * userId: ObjectId [FK->User] [unique]
+  --
+  status: String [active/inactive/paused]
+  pausedAt: Date
+  deletedAt: Date
+  --
+  settings: {
+    + visibility: String
+    + searchable: Boolean
+  }
+  --
+  personalInfo: {
+    + fullName: String
+    + dateOfBirth: Date
+    + gender: String
+    + phone: String
+    + address: Object
+    + bio: String
+    + avatar: String
+    + linkedin: String
+    + github: String
+  }
+  --
+  targetJob: {
+    + title: String
+    + industry: String
+    + level: String
+    + salary: String
+    + location: String
+  }
+  --
+  skills: {
+    + technical: [{
+      + skillId: ObjectId [FK->Skill]
+      + name: String
+      + level: String
+      + verified: Boolean
+      + endorsements: Number
+      + projects: [Object]
+    }]
+    + soft: [{
+      + skillId: ObjectId [FK->Skill]
+      + name: String
+      + level: String
+      + selfAssessment: Number
+      + verified: Boolean
+      + endorsements: Number
+    }]
+    + languages: [{
+      + name: String
+      + level: String
+      + certificate: String
+      + verified: Boolean
+    }]
+  }
+  --
+  education: {
+    + university: Object
+    + certifications: [Object]
+  }
+  --
+  experience: {
+    + internships: [Object]
+    + projects: [Object]
+  }
+  --
+  preferences: {
+    + locations: [String]
+    + internshipTypes: [String]
+    + industries: [String]
+    + salary: Object
+    + availableFrom: Date
+    + learning: Object
+    + roadmap: Object
+  }
+  --
+  resume: {
+    + current: Object
+    + history: [Object]
+    + builderTemplates: Map
+  }
+  --
+  followedCompanies: [ObjectId] [FK->EmployerProfile]
+  --
+  progress: {
+    + profileCompletion: Number
+    + skillVerification: Object
+    + activeRoadmaps: [Object]
+  }
+  --
+  analytics: {
+    + viewCount: Number
+    + applicationStats: Object
+    + skillGrowth: [Object]
+    + lastActive: Date
+  }
+  --
+  + createdAt: Date
+  + updatedAt: Date
+}
+
+entity "EmployerProfile" as EmployerProfile {
+  * _id: ObjectId [PK]
+  --
+  * owner: ObjectId [FK->User] [unique]
+  --
+  company: Object [CompanyInfoSchema]
+  businessInfo: Object [BusinessInfoSchema]
+  --
+  position: {
+    + title: String
+    + level: String
+    + department: String
+  }
+  --
+  legalRepresentative: {
+    + fullName: String
+    + position: String
+    + phone: String
+    + email: String
+    + identification: Object
+  }
+  --
+  contact: {
+    + name: String
+    + phone: String
+    + email: String
+  }
+  --
+  members: [{
+    + user: ObjectId [FK->User]
+    + email: String
+    + role: String
+    + permissions: Object
+    + status: String
+    + invitedAt: Date
+    + joinedAt: Date
+  }]
+  --
+  verification: Object [VerificationSchema]
+  status: String
+  --
+  stats: {
+    + totalJobs: Number
+    + activeJobs: Number
+    + totalApplications: Number
+    + successfulHires: Number
+    + activeMembers: Number
+  }
+  --
+  ai: {
+    + companyEmbedding: [Number]
+    + industryAnalysis: Object
+    + cultureProfile: Object
+    + hiringTrends: Object
+  }
+  --
+  reputation: {
+    + rating: Object
+    + reviewCount: Number
+    + wouldRecommend: Number
+  }
+  --
+  engagement: {
+    + profileViews: Number
+    + jobViews: Number
+    + applicationRate: Number
+    + responseTime: Object
+  }
+  --
+  subscription: {
+    + plan: String
+  }
+  --
+  + createdAt: Date
+  + updatedAt: Date
+}
+
+entity "Job" as Job {
+  * _id: ObjectId [PK]
+  --
+  * employer: ObjectId [FK->EmployerProfile]
+  * postedBy: ObjectId [FK->User]
+  --
+  * title: String
+  * slug: String [unique]
+  * description: String
+  * requirements: String
+  * benefits: String
+  --
+  skills: [String]
+  skillIds: [ObjectId] [FK->Skill]
+  tags: [String]
+  --
+  industryCode: String
+  subIndustryCode: String
+  industryPath: [String]
+  --
+  level: String
+  jobType: String
+  workingMode: String
+  --
+  address: {
+    + street: String
+    + ward: String
+    + district: String
+    + city: String
+    + country: String
+    + fullAddress: String
+  }
+  --
+  salary: Object
+  applicationDeadline: Date
+  --
+  status: String
+  views: Number
+  applicationsCount: Number
+  --
+  ai: {
+    + keywords: [String]
+    + embedding: [Number]
+    + extractedSkills: [Object]
+    + jobCategory: Object
+    + matchingPool: [{
+      + candidateId: ObjectId [FK->CandidateProfile]
+      + matchScore: Number
+      + matchReasons: [String]
+    }]
+    + suggestedCandidates: [{
+      + candidateId: ObjectId [FK->CandidateProfile]
+      + score: Number
+      + matchingSkills: [String]
+      + strengthsMatch: [String]
+      + weaknessesMatch: [String]
+      + recommendations: [String]
+    }]
+  }
+  --
+  + createdAt: Date
+  + updatedAt: Date
+  + deletedAt: Date
+  + deletedBy: ObjectId [FK->User]
+}
+
+entity "Application" as Application {
+  * _id: ObjectId [PK]
+  --
+  * candidateId: ObjectId [FK->CandidateProfile]
+  * jobId: ObjectId [FK->Job]
+  --
+  status: String
+  coverLetter: String
+  --
+  attachments: [{
+    + name: String
+    + url: String
+    + type: String
+  }]
+  --
+  resume: {
+    + url: String
+    + version: Number
+    + uploadedAt: Date
+  }
+  --
+  matchingScore: {
+    + overall: Number
+    + skills: [Object]
+    + experience: Number
+    + education: Number
+  }
+  --
+  interviews: [{
+    + scheduledAt: Date
+    + duration: Number
+    + type: String
+    + location: String
+    + interviewer: ObjectId [FK->User]
+    + feedback: Object
+  }]
+  --
+  timeline: [{
+    + status: String
+    + note: String
+    + createdAt: Date
+    + createdBy: ObjectId [FK->User]
+  }]
+  --
+  feedback: {
+    + rating: Number
+    + strengths: [String]
+    + improvements: [String]
+    + notes: String
+    + createdAt: Date
+    + updatedAt: Date
+  }
+  --
+  aiAnalysis: {
+    + resumeScore: Object
+    + matchAnalysis: Object
+    + predictedSuccess: Object
+    + analyzedAt: Date
+  }
+  --
+  + createdAt: Date
+  + updatedAt: Date
+}
+
+entity "Skill" as Skill {
+  * _id: ObjectId [PK]
+  --
+  * name: String [unique]
+  * category: String
+  aliases: [String]
+  description: String
+  --
+  embedding: [Number]
+  --
+  popularity: Number
+  isActive: Boolean
+  demandLevel: String
+  trend: String
+  --
+  + createdAt: Date
+  + updatedAt: Date
+}
+
+entity "Industry" as Industry {
+  * _id: ObjectId [PK]
+  --
+  * code: String [unique]
+  parentCode: String
+  --
+  name: {
+    + vi: String
+    + en: String
+  }
+  --
+  description: {
+    + vi: String
+    + en: String
+  }
+  --
+  color: String
+  icon: String
+  keywords: [String]
+  --
+  suggestedTemplates: [String]
+  suggestions: Object
+  --
+  visible: Boolean
+  sortOrder: Number
+  --
+  stats: {
+    + totalJobs: Number
+    + totalCandidates: Number
+    + totalCVs: Number
+    + totalApplications: Number
+  }
+  --
+  + createdAt: Date
+  + updatedAt: Date
+}
+
+entity "ResumeBuilder" as ResumeBuilder {
+  * _id: ObjectId [PK]
+  --
+  * candidateId: ObjectId [FK->CandidateProfile]
+  --
+  templateId: String
+  --
+  content: {
+    + personalInfo: Object
+    + summary: String
+    + experience: [Object]
+    + education: [Object]
+    + skills: [Object]
+    + projects: [Object]
+    + certifications: [Object]
+  }
+  --
+  customization: {
+    + targetJobId: ObjectId [FK->Job]
+    + targetRole: String
+    + tailoredFor: String
+    + keywords: [String]
+  }
+  --
+  aiGenerated: {
+    + summary: Boolean
+    + experienceBullets: [Number]
+    + suggestions: [String]
+  }
+  --
+  versions: [{
+    + content: Object
+    + createdAt: Date
+    + note: String
+  }]
+  --
+  exports: [{
+    + format: String
+    + url: String
+    + generatedAt: Date
+  }]
+  --
+  + createdAt: Date
+  + updatedAt: Date
+}
+
+entity "Notification" as Notification {
+  * _id: ObjectId [PK]
+  --
+  * recipient: ObjectId [FK->User]
+  sender: ObjectId [FK->User]
+  --
+  * type: String
+  * title: String
+  * message: String
+  --
+  data: {
+    + jobId: ObjectId [FK->Job]
+    + applicationId: ObjectId [FK->Application]
+    + candidateId: ObjectId [FK->User]
+    + interviewTime: Date
+    + chatRoomId: String
+    + url: String
+  }
+  --
+  isRead: Boolean
+  isSent: Boolean
+  priority: String
+  channel: String
+  --
+  sentAt: Date
+  deliveredAt: Date
+  readAt: Date
+  archivedAt: Date
+  --
+  actionRequired: Boolean
+  dedupeKey: String
+  templateKey: String
+  locale: String
+  --
+  error: {
+    + code: String
+    + message: String
+    + retries: Number
+  }
+  --
+  + createdAt: Date
+  + updatedAt: Date
+}
+
+entity "SavedJob" as SavedJob {
+  * _id: ObjectId [PK]
+  --
+  * candidateId: ObjectId [FK->CandidateProfile]
+  * jobId: ObjectId [FK->Job]
+  --
+  savedAt: Date
+  notes: String
+  --
+  + createdAt: Date
+  + updatedAt: Date
+}
+
+entity "CompanyFollow" as CompanyFollow {
+  * _id: ObjectId [PK]
+  --
+  * candidateId: ObjectId [FK->CandidateProfile]
+  * employerId: ObjectId [FK->EmployerProfile]
+  --
+  createdAt: Date
+  deletedAt: Date
+  --
+  + createdAt: Date
+  + updatedAt: Date
+}
+
+entity "LearningRoadmap" as LearningRoadmap {
+  * _id: ObjectId [PK]
+  --
+  * candidateId: ObjectId [FK->User]
+  --
+  targetJobId: ObjectId [FK->Job]
+  targetRole: String
+  currentLevel: String
+  --
+  skillGaps: [{
+    + skill: String
+    + currentLevel: String
+    + targetLevel: String
+    + priority: String
+    + importance: Number
+  }]
+  --
+  phases: [{
+    + phaseNumber: Number
+    + title: String
+    + duration: String
+    + objectives: [String]
+    + weeks: [{
+      + weekNumber: Number
+      + focus: String
+      + learningObjectives: [String]
+      + resources: [Object]
+      + projects: [Object]
+      + assessments: [Object]
+      + timeCommitment: String
+    }]
+  }]
+  --
+  milestones: [Object]
+  progress: Object
+  metadata: Object
+  --
+  + createdAt: Date
+  + updatedAt: Date
+}
+
+entity "CVMatchingScore" as CVMatchingScore {
+  * _id: ObjectId [PK]
+  --
+  * candidateId: ObjectId [FK->User]
+  * jobId: ObjectId [FK->Job]
+  --
+  applicationId: ObjectId [FK->Application]
+  --
+  * overallScore: Number [0-100]
+  --
+  scoreBreakdown: {
+    + skillsScore: Object
+    + experienceScore: Object
+    + educationScore: Object
+    + keywordScore: Object
+    + softSkillsScore: Object
+  }
+  --
+  aiInsights: {
+    + strengths: [String]
+    + weaknesses: [String]
+    + recommendations: [String]
+    + learningSuggestions: [Object]
+    + careerAdvice: String
+  }
+  --
+  metadata: {
+    + algorithmVersion: String
+    + processingTime: Number
+    + confidence: Number
+    + lastUpdated: Date
+  }
+  --
+  + createdAt: Date
+  + updatedAt: Date
+}
+
+' ===== RELATIONSHIPS =====
+
+' Core user relationships
+User ||--o| CandidateProfile : "1-1 (candidateProfile)"
+User ||--o| EmployerProfile : "1-1 (employerProfile)"
+User ||--o{ Notification : "1-many (recipient)"
+User ||--o{ Notification : "1-many (sender)"
+
+' Profile relationships
+CandidateProfile ||--o{ Application : "1-many"
+CandidateProfile ||--o{ ResumeBuilder : "1-many"
+CandidateProfile ||--o{ SavedJob : "1-many"
+CandidateProfile ||--o{ CompanyFollow : "1-many"
+CandidateProfile ||--o{ LearningRoadmap : "1-many"
+CandidateProfile ||--o{ CVMatchingScore : "1-many"
+
+EmployerProfile ||--o{ Job : "1-many"
+EmployerProfile ||--o{ CompanyFollow : "1-many (followed by)"
+
+' Job relationships
+Job ||--o{ Application : "1-many"
+Job ||--o{ SavedJob : "1-many"
+Job ||--o{ CVMatchingScore : "1-many"
+Job ||--o{ ResumeBuilder : "1-many (targets)"
+Job ||--o{ Notification : "1-many (data.jobId)"
+
+' Application relationships
+Application ||--|| CVMatchingScore : "1-1 (applicationId)"
+Application ||--o{ Notification : "1-many (data.applicationId)"
+
+' Skill relationships
+Skill ||--o{ CandidateProfile : "many-many (skills.technical.skillId)"
+Skill ||--o{ CandidateProfile : "many-many (skills.soft.skillId)"
+Skill ||--o{ Job : "many-many (skillIds)"
+Skill ||--o{ LearningRoadmap : "1-many (skillGaps.skill)"
+
+' Industry relationships (hierarchical)
+Industry ||--o{ Industry : "1-many (parentCode)"
+
+' AI and Analytics relationships
+Job ||--o{ CandidateProfile : "many-many (ai.matchingPool.candidateId)"
+Job ||--o{ CandidateProfile : "many-many (ai.suggestedCandidates.candidateId)"
+
+' ===== LEGEND =====
+legend right
+  |= Symbol | Meaning |
+  | * | Required Field |
+  | [PK] | Primary Key (_id) |
+  | [FK->Model] | Foreign Key Reference |
+  | [unique] | Unique Constraint |
+  | Object | Embedded Object |
+  | [Type] | Array of Type |
+  | ObjectId | MongoDB ObjectId |
+  | ||--o{ | One to Many |
+  | ||--o| | One to One |
+  | ||--|| | One to One |
+  | o--o | Many to Many |
+endlegend
+
+@enduml

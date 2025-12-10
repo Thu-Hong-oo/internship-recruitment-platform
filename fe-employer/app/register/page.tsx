@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,6 +36,7 @@ import {
 
 export default function EmployerRegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { 
     handleGoogleSignIn, 
     renderGoogleButton, 
@@ -57,6 +58,26 @@ export default function EmployerRegisterPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  
+  // Check for email from invitation
+  useEffect(() => {
+    const emailParam = searchParams?.get("email");
+    const roleParam = searchParams?.get("role");
+    const fromInvitation = searchParams?.get("fromInvitation");
+    
+    if (emailParam) {
+      setEmail(emailParam);
+      if (fromInvitation === "true") {
+        // Get role from query param or localStorage
+        const invitationRole = roleParam || (typeof window !== "undefined" ? localStorage.getItem("invitationRole") : null);
+        if (invitationRole) {
+          setSuccess(`Vui lòng đăng ký tài khoản để hoàn tất việc tham gia team với vai trò ${invitationRole}. Email đã được điền sẵn.`);
+        } else {
+          setSuccess("Vui lòng đăng ký tài khoản để hoàn tất việc tham gia team. Email đã được điền sẵn.");
+        }
+      }
+    }
+  }, [searchParams]);
 
   // Render Google button when component mounts and Google script is loaded
   useEffect(() => {
@@ -103,6 +124,9 @@ export default function EmployerRegisterPage() {
     }
     try {
       setSubmitting(true);
+      
+      // User always registers as "employer" role
+      // Team role (hr, recruiter, etc.) is stored in invitation and will be linked after registration
       const res = await registerEmployer({ email, password, fullName });
       if (res.success) {
         const msg =

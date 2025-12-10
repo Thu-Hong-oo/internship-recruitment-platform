@@ -23,6 +23,7 @@ export default function AuthGate({ children }: Props) {
       "/",
       "/register",
       "/email-verification",
+      "/invitations/accept",
     ]);
 
     const token = getToken();
