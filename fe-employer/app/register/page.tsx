@@ -62,12 +62,19 @@ export default function EmployerRegisterPage() {
   // Check for email from invitation
   useEffect(() => {
     const emailParam = searchParams?.get("email");
+    const roleParam = searchParams?.get("role");
     const fromInvitation = searchParams?.get("fromInvitation");
     
     if (emailParam) {
       setEmail(emailParam);
       if (fromInvitation === "true") {
-        setSuccess("Vui lòng đăng ký tài khoản để hoàn tất việc tham gia team. Email đã được điền sẵn.");
+        // Get role from query param or localStorage
+        const invitationRole = roleParam || (typeof window !== "undefined" ? localStorage.getItem("invitationRole") : null);
+        if (invitationRole) {
+          setSuccess(`Vui lòng đăng ký tài khoản để hoàn tất việc tham gia team với vai trò ${invitationRole}. Email đã được điền sẵn.`);
+        } else {
+          setSuccess("Vui lòng đăng ký tài khoản để hoàn tất việc tham gia team. Email đã được điền sẵn.");
+        }
       }
     }
   }, [searchParams]);
@@ -117,6 +124,9 @@ export default function EmployerRegisterPage() {
     }
     try {
       setSubmitting(true);
+      
+      // User always registers as "employer" role
+      // Team role (hr, recruiter, etc.) is stored in invitation and will be linked after registration
       const res = await registerEmployer({ email, password, fullName });
       if (res.success) {
         const msg =

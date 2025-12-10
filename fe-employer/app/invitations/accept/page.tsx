@@ -83,7 +83,12 @@ export default function AcceptInvitationPage() {
       const response = await acceptInvitation("", { token });
       
       if (response.success && response.data) {
-        const { email, needsLogin, needsRegister } = response.data;
+        const { email, role, needsLogin, needsRegister } = response.data;
+        
+        // Store invitation role for registration
+        if (role && typeof window !== "undefined") {
+          localStorage.setItem("invitationRole", role);
+        }
         
         toast({
           title: "Thành công",
@@ -104,9 +109,9 @@ export default function AcceptInvitationPage() {
             router.push(`/?email=${encodeURIComponent(email)}&fromInvitation=true`);
           }, 1500);
         } else if (needsRegister) {
-          // User doesn't have account, redirect to register with email
+          // User doesn't have account, redirect to register with email and role
           setTimeout(() => {
-            router.push(`/register?email=${encodeURIComponent(email)}&fromInvitation=true`);
+            router.push(`/register?email=${encodeURIComponent(email)}&fromInvitation=true&role=${encodeURIComponent(role)}`);
           }, 1500);
         } else {
           // Fallback: redirect to login

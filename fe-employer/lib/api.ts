@@ -5,6 +5,7 @@ export type RegisterEmployerPayload = {
   email: string;
   password: string;
   fullName: string;
+  role?: string; // Optional role (employer, hr, recruiter, interviewer)
 };
 
 export type RegisterEmployerResponse = {
@@ -19,10 +20,12 @@ export async function registerEmployer(
   payload: RegisterEmployerPayload
 ): Promise<RegisterEmployerResponse> {
   try {
+    // Use provided role or default to "employer"
+    const role = payload.role || "employer";
     const res = await fetch(`${API_BASE_URL}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...payload, role: "employer" }),
+      body: JSON.stringify({ ...payload, role }),
     });
 
     const data = (await res
