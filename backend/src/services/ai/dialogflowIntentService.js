@@ -92,6 +92,13 @@ class DialogflowIntentService {
             dialogflowResult.parameters
           );
 
+          // Debug logging để kiểm tra parameters từ Dialogflow
+          logger.debug('🔍 Dialogflow parameters:', {
+            raw: dialogflowResult.parameters,
+            normalized: normalizedParams,
+            intent: dialogflowResult.intent,
+          });
+
           return {
             success: true,
             intent: dialogflowResult.intent,
@@ -115,7 +122,7 @@ class DialogflowIntentService {
   }
 
   /**
-   * Normalize parameters (đặc biệt là location)
+   * Normalize parameters (đặc biệt là location và keyword)
    * @param {Object} parameters - Raw parameters từ Dialogflow
    * @returns {Object} Normalized parameters
    */
@@ -125,6 +132,33 @@ class DialogflowIntentService {
     }
 
     const normalized = { ...parameters };
+
+    // Normalize keyword/job_title fields - đảm bảo có keyword
+    // Dialogflow có thể trả về: job_title, keyword, jobTitle, job_name, etc.
+    const keywordFields = [
+      'job_title',
+      'keyword',
+      'jobTitle',
+      'job_name',
+      'jobName',
+      'title',
+    ];
+    let foundKeyword = null;
+
+    keywordFields.forEach(field => {
+      if (normalized[field] && !foundKeyword) {
+        foundKeyword = String(normalized[field]).trim();
+      }
+    });
+
+    // Nếu tìm thấy keyword từ bất kỳ field nào, normalize và set vào keyword
+    if (foundKeyword) {
+      normalized.keyword = foundKeyword;
+      // Giữ lại job_title nếu có để tương thích
+      if (!normalized.job_title) {
+        normalized.job_title = foundKeyword;
+      }
+    }
 
     // Normalize location fields
     const locationFields = [
@@ -140,6 +174,10 @@ class DialogflowIntentService {
         const normalizedLocation = this._normalizeLocation(normalized[field]);
         if (normalizedLocation) {
           normalized[field] = normalizedLocation;
+          // Đảm bảo có city field cho navigationService
+          if (field !== 'city' && !normalized.city) {
+            normalized.city = normalizedLocation;
+          }
         }
       }
     });
@@ -228,6 +266,30 @@ class DialogflowIntentService {
         /làm\s+(cv|hồ sơ|resume)/i,
         /viết\s+(cv|hồ sơ)/i,
       ],
+      'applied-jobs.view': [
+        /xem\s+(việc|job)s?\s+(đã\s+)?(ứng\s+tuyển|apply|nộp)/i,
+        /(danh\s+sách|list)\s+(đã\s+)?(apply|ứng\s+tuyển)/i,
+        /(đã\s+)?(apply|ứng\s+tuyển)\s+(của\s+tôi|của\s+mình)?/i,
+      ],
+      'saved-jobs.view': [
+        /xem\s+(việc|job)s?\s+(đã\s+)?(lưu|save|đánh\s+dấu)/i,
+        /(danh\s+sách|list)\s+(đã\s+)?(lưu|save)/i,
+        /(việc|job)s?\s+(được\s+)?lưu/i,
+      ],
+      'skill-gap.analyze': [
+        /(phân\s+tích|xem)\s+(khoảng\s+cách\s+kỹ\s+năng|skill\s+gap)/i,
+        /(đánh\s+giá|phân\s+tích)\s+(kỹ\s+năng|skill)/i,
+      ],
+      'roadmap.view': [
+        /(xem|mở)\s+lộ\s+trình/i,
+        /roadmap/i,
+        /(lộ\s+trình|kế\s+hoạch)\s+(học|kỹ\s+năng)/i,
+      ],
+      'notifications.view': [
+        /(xem|mở)\s+thông\s+báo/i,
+        /notification(s)?/i,
+        /chuông\s+thông\s+báo/i,
+      ],
       'job.search': [
         /tìm\s+(việc|job|công việc)(?:\s+(.+?))?(?:\s+(?:tại|ở|in)|$)/i, // "tìm việc" hoặc "tìm việc IT"
         /tìm\s+kiếm\s+(việc|job)/i,
@@ -256,21 +318,62 @@ class DialogflowIntentService {
           if (intent === 'job.search.location') {
             // Pattern 1: "tìm việc [keyword] ở [location]" -> match[2] = keyword, match[4] = location
             // Pattern 2: "tìm việc ở [location]" -> match[3] = location
+            // Pattern 3: "việc [keyword] ở [location]" -> match[2] = keyword, match[4] = location
             if (match[4]) {
               // Format: "tìm việc IT ở Sài Gòn" -> match[2] = "IT", match[4] = "Sài Gòn"
-              if (match[2] && match[2].trim()) {
-                params.keyword = match[2].trim();
+              // Hoặc: "việc IT ở Sài Gòn" -> match[2] = "IT", match[4] = "Sài Gòn"
+              const keyword = match[2] ? match[2].trim() : '';
+              const location = match[4].trim();
+
+              // Loại bỏ các từ không phải keyword (như "việc", "job", "làm", "tuyển")
+              const stopWords = [
+                'việc',
+                'job',
+                'công việc',
+                'làm',
+                'tuyển',
+                'tìm',
+                'kiếm',
+              ];
+              const cleanKeyword = keyword
+                .split(/\s+/)
+                .filter(word => !stopWords.includes(word.toLowerCase()))
+                .join(' ')
+                .trim();
+
+              if (cleanKeyword && cleanKeyword.length > 0) {
+                params.keyword = cleanKeyword;
+                params.job_title = cleanKeyword; // Tương thích với navigationService
               }
-              params.city = this._normalizeLocation(match[4].trim());
+              params.city = this._normalizeLocation(location);
             } else if (match[3]) {
               // Format: "tìm việc ở Sài Gòn" -> match[3] = "Sài Gòn"
               params.city = this._normalizeLocation(match[3].trim());
             }
-          } else if (intent === 'job.search' && match[2]) {
-            // Extract keyword from "tìm việc [keyword]"
-            const keyword = match[2].trim();
-            if (keyword && keyword.length > 0) {
-              params.keyword = keyword;
+          } else if (intent === 'job.search') {
+            // Extract keyword from various patterns
+            if (match[2]) {
+              const keyword = match[2].trim();
+              // Loại bỏ stop words
+              const stopWords = [
+                'việc',
+                'job',
+                'công việc',
+                'làm',
+                'tuyển',
+                'tìm',
+                'kiếm',
+              ];
+              const cleanKeyword = keyword
+                .split(/\s+/)
+                .filter(word => !stopWords.includes(word.toLowerCase()))
+                .join(' ')
+                .trim();
+
+              if (cleanKeyword && cleanKeyword.length > 0) {
+                params.keyword = cleanKeyword;
+                params.job_title = cleanKeyword; // Tương thích với navigationService
+              }
             }
           }
 
