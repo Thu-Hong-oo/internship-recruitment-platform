@@ -12,6 +12,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -81,10 +87,12 @@ export default function JobDetailPage() {
       score: number;
       tier?: string;
       matchedSkills?: string[];
+      raw?: any;
     }>
   >([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
+  const [selectedCandidate, setSelectedCandidate] = useState<any | null>(null);
 
   const [jobData, setJobData] = useState<any>(null);
   const [formData, setFormData] = useState<CreateJobPayload>({
@@ -202,6 +210,7 @@ export default function JobDetailPage() {
                     (s: any) => s.skill || s
                   ) ||
                   [],
+                raw: item,
               };
             })
             // Hide candidates without email so actions remain usable
@@ -688,6 +697,10 @@ export default function JobDetailPage() {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
+  const profileBaseUrl =
+    process.env.NEXT_PUBLIC_CANDIDATE_PROFILE_URL ||
+    "https://internbridge.web.app";
+
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -822,6 +835,9 @@ export default function JobDetailPage() {
               )}
             <div className="space-y-3">
               {suggestedCandidates.map((c) => {
+                const profileLink = c.candidateId
+                  ? `${profileBaseUrl}/profile/${c.candidateId}?public=1`
+                  : undefined;
                 const mailto = c.email
                   ? `mailto:${c.email}?subject=Mời ứng tuyển - ${jobData?.title || "Cơ hội mới"}&body=Chào ${c.name},%0D%0AChúng tôi muốn mời bạn ứng tuyển vị trí ${jobData?.title || ""}.`
                   : undefined;
@@ -861,10 +877,8 @@ export default function JobDetailPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => {
-                            if (mailto) window.open(mailto, "_blank");
-                          }}
-                          disabled={!mailto}
+                          onClick={() => setSelectedCandidate(c)}
+                          disabled={!c}
                         >
                           Xem hồ sơ
                         </Button>
@@ -886,6 +900,88 @@ export default function JobDetailPage() {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={!!selectedCandidate} onOpenChange={() => setSelectedCandidate(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Hồ sơ ứng viên</DialogTitle>
+          </DialogHeader>
+          {selectedCandidate && (
+            <div className="space-y-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-lg font-semibold text-gray-900">
+                    {selectedCandidate.name}
+                  </p>
+                  {selectedCandidate.email && (
+                    <p className="text-sm text-gray-600">
+                      {selectedCandidate.email}
+                    </p>
+                  )}
+                  {selectedCandidate.tier && (
+                    <p className="text-sm text-blue-600 mt-1">
+                      Tier: {selectedCandidate.tier}
+                    </p>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-blue-700">
+                    Điểm: {Math.round(selectedCandidate.score)}%
+                  </p>
+                </div>
+              </div>
+
+              {selectedCandidate.matchedSkills &&
+                selectedCandidate.matchedSkills.length > 0 && (
+                  <div className="text-sm text-gray-700">
+                    <p className="font-medium mb-1">Kỹ năng khớp</p>
+                    <p className="text-gray-600">
+                      {selectedCandidate.matchedSkills.join(", ")}
+                    </p>
+                  </div>
+                )}
+
+              {selectedCandidate.raw?.scoreBreakdown && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                  {Object.entries(selectedCandidate.raw.scoreBreakdown).map(
+                    ([key, val]: any) => {
+                      const details = val?.details || {};
+                      return (
+                        <Card key={key} className="border-blue-100">
+                          <CardContent className="p-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <p className="font-medium capitalize text-gray-800">
+                                {key.replace("Score", "")}
+                              </p>
+                              <p className="text-blue-700 font-semibold">
+                                {Math.round(val?.score ?? 0)}% (w {val?.weight ?? 0})
+                              </p>
+                            </div>
+                            {Object.keys(details).length > 0 && (
+                              <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                                {Object.entries(details).map(([k, v]) => (
+                                  <li key={k}>
+                                    <span className="font-medium">{k}:</span>{" "}
+                                    {Array.isArray(v)
+                                      ? v.join(", ")
+                                      : typeof v === "object"
+                                      ? Object.values(v).join(", ")
+                                      : String(v)}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    }
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {isEditMode ? (
         /* Edit Mode - Form */
