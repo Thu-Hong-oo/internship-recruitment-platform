@@ -40,7 +40,8 @@ class SentenceBertService {
         return;
       }
 
-      const result = await this._runPython(['--check'], 15000);
+      const checkTimeoutMs = parseInt(process.env.SENTENCE_BERT_CHECK_TIMEOUT_MS || '45000', 10);
+      const result = await this._runPython(['--check'], checkTimeoutMs);
       this.isAvailable = result.success;
       
       if (this.isAvailable) {

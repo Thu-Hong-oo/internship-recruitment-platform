@@ -419,6 +419,43 @@ export const nlpService = {
   },
 
   /**
+   * Get a learning roadmap by ID
+   */
+  async getLearningRoadmap(roadmapId: string): Promise<{
+    success: boolean;
+    data: LearningRoadmap;
+  }> {
+    return apiClient.get(`/nlp/learning-roadmap/${roadmapId}`);
+  },
+
+  /**
+   * Customize roadmap structure (add/update/remove resource/week/phase)
+   */
+  async customizeRoadmap(
+    roadmapId: string,
+    payload: {
+      action:
+        | "addResource"
+        | "updateResource"
+        | "removeResource"
+        | "addWeek"
+        | "removeWeek"
+        | "addPhase"
+        | "removePhase";
+      phaseNumber?: number;
+      weekNumber?: number;
+      resourceIndex?: number;
+      resource?: any;
+      week?: any;
+    }
+  ): Promise<{
+    success: boolean;
+    data: LearningRoadmap;
+  }> {
+    return apiClient.put(`/nlp/learning-roadmap/${roadmapId}/customize`, payload);
+  },
+
+  /**
    * Get popular public roadmaps
    */
   async getPopularRoadmaps(limit?: number): Promise<{
