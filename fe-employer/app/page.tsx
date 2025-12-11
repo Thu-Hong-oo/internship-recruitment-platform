@@ -28,10 +28,10 @@ import {
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { 
-    handleGoogleSignIn, 
-    renderGoogleButton, 
-    loading: googleLoading, 
+  const {
+    handleGoogleSignIn,
+    renderGoogleButton,
+    loading: googleLoading,
     error: googleError,
     showRoleMismatchModal: googleShowRoleMismatchModal,
     setShowRoleMismatchModal: setGoogleShowRoleMismatchModal,
@@ -51,12 +51,12 @@ export default function LoginPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [showRoleMismatchModal, setShowRoleMismatchModal] = useState(false);
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
-  
+
   // Check for email from invitation
   useEffect(() => {
     const emailParam = searchParams?.get("email");
     const fromInvitation = searchParams?.get("fromInvitation");
-    
+
     if (emailParam) {
       setEmail(emailParam);
       if (fromInvitation === "true") {
@@ -120,14 +120,17 @@ export default function LoginPage() {
 
       if (data?.success) {
         // Check if user role is employer
-        if (data?.user && data.user.role !== 'employer') {
-          const isLocalhost = typeof window !== "undefined" && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-          const candidateUrl = isLocalhost 
-            ? 'http://localhost:3001' 
-            : 'https://internbridge.web.app';
+        if (data?.user && data.user.role !== "employer") {
+          const isLocalhost =
+            typeof window !== "undefined" &&
+            (window.location.hostname === "localhost" ||
+              window.location.hostname === "127.0.0.1");
+          const candidateUrl = isLocalhost
+            ? "http://localhost:3001"
+            : "https://internbridge.web.app";
           setRedirectUrl(candidateUrl);
           setShowRoleMismatchModal(true);
-          
+
           // Auto redirect after 3 seconds
           setTimeout(() => {
             if (typeof window !== "undefined") {
@@ -144,12 +147,12 @@ export default function LoginPage() {
         if (data?.user) {
           saveUserData(data.user, remember);
         }
-        
+
         // Dispatch custom event to notify AppHeader to reload user data
         if (typeof window !== "undefined") {
-          window.dispatchEvent(new Event('user-login'));
+          window.dispatchEvent(new Event("user-login"));
         }
-        
+
         setSuccess("Đăng nhập thành công! Đang chuyển hướng...");
         setTimeout(() => router.push("/dashboard"), 1000);
         return;
@@ -169,13 +172,16 @@ export default function LoginPage() {
 
       // Các lỗi cụ thể
       if (data?.errorType === "ROLE_MISMATCH") {
-        const isLocalhost = typeof window !== "undefined" && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-        const candidateUrl = isLocalhost 
-          ? 'http://localhost:3001' 
-          : 'https://internbridge.web.app';
+        const isLocalhost =
+          typeof window !== "undefined" &&
+          (window.location.hostname === "localhost" ||
+            window.location.hostname === "127.0.0.1");
+        const candidateUrl = isLocalhost
+          ? "http://localhost:3001"
+          : "https://internbridge.web.app";
         setRedirectUrl(candidateUrl);
         setShowRoleMismatchModal(true);
-        
+
         // Auto redirect after 3 seconds
         setTimeout(() => {
           if (typeof window !== "undefined") {
@@ -215,7 +221,6 @@ export default function LoginPage() {
       {/* Left side - Login Form */}
       <div className="flex-1 flex flex-col justify-center px-8 lg:px-16">
         <div className="max-w-md mx-auto w-full">
-
           {/* Welcome Message */}
           <div className="mb-8">
             <h1 className="text-2xl font-bold text-slate-800 mb-2">
@@ -233,7 +238,9 @@ export default function LoginPage() {
             <div
               id="google-signin-button"
               ref={googleButtonRef}
-              className={`w-full flex items-center justify-center ${googleButtonRendered ? '' : 'hidden'}`}
+              className={`w-full flex items-center justify-center ${
+                googleButtonRendered ? "" : "hidden"
+              }`}
             />
             {/* Fallback Button - only show if Google button not rendered */}
             {!googleButtonRendered && (
@@ -439,12 +446,18 @@ export default function LoginPage() {
         {/* Centered Caption */}
         <div className="relative z-20 flex flex-col items-center justify-center text-center px-10 w-full">
           <h2 className="text-white text-4xl font-extrabold drop-shadow-2xl mb-5 leading-tight tracking-tight">
-            Cùng <span className="text-primary">InternBridge</span> 
+            Cùng <span className="text-primary">InternBridge</span>
             <br />
-            tìm ứng viên <span className="underline underline-offset-4 decoration-primary decoration-4">tiềm năng</span> cho bạn
+            tìm ứng viên{" "}
+            <span className="underline underline-offset-4 decoration-primary decoration-4">
+              tiềm năng
+            </span>{" "}
+            cho bạn
           </h2>
           <p className="text-white/90 text-lg font-medium drop-shadow mb-4 max-w-lg">
-            Nền tảng tuyển dụng hiện đại, kết nối doanh nghiệp với sinh viên tài năng trên toàn quốc.<br />
+            Nền tảng tuyển dụng hiện đại, kết nối doanh nghiệp với sinh viên tài
+            năng trên toàn quốc.
+            <br />
             Tăng hiệu quả tuyển dụng với công cụ quản lý ứng viên thông minh.
           </p>
           {/* Optional nice Call to Action button */}
@@ -466,7 +479,9 @@ export default function LoginPage() {
             </AlertDialogTitle>
             <AlertDialogDescription className="text-base text-slate-600 leading-relaxed">
               <p>
-                Tài khoản này là tài khoản <strong className="text-slate-900">candidate</strong>, không thể đăng nhập vào trang employer.
+                Tài khoản này là tài khoản{" "}
+                <strong className="text-slate-900">candidate</strong>, không thể
+                đăng nhập vào trang employer.
               </p>
               <p className="mt-3 text-sm text-slate-500">
                 Đang chuyển hướng đến trang phù hợp...
@@ -485,7 +500,9 @@ export default function LoginPage() {
             </AlertDialogTitle>
             <AlertDialogDescription className="text-base text-slate-600 leading-relaxed">
               <p>
-                Tài khoản này là tài khoản <strong className="text-slate-900">candidate</strong>, không thể đăng nhập vào trang employer.
+                Tài khoản này là tài khoản{" "}
+                <strong className="text-slate-900">candidate</strong>, không thể
+                đăng nhập vào trang employer.
               </p>
               <p className="mt-3 text-sm text-slate-500">
                 Đang chuyển hướng đến trang phù hợp...

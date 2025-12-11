@@ -795,13 +795,312 @@ const updateJob = async (req, res) => {
       .populate('postedBy', 'fullName name email avatar')
       .populate('skillIds', 'name category');
 
-    // Invalidate job caches when job is updated
-    const cacheService = getCacheService();
-    if (cacheService) {
-      await cacheService.invalidateJobCache(req.params.id);
-    }
+    /**
+     * Sau mỗi lần cập nhật, bắt buộc đi qua moderation trước khi được hoạt động.
+     * Logic tương tự submitJobForReview.
+     */
+    try {
+      const {
+        getContentModerationService,
+      } = require('../services/moderation/contentModerationService');
+      const moderationService = getContentModerationService();
+      const moderationResult = await moderationService.moderateContent(
+        updatedJob.toObject()
+      );
 
-    res.status(200).json({ success: true, data: updatedJob });
+      if (!updatedJob.moderation) {
+        updatedJob.moderation = {};
+      }
+
+      updatedJob.moderation.autoModerationScore =
+        moderationResult.confidence * 100;
+      updatedJob.moderation.moderationResult = {
+        action: moderationResult.action,
+        method: moderationResult.method,
+        flags: moderationResult.flags,
+        reasons: moderationResult.reasons,
+      };
+      updatedJob.moderation.moderatedAt = new Date();
+
+      // Auto-approve nếu pass moderation
+      if (
+        moderationResult.action === 'APPROVE' &&
+        moderationResult.confidence >= 0.8
+      ) {
+        updatedJob.status = JOB_STATUS.ACTIVE;
+        updatedJob.moderation.status = 'auto_approved';
+        await updatedJob.save();
+
+        logger.info(`Job auto-approved after update: ${updatedJob._id}`, {
+          jobId: updatedJob._id,
+          confidence: moderationResult.confidence,
+          method: moderationResult.method,
+        });
+
+        // Invalidate job caches when job is updated
+        const cacheService = getCacheService();
+        if (cacheService) {
+          await cacheService.invalidateJobCache(req.params.id);
+        }
+
+        return res.status(200).json({
+          success: true,
+          data: updatedJob,
+          message:
+            'Job đã được tự động duyệt và đăng thành công sau khi cập nhật',
+          autoApproved: true,
+        });
+      }
+
+      // Auto-reject nếu có nội dung nhạy cảm
+      if (moderationResult.action === 'REJECT') {
+        updatedJob.status = JOB_STATUS.REJECTED;
+        updatedJob.moderation.status = 'auto_rejected';
+        await updatedJob.save();
+
+        // Format reasons for employer
+        const formatReasons = reasons => {
+          if (!reasons || reasons.length === 0) return [];
+          return reasons.map(reason => {
+            if (reason.includes('Chứa từ cảnh báo')) {
+              const word = reason.match(/"([^"]+)"/)?.[1];
+              return {
+                type: 'warning_word',
+                message: `Nội dung chứa từ khóa "${word}" - cần kiểm tra lại ngữ cảnh sử dụng`,
+                severity: 'medium',
+              };
+            }
+            if (reason.includes('pattern đáng nghi')) {
+              if (reason.includes('thu nhập') || reason.includes('lương')) {
+                if (
+                  reason.includes('khủng') ||
+                  reason.includes('cao') ||
+                  reason.includes('nhanh')
+                ) {
+                  return {
+                    type: 'suspicious_pattern',
+                    message:
+                      'Nội dung có dấu hiệu hứa hẹn thu nhập không thực tế - vui lòng điều chỉnh để rõ ràng và thực tế hơn',
+                    severity: 'high',
+                  };
+                }
+              }
+              if (
+                reason.includes('không cần') ||
+                reason.includes('không yêu cầu')
+              ) {
+                if (
+                  reason.includes('kinh nghiệm') ||
+                  reason.includes('bằng cấp')
+                ) {
+                  return {
+                    type: 'suspicious_pattern',
+                    message:
+                      'Nội dung có dấu hiệu yêu cầu quá thấp - vui lòng mô tả rõ yêu cầu thực tế',
+                    severity: 'medium',
+                  };
+                }
+              }
+              if (
+                reason.includes('làm tại nhà') ||
+                reason.includes('work from home')
+              ) {
+                if (reason.includes('kiếm') || reason.includes('thu nhập')) {
+                  return {
+                    type: 'suspicious_pattern',
+                    message:
+                      'Nội dung có dấu hiệu đáng nghi về công việc làm tại nhà - vui lòng mô tả rõ ràng hơn về công việc',
+                    severity: 'medium',
+                  };
+                }
+              }
+              return {
+                type: 'suspicious_pattern',
+                message: 'Nội dung có dấu hiệu đáng nghi - cần kiểm tra lại',
+                severity: 'medium',
+              };
+            }
+            return {
+              type: 'other',
+              message: reason,
+              severity: 'low',
+            };
+          });
+        };
+
+        const reviewReasons = formatReasons(moderationResult.reasons);
+        const reviewMessage =
+          reviewReasons.length > 0
+            ? `Job không được duyệt do: ${reviewReasons
+                .map(r => r.message)
+                .join('; ')}`
+            : 'Job không được duyệt do chứa nội dung không phù hợp';
+
+        logger.warn(`Job auto-rejected after update: ${updatedJob._id}`, {
+          jobId: updatedJob._id,
+          reasons: moderationResult.reasons,
+          flags: moderationResult.flags,
+        });
+
+        // Invalidate job caches when job is updated
+        const cacheService = getCacheService();
+        if (cacheService) {
+          await cacheService.invalidateJobCache(req.params.id);
+        }
+
+        return res.status(400).json({
+          success: false,
+          message: reviewMessage,
+          reasons: moderationResult.reasons,
+          flags: moderationResult.flags,
+          reviewReasons,
+          autoRejected: true,
+        });
+      }
+
+      // Manual review cho các trường hợp còn lại
+      updatedJob.status = JOB_STATUS.PENDING;
+      updatedJob.moderation.status = 'manual_review';
+      await updatedJob.save();
+
+      logger.info(
+        `Job requires manual review after update: ${updatedJob._id}`,
+        {
+          jobId: updatedJob._id,
+          confidence: moderationResult.confidence,
+          warnings: moderationResult.reasons,
+        }
+      );
+
+      // Format reasons thành message dễ hiểu cho employer
+      const formatReasons = reasons => {
+        if (!reasons || reasons.length === 0) return [];
+
+        return reasons.map(reason => {
+          // Format các loại reasons
+          if (reason.includes('Chứa từ cảnh báo')) {
+            const word = reason.match(/"([^"]+)"/)?.[1];
+            return {
+              type: 'warning_word',
+              message: `Nội dung chứa từ khóa "${word}" - cần kiểm tra lại ngữ cảnh sử dụng`,
+              severity: 'medium',
+            };
+          }
+          if (reason.includes('pattern đáng nghi')) {
+            // Check pattern về thu nhập
+            if (reason.includes('thu nhập') || reason.includes('lương')) {
+              if (
+                reason.includes('khủng') ||
+                reason.includes('cao') ||
+                reason.includes('nhanh')
+              ) {
+                return {
+                  type: 'suspicious_pattern',
+                  message:
+                    'Nội dung có dấu hiệu hứa hẹn thu nhập không thực tế - vui lòng điều chỉnh để rõ ràng và thực tế hơn',
+                  severity: 'high',
+                };
+              }
+            }
+            // Check pattern về yêu cầu
+            if (
+              reason.includes('không cần') ||
+              reason.includes('không yêu cầu')
+            ) {
+              if (
+                reason.includes('kinh nghiệm') ||
+                reason.includes('bằng cấp')
+              ) {
+                return {
+                  type: 'suspicious_pattern',
+                  message:
+                    'Nội dung có dấu hiệu yêu cầu quá thấp - vui lòng mô tả rõ yêu cầu thực tế',
+                  severity: 'medium',
+                };
+              }
+            }
+            // Check pattern về làm tại nhà
+            if (
+              reason.includes('làm tại nhà') ||
+              reason.includes('work from home')
+            ) {
+              if (reason.includes('kiếm') || reason.includes('thu nhập')) {
+                return {
+                  type: 'suspicious_pattern',
+                  message:
+                    'Nội dung có dấu hiệu đáng nghi về công việc làm tại nhà - vui lòng mô tả rõ ràng hơn về công việc',
+                  severity: 'medium',
+                };
+              }
+            }
+            return {
+              type: 'suspicious_pattern',
+              message: 'Nội dung có dấu hiệu đáng nghi - cần kiểm tra lại',
+              severity: 'medium',
+            };
+          }
+          return {
+            type: 'other',
+            message: reason,
+            severity: 'low',
+          };
+        });
+      };
+
+      const reviewReasons = formatReasons(moderationResult.reasons);
+
+      // Tạo message tổng hợp
+      const reviewMessage =
+        reviewReasons.length > 0
+          ? `Job của bạn cần được admin xem xét do: ${reviewReasons
+              .map(r => r.message)
+              .join('; ')}`
+          : 'Đã gửi duyệt. Vui lòng chờ admin phê duyệt';
+
+      // Invalidate job caches when job is updated
+      const cacheService = getCacheService();
+      if (cacheService) {
+        await cacheService.invalidateJobCache(req.params.id);
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: updatedJob,
+        message: reviewMessage,
+        requiresReview: true,
+        reviewReasons: reviewReasons,
+        warnings: moderationResult.reasons, // Giữ nguyên để backward compatibility
+        moderationScore: moderationResult.confidence * 100,
+        moderationMethod: moderationResult.method,
+      });
+    } catch (moderationError) {
+      logger.error('Moderation after update failed:', {
+        error: moderationError.message,
+        jobId: updatedJob._id,
+      });
+
+      // Fallback: đưa về trạng thái pending để admin duyệt
+      updatedJob.status = JOB_STATUS.PENDING;
+      if (!updatedJob.moderation) {
+        updatedJob.moderation = {};
+      }
+      updatedJob.moderation.status = 'manual_review';
+      updatedJob.moderation.moderationError = moderationError.message;
+      await updatedJob.save();
+
+      // Invalidate job caches when job is updated
+      const cacheService = getCacheService();
+      if (cacheService) {
+        await cacheService.invalidateJobCache(req.params.id);
+      }
+
+      return res.status(200).json({
+        success: true,
+        data: updatedJob,
+        message:
+          'Job đã được cập nhật và gửi duyệt. Vui lòng chờ admin phê duyệt',
+      });
+    }
   } catch (error) {
     logger.error('Error updating job:', error);
     res.status(500).json({
@@ -1662,13 +1961,284 @@ const submitJobForReview = async (req, res) => {
         message: 'Chỉ có thể gửi duyệt job ở trạng thái nháp',
       });
     }
-    job.status = JOB_STATUS.PENDING;
-    await job.save();
-    res.status(200).json({
-      success: true,
-      data: job,
-      message: 'Đã gửi duyệt. Vui lòng chờ admin phê duyệt',
-    });
+
+    // Auto-moderation: Quét từ nhạy cảm và nội dung nhạy cảm
+    try {
+      const {
+        getContentModerationService,
+      } = require('../services/moderation/contentModerationService');
+      const moderationService = getContentModerationService();
+      const moderationResult = await moderationService.moderateContent(
+        job.toObject()
+      );
+
+      // Initialize moderation field if not exists
+      if (!job.moderation) {
+        job.moderation = {};
+      }
+
+      job.moderation.autoModerationScore = moderationResult.confidence * 100;
+      job.moderation.moderationResult = {
+        action: moderationResult.action,
+        method: moderationResult.method,
+        flags: moderationResult.flags,
+        reasons: moderationResult.reasons,
+      };
+      job.moderation.moderatedAt = new Date();
+
+      // Auto-approve nếu pass moderation
+      if (
+        moderationResult.action === 'APPROVE' &&
+        moderationResult.confidence >= 0.8
+      ) {
+        job.status = JOB_STATUS.ACTIVE;
+        job.moderation.status = 'auto_approved';
+        await job.save();
+
+        logger.info(`Job auto-approved: ${job._id}`, {
+          jobId: job._id,
+          confidence: moderationResult.confidence,
+          method: moderationResult.method,
+        });
+
+        return res.status(200).json({
+          success: true,
+          data: job,
+          message: 'Job đã được tự động duyệt và đăng thành công',
+          autoApproved: true,
+        });
+      }
+
+      // Auto-reject nếu có nội dung nhạy cảm
+      if (moderationResult.action === 'REJECT') {
+        job.status = JOB_STATUS.REJECTED;
+        job.moderation.status = 'auto_rejected';
+        await job.save();
+
+        // Format reasons for employer
+        const formatReasons = reasons => {
+          if (!reasons || reasons.length === 0) return [];
+          return reasons.map(reason => {
+            if (reason.includes('Chứa từ cảnh báo')) {
+              const word = reason.match(/"([^"]+)"/)?.[1];
+              return {
+                type: 'warning_word',
+                message: `Nội dung chứa từ khóa "${word}" - cần kiểm tra lại ngữ cảnh sử dụng`,
+                severity: 'medium',
+              };
+            }
+            if (reason.includes('pattern đáng nghi')) {
+              if (reason.includes('thu nhập') || reason.includes('lương')) {
+                if (
+                  reason.includes('khủng') ||
+                  reason.includes('cao') ||
+                  reason.includes('nhanh')
+                ) {
+                  return {
+                    type: 'suspicious_pattern',
+                    message:
+                      'Nội dung có dấu hiệu hứa hẹn thu nhập không thực tế - vui lòng điều chỉnh để rõ ràng và thực tế hơn',
+                    severity: 'high',
+                  };
+                }
+              }
+              if (
+                reason.includes('không cần') ||
+                reason.includes('không yêu cầu')
+              ) {
+                if (
+                  reason.includes('kinh nghiệm') ||
+                  reason.includes('bằng cấp')
+                ) {
+                  return {
+                    type: 'suspicious_pattern',
+                    message:
+                      'Nội dung có dấu hiệu yêu cầu quá thấp - vui lòng mô tả rõ yêu cầu thực tế',
+                    severity: 'medium',
+                  };
+                }
+              }
+              if (
+                reason.includes('làm tại nhà') ||
+                reason.includes('work from home')
+              ) {
+                if (reason.includes('kiếm') || reason.includes('thu nhập')) {
+                  return {
+                    type: 'suspicious_pattern',
+                    message:
+                      'Nội dung có dấu hiệu đáng nghi về công việc làm tại nhà - vui lòng mô tả rõ ràng hơn về công việc',
+                    severity: 'medium',
+                  };
+                }
+              }
+              return {
+                type: 'suspicious_pattern',
+                message: 'Nội dung có dấu hiệu đáng nghi - cần kiểm tra lại',
+                severity: 'medium',
+              };
+            }
+            return {
+              type: 'other',
+              message: reason,
+              severity: 'low',
+            };
+          });
+        };
+
+        const reviewReasons = formatReasons(moderationResult.reasons);
+        const reviewMessage =
+          reviewReasons.length > 0
+            ? `Job không được duyệt do: ${reviewReasons
+                .map(r => r.message)
+                .join('; ')}`
+            : 'Job không được duyệt do chứa nội dung không phù hợp';
+
+        logger.warn(`Job auto-rejected: ${job._id}`, {
+          jobId: job._id,
+          reasons: moderationResult.reasons,
+          flags: moderationResult.flags,
+        });
+
+        return res.status(400).json({
+          success: false,
+          message: reviewMessage,
+          reasons: moderationResult.reasons,
+          flags: moderationResult.flags,
+          reviewReasons,
+          autoRejected: true,
+        });
+      }
+
+      // Manual review cho các trường hợp còn lại
+      job.status = JOB_STATUS.PENDING;
+      job.moderation.status = 'manual_review';
+      await job.save();
+
+      logger.info(`Job requires manual review: ${job._id}`, {
+        jobId: job._id,
+        confidence: moderationResult.confidence,
+        warnings: moderationResult.reasons,
+      });
+
+      // Format reasons thành message dễ hiểu cho employer
+      const formatReasons = reasons => {
+        if (!reasons || reasons.length === 0) return [];
+
+        return reasons.map(reason => {
+          // Format các loại reasons
+          if (reason.includes('Chứa từ cảnh báo')) {
+            const word = reason.match(/"([^"]+)"/)?.[1];
+            return {
+              type: 'warning_word',
+              message: `Nội dung chứa từ khóa "${word}" - cần kiểm tra lại ngữ cảnh sử dụng`,
+              severity: 'medium',
+            };
+          }
+          if (reason.includes('pattern đáng nghi')) {
+            // Check pattern về thu nhập
+            if (reason.includes('thu nhập') || reason.includes('lương')) {
+              if (
+                reason.includes('khủng') ||
+                reason.includes('cao') ||
+                reason.includes('nhanh')
+              ) {
+                return {
+                  type: 'suspicious_pattern',
+                  message:
+                    'Nội dung có dấu hiệu hứa hẹn thu nhập không thực tế - vui lòng điều chỉnh để rõ ràng và thực tế hơn',
+                  severity: 'high',
+                };
+              }
+            }
+            // Check pattern về yêu cầu
+            if (
+              reason.includes('không cần') ||
+              reason.includes('không yêu cầu')
+            ) {
+              if (
+                reason.includes('kinh nghiệm') ||
+                reason.includes('bằng cấp')
+              ) {
+                return {
+                  type: 'suspicious_pattern',
+                  message:
+                    'Nội dung có dấu hiệu yêu cầu quá thấp - vui lòng mô tả rõ yêu cầu thực tế',
+                  severity: 'medium',
+                };
+              }
+            }
+            // Check pattern về làm tại nhà
+            if (
+              reason.includes('làm tại nhà') ||
+              reason.includes('work from home')
+            ) {
+              if (reason.includes('kiếm') || reason.includes('thu nhập')) {
+                return {
+                  type: 'suspicious_pattern',
+                  message:
+                    'Nội dung có dấu hiệu đáng nghi về công việc làm tại nhà - vui lòng mô tả rõ ràng hơn về công việc',
+                  severity: 'medium',
+                };
+              }
+            }
+            return {
+              type: 'suspicious_pattern',
+              message: 'Nội dung có dấu hiệu đáng nghi - cần kiểm tra lại',
+              severity: 'medium',
+            };
+          }
+          return {
+            type: 'other',
+            message: reason,
+            severity: 'low',
+          };
+        });
+      };
+
+      const reviewReasons = formatReasons(moderationResult.reasons);
+
+      // Tạo message tổng hợp
+      const reviewMessage =
+        reviewReasons.length > 0
+          ? `Job của bạn cần được admin xem xét do: ${reviewReasons
+              .map(r => r.message)
+              .join('; ')}`
+          : 'Đã gửi duyệt. Vui lòng chờ admin phê duyệt';
+
+      return res.status(200).json({
+        success: true,
+        data: job,
+        message: reviewMessage,
+        requiresReview: true,
+        reviewReasons: reviewReasons,
+        warnings: moderationResult.reasons, // Giữ nguyên để backward compatibility
+        moderationScore: moderationResult.confidence * 100,
+        moderationMethod: moderationResult.method,
+      });
+    } catch (moderationError) {
+      // Nếu moderation fail, vẫn cho submit nhưng chuyển sang manual review
+      logger.error(
+        'Content moderation failed, falling back to manual review:',
+        {
+          error: moderationError.message,
+          jobId: job._id,
+        }
+      );
+
+      job.status = JOB_STATUS.PENDING;
+      if (!job.moderation) {
+        job.moderation = {};
+      }
+      job.moderation.status = 'manual_review';
+      job.moderation.moderationError = moderationError.message;
+      await job.save();
+
+      return res.status(200).json({
+        success: true,
+        data: job,
+        message: 'Đã gửi duyệt. Vui lòng chờ admin phê duyệt',
+      });
+    }
   } catch (error) {
     logger.error('Error submitting job for review:', error);
     res.status(500).json({ success: false, message: 'Lỗi khi gửi duyệt job' });
@@ -1715,7 +2285,10 @@ const getRelatedJobs = async (req, res) => {
 
     if (orConditions.length > 0) {
       query.$or = orConditions;
-    } else if (Array.isArray(baseJob.industryPath) && baseJob.industryPath.length > 0) {
+    } else if (
+      Array.isArray(baseJob.industryPath) &&
+      baseJob.industryPath.length > 0
+    ) {
       query.$or = [{ industryPath: { $in: baseJob.industryPath } }];
     }
 
@@ -1745,7 +2318,10 @@ const getRelatedJobs = async (req, res) => {
 
     // Fallback: if no related by industry/skills, return newest open jobs
     if (!relatedJobs || relatedJobs.length === 0) {
-      relatedJobs = await Job.find({ _id: { $ne: id }, status: { $in: activeStatuses } })
+      relatedJobs = await Job.find({
+        _id: { $ne: id },
+        status: { $in: activeStatuses },
+      })
         .select(projection)
         .populate('employer', 'company.name company.logo')
         .sort({ createdAt: -1 })
