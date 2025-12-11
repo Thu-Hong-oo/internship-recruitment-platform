@@ -33,6 +33,12 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu \
     -r /tmp/python-requirements.txt
 
+# Pre-download Sentence-BERT model to avoid runtime download/timeout
+RUN python3 - <<'PY'
+from sentence_transformers import SentenceTransformer
+SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+PY
+
 # Copy application files
 COPY ${APP_PATH}/. .
 
