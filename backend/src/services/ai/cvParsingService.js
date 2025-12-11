@@ -117,7 +117,7 @@ class CVParsingService {
       // Try different paths for different pdfjs-dist versions
       let pdfjsLib;
       const path = require('path');
-      
+
       try {
         // Try legacy path first (for older versions)
         pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
@@ -145,12 +145,29 @@ class CVParsingService {
           pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath;
         }
       }
-      
+
+      // Reduce canvas polyfill warnings; disable features not needed for text
+      pdfjsLib.GlobalWorkerOptions.disableFontFace = true;
+      pdfjsLib.GlobalWorkerOptions.disableRange = true;
+
+      // pdfjs-dist expects Uint8Array for data (Buffer is technically Uint8Array, but make a clean view)
+      let data;
+      if (fileBuffer instanceof Uint8Array) {
+        data = new Uint8Array(
+          fileBuffer.buffer,
+          fileBuffer.byteOffset || 0,
+          fileBuffer.byteLength
+        );
+      } else {
+        // Accept ArrayBuffer, Buffer, or plain typed data
+        data = new Uint8Array(fileBuffer);
+      }
+
       const loadingTask = pdfjsLib.getDocument({
-        data: fileBuffer,
+        data,
         useSystemFonts: true,
         verbosity: 0,
-        // Disable worker in Node.js (optional, but can help avoid issues)
+        // Disable worker eval in Node.js
         isEvalSupported: false,
       });
       

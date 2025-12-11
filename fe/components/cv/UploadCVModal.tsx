@@ -187,6 +187,16 @@ export default function UploadCVModal({
             : "CV đã được tải lên thành công!"
         );
 
+        // Trigger background matching scores calculation
+        try {
+          const { calculateMatchingScoresImmediate } = await import("@/lib/utils/backgroundMatching");
+          calculateMatchingScoresImmediate().catch((err) => {
+            console.warn("Failed to trigger matching scores calculation:", err);
+          });
+        } catch (err) {
+          console.warn("Failed to load background matching utility:", err);
+        }
+
         // Show parsed data if available
         if (uploadMode === "parse" && response.data.parsing?.extractedData) {
           setParsedData(response.data.parsing.extractedData);

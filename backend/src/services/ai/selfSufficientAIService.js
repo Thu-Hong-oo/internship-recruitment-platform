@@ -30,7 +30,7 @@ class SelfSufficientAIService {
       try {
         const genAI = new GoogleGenerativeAI(this.geminiApiKey);
         this.geminiModel = genAI.getGenerativeModel({
-          model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp'
+          model: process.env.GEMINI_MODEL
         });
         logger.info('✅ Gemini model initialized for CV improvements analysis');
       } catch (error) {

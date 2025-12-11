@@ -23,7 +23,7 @@ class SentenceBertService {
     this.embeddingDim = 768;
     this.isAvailable = false;
     
-    // Check if model is available
+    // Check if model is available (non-blocking, reduced load)
     this._checkAvailability();
   }
 
@@ -40,18 +40,11 @@ class SentenceBertService {
         return;
       }
 
-      const result = await this._runPython(['--check']);
+      const result = await this._runPython(['--check'], 15000);
       this.isAvailable = result.success;
       
       if (this.isAvailable) {
         logger.info(`✅ Sentence-BERT model available: ${this.modelName}`);
-        // Pre-warm model with dummy encoding to speed up first real request
-        try {
-          await this._runPython(['--encode', 'warmup']);
-          logger.info('✅ Sentence-BERT model pre-warmed');
-        } catch (warmupError) {
-          logger.warn('⚠️ Model warmup failed:', warmupError.message);
-        }
       } else {
         logger.warn('⚠️ Sentence-BERT model not available. Run: pip install sentence-transformers');
         this.isAvailable = false;
@@ -204,7 +197,7 @@ class SentenceBertService {
    * Execute Python script
    * @private
    */
-  _runPython(args) {
+  _runPython(args, timeoutMs = 30000) {
     return new Promise((resolve, reject) => {
       // Check if Python script exists
       const fs = require('fs');
@@ -244,12 +237,12 @@ class SentenceBertService {
         stderr += data.toString();
       });
 
-      // Timeout after 30 seconds (model is pre-warmed)
+      // Timeout guard
       const timeoutId = setTimeout(() => {
         pythonProcess.kill('SIGKILL');
-        logger.error('⏱️ Sentence-BERT timeout after 30s');
-        reject(new Error('Sentence-BERT timeout (30s)'));
-      }, 30000);
+        logger.error(`⏱️ Sentence-BERT timeout after ${timeoutMs / 1000}s`);
+        reject(new Error(`Sentence-BERT timeout (${timeoutMs / 1000}s)`));
+      }, timeoutMs);
 
       pythonProcess.on('close', (code) => {
         clearTimeout(timeoutId);
@@ -271,21 +264,34 @@ class SentenceBertService {
           } else {
             // Log more details for debugging
             const errorMsg = stderr || stdout || `Python script exited with code ${code}`;
-            logger.error(`❌ Python script error (code ${code}):`, errorMsg.substring(0, 500));
+            logger.error(`❌ Python script error (code ${code}):`, errorMsg.substring(0, 1000));
             logger.error(`   Command: ${pythonCmd} ${this.pythonScript} ${args.join(' ')}`);
             logger.error(`   Script path: ${this.pythonScript}`);
             logger.error(`   Script exists: ${fs.existsSync(this.pythonScript)}`);
-            if (stdout) logger.error(`   stdout: ${stdout.substring(0, 200)}`);
+            if (stdout) logger.error(`   stdout (first 500 chars): ${stdout.substring(0, 500)}`);
+            if (stderr) logger.error(`   stderr (first 500 chars): ${stderr.substring(0, 500)}`);
           }
           return reject(new Error(stderr || stdout || `Python script exited with code ${code}`));
         }
 
         try {
+          // Python script outputs JSON, try to parse it
           const result = JSON.parse(stdout);
+          
+          // Check if Python script returned an error in JSON format
+          if (result.success === false) {
+            logger.error(`❌ Python script returned error: ${result.error || 'Unknown error'}`);
+            logger.error(`   Error type: ${result.type || 'Unknown'}`);
+            return reject(new Error(result.error || 'Python script failed'));
+          }
+          
           resolve(result);
         } catch (error) {
-          logger.error(`❌ Failed to parse Python output. stdout: ${stdout.substring(0, 200)}`);
-          logger.error(`   stderr: ${stderr.substring(0, 200)}`);
+          // If stdout is not JSON, log both stdout and stderr for debugging
+          logger.error(`❌ Failed to parse Python output as JSON`);
+          logger.error(`   stdout (first 500 chars): ${stdout.substring(0, 500)}`);
+          logger.error(`   stderr (first 500 chars): ${stderr.substring(0, 500)}`);
+          logger.error(`   Parse error: ${error.message}`);
           reject(new Error(`Failed to parse Python output: ${stdout.substring(0, 200)}`));
         }
       });

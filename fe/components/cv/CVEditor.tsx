@@ -222,6 +222,16 @@ export default function CVEditor({
       if (response.success) {
         setHasUnsavedChanges(false);
         alert("Đã lưu thành công!");
+        
+        // Trigger background matching scores calculation after saving CV
+        try {
+          const { calculateMatchingScoresBackground } = await import("@/lib/utils/backgroundMatching");
+          calculateMatchingScoresBackground().catch((err) => {
+            console.warn("Failed to trigger matching scores calculation:", err);
+          });
+        } catch (err) {
+          console.warn("Failed to load background matching utility:", err);
+        }
       } else {
         throw new Error("Lưu thất bại");
       }

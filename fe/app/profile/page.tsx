@@ -158,6 +158,16 @@ export default function ProfilePage() {
       if (response.success) {
         console.log("Profile updated successfully");
         alert("Cập nhật thông tin thành công!");
+        
+        // Trigger background matching scores calculation
+        try {
+          const { calculateMatchingScoresBackground } = await import("@/lib/utils/backgroundMatching");
+          calculateMatchingScoresBackground().catch((err) => {
+            console.warn("Failed to trigger matching scores calculation:", err);
+          });
+        } catch (err) {
+          console.warn("Failed to load background matching utility:", err);
+        }
       } else {
         console.error("Failed to update profile:", response.message);
         alert("Cập nhật thất bại: " + response.message);

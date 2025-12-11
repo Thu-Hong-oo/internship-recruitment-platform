@@ -721,6 +721,204 @@ const viewApplicationResume = asyncHandler(async (req, res) => {
   res.send(fileBuffer);
 });
 
+// @desc    Schedule an interview (Employer)
+// @route   POST /api/applications/:id/interviews
+// @access  Private (Employer)
+const scheduleInterview = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { scheduledAt, duration, type, location, interviewerId, note, metadata } = req.body;
+
+  if (!scheduledAt) {
+    throw new AppError('scheduledAt is required', 400);
+  }
+
+  const application = await Application.findById(id).populate('jobId', 'postedBy');
+  if (!application) {
+    throw new AppError('Application not found', 404);
+  }
+
+  if (!application.jobId || String(application.jobId.postedBy) !== String(req.user.id)) {
+    throw new AppError('Bạn không có quyền đặt lịch phỏng vấn cho ứng viên này', 403);
+  }
+
+  const interview = {
+    scheduledAt: new Date(scheduledAt),
+    duration,
+    type,
+    location,
+    interviewer: interviewerId,
+    note,
+    metadata,
+  };
+
+  await application.scheduleInterview(interview);
+
+  res.status(200).json({
+    success: true,
+    message: 'Đã đặt lịch phỏng vấn',
+    data: application,
+  });
+});
+
+// @desc    Update an interview (Employer)
+// @route   PUT /api/applications/:id/interviews/:interviewId
+// @access  Private (Employer)
+const updateInterview = asyncHandler(async (req, res) => {
+  const { id, interviewId } = req.params;
+  const { scheduledAt, duration, type, location, interviewerId, note, metadata } = req.body;
+
+  const application = await Application.findById(id).populate('jobId', 'postedBy');
+  if (!application) {
+    throw new AppError('Application not found', 404);
+  }
+
+  if (!application.jobId || String(application.jobId.postedBy) !== String(req.user.id)) {
+    throw new AppError('Bạn không có quyền cập nhật lịch phỏng vấn này', 403);
+  }
+
+  const interview = application.interviews.id(interviewId);
+  if (!interview) {
+    throw new AppError('Interview not found', 404);
+  }
+
+  if (scheduledAt) interview.scheduledAt = new Date(scheduledAt);
+  if (duration !== undefined) interview.duration = duration;
+  if (type) interview.type = type;
+  if (location) interview.location = location;
+  if (interviewerId) interview.interviewer = interviewerId;
+  if (note !== undefined) interview.note = note;
+  if (metadata !== undefined) interview.metadata = metadata;
+
+  application.timeline.push({
+    status: 'interview',
+    note: 'Cập nhật lịch phỏng vấn',
+    createdBy: req.user.id,
+  });
+
+  await application.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Đã cập nhật lịch phỏng vấn',
+    data: application,
+  });
+});
+
+// @desc    Cancel an interview (Employer)
+// @route   DELETE /api/applications/:id/interviews/:interviewId
+// @access  Private (Employer)
+const cancelInterview = asyncHandler(async (req, res) => {
+  const { id, interviewId } = req.params;
+
+  const application = await Application.findById(id).populate('jobId', 'postedBy');
+  if (!application) {
+    throw new AppError('Application not found', 404);
+  }
+
+  if (!application.jobId || String(application.jobId.postedBy) !== String(req.user.id)) {
+    throw new AppError('Bạn không có quyền hủy lịch phỏng vấn này', 403);
+  }
+
+  const interview = application.interviews.id(interviewId);
+  if (!interview) {
+    throw new AppError('Interview not found', 404);
+  }
+
+  interview.remove();
+
+  application.timeline.push({
+    status: 'interview',
+    note: 'Hủy lịch phỏng vấn',
+    createdBy: req.user.id,
+  });
+
+  await application.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Đã hủy lịch phỏng vấn',
+    data: application,
+  });
+});
+
+// @desc    Get employer interviews (upcoming)
+// @route   GET /api/applications/interviews/employer
+// @access  Private (Employer)
+const getEmployerInterviews = asyncHandler(async (req, res) => {
+  const { from, to, limit = 20 } = req.query;
+  const fromDate = from ? new Date(from) : new Date();
+  const toDate = to ? new Date(to) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+  // Get jobs posted by this employer
+  const jobs = await Job.find({ postedBy: req.user.id }).select('_id title');
+  const jobIds = jobs.map(j => j._id);
+  if (jobIds.length === 0) {
+    return res.json({ success: true, data: [] });
+  }
+
+  const interviews = await Application.aggregate([
+    { $match: { jobId: { $in: jobIds } } },
+    { $unwind: '$interviews' },
+    {
+      $match: {
+        'interviews.scheduledAt': { $gte: fromDate, $lte: toDate },
+      },
+    },
+    {
+      $lookup: {
+        from: 'jobs',
+        localField: 'jobId',
+        foreignField: '_id',
+        as: 'job',
+      },
+    },
+    { $unwind: '$job' },
+    {
+      $lookup: {
+        from: 'candidateprofiles',
+        localField: 'candidateId',
+        foreignField: '_id',
+        as: 'candidateProfile',
+      },
+    },
+    { $unwind: { path: '$candidateProfile', preserveNullAndEmptyArrays: true } },
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'candidateProfile.userId',
+        foreignField: '_id',
+        as: 'candidateUser',
+      },
+    },
+    { $unwind: { path: '$candidateUser', preserveNullAndEmptyArrays: true } },
+    {
+      $project: {
+        _id: 0,
+        applicationId: '$_id',
+        interviewId: '$interviews._id',
+        scheduledAt: '$interviews.scheduledAt',
+        type: '$interviews.type',
+        location: '$interviews.location',
+        note: '$interviews.note',
+        metadata: '$interviews.metadata',
+        jobId: '$job._id',
+        jobTitle: '$job.title',
+        candidateName: {
+          $ifNull: [
+            '$candidateUser.fullName',
+            '$candidateUser.displayFullName',
+          ],
+        },
+        candidateEmail: '$candidateUser.email',
+      },
+    },
+    { $sort: { scheduledAt: 1 } },
+    { $limit: Number(limit) },
+  ]);
+
+  res.json({ success: true, data: interviews });
+});
+
 module.exports = {
   getUserApplications,
   getApplication,
@@ -730,4 +928,8 @@ module.exports = {
   updateApplicationStatus,
   getEmployerApplications,
   viewApplicationResume,
+  scheduleInterview,
+  updateInterview,
+  cancelInterview,
+  getEmployerInterviews,
 };

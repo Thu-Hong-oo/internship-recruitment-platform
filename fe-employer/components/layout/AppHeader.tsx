@@ -571,9 +571,14 @@ export default function AppHeader() {
                             handleMarkAsRead(notification._id);
                           }
                           if (notification.data?.jobId) {
-                            router.push("/jobs");
+                            // Nếu có jobId, chuyển thẳng tới trang ứng viên của job đó
+                            router.push(`/jobs/${notification.data.jobId}/applications`);
                             setNotificationDropdownOpen(false);
+                            return;
                           }
+                          // Fallback: mở trang thông báo
+                          router.push("/notifications");
+                          setNotificationDropdownOpen(false);
                         }}
                       >
                         <div className="flex items-start gap-3">
@@ -612,7 +617,7 @@ export default function AppHeader() {
                               {notification.data?.jobId && (
                                 <div className="flex items-center gap-1 text-blue-600">
                                   <ExternalLink className="w-3 h-3" />
-                                  <span>Xem công việc</span>
+                                  <span>Xem ứng viên</span>
                                 </div>
                               )}
                             </div>

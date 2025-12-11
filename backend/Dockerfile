@@ -31,11 +31,11 @@ RUN if [ -f package-lock.json ]; then \
 # Install Python dependencies for Sentence-BERT
 # sentence-transformers is required for RAG recommendations
 # Note: This may take a few minutes to download the model on first build
-# Using CPU-only torch to reduce image size
-RUN pip install --no-cache-dir --upgrade pip && \
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir \
     sentence-transformers \
     numpy \
+    torch --index-url https://download.pytorch.org/whl/cpu \
     || (echo "⚠️ Python dependencies installation failed, Sentence-BERT may be unavailable" && exit 0)
 
 # Remove build dependencies to reduce image size (keep python3 and pip)

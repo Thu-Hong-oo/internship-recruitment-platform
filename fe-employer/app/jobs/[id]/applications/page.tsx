@@ -6,6 +6,8 @@ import {
   getJobApplications,
   viewApplicationResume,
   updateApplicationStatus,
+  scheduleInterview,
+  getJobById,
 } from "@/lib/jobAPI";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,12 +39,25 @@ import {
   Eye,
   X,
   AlertCircle,
+  CalendarClock,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 type ApplicationItem = {
   _id: string;
   status: string;
   createdAt: string;
+  interviews?: InterviewItem[];
   candidateId?: {
     userId?: {
       fullName?: string;
@@ -57,6 +72,17 @@ type ApplicationItem = {
       };
     };
   };
+};
+
+type InterviewItem = {
+  _id: string;
+  scheduledAt?: string;
+  duration?: number;
+  type?: string;
+  location?: string;
+  interviewer?: string;
+  note?: string;
+  metadata?: Record<string, any>;
 };
 
 const statusConfig: Record<
@@ -127,6 +153,7 @@ export default function JobApplicationsPage() {
   const { toast } = useToast();
 
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
+  const [jobTitle, setJobTitle] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -134,6 +161,16 @@ export default function JobApplicationsPage() {
   const [limit] = useState(10);
   const [total, setTotal] = useState(0);
   const [pages, setPages] = useState(1);
+  const [schedulingFor, setSchedulingFor] = useState<string | null>(null);
+  const [scheduleForm, setScheduleForm] = useState({
+    scheduledAt: "",
+    duration: "",
+    type: "online",
+    location: "",
+    interviewerId: "",
+    note: "",
+    metadata: "",
+  });
 
   const loadData = async (
     nextPage = page,
@@ -181,6 +218,24 @@ export default function JobApplicationsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId, statusFilter]);
 
+  // Load job title for context
+  useEffect(() => {
+    const loadJob = async () => {
+      try {
+        const token =
+          localStorage.getItem("token") || sessionStorage.getItem("token");
+        if (!token || !jobId) return;
+        const res = await getJobById(jobId, token);
+        if (res.success && res.data?.title) {
+          setJobTitle(res.data.title);
+        }
+      } catch (e) {
+        // silent fail
+      }
+    };
+    loadJob();
+  }, [jobId]);
+
   const formatDateTime = (value?: string) => {
     if (!value) return "-";
     return new Date(value).toLocaleString("vi-VN");
@@ -192,6 +247,91 @@ export default function JobApplicationsPage() {
       variant: "secondary" as const,
     };
     return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const getUpcomingInterview = (app: ApplicationItem) => {
+    if (!app.interviews || app.interviews.length === 0) return null;
+    const now = new Date();
+    const future = app.interviews
+      .filter((i) => i.scheduledAt && new Date(i.scheduledAt) >= now)
+      .sort(
+        (a, b) =>
+          new Date(a.scheduledAt || 0).getTime() -
+          new Date(b.scheduledAt || 0).getTime()
+      );
+    return future[0] || null;
+  };
+
+  const handleScheduleSubmit = async () => {
+    if (!schedulingFor) return;
+    const token =
+      localStorage.getItem("token") || sessionStorage.getItem("token");
+    if (!token) {
+      toast({
+        title: "Lỗi",
+        description: "Vui lòng đăng nhập",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!scheduleForm.scheduledAt) {
+      toast({
+        title: "Thiếu thông tin",
+        description: "Vui lòng chọn thời gian phỏng vấn",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    let parsedMetadata: Record<string, any> | undefined = undefined;
+    if (scheduleForm.metadata.trim()) {
+      try {
+        parsedMetadata = JSON.parse(scheduleForm.metadata);
+      } catch (e) {
+        toast({
+          title: "Metadata không hợp lệ",
+          description: "Vui lòng nhập JSON hợp lệ (ví dụ: {\"note\":\"...\"})",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    const payload = {
+      scheduledAt: new Date(scheduleForm.scheduledAt).toISOString(),
+      duration: scheduleForm.duration ? Number(scheduleForm.duration) : undefined,
+      type: scheduleForm.type || undefined,
+      location: scheduleForm.location || undefined,
+      interviewerId: scheduleForm.interviewerId || undefined,
+      note: scheduleForm.note || undefined,
+      metadata: parsedMetadata,
+    };
+
+    const res = await scheduleInterview(schedulingFor, payload, token);
+    if (res.success) {
+      toast({
+        title: "Đã mời phỏng vấn",
+        description: "Đã lưu lịch và gửi thông báo",
+      });
+      setSchedulingFor(null);
+      setScheduleForm({
+        scheduledAt: "",
+        duration: "",
+        type: "online",
+        location: "",
+        interviewerId: "",
+        note: "",
+        metadata: "",
+      });
+      loadData(page, statusFilter);
+    } else {
+      toast({
+        title: "Lỗi",
+        description: res.error || "Không thể đặt lịch",
+        variant: "destructive",
+      });
+    }
   };
 
   const renderCandidateInfo = (item: ApplicationItem) => {
@@ -428,7 +568,7 @@ export default function JobApplicationsPage() {
                   <TableHead>Trạng thái</TableHead>
                   <TableHead>Thời gian</TableHead>
                   <TableHead>Tài liệu</TableHead>
-                  <TableHead className="w-[120px]">Hành động</TableHead>
+                  <TableHead className="w-[200px]">Hành động</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -438,16 +578,22 @@ export default function JobApplicationsPage() {
                     <TableRow key={app._id}>
                       <TableCell>{renderCandidateInfo(app)}</TableCell>
                       <TableCell>
-                        {FINAL_STATUSES.includes(app.status || "") ? (
-                          // Hiển thị Badge cố định cho các trạng thái cuối
-                          renderStatusBadge(app.status || "pending")
-                        ) : (
-                          // Hiển thị Select dropdown với các trạng thái hợp lệ
+                      {(() => {
+                        const upcoming = getUpcomingInterview(app);
+                        if (upcoming && app.status === "interview") {
+                          return (
+                            <Badge variant="default" className="bg-blue-100 text-blue-700">
+                              Đã lên lịch
+                            </Badge>
+                          );
+                        }
+                        if (FINAL_STATUSES.includes(app.status || "")) {
+                          return renderStatusBadge(app.status || "pending");
+                        }
+                        return (
                           <Select
                             value={app.status || "pending"}
-                            onValueChange={(value) =>
-                              handleStatusChange(app._id, value)
-                            }
+                            onValueChange={(value) => handleStatusChange(app._id, value)}
                             disabled={updatingStatus === app._id}
                           >
                             <SelectTrigger className="w-[160px]">
@@ -462,26 +608,25 @@ export default function JobApplicationsPage() {
                                 const availableStatuses = getAvailableStatuses(
                                   app.status || "pending"
                                 );
-                                // Luôn hiển thị trạng thái hiện tại và các trạng thái có thể chuyển
                                 return (
                                   option.value === app.status ||
                                   availableStatuses.includes(option.value)
                                 );
                               }).map((option) => (
-                                <SelectItem
-                                  key={option.value}
-                                  value={option.value}
-                                >
+                                <SelectItem key={option.value} value={option.value}>
                                   {option.label}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
-                        )}
+                        );
+                      })()}
                       </TableCell>
                       <TableCell>
                         <div className="text-sm text-muted-foreground">
-                          {formatDateTime(app.createdAt)}
+                          {getUpcomingInterview(app)?.scheduledAt
+                            ? formatDateTime(getUpcomingInterview(app)!.scheduledAt!)
+                            : formatDateTime(app.createdAt)}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -502,18 +647,178 @@ export default function JobApplicationsPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            router.push(
-                              `/jobs/${jobId}/applications/${app._id}`
-                            )
-                          }
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          Chi tiết
-                        </Button>
+                        <div className="flex flex-wrap gap-2 justify-end">
+                          <Dialog
+                            open={schedulingFor === app._id}
+                            onOpenChange={(open) =>
+                              setSchedulingFor(open ? app._id : null)
+                            }
+                          >
+                            <DialogTrigger asChild>
+                              {(() => {
+                                const upcoming = getUpcomingInterview(app);
+                                const isFinal = FINAL_STATUSES.includes(app.status || "");
+                                if (upcoming) {
+                                  return (
+                                    <Button variant="outline" size="sm" disabled className="gap-2">
+                                      <CalendarClock className="h-4 w-4" />
+                                      Đã lên lịch
+                                    </Button>
+                                  );
+                                }
+                                if (isFinal) {
+                                  return (
+                                    <Button variant="outline" size="sm" disabled className="gap-2">
+                                      <CalendarClock className="h-4 w-4" />
+                                      Đã kết thúc
+                                    </Button>
+                                  );
+                                }
+                                return (
+                                  <Button variant="outline" size="sm" className="gap-2">
+                                    <CalendarClock className="h-4 w-4" />
+                                    Mời phỏng vấn
+                                  </Button>
+                                );
+                              })()}
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-lg">
+                              <DialogHeader>
+                                <DialogTitle>Mời phỏng vấn</DialogTitle>
+                              </DialogHeader>
+                              <div className="space-y-4">
+                                <div className="grid gap-2">
+                                  <Label htmlFor="scheduledAt">Thời gian</Label>
+                                  <Input
+                                    id="scheduledAt"
+                                    type="datetime-local"
+                                    value={scheduleForm.scheduledAt}
+                                    onChange={(e) =>
+                                      setScheduleForm((prev) => ({
+                                        ...prev,
+                                        scheduledAt: e.target.value,
+                                      }))
+                                    }
+                                  />
+                                </div>
+                                <div className="grid gap-2">
+                                  <Label htmlFor="duration">Thời lượng (phút)</Label>
+                                  <Input
+                                    id="duration"
+                                    type="number"
+                                    min={0}
+                                    value={scheduleForm.duration}
+                                    onChange={(e) =>
+                                      setScheduleForm((prev) => ({
+                                        ...prev,
+                                        duration: e.target.value,
+                                      }))
+                                    }
+                                  />
+                                </div>
+                                <div className="grid gap-2">
+                                  <Label htmlFor="type">Hình thức</Label>
+                                  <Select
+                                    value={scheduleForm.type}
+                                    onValueChange={(val) =>
+                                      setScheduleForm((prev) => ({ ...prev, type: val }))
+                                    }
+                                  >
+                                    <SelectTrigger id="type">
+                                      <SelectValue placeholder="Chọn hình thức" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="online">Online</SelectItem>
+                                      <SelectItem value="onsite">Onsite</SelectItem>
+                                      <SelectItem value="phone">Phone</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="grid gap-2">
+                                  <Label htmlFor="location">Địa điểm / Link</Label>
+                                  <Input
+                                    id="location"
+                                    placeholder="Phòng họp / Google Meet link..."
+                                    value={scheduleForm.location}
+                                    onChange={(e) =>
+                                      setScheduleForm((prev) => ({
+                                        ...prev,
+                                        location: e.target.value,
+                                      }))
+                                    }
+                                  />
+                                </div>
+                                <div className="grid gap-2">
+                                  <Label htmlFor="interviewerId">Người phỏng vấn (User ID)</Label>
+                                  <Input
+                                    id="interviewerId"
+                                    placeholder="Optional"
+                                    value={scheduleForm.interviewerId}
+                                    onChange={(e) =>
+                                      setScheduleForm((prev) => ({
+                                        ...prev,
+                                        interviewerId: e.target.value,
+                                      }))
+                                    }
+                                  />
+                                </div>
+                                <div className="grid gap-2">
+                                  <Label htmlFor="note">Ghi chú gửi ứng viên</Label>
+                                  <Textarea
+                                    id="note"
+                                    rows={3}
+                                    value={scheduleForm.note}
+                                    onChange={(e) =>
+                                      setScheduleForm((prev) => ({
+                                        ...prev,
+                                        note: e.target.value,
+                                      }))
+                                    }
+                                  />
+                                </div>
+                                <div className="grid gap-2">
+                                  <Label htmlFor="metadata">
+                                    Metadata tùy biến (JSON) — ví dụ: {"{\"room\":\"A1\"}"}
+                                  </Label>
+                                  <Textarea
+                                    id="metadata"
+                                    rows={3}
+                                    placeholder='{"room":"A1","panel":"Mr A, Ms B"}'
+                                    value={scheduleForm.metadata}
+                                    onChange={(e) =>
+                                      setScheduleForm((prev) => ({
+                                        ...prev,
+                                        metadata: e.target.value,
+                                      }))
+                                    }
+                                  />
+                                </div>
+                              </div>
+                              <DialogFooter className="mt-4">
+                                <Button
+                                  variant="outline"
+                                  onClick={() => setSchedulingFor(null)}
+                                  type="button"
+                                >
+                                  Đóng
+                                </Button>
+                                <Button onClick={handleScheduleSubmit}>Lưu lịch</Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              router.push(
+                                `/jobs/${jobId}/applications/${app._id}`
+                              )
+                            }
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            Chi tiết
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );

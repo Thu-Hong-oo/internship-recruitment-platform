@@ -456,6 +456,16 @@ export function ApplyJobModal({
           if (uploadRes?.success) {
             // Sau khi upload, CV mới sẽ trở thành current
             finalResumeId = "current";
+            
+            // Trigger background matching scores calculation
+            try {
+              const { calculateMatchingScoresImmediate } = await import("@/lib/utils/backgroundMatching");
+              calculateMatchingScoresImmediate().catch((err) => {
+                console.warn("Failed to trigger matching scores calculation:", err);
+              });
+            } catch (err) {
+              console.warn("Failed to load background matching utility:", err);
+            }
           } else {
             throw new Error("Không thể tải lên CV");
           }
@@ -502,6 +512,16 @@ export function ApplyJobModal({
           const uploadRes = await api.candidateCV.uploadCV(formDataUpload);
           if (uploadRes?.success) {
             finalResumeId = "current";
+            
+            // Trigger background matching scores calculation after upload
+            try {
+              const { calculateMatchingScoresImmediate } = await import("@/lib/utils/backgroundMatching");
+              calculateMatchingScoresImmediate().catch((err) => {
+                console.warn("Failed to trigger matching scores calculation:", err);
+              });
+            } catch (err) {
+              console.warn("Failed to load background matching utility:", err);
+            }
           } else {
             throw new Error("Không thể tải lên CV đã export");
           }

@@ -62,7 +62,7 @@ class AIService {
     
     // Respect user's choice from .env, use default if not set
     // Default: gemini-2.0-flash-lite (nhanh nhất) - xem GEMINI_MODEL_COMPARISON.md
-    let modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash-lite';
+    let modelName = process.env.GEMINI_MODEL
     
     // Check if API key is available
     if (!apiKey) {
@@ -3997,7 +3997,7 @@ LƯU Ý:
         return this.basicSkillGapAnalysis(cvData, jobData);
       }
 
-      const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-pro';
+      const modelName = process.env.GEMINI_MODEL;
       const model = genAI.getGenerativeModel({ model: modelName });
 
       // Extract skills from cvData
@@ -4152,7 +4152,7 @@ Return ONLY valid JSON (no markdown):
         return this.getDefaultLearningRoadmap();
       }
 
-      const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-pro';
+      const modelName = process.env.GEMINI_MODEL;
       const model = genAI.getGenerativeModel({ model: modelName });
 
       // Safely extract skillGaps
@@ -4447,43 +4447,66 @@ Return ONLY valid JSON (no markdown):
     try {
       const { limit = 10, minScore = 60 } = options;
 
-      if (!job || !candidates || candidates.length === 0) {
-        logger.warn('Invalid input for candidate recommendations', {
+      // Validate job (candidates parameter is kept for backward compatibility but not used)
+      if (!job) {
+        logger.warn('Invalid input for candidate recommendations: job is required', {
           hasJob: !!job,
-          candidatesCount: candidates?.length || 0,
         });
         return [];
       }
 
       // Use NEW candidateRecommendationService.getRecommendations() - self-sufficient
-      const recommendations = await candidateRecommendationService.getRecommendations(
+      // Note: candidateRecommendationService.getRecommendations() is self-sufficient
+      // and fetches candidates internally, so we don't pass candidates array
+      const result = await candidateRecommendationService.getRecommendations(
         job,
-        candidates,
         {
           limit,
           minScore,
-          includeSkillGaps: true,
-          includeTier: true,
+          includeSkillGap: true,
+          tierFilter: ['A', 'B', 'C'],
         }
       );
+      
+      // Extract recommendations from result object
+      const recommendations = result?.recommendations || [];
 
       // Map to legacy format for backward compatibility
-      const validCandidates = recommendations.map((rec, index) => ({
-        candidateId: rec.candidateId,
-        rank: index + 1,
-        score: rec.matchScore,
-        tier: rec.tier,
-        matchDetails: {
-          overall: rec.matchScore,
-          technicalFit: rec.scoreBreakdown?.skills || 0,
-          experienceFit: rec.scoreBreakdown?.experience || 0,
-          educationFit: rec.scoreBreakdown?.education || 0,
-        },
-        strengths: rec.explanation?.split('. ').filter(s => s.includes('Strong') || s.includes('Good')) || [],
-        concerns: rec.skillGaps?.critical?.map(s => `Missing critical skill: ${s}`) || [],
-        skillGaps: rec.skillGaps,
-        interviewQuestions: this.generateInterviewQuestions(job, rec.candidate, { overall: rec.matchScore }),
-      }));
+      const validCandidates = recommendations.map((rec, index) => {
+        // Handle both old format (direct candidateId) and new format (with candidate object)
+        const candidateId = rec.candidateId || rec.candidate?.id || rec.candidate?._id;
+        const candidate = rec.candidate || {};
+        
+        return {
+          candidateId: candidateId,
+          rank: index + 1,
+          score: rec.matchScore || rec.score || 0,
+          tier: rec.tier || 'C',
+          matchDetails: {
+            overall: rec.matchScore || rec.score || 0,
+            technicalFit: rec.scoreBreakdown?.skills || rec.breakdown?.skills?.score || 0,
+            experienceFit: rec.scoreBreakdown?.experience || rec.breakdown?.experience?.score || 0,
+            educationFit: rec.scoreBreakdown?.education || rec.breakdown?.education?.score || 0,
+          },
+          strengths: rec.explanation?.split('. ').filter(s => s.includes('Strong') || s.includes('Good')) || [],
+          concerns: rec.skillGap?.missingSkills?.critical?.map(s => `Missing critical skill: ${s}`) || rec.skillGaps?.critical?.map(s => `Missing critical skill: ${s}`) || [],
+          skillGaps: rec.skillGap || rec.skillGaps,
+          candidate: {
+            id: candidateId,
+            name: candidate.fullName || candidate.name || 'Unknown',
+            email: candidate.email || '',
+            phone: candidate.phone || '',
+            location: candidate.location || '',
+            currentTitle: candidate.currentPosition || candidate.currentTitle || '',
+            yearsExperience: candidate.yearsExperience || 0,
+            education: candidate.education || '',
+            availability: candidate.availability || 'available',
+            expectedSalary: candidate.expectedSalary || null,
+            profileUrl: candidate.profileUrl || `/candidates/${candidateId}`,
+          },
+          interviewQuestions: this.generateInterviewQuestions(job, candidate, { overall: rec.matchScore || rec.score || 0 }),
+        };
+      });
 
       logger.info(`Generated ${validCandidates.length} candidate recommendations using self-sufficient stack`);
       return validCandidates;
@@ -5106,11 +5129,26 @@ Return ONLY valid JSON (no markdown):
         })
       );
 
+      // Guard invalid skills (missing name) to avoid toLowerCase errors
+      const safeRequiredSkills = requiredSkills.filter((s) => s && s.name);
+      const safeNiceToHaveSkills = niceToHaveSkills.filter((s) => s && s.name);
+      if (requiredSkills.length !== safeRequiredSkills.length || niceToHaveSkills.length !== safeNiceToHaveSkills.length) {
+        logger.warn('⚠️ Some job skills missing name, skipping invalid entries', {
+          jobId: jobData?._id || jobData?.id,
+          requiredTotal: requiredSkills.length,
+          requiredValid: safeRequiredSkills.length,
+          niceToHaveTotal: niceToHaveSkills.length,
+          niceToHaveValid: safeNiceToHaveSkills.length,
+        });
+      }
+
       // Check required skills với semantic matching cải tiến
       let requiredMatched = 0;
-      for (const jobSkill of requiredSkills) {
+      for (const jobSkill of safeRequiredSkills) {
         // Use AI-powered normalization (async)
-        const skillName = await this._normalizeSkillName(jobSkill.name.toLowerCase().trim());
+        const rawName = (jobSkill.name || '').toLowerCase().trim();
+        if (!rawName) continue;
+        const skillName = await this._normalizeSkillName(rawName);
         // Improved matching: exact match, substring match, hoặc synonym match
         const isMatched = await Promise.all(
           cvSkillNames.map(async (cvSkill) => {
@@ -5150,8 +5188,10 @@ Return ONLY valid JSON (no markdown):
 
       // Check nice-to-have skills với semantic matching cải tiến
       let niceToHaveMatched = 0;
-      for (const jobSkill of niceToHaveSkills) {
-        const skillName = await this._normalizeSkillName(jobSkill.name.toLowerCase().trim());
+      for (const jobSkill of safeNiceToHaveSkills) {
+        const rawName = (jobSkill.name || '').toLowerCase().trim();
+        if (!rawName) continue;
+        const skillName = await this._normalizeSkillName(rawName);
         // Improved matching: exact match, substring match, hoặc synonym match
         const isMatched = await Promise.all(
           cvSkillNames.map(async (cvSkill) => {

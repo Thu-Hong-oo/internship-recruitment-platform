@@ -474,10 +474,10 @@ export default function NotificationsPage() {
                             className="h-auto p-0 text-xs font-medium text-[oklch(0.60_0.12_195)] hover:text-[oklch(0.55_0.12_195)]"
                             onClick={(e) => {
                               e.stopPropagation();
-                              router.push(`/jobs`);
+                              router.push(`/jobs/${notification.data.jobId}/applications`);
                             }}
                           >
-                            Xem công việc
+                            Xem ứng viên
                             <ExternalLink className="w-3 h-3 ml-1" />
                           </Button>
                         )}
@@ -581,11 +581,11 @@ export default function NotificationsPage() {
                   <Button
                     onClick={() => {
                       setShowDetail(false);
-                      router.push(`/jobs`);
+                      router.push(`/jobs/${selectedNotification.data?.jobId}/applications`);
                     }}
                     className="w-full rounded-xl bg-gradient-to-r from-[oklch(0.60_0.12_195)] via-[oklch(0.72_0.08_210)] to-[oklch(0.88_0.03_195)] text-white hover:brightness-110 shadow-lg transition-all duration-300 hover:scale-[1.02]"
                   >
-                    Xem công việc liên quan
+                    Xem ứng viên
                     <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </div>

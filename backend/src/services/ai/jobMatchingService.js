@@ -158,25 +158,31 @@ class JobMatchingService {
    * Calculate skill matching score using hybrid approach
    */
   async _calculateSkillScore(candidateSkills, jobSkills, useSemanticSimilarity = true) {
-    if (!jobSkills || jobSkills.length === 0) {
-      return { score: 0, matched: [], missing: jobSkills };
-    }
+    // Filter out invalid/empty skills
+    const clean = (arr) =>
+      arr
+        .map((s) => (typeof s === 'string' ? s : s.name))
+        .filter((s) => s && typeof s === 'string' && s.trim().length > 0);
 
-    if (!candidateSkills || candidateSkills.length === 0) {
-      return { score: 0, matched: [], missing: jobSkills };
+    const candidateSkillsClean = clean(candidateSkills);
+    const jobSkillsClean = clean(jobSkills);
+
+    if (jobSkillsClean.length === 0) {
+      logger.warn('⚠️ Job skills empty after cleaning, skipping skill match');
+      return { score: 0, matched: [], missing: [] };
+    }
+    if (candidateSkillsClean.length === 0) {
+      logger.warn('⚠️ Candidate skills empty after cleaning, skipping skill match');
+      return { score: 0, matched: [], missing: jobSkillsClean };
     }
 
     const matched = [];
     const missing = [];
 
     // Normalize skill names for comparison
-    const candidateSkillNames = candidateSkills.map(s => 
-      typeof s === 'string' ? s.toLowerCase().trim() : s.name.toLowerCase().trim()
-    );
+    const candidateSkillNames = candidateSkillsClean.map(s => s.toLowerCase().trim());
 
-    const jobSkillNames = jobSkills.map(s => 
-      typeof s === 'string' ? s.toLowerCase().trim() : s.name.toLowerCase().trim()
-    );
+    const jobSkillNames = jobSkillsClean.map(s => s.toLowerCase().trim());
 
     // Method 1: Exact match
     for (const jobSkill of jobSkillNames) {
@@ -463,17 +469,45 @@ class JobMatchingService {
    * Extract skills from candidate or job
    */
   async _extractSkills(data) {
+    // Stopwords/ignore list for generic skills
+    const stopwords = new Set([
+      'giao tiếp',
+      'kỹ năng giao tiếp',
+      'kỹ năng làm việc nhóm',
+      'làm việc nhóm',
+      'kỹ năng mềm',
+      'kinh nghiệm',
+      'thành thạo microsoft office',
+      'tin học văn phòng',
+      'office',
+      'ms office',
+      'word',
+      'excel',
+    ]);
+
     // Check if skills already extracted
     if (data.cv && data.cv.skills && Array.isArray(data.cv.skills)) {
-      return data.cv.skills;
+      return data.cv.skills
+        .map((s) => (typeof s === 'string' ? s : s.name))
+        .filter((s) => s && typeof s === 'string')
+        .map((s) => s.toLowerCase().trim())
+        .filter((s) => s && !stopwords.has(s));
     }
 
     if (data.requirements && data.requirements.skills && Array.isArray(data.requirements.skills)) {
-      return data.requirements.skills;
+      return data.requirements.skills
+        .map((s) => (typeof s === 'string' ? s : s.name))
+        .filter((s) => s && typeof s === 'string')
+        .map((s) => s.toLowerCase().trim())
+        .filter((s) => s && !stopwords.has(s));
     }
 
     if (data.skills && Array.isArray(data.skills)) {
-      return data.skills;
+      return data.skills
+        .map((s) => (typeof s === 'string' ? s : s.name))
+        .filter((s) => s && typeof s === 'string')
+        .map((s) => s.toLowerCase().trim())
+        .filter((s) => s && !stopwords.has(s));
     }
 
     // Extract from text using PhoBERT
@@ -490,7 +524,11 @@ class JobMatchingService {
         useGemini: false      // NO Gemini dependency
       });
       
-      return extracted.map(s => s.name);
+      return extracted
+        .map(s => s.name)
+        .filter(s => s && typeof s === 'string')
+        .map(s => s.toLowerCase().trim())
+        .filter(s => s && !stopwords.has(s));
     } catch (error) {
       logger.warn('Skill extraction failed:', error.message);
       return [];

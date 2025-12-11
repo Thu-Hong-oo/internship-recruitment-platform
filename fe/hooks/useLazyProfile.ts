@@ -178,6 +178,20 @@ export const useLazyProfile = () => {
         const response = await profileAPI.updateProfile(section, data);
         dataCache.profile = response.data;
         setProfile(response.data);
+        
+        // Trigger background matching scores calculation if profile section was updated
+        // (not for visibility or preferences)
+        if (section === "profile" && response.success) {
+          try {
+            const { calculateMatchingScoresBackground } = await import("@/lib/utils/backgroundMatching");
+            calculateMatchingScoresBackground().catch((err) => {
+              console.warn("Failed to trigger matching scores calculation:", err);
+            });
+          } catch (err) {
+            console.warn("Failed to load background matching utility:", err);
+          }
+        }
+        
         return response; // Trả về toàn bộ response thay vì chỉ data
       } catch (err: any) {
         setErrors((prev) => ({
@@ -205,6 +219,17 @@ export const useLazyProfile = () => {
 
         dataCache.education = fullEducationResponse.data;
         setEducation(fullEducationResponse.data);
+        
+        // Trigger background matching scores calculation after adding education
+        try {
+          const { calculateMatchingScoresBackground } = await import("@/lib/utils/backgroundMatching");
+          calculateMatchingScoresBackground().catch((err) => {
+            console.warn("Failed to trigger matching scores calculation:", err);
+          });
+        } catch (err) {
+          console.warn("Failed to load background matching utility:", err);
+        }
+        
         return fullEducationResponse.data;
       } catch (err: any) {
         setErrors((prev) => ({
@@ -232,6 +257,17 @@ export const useLazyProfile = () => {
 
         dataCache.education = fullEducationResponse.data;
         setEducation(fullEducationResponse.data);
+        
+        // Trigger background matching scores calculation after updating education
+        try {
+          const { calculateMatchingScoresBackground } = await import("@/lib/utils/backgroundMatching");
+          calculateMatchingScoresBackground().catch((err) => {
+            console.warn("Failed to trigger matching scores calculation:", err);
+          });
+        } catch (err) {
+          console.warn("Failed to load background matching utility:", err);
+        }
+        
         return fullEducationResponse.data;
       } catch (err: any) {
         setErrors((prev) => ({
@@ -272,6 +308,17 @@ export const useLazyProfile = () => {
         );
         dataCache.experience = response.data;
         setExperience(response.data);
+        
+        // Trigger background matching scores calculation after adding experience
+        try {
+          const { calculateMatchingScoresBackground } = await import("@/lib/utils/backgroundMatching");
+          calculateMatchingScoresBackground().catch((err) => {
+            console.warn("Failed to trigger matching scores calculation:", err);
+          });
+        } catch (err) {
+          console.warn("Failed to load background matching utility:", err);
+        }
+        
         return response.data;
       } catch (err: any) {
         setErrors((prev) => ({
@@ -293,6 +340,17 @@ export const useLazyProfile = () => {
         );
         dataCache.experience = response.data;
         setExperience(response.data);
+        
+        // Trigger background matching scores calculation after updating experience
+        try {
+          const { calculateMatchingScoresBackground } = await import("@/lib/utils/backgroundMatching");
+          calculateMatchingScoresBackground().catch((err) => {
+            console.warn("Failed to trigger matching scores calculation:", err);
+          });
+        } catch (err) {
+          console.warn("Failed to load background matching utility:", err);
+        }
+        
         return response.data;
       } catch (err: any) {
         setErrors((prev) => ({
@@ -331,6 +389,17 @@ export const useLazyProfile = () => {
         const response = await makeRequest(() => profileAPI.addSkill(data));
         dataCache.skills = response.data;
         setSkills(response.data);
+        
+        // Trigger background matching scores calculation after adding skill
+        try {
+          const { calculateMatchingScoresBackground } = await import("@/lib/utils/backgroundMatching");
+          calculateMatchingScoresBackground().catch((err) => {
+            console.warn("Failed to trigger matching scores calculation:", err);
+          });
+        } catch (err) {
+          console.warn("Failed to load background matching utility:", err);
+        }
+        
         return response.data;
       } catch (err: any) {
         setErrors((prev) => ({
@@ -352,6 +421,17 @@ export const useLazyProfile = () => {
         );
         dataCache.skills = response.data;
         setSkills(response.data);
+        
+        // Trigger background matching scores calculation after updating skill
+        try {
+          const { calculateMatchingScoresBackground } = await import("@/lib/utils/backgroundMatching");
+          calculateMatchingScoresBackground().catch((err) => {
+            console.warn("Failed to trigger matching scores calculation:", err);
+          });
+        } catch (err) {
+          console.warn("Failed to load background matching utility:", err);
+        }
+        
         return response.data;
       } catch (err: any) {
         setErrors((prev) => ({

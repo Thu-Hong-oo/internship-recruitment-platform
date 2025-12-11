@@ -5,7 +5,7 @@ const { logger } = require('../utils/logger');
 const RATE_LIMIT_CONFIG = {
   global: {
     windowMs: parseInt(process.env.GLOBAL_RATE_LIMIT_WINDOW) || 15 * 60 * 1000, // 15 phút
-    max: parseInt(process.env.GLOBAL_RATE_LIMIT_MAX) || 1000,
+    max: parseInt(process.env.GLOBAL_RATE_LIMIT_MAX) || 10000,
     message: 'Quá nhiều yêu cầu từ IP này. Vui lòng thử lại sau 15 phút.',
     retryAfter: parseInt(process.env.GLOBAL_RATE_LIMIT_WINDOW) || 15 * 60,
   },
