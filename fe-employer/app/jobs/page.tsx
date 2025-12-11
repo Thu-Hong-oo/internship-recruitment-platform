@@ -880,5 +880,6 @@ export default function JobsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </EmployerShell>
   );
 }
