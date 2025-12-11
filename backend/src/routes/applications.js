@@ -1,6 +1,8 @@
 const express = require('express');
 const { protect, authorize } = require('../middleware/auth');
-const { requireVerifiedEmployer } = require('../middleware/employerVerification');
+const {
+  requireVerifiedEmployer,
+} = require('../middleware/employerVerification');
 const {
   updateApplicationStatus,
   getEmployerApplications,
@@ -31,4 +33,3 @@ router.get(
 );
 
 module.exports = router;
-
