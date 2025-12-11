@@ -306,3 +306,17 @@ export interface ApplicationsResponse {
   timestamp?: string;
   requestId?: string | null;
 }
+
+// Application status statistics
+export interface ApplicationStatusStat {
+  status: string;
+  count: number;
+}
+
+export interface ApplicationStatusStatsResponse {
+  success: boolean;
+  data: {
+    stats: ApplicationStatusStat[];
+  };
+  message?: string;
+}

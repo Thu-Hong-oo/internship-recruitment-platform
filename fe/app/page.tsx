@@ -25,6 +25,7 @@ import { api, candidateService } from "@/lib/api";
 import { savedJobService } from "@/lib/api";
 import type { SavedJob } from "@/lib/api/services/savedJob.service";
 import type { CVData } from "@/lib/mocks/cvSamples";
+import type { ApplicationStatusStat } from "@/lib/api";
 import { getNotifications } from "@/lib/notificationAPI";
 import { AINavigationInput } from "@/components/ai/AINavigationInput";
 import { useToast } from "@/components/ui/use-toast";
@@ -149,6 +150,10 @@ export default function DashboardPage() {
   const [cvDataMap, setCvDataMap] = useState<Record<string, CVData>>({});
   const [loadingCVs, setLoadingCVs] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingStatusStats, setLoadingStatusStats] = useState(false);
+  const [applicationStatusStats, setApplicationStatusStats] = useState<
+    ApplicationStatusStat[]
+  >([]);
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [upcomingDeadlines, setUpcomingDeadlines] = useState<SavedJob[]>([]);
   const [prevUnreadCount, setPrevUnreadCount] = useState<number | null>(null);
@@ -240,6 +245,26 @@ export default function DashboardPage() {
         if (profileRes?.success && profileRes.data) {
           const completion = profileRes.data.progress?.profileCompletion || 0;
           setProfileCompletion(completion);
+        }
+
+        // Fetch application status statistics (candidate)
+        try {
+          setLoadingStatusStats(true);
+          const statusStatsRes =
+            await api.candidateCV.getApplicationStatusStats();
+          if (
+            statusStatsRes?.success &&
+            Array.isArray(statusStatsRes.data?.stats)
+          ) {
+            setApplicationStatusStats(statusStatsRes.data.stats);
+          } else {
+            setApplicationStatusStats([]);
+          }
+        } catch (err) {
+          console.error("Error fetching application status stats:", err);
+          setApplicationStatusStats([]);
+        } finally {
+          setLoadingStatusStats(false);
         }
 
         // Filter saved jobs with upcoming deadlines (within 7 days)
@@ -364,6 +389,69 @@ export default function DashboardPage() {
 
   const primaryColor = "oklch(0.60 0.12 195)";
   const primaryGradient = `linear-gradient(135deg, ${primaryColor} 0%, oklch(0.72 0.08 210) 55%, oklch(0.88 0.03 195) 100%)`;
+
+  const totalApplications = applicationStatusStats.reduce(
+    (sum, item) => sum + (item.count || 0),
+    0
+  );
+
+  const statusLabel = (status: string) => {
+    const map: Record<string, string> = {
+      pending: "Đang chờ",
+      reviewing: "Đang duyệt",
+      shortlisted: "Shortlist",
+      interview: "Phỏng vấn",
+      offer: "Offer",
+      accepted: "Đã nhận offer",
+      rejected: "Từ chối",
+      withdrawn: "Đã rút",
+      hired: "Đã nhận",
+    };
+    return map[status] || status || "Không xác định";
+  };
+
+  const statusColors: Record<string, string> = {
+    pending: "#3b82f6",
+    reviewing: "#06b6d4",
+    shortlisted: "#8b5cf6",
+    interview: "#f97316",
+    offer: "#22c55e",
+    accepted: "#16a34a",
+    rejected: "#ef4444",
+    withdrawn: "#94a3b8",
+    hired: "#0ea5e9",
+  };
+
+  const fallbackColors = [
+    "#6366f1",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#0ea5e9",
+    "#14b8a6",
+    "#a855f7",
+    "#f97316",
+  ];
+
+  const buildDonutGradient = () => {
+    if (totalApplications <= 0 || applicationStatusStats.length === 0) {
+      return "#e5e7eb 0% 100%";
+    }
+    let start = 0;
+    const segments: string[] = [];
+    applicationStatusStats.forEach((item, idx) => {
+      const pct =
+        totalApplications > 0 ? (item.count / totalApplications) * 100 : 0;
+      const color =
+        statusColors[item.status] ||
+        fallbackColors[idx % fallbackColors.length];
+      const end = start + pct;
+      segments.push(`${color} ${start}% ${end}%`);
+      start = end;
+    });
+    return `conic-gradient(${segments.join(", ")})`;
+  };
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,oklch(0.97_0.02_210)_0%,white_30%)]">
@@ -832,6 +920,95 @@ export default function DashboardPage() {
                       </span>
                     </Link>
                   </nav>
+                </CardContent>
+              </Card>
+
+              {/* Application Status Statistics */}
+              <Card className="mt-4 border-white/40 bg-white/70 backdrop-blur-xl shadow-[0_20px_50px_rgba(15,45,95,0.08)]">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-slate-900">
+                      Trạng thái ứng tuyển
+                    </h3>
+                    <Badge
+                      className="border-none"
+                      style={{
+                        background: `oklch(0.60 0.12 195 / 0.15)`,
+                        color: primaryColor,
+                      }}
+                    >
+                      {loadingStatusStats
+                        ? "Đang tải..."
+                        : `${totalApplications} đơn`}
+                    </Badge>
+                  </div>
+                  {loadingStatusStats ? (
+                    <div className="flex items-center justify-center py-6 text-slate-500">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    </div>
+                  ) : applicationStatusStats.length === 0 ? (
+                    <div className="text-center text-slate-500">
+                      Chưa có dữ liệu ứng tuyển
+                    </div>
+                  ) : (
+                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                      <div className="flex items-center justify-center w-full lg:w-auto">
+                        <div
+                          className="relative"
+                          style={{ width: 190, height: 190 }}
+                        >
+                          <div
+                            className="w-full h-full rounded-full"
+                            style={{ background: buildDonutGradient() }}
+                          />
+                          <div className="absolute inset-[28%] rounded-full bg-white/90 flex flex-col items-center justify-center text-center px-2">
+                            <span className="text-xl font-semibold text-slate-900">
+                              {totalApplications}
+                            </span>
+                            <span className="text-xs text-slate-500">đơn</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 w-full">
+                        {applicationStatusStats.map((item, idx) => {
+                          const color =
+                            statusColors[item.status] ||
+                            fallbackColors[idx % fallbackColors.length];
+                          const pct =
+                            totalApplications > 0
+                              ? Math.round(
+                                  (item.count / totalApplications) * 100
+                                )
+                              : 0;
+                          return (
+                            <div
+                              key={item.status}
+                              className="flex items-center justify-between p-3 rounded-lg border border-slate-200/70 bg-white/60 gap-3"
+                            >
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <span
+                                  className="w-3 h-3 rounded-sm flex-shrink-0"
+                                  style={{ backgroundColor: color }}
+                                />
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-sm font-semibold text-slate-900 truncate">
+                                    {statusLabel(item.status)}
+                                  </span>
+                                  <span className="text-xs text-slate-500">
+                                    {item.count} đơn
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="text-xs font-semibold text-slate-600 flex-shrink-0">
+                                {pct}%
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>

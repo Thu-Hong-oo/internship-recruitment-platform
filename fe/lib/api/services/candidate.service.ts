@@ -585,6 +585,23 @@ class CandidateService {
     const endpoint = `/candidates/applications${query.toString() ? `?${query.toString()}` : ""}`;
     return apiClient.get<ApplicationsResponse>(endpoint);
   }
+
+  /**
+   * Lấy thống kê số lượng đơn ứng tuyển theo status của ứng viên hiện tại
+   * GET /candidates/applications/status
+   */
+  async getApplicationStatusStats(params?: {
+    from?: string;
+    to?: string;
+  }): Promise<import("../types").ApplicationStatusStatsResponse> {
+    const query = new URLSearchParams();
+    if (params?.from) query.set("from", params.from);
+    if (params?.to) query.set("to", params.to);
+    const endpoint = `/candidates/applications/status${
+      query.toString() ? `?${query.toString()}` : ""
+    }`;
+    return apiClient.get(endpoint);
+  }
 }
 
 export const candidateService = new CandidateService();
