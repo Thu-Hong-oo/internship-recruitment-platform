@@ -686,6 +686,63 @@ class AdvancedNLPController {
         await roadmap.save();
       }
 
+      // If all weeks are completed, mark roadmap as completed and sync skills to profile
+      const totalWeeks = roadmap.totalWeeks || 0;
+      const completedWeeksCount = roadmap.progress.completedWeeks.length;
+      if (totalWeeks > 0 && completedWeeksCount >= totalWeeks) {
+        roadmap.status = 'completed';
+        roadmap.progress.overallProgress = 100;
+        roadmap.progress.completedAt = new Date();
+
+        // Sync learned skills into candidate profile (avoid duplicates, upgrade level if needed)
+        try {
+          const profile = await CandidateProfile.findOne({
+            userId: roadmap.candidateId,
+          });
+
+          if (profile) {
+            const currentTechSkills = profile.skills?.technical || [];
+            const skillGaps = roadmap.skillGaps || [];
+
+            skillGaps.forEach((gap) => {
+              const name = (gap.skill || '').trim();
+              if (!name) return;
+
+              const existing = currentTechSkills.find(
+                (s) => s.name && s.name.toLowerCase() === name.toLowerCase()
+              );
+
+              if (existing) {
+                // Upgrade level if target level is higher/defined
+                if (gap.targetLevel) {
+                  existing.level = gap.targetLevel;
+                }
+              } else {
+                currentTechSkills.push({
+                  name,
+                  level: gap.targetLevel || 'intermediate',
+                  verified: false,
+                });
+              }
+            });
+
+            profile.skills = {
+              ...profile.skills,
+              technical: currentTechSkills,
+            };
+
+            await profile.save();
+          }
+        } catch (syncError) {
+          logger.warn('Failed to sync roadmap skills to profile', {
+            error: syncError.message,
+            roadmapId,
+          });
+        }
+
+        await roadmap.save();
+      }
+
       res.status(200).json({
         success: true,
         message: 'Progress updated successfully',
