@@ -150,6 +150,7 @@ export default function DashboardPage() {
   const [cvDataMap, setCvDataMap] = useState<Record<string, CVData>>({});
   const [loadingCVs, setLoadingCVs] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingSavedJobs, setLoadingSavedJobs] = useState(false);
   const [loadingStatusStats, setLoadingStatusStats] = useState(false);
   const [applicationStatusStats, setApplicationStatusStats] = useState<
     ApplicationStatusStat[]
@@ -229,15 +230,23 @@ export default function DashboardPage() {
           setPrevUnreadCount(newUnread);
         }
 
-        // Fetch saved jobs (3 latest)
-        const savedJobsRes = await api.savedJobs.getSavedJobs({ limit: 3 });
-        if (savedJobsRes?.success) {
-          if (savedJobsRes.pagination) {
-            setSavedJobsCount(savedJobsRes.pagination.total || 0);
+        // Fetch saved jobs (3 latest) - separate loading
+        setLoadingSavedJobs(true);
+        let savedJobsRes: any = null;
+        try {
+          savedJobsRes = await api.savedJobs.getSavedJobs({ limit: 3 });
+          if (savedJobsRes?.success) {
+            if (savedJobsRes.pagination) {
+              setSavedJobsCount(savedJobsRes.pagination.total || 0);
+            }
+            if (savedJobsRes.data) {
+              setSavedJobsList(savedJobsRes.data.slice(0, 3));
+            }
           }
-          if (savedJobsRes.data) {
-            setSavedJobsList(savedJobsRes.data.slice(0, 3));
-          }
+        } catch (err) {
+          console.error("Error fetching saved jobs:", err);
+        } finally {
+          setLoadingSavedJobs(false);
         }
 
         // Fetch profile completion
@@ -274,7 +283,7 @@ export default function DashboardPage() {
             now.getTime() + 7 * 24 * 60 * 60 * 1000
           );
 
-          const upcoming = savedJobsRes.data.filter((savedJob) => {
+          const upcoming = savedJobsRes.data.filter((savedJob: any) => {
             const deadline = savedJob.jobId?.deadline;
             if (!deadline) return false;
             const deadlineDate = new Date(deadline);
@@ -282,7 +291,7 @@ export default function DashboardPage() {
           });
 
           // Sort by deadline (soonest first)
-          upcoming.sort((a, b) => {
+          upcoming.sort((a: any, b: any) => {
             const dateA = new Date(a.jobId?.deadline || 0).getTime();
             const dateB = new Date(b.jobId?.deadline || 0).getTime();
             return dateA - dateB;
@@ -291,7 +300,8 @@ export default function DashboardPage() {
           setUpcomingDeadlines(upcoming.slice(0, 5)); // Top 5
         }
 
-        // Fetch CV online (ResumeBuilder CVs)
+        // Fetch CV online (ResumeBuilder CVs) - Progressive loading
+        // Load template map first to show CV list immediately
         const templateMapRes = await api.candidateCV.getTemplateResumeMap();
         if (templateMapRes?.success && templateMapRes.data?.map) {
           const map = templateMapRes.data.map;
@@ -329,45 +339,46 @@ export default function DashboardPage() {
             });
           }
 
+          // Hiển thị CV list ngay lập tức (không cần đợi preview)
           setOnlineCvs(cvList.slice(0, 3)); // Hiển thị tối đa 3 CV
 
-          // Nạp dữ liệu CV để hiển thị preview
+          // Load preview data in background (non-blocking)
           if (cvList.length > 0) {
             setLoadingCVs(true);
-            try {
-              const previewPromises = cvList
-                .slice(0, 3)
-                .map(async ({ resumeId, templateId }) => {
-                  try {
-                    const resumeRes = await candidateService.getResumeById(
-                      resumeId
-                    );
-                    if (resumeRes?.success && resumeRes.data?.content) {
-                      return {
-                        resumeId,
-                        data: normalizeContentToCVData(
-                          resumeRes.data.content,
-                          templateId
-                        ),
-                      };
-                    }
-                  } catch (err) {
-                    console.error(`Không thể tải dữ liệu CV ${resumeId}:`, err);
+            // Load previews asynchronously without blocking
+            Promise.all(
+              cvList.slice(0, 3).map(async ({ resumeId, templateId }) => {
+                try {
+                  const resumeRes = await candidateService.getResumeById(
+                    resumeId
+                  );
+                  if (resumeRes?.success && resumeRes.data?.content) {
+                    return {
+                      resumeId,
+                      data: normalizeContentToCVData(
+                        resumeRes.data.content,
+                        templateId
+                      ),
+                    };
                   }
-                  return null;
-                });
-
-              const previewResults = await Promise.all(previewPromises);
-              const newMap: Record<string, CVData> = {};
-              previewResults.forEach((result) => {
-                if (result) {
-                  newMap[result.resumeId] = result.data;
+                } catch (err) {
+                  console.error(`Không thể tải dữ liệu CV ${resumeId}:`, err);
                 }
+                return null;
+              })
+            )
+              .then((previewResults) => {
+                const newMap: Record<string, CVData> = {};
+                previewResults.forEach((result) => {
+                  if (result) {
+                    newMap[result.resumeId] = result.data;
+                  }
+                });
+                setCvDataMap(newMap);
+              })
+              .finally(() => {
+                setLoadingCVs(false);
               });
-              setCvDataMap(newMap);
-            } finally {
-              setLoadingCVs(false);
-            }
           }
         }
       } catch (error) {
@@ -669,10 +680,23 @@ export default function DashboardPage() {
                     </Link>
                   </div>
                   <div className="space-y-3">
-                    {loading ? (
-                      <div className="text-center py-4 text-slate-500">
-                        Đang tải...
-                      </div>
+                    {loadingSavedJobs ? (
+                      // Skeleton loading for saved jobs
+                      Array.from({ length: 3 }).map((_, idx) => (
+                        <div
+                          key={`skeleton-${idx}`}
+                          className="flex items-center justify-between p-3 rounded-lg border border-slate-200/70 bg-white/60 animate-pulse"
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="w-5 h-5 rounded-full bg-slate-200 flex-shrink-0" />
+                            <div className="flex-1 min-w-0 space-y-2">
+                              <div className="h-4 bg-slate-200 rounded w-3/4" />
+                              <div className="h-3 bg-slate-200 rounded w-1/2" />
+                            </div>
+                          </div>
+                          <div className="w-16 h-6 bg-slate-200 rounded flex-shrink-0" />
+                        </div>
+                      ))
                     ) : savedJobsList.length > 0 ? (
                       savedJobsList.map((savedJob) => {
                         const job = savedJob.jobId;
@@ -730,7 +754,9 @@ export default function DashboardPage() {
                       })
                     ) : (
                       <div className="text-center py-4 text-slate-500">
-                        Chưa có việc làm đã lưu
+                        {loadingSavedJobs
+                          ? "Đang tải việc làm đã lưu..."
+                          : "Chưa có việc làm đã lưu"}
                       </div>
                     )}
                   </div>
@@ -751,9 +777,21 @@ export default function DashboardPage() {
                     </Link>
                   </div>
                   <div className="space-y-4">
-                    {loading ? (
-                      <div className="text-center py-4 text-slate-500">
-                        Đang tải...
+                    {loading && onlineCvs.length === 0 ? (
+                      // Skeleton loading for CV Online (only on initial load)
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {Array.from({ length: 2 }).map((_, idx) => (
+                          <div
+                            key={`cv-skeleton-${idx}`}
+                            className="overflow-hidden rounded-xl border border-slate-200/70 bg-white/80 animate-pulse"
+                          >
+                            <div className="relative w-full aspect-[3/4] bg-slate-200" />
+                            <div className="p-3 space-y-2">
+                              <div className="h-4 bg-slate-200 rounded w-2/3" />
+                              <div className="h-3 bg-slate-200 rounded w-1/2" />
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     ) : onlineCvs.length > 0 ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -916,7 +954,7 @@ export default function DashboardPage() {
                         style={{ color: primaryColor }}
                       />
                       <span className="text-sm font-medium text-slate-700">
-                        Quản Lý Thông Tin Tài Khoản
+                        Quản Lý Tài Khoản
                       </span>
                     </Link>
                   </nav>
