@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { getJobById, updateJob, CreateJobPayload } from "@/lib/jobAPI";
+import { nlpService } from "@/lib/api/nlp.service";
 import { industryService, Industry } from "@/lib/industryAPI";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,9 +28,9 @@ import {
   DollarSign,
   Calendar,
   Briefcase,
-  Users,
   Clock,
   Building,
+  Users,
 } from "lucide-react";
 import { getCities, getDistricts, getWards } from "@/lib/vietnamAddress";
 import { findOptionByLabelLoose } from "@/lib/addressUtils";
@@ -72,6 +73,18 @@ export default function JobDetailPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [suggestedCandidates, setSuggestedCandidates] = useState<
+    Array<{
+      candidateId: string;
+      name: string;
+      email?: string;
+      score: number;
+      tier?: string;
+      matchedSkills?: string[];
+    }>
+  >([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [suggestionError, setSuggestionError] = useState<string | null>(null);
 
   const [jobData, setJobData] = useState<any>(null);
   const [formData, setFormData] = useState<CreateJobPayload>({
@@ -112,6 +125,7 @@ export default function JobDetailPage() {
   const [selectedDistrict, setSelectedDistrict] = useState<string>("");
   const [selectedWard, setSelectedWard] = useState<string>("");
   const [loadingAddress, setLoadingAddress] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Load job data on mount
   useEffect(() => {
@@ -142,6 +156,49 @@ export default function JobDetailPage() {
     if (jobId) {
       loadJobData();
     }
+  }, [jobId]);
+
+  // Fetch suggested candidates for this job (employer view)
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (!jobId) return;
+      setLoadingSuggestions(true);
+      setSuggestionError(null);
+      try {
+        const res = await nlpService.getTopCandidates(jobId, {
+          limit: 5,
+          minScore: 30,
+        });
+        if (res.success && Array.isArray(res.data)) {
+          const mapped = res.data.map((item: any) => ({
+            candidateId: item.candidateId || item.candidate?._id || "",
+            name: item.candidate?.name || item.candidate?.fullName || "Ứng viên",
+            email: item.candidate?.email,
+            score: item.overallScore || item.matchScore || 0,
+            tier: item.tier,
+            matchedSkills:
+              item.breakdown?.skills?.matched ||
+              item.scoreBreakdown?.skillsScore?.details?.matchedSkills?.map(
+                (s: any) => s.skill
+              ) ||
+              [],
+          }));
+          setSuggestedCandidates(mapped);
+        } else {
+          setSuggestionError(res.message || "Không tải được gợi ý ứng viên");
+        }
+      } catch (err: any) {
+        setSuggestionError(
+          err?.response?.data?.message ||
+            "Không thể tải gợi ý ứng viên cho job này"
+        );
+      } finally {
+        setLoadingSuggestions(false);
+      }
+    };
+
+    // Only employers should see suggestions
+    fetchSuggestions();
   }, [jobId]);
 
   // Initialize form data from job data
@@ -218,6 +275,48 @@ export default function JobDetailPage() {
       console.error("Failed to load industries:", err);
     }
   };
+
+  // Fetch suggested candidates for this job (employer view)
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      if (!jobId) return;
+      setLoadingSuggestions(true);
+      setSuggestionError(null);
+      try {
+        const res = await nlpService.getTopCandidates(jobId, {
+          limit: 5,
+          minScore: 30,
+        });
+        if (res.success && Array.isArray(res.data)) {
+          const mapped = res.data.map((item: any) => ({
+            candidateId: item.candidateId || item.candidate?._id || "",
+            name: item.candidate?.name || item.candidate?.fullName || "Ứng viên",
+            email: item.candidate?.email,
+            score: item.overallScore || item.matchScore || 0,
+            tier: item.tier,
+            matchedSkills:
+              item.breakdown?.skills?.matched ||
+              item.scoreBreakdown?.skillsScore?.details?.matchedSkills?.map(
+                (s: any) => s.skill
+              ) ||
+              [],
+          }));
+          setSuggestedCandidates(mapped);
+        } else {
+          setSuggestionError(res.message || "Không tải được gợi ý ứng viên");
+        }
+      } catch (err: any) {
+        setSuggestionError(
+          err?.response?.data?.message ||
+            "Không thể tải gợi ý ứng viên cho job này"
+        );
+      } finally {
+        setLoadingSuggestions(false);
+      }
+    };
+
+    fetchSuggestions();
+  }, [jobId]);
 
   // Parse location string and set address dropdowns
   const parseAndSetLocation = async (
@@ -599,43 +698,66 @@ export default function JobDetailPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="max-w-5xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-6">
-        <div className="flex items-center gap-4 mb-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.back()}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Quay lại
-          </Button>
-        </div>
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold mb-2">
-              {isEditMode
-                ? "Chỉnh sửa bài tuyển dụng"
-                : "Chi tiết bài tuyển dụng"}
-            </h1>
-            <p className="text-gray-600">
-              {isEditMode
-                ? "Cập nhật thông tin về vị trí tuyển dụng"
-                : "Xem thông tin chi tiết về bài tuyển dụng"}
-            </p>
-          </div>
-          {!isEditMode && (
+        <div className="flex items-center justify-between gap-4 mb-4">
+          <div className="flex items-center gap-4">
             <Button
-              onClick={() => setIsEditMode(true)}
+              variant="ghost"
+              size="sm"
+              onClick={() => router.back()}
               className="flex items-center gap-2"
             >
-              <Edit className="h-4 w-4" />
-              Chỉnh sửa
+              <ArrowLeft className="h-4 w-4" />
+              Quay lại
             </Button>
-          )}
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-2xl font-bold text-gray-900">
+                  {jobData.title}
+                </h1>
+                {jobData?.status && getStatusBadge(jobData.status)}
+              </div>
+              <p className="text-gray-600">
+                {jobData.company || "Công ty chưa cập nhật"} •{" "}
+                {formatDate(jobData.createdAt)}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {!isEditMode ? (
+              <Button onClick={() => setIsEditMode(true)}>
+                <Edit className="h-4 w-4 mr-2" />
+                Chỉnh sửa
+              </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setIsEditMode(false)}>
+                  <X className="h-4 w-4 mr-2" />
+                  Hủy
+                </Button>
+                <Button onClick={handleSave} disabled={saving}>
+                  <Save className="h-4 w-4 mr-2" />
+                  {saving ? "Đang lưu..." : "Lưu thay đổi"}
+                </Button>
+              </div>
+            )}
+            <Button
+              variant={showSuggestions ? "default" : "outline"}
+              onClick={() => setShowSuggestions((prev) => !prev)}
+            >
+              Ứng viên gợi ý
+            </Button>
+          </div>
         </div>
+
+        {!isEditMode && (
+          <div className="mb-4 text-gray-700">
+            <p>{jobData.description}</p>
+          </div>
+        )}
       </div>
 
       {success && (
@@ -650,6 +772,62 @@ export default function JobDetailPage() {
         <Card className="border-red-200 bg-red-50 mb-6">
           <CardContent className="p-4">
             <p className="text-red-600">{error}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Suggested Candidates */}
+      {showSuggestions && (
+        <Card className="border-blue-100 bg-blue-50 mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <span className="inline-flex h-2 w-2 rounded-full bg-blue-500"></span>
+              Ứng viên gợi ý cho bài tuyển dụng
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingSuggestions && (
+              <p className="text-sm text-gray-600">Đang tải gợi ý ứng viên...</p>
+            )}
+            {suggestionError && (
+              <p className="text-sm text-red-600">{suggestionError}</p>
+            )}
+            {!loadingSuggestions &&
+              !suggestionError &&
+              suggestedCandidates.length === 0 && (
+                <p className="text-sm text-gray-600">Chưa có gợi ý phù hợp.</p>
+              )}
+            <div className="space-y-3">
+              {suggestedCandidates.map((c) => (
+                <div
+                  key={c.candidateId}
+                  className="border border-blue-100 bg-white rounded-md p-3 flex justify-between items-start"
+                >
+                  <div>
+                    <p className="font-semibold text-gray-900">{c.name}</p>
+                    {c.email && (
+                      <p className="text-sm text-gray-600">{c.email}</p>
+                    )}
+                    {c.matchedSkills && c.matchedSkills.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Kỹ năng khớp: {c.matchedSkills.slice(0, 5).join(", ")}
+                        {c.matchedSkills.length > 5
+                          ? ` +${c.matchedSkills.length - 5}`
+                          : ""}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-blue-700">
+                      Điểm: {Math.round(c.score)}%
+                    </p>
+                    {c.tier && (
+                      <p className="text-xs text-gray-500">Tier {c.tier}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}

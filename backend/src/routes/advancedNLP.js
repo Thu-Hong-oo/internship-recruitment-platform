@@ -120,6 +120,18 @@ router.put(
 );
 
 /**
+ * @route   PUT /api/nlp/learning-roadmap/:roadmapId/customize
+ * @desc    Customize roadmap structure
+ * @access  Private (Candidate/Intern)
+ */
+router.put(
+  '/learning-roadmap/:roadmapId/customize',
+  protect,
+  authorize('intern', 'candidate'),
+  advancedNLPController.customizeRoadmap
+);
+
+/**
  * @route   PUT /api/nlp/learning-roadmap/:roadmapId/feedback
  * @desc    Submit feedback for roadmap
  * @access  Private (Candidate/Intern)

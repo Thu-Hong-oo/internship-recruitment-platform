@@ -9,6 +9,77 @@ const { logger } = require('../utils/logger');
 const { getCacheService } = require('../config/initializeServices');
 
 /**
+ * Recalculate matching scores for a candidate across all active jobs.
+ * Fire-and-forget helper used after skill updates (e.g., roadmap completion).
+ */
+async function recalcAllMatchesForCandidate(candidateUserId) {
+  try {
+    const candidateProfile = await CandidateProfile.findOne({
+      userId: candidateUserId,
+    }).populate('userId', 'fullName email');
+
+    if (!candidateProfile) {
+      logger.warn(`recalcAllMatchesForCandidate: profile not found for ${candidateUserId}`);
+      return;
+    }
+
+    const profileSkills = candidateProfile.skills || {};
+    const allSkills = [
+      ...(profileSkills.technical || []),
+      ...(profileSkills.soft || []),
+      ...(profileSkills.languages || []),
+    ];
+
+    const profileExperience = candidateProfile.experience || {};
+    const allExperience = [
+      ...(profileExperience.internships || []),
+      ...(profileExperience.fullTime || []),
+      ...(profileExperience.projects || []),
+    ];
+
+    const cvData = {
+      personalInfo: candidateProfile.personalInfo || {},
+      education: candidateProfile.education || {},
+      experience: allExperience,
+      skills: allSkills,
+      resume: candidateProfile.resume?.current,
+      extractedText: candidateProfile.resume?.current?.aiAnalysis?.extractedData || {},
+    };
+
+    const activeJobs = await Job.find({ status: 'active' }).lean();
+    for (const job of activeJobs) {
+      try {
+        const matchingResult = await aiService.calculateAdvancedMatchScore(cvData, job, {
+          candidateId: candidateUserId,
+          jobId: job._id,
+          forceRecalculate: true,
+        });
+
+        await CVMatchingScore.deleteMany({
+          candidateId: candidateUserId,
+          jobId: job._id,
+        });
+
+        await CVMatchingScore.create(matchingResult);
+      } catch (err) {
+        logger.warn('recalcAllMatchesForCandidate: error', {
+          candidateUserId,
+          jobId: job._id,
+          error: err.message,
+        });
+      }
+    }
+
+    logger.info(`recalcAllMatchesForCandidate: completed for ${candidateUserId} (jobs: ${activeJobs.length})`);
+  } catch (err) {
+    logger.error('recalcAllMatchesForCandidate failed', {
+      candidateUserId,
+      error: err.message,
+    });
+  }
+}
+
+/**
  * Advanced NLP Controller
  * Handles matching score and learning roadmap generation
  */
@@ -741,6 +812,14 @@ class AdvancedNLPController {
         }
 
         await roadmap.save();
+
+        // Recalculate candidate-job matching so employer recommendations stay fresh
+        recalcAllMatchesForCandidate(roadmap.candidateId).catch((err) => {
+          logger.warn('Failed to recalc matches after roadmap completion', {
+            error: err.message,
+            roadmapId,
+          });
+        });
       }
 
       res.status(200).json({
@@ -753,6 +832,144 @@ class AdvancedNLPController {
       res.status(500).json({
         success: false,
         message: 'Error updating progress',
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * @route   PUT /api/nlp/learning-roadmap/:roadmapId/customize
+   * @desc    Customize roadmap structure (add/update/remove resource/week/phase)
+   * @access  Private (Candidate)
+   */
+  async customizeRoadmap(req, res) {
+    try {
+      const { roadmapId } = req.params;
+      const { action, phaseNumber, weekNumber, resource, resourceIndex, week } = req.body;
+
+      const roadmap = await LearningRoadmap.findById(roadmapId);
+      if (!roadmap) {
+        return res.status(404).json({
+          success: false,
+          message: 'Roadmap not found',
+        });
+      }
+
+      if (roadmap.candidateId.toString() !== req.user._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied',
+        });
+      }
+
+      const findPhase = () => roadmap.phases.find((p) => p.phaseNumber === Number(phaseNumber));
+      const findWeek = (phase) =>
+        phase?.weeks?.find((w) => w.weekNumber === Number(weekNumber));
+
+      switch (action) {
+        case 'addResource': {
+          const phase = findPhase();
+          const targetWeek = findWeek(phase);
+          if (!targetWeek) {
+            return res.status(400).json({ success: false, message: 'Week not found' });
+          }
+          targetWeek.resources = targetWeek.resources || [];
+          targetWeek.resources.push(resource);
+          break;
+        }
+        case 'updateResource': {
+          const phase = findPhase();
+          const targetWeek = findWeek(phase);
+          if (!targetWeek || typeof resourceIndex !== 'number') {
+            return res.status(400).json({ success: false, message: 'Week or resource not found' });
+          }
+          if (!targetWeek.resources?.[resourceIndex]) {
+            return res.status(400).json({ success: false, message: 'Resource index invalid' });
+          }
+          targetWeek.resources[resourceIndex] = { ...targetWeek.resources[resourceIndex], ...resource };
+          break;
+        }
+        case 'removeResource': {
+          const phase = findPhase();
+          const targetWeek = findWeek(phase);
+          if (!targetWeek || typeof resourceIndex !== 'number') {
+            return res.status(400).json({ success: false, message: 'Week or resource not found' });
+          }
+          if (!targetWeek.resources?.[resourceIndex]) {
+            return res.status(400).json({ success: false, message: 'Resource index invalid' });
+          }
+          targetWeek.resources.splice(resourceIndex, 1);
+          break;
+        }
+        case 'addWeek': {
+          const phase = findPhase();
+          if (!phase) {
+            return res.status(400).json({ success: false, message: 'Phase not found' });
+          }
+          const newWeekNumber =
+            week?.weekNumber ||
+            (phase.weeks && phase.weeks.length > 0
+              ? Math.max(...phase.weeks.map((w) => w.weekNumber || 0)) + 1
+              : 1);
+          const newWeek = {
+            weekNumber: newWeekNumber,
+            focus: week?.focus || `Week ${newWeekNumber}`,
+            learningObjectives: week?.learningObjectives || [],
+            resources: week?.resources || [],
+            timeCommitment: week?.timeCommitment || '5-8 hours/week',
+          };
+          phase.weeks = phase.weeks || [];
+          phase.weeks.push(newWeek);
+          break;
+        }
+        case 'removeWeek': {
+          const phase = findPhase();
+          if (!phase) {
+            return res.status(400).json({ success: false, message: 'Phase not found' });
+          }
+          phase.weeks = (phase.weeks || []).filter((w) => w.weekNumber !== Number(weekNumber));
+          break;
+        }
+        case 'addPhase': {
+          const nextPhaseNumber =
+            roadmap.phases && roadmap.phases.length > 0
+              ? Math.max(...roadmap.phases.map((p) => p.phaseNumber || 0)) + 1
+              : 1;
+          roadmap.phases = roadmap.phases || [];
+          roadmap.phases.push({
+            phaseNumber: phaseNumber || nextPhaseNumber,
+            title: week?.title || `Phase ${phaseNumber || nextPhaseNumber}`,
+            duration: week?.duration || '4 weeks',
+            objectives: week?.objectives || [],
+            weeks: week?.weeks || [],
+          });
+          break;
+        }
+        case 'removePhase': {
+          roadmap.phases = (roadmap.phases || []).filter(
+            (p) => p.phaseNumber !== Number(phaseNumber)
+          );
+          break;
+        }
+        default:
+          return res.status(400).json({
+            success: false,
+            message: 'Invalid action',
+          });
+      }
+
+      await roadmap.save();
+
+      return res.status(200).json({
+        success: true,
+        message: 'Roadmap updated',
+        data: roadmap,
+      });
+    } catch (error) {
+      logger.error('Error customizing roadmap:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error customizing roadmap',
         error: error.message,
       });
     }
