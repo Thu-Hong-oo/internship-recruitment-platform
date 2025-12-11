@@ -65,14 +65,27 @@ export interface AnalyticsResponse {
   success: boolean;
   message?: string;
   data?: {
+    periodDays?: number;
     jobs?: {
       total?: number;
       active?: number;
       draft?: number;
       closed?: number;
+      byIndustry?: {
+        industryCode?: string | null;
+        category?: string | null;
+        industry?: string | null;
+        name: string;
+        count: number;
+        active: number;
+      }[];
     };
     applications?: {
       total?: number;
+      new7d?: number;
+      perDay?: { date: string; count: number }[];
+      statusDistribution?: { status: string; count: number }[];
+      topJobs?: { jobId: string; title: string; status?: string; count: number }[];
     };
     summary?: {
       totalJobs?: number;
@@ -407,5 +420,121 @@ export const updateApplicationStatus = async (
     };
   } catch (e) {
     return { success: false, error: "Không thể kết nối máy chủ" };
+  }
+};
+
+// Schedule interview
+export const scheduleInterview = async (
+  applicationId: string,
+  payload: {
+    scheduledAt: string;
+    duration?: number;
+    type?: string;
+    location?: string;
+    interviewerId?: string;
+    note?: string;
+    metadata?: Record<string, any>;
+  },
+  token: string
+): Promise<{ success: boolean; data?: any; error?: string }> => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/applications/${applicationId}/interviews`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+    return (await response.json()) as { success: boolean; data?: any; error?: string };
+  } catch (e: any) {
+    return { success: false, error: e?.message || "Không thể kết nối máy chủ" };
+  }
+};
+
+// Update interview
+export const updateInterview = async (
+  applicationId: string,
+  interviewId: string,
+  payload: {
+    scheduledAt?: string;
+    duration?: number;
+    type?: string;
+    location?: string;
+    interviewerId?: string;
+    note?: string;
+    metadata?: Record<string, any>;
+  },
+  token: string
+): Promise<{ success: boolean; data?: any; error?: string }> => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/applications/${applicationId}/interviews/${interviewId}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      }
+    );
+    return (await response.json()) as { success: boolean; data?: any; error?: string };
+  } catch (e: any) {
+    return { success: false, error: e?.message || "Không thể kết nối máy chủ" };
+  }
+};
+
+// Cancel interview
+export const cancelInterview = async (
+  applicationId: string,
+  interviewId: string,
+  token: string
+): Promise<{ success: boolean; data?: any; error?: string }> => {
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/applications/${applicationId}/interviews/${interviewId}`,
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    return (await response.json()) as { success: boolean; data?: any; error?: string };
+  } catch (e: any) {
+    return { success: false, error: e?.message || "Không thể kết nối máy chủ" };
+  }
+};
+
+// Get employer interviews (upcoming)
+export const getEmployerInterviews = async (
+  token: string,
+  options?: { from?: string; to?: string; limit?: number }
+): Promise<{ success: boolean; data?: any[]; error?: string }> => {
+  try {
+    const params = new URLSearchParams();
+    if (options?.from) params.append("from", options.from);
+    if (options?.to) params.append("to", options.to);
+    if (options?.limit) params.append("limit", options.limit.toString());
+
+    const url = `${API_BASE_URL}/applications/interviews/employer${
+      params.toString() ? `?${params.toString()}` : ""
+    }`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return (await response.json()) as { success: boolean; data?: any[]; error?: string };
+  } catch (e: any) {
+    return { success: false, error: e?.message || "Không thể kết nối máy chủ" };
   }
 };

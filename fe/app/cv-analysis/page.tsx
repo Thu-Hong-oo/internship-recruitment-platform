@@ -55,6 +55,7 @@ export default function CVAnalysisPage() {
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [editableCVText, setEditableCVText] = useState("");
   const [improvements, setImprovements] = useState<any>(null);
+  const [ragSuggestions, setRagSuggestions] = useState<any>(null);
   const [isAnalyzingImprovements, setIsAnalyzingImprovements] = useState(false);
   const [showProgressModal, setShowProgressModal] = useState(false);
   const [progressValue, setProgressValue] = useState(0);
@@ -362,7 +363,7 @@ export default function CVAnalysisPage() {
       
       await updateProgress(60, "Đang xử lý kinh nghiệm và học vấn...", 200);
       
-      setAnalysisResult({
+      const parsedData = {
         extractedSkills: uniqueSkills,
         skills: {
           technical: technicalSkills,
@@ -373,7 +374,10 @@ export default function CVAnalysisPage() {
         education: data.education || [],
         suggestions: data.suggestions || [],
         extractedText: data.extractedText || "",
-      });
+        extractedData: data.extractedData || data.analysis?.extractedData || {},
+      };
+
+      setAnalysisResult(parsedData);
       
       if (data.extractedText) {
         setEditableCVText(data.extractedText);
@@ -440,6 +444,27 @@ export default function CVAnalysisPage() {
         })),
       };
       setCvFormData(formData);
+
+      // Call CV improvements (RAG) using parsingData
+      setIsAnalyzingImprovements(true);
+      try {
+      const improveRes = await aiService.analyzeCVImprovements({
+        parsingData: {
+          extractedData: parsedData.extractedData,
+          skills: parsedData.skills,
+          suggestions: parsedData.suggestions,
+        },
+        jobCategory: targetJobId || undefined,
+      });
+        if (improveRes?.success && improveRes.data) {
+          setImprovements(improveRes.data);
+          setRagSuggestions(improveRes.data.ragSuggestions || null);
+        }
+      } catch (err) {
+        console.error("Analyze CV improvements failed:", err);
+      } finally {
+        setIsAnalyzingImprovements(false);
+      }
       
       await updateProgress(100, "Hoàn thành!", 500);
       

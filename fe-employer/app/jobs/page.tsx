@@ -57,6 +57,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import EmployerShell from "@/components/layout/EmployerShell";
 
 type Job = {
   _id: string;
@@ -239,47 +240,44 @@ export default function JobsPage() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <EmployerShell active="jobs">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
             <p className="text-gray-600">Đang tải danh sách công việc...</p>
           </div>
         </div>
-      </div>
+      </EmployerShell>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold mb-2">
-            Quản lý tin tuyển dụng
-          </h1>
-          <p className="text-gray-600">
-            Quản lý các bài đăng tuyển dụng của bạn
-          </p>
+    <EmployerShell active="jobs">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-semibold mb-2">Quản lý tin tuyển dụng</h1>
+            <p className="text-gray-600">Quản lý các bài đăng tuyển dụng của bạn</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => router.push("/analytics")}>
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Thống kê
+            </Button>
+            <Button onClick={() => router.push("/jobs/create-job")}>
+              <Plus className="h-4 w-4 mr-2" />
+              Tạo tin mới
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => router.push("/analytics")}>
-            <BarChart3 className="h-4 w-4 mr-2" />
-            Thống kê
-          </Button>
-          <Button onClick={() => router.push("/jobs/create-job")}>
-            <Plus className="h-4 w-4 mr-2" />
-            Tạo tin mới
-          </Button>
-        </div>
-      </div>
 
-      {error && (
-        <Card className="border-red-200 bg-red-50 mb-6">
-          <CardContent className="p-4">
-            <p className="text-red-600">{error}</p>
-          </CardContent>
-        </Card>
-      )}
+        {error && (
+          <Card className="border-red-200 bg-red-50 mb-6">
+            <CardContent className="p-4">
+              <p className="text-red-600">{error}</p>
+            </CardContent>
+          </Card>
+        )}
 
       {/* Filters */}
       <Card className="mb-6">
@@ -622,6 +620,7 @@ export default function JobsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+      </div>
+    </EmployerShell>
   );
 }

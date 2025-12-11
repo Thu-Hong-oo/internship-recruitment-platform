@@ -6,6 +6,7 @@ import {
   getEmployerApplications,
   viewApplicationResume,
   updateApplicationStatus,
+  scheduleInterview,
 } from "@/lib/jobAPI";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -35,7 +36,20 @@ import {
   Eye,
   X,
   ExternalLink,
+  CalendarClock,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import EmployerShell from "@/components/layout/EmployerShell";
 
 type Application = {
   _id: string;
@@ -57,6 +71,15 @@ type Application = {
     url?: string;
   };
   createdAt: string;
+};
+
+type InterviewItem = {
+  _id?: string;
+  scheduledAt?: string;
+  type?: string;
+  location?: string;
+  note?: string;
+  metadata?: Record<string, any>;
 };
 
 const statusConfig: Record<
@@ -129,6 +152,16 @@ export default function EmployerApplicationsPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [loadingCV, setLoadingCV] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const [schedulingFor, setSchedulingFor] = useState<string | null>(null);
+  const [scheduleForm, setScheduleForm] = useState({
+    scheduledAt: "",
+    duration: "",
+    type: "online",
+    location: "",
+    interviewerId: "",
+    note: "",
+    metadata: "",
+  });
 
   const loadApplications = async (
     page = pageMeta.page,
@@ -288,6 +321,87 @@ export default function EmployerApplicationsPage() {
     }
   };
 
+  const getUpcomingInterview = (application: any): InterviewItem | null => {
+    if (!application.interviews || application.interviews.length === 0) return null;
+    const now = new Date();
+    const future = application.interviews
+      .filter((i: InterviewItem) => i.scheduledAt && new Date(i.scheduledAt) >= now)
+      .sort(
+        (a: InterviewItem, b: InterviewItem) =>
+          new Date(a.scheduledAt || 0).getTime() - new Date(b.scheduledAt || 0).getTime()
+      );
+    return future[0] || null;
+  };
+
+  const handleScheduleSubmit = async () => {
+    if (!schedulingFor) return;
+    const token =
+      localStorage.getItem("token") || sessionStorage.getItem("token");
+    if (!token) {
+      toast({
+        title: "Lỗi",
+        description: "Vui lòng đăng nhập",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!scheduleForm.scheduledAt) {
+      toast({
+        title: "Thiếu thông tin",
+        description: "Vui lòng chọn thời gian phỏng vấn",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    let parsedMetadata: Record<string, any> | undefined = undefined;
+    if (scheduleForm.metadata.trim()) {
+      try {
+        parsedMetadata = JSON.parse(scheduleForm.metadata);
+      } catch (e) {
+        toast({
+          title: "Metadata không hợp lệ",
+          description: 'Nhập JSON hợp lệ, ví dụ: {"room":"A1"}',
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    const payload = {
+      scheduledAt: new Date(scheduleForm.scheduledAt).toISOString(),
+      duration: scheduleForm.duration ? Number(scheduleForm.duration) : undefined,
+      type: scheduleForm.type || undefined,
+      location: scheduleForm.location || undefined,
+      interviewerId: scheduleForm.interviewerId || undefined,
+      note: scheduleForm.note || undefined,
+      metadata: parsedMetadata,
+    };
+
+    const res = await scheduleInterview(schedulingFor, payload, token);
+    if (res.success) {
+      toast({ title: "Đã mời phỏng vấn", description: "Lịch đã được lưu." });
+      setSchedulingFor(null);
+      setScheduleForm({
+        scheduledAt: "",
+        duration: "",
+        type: "online",
+        location: "",
+        interviewerId: "",
+        note: "",
+        metadata: "",
+      });
+      loadApplications(pageMeta.page, filters.status);
+    } else {
+      toast({
+        title: "Lỗi",
+        description: res.error || "Không thể đặt lịch",
+        variant: "destructive",
+      });
+    }
+  };
+
   const renderStatusBadge = (status: string) => {
     const config = statusConfig[status] || {
       label: status,
@@ -327,235 +441,376 @@ export default function EmployerApplicationsPage() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <EmployerShell active="applications">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
             <p className="text-gray-600">Đang tải danh sách ứng viên...</p>
           </div>
         </div>
-      </div>
+      </EmployerShell>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold mb-2">Ứng viên ứng tuyển</h1>
-          <p className="text-gray-600">
-            Theo dõi tất cả ứng viên đã ứng tuyển vào các tin tuyển dụng của bạn
-          </p>
-        </div>
-      </div>
-
-      {error && (
-        <Card className="border-red-200 bg-red-50 mb-6">
-          <CardContent className="p-4 flex items-center gap-2 text-red-700">
-            <AlertCircle className="h-4 w-4" />
-            <span>{error}</span>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card className="mb-6">
-        <CardContent className="p-4 flex flex-wrap items-center gap-4">
-          <div className="text-sm font-medium">Bộ lọc</div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Trạng thái:</span>
-            <Select
-              value={filters.status}
-              onValueChange={handleFilterStatusChange}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Tất cả" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tất cả</SelectItem>
-                <SelectItem value="pending">Chờ duyệt</SelectItem>
-                <SelectItem value="reviewing">Đang xem xét</SelectItem>
-                <SelectItem value="shortlisted">Vòng tiếp theo</SelectItem>
-                <SelectItem value="interview">Đã phỏng vấn</SelectItem>
-                <SelectItem value="offer">Đã đề xuất</SelectItem>
-                <SelectItem value="accepted">Đã tuyển</SelectItem>
-                <SelectItem value="rejected">Từ chối</SelectItem>
-              </SelectContent>
-            </Select>
+    <EmployerShell active="applications">
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold mb-2">Ứng viên ứng tuyển</h1>
+            <p className="text-gray-600">
+              Theo dõi tất cả ứng viên đã ứng tuyển vào các tin tuyển dụng của bạn
+            </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {applications.length === 0 ? (
+        {error && (
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="p-4 flex items-center gap-2 text-red-700">
+              <AlertCircle className="h-4 w-4" />
+              <span>{error}</span>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
-          <CardContent className="p-8 text-center text-muted-foreground">
-            <div className="max-w-md mx-auto space-y-4">
-              <UserRound className="h-12 w-12 mx-auto text-gray-300" />
-              <div>
-                <p className="text-lg font-medium mb-2">Chưa có ứng viên nào</p>
-                <p className="text-sm">
-                  Khi ứng viên nộp hồ sơ vào tin tuyển dụng, thông tin của họ sẽ
-                  xuất hiện ở đây.
-                </p>
-              </div>
-              <Button variant="outline" onClick={() => router.push("/jobs")}>
-                Quay lại quản lý tin tuyển dụng
-              </Button>
+          <CardContent className="p-4 flex flex-wrap items-center gap-4">
+            <div className="text-sm font-medium">Bộ lọc</div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Trạng thái:</span>
+              <Select value={filters.status} onValueChange={handleFilterStatusChange}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Tất cả" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả</SelectItem>
+                  <SelectItem value="pending">Chờ duyệt</SelectItem>
+                  <SelectItem value="reviewing">Đang xem xét</SelectItem>
+                  <SelectItem value="shortlisted">Vòng tiếp theo</SelectItem>
+                  <SelectItem value="interview">Đã phỏng vấn</SelectItem>
+                  <SelectItem value="offer">Đã đề xuất</SelectItem>
+                  <SelectItem value="accepted">Đã tuyển</SelectItem>
+                  <SelectItem value="rejected">Từ chối</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              Danh sách ứng viên ({applications.length} ứng viên trên trang{" "}
-              {pageMeta.page}/{pageMeta.totalPages})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Ứng viên</TableHead>
-                  <TableHead>Công việc</TableHead>
-                  <TableHead>Trạng thái</TableHead>
-                  <TableHead>Thời gian</TableHead>
-                  <TableHead>Tài liệu</TableHead>
-                  <TableHead className="w-[120px]">Hành động</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {applications.map((application) => (
-                  <TableRow key={application._id}>
-                    <TableCell>{renderCandidateInfo(application)}</TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="font-medium">
-                          {application.jobId?.title || "Tin đã bị xóa"}
-                        </div>
-                        {application.jobId?._id && (
-                          <Button
-                            variant="link"
-                            className="px-0 h-auto text-sm"
-                            onClick={() =>
-                              router.push(`/jobs/${application.jobId?._id}`)
-                            }
-                          >
-                            <Eye className="h-3 w-3 mr-1" />
-                            Xem tin
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {FINAL_STATUSES.includes(application.status || "") ? (
-                        // Hiển thị Badge cố định cho các trạng thái cuối
-                        renderStatusBadge(application.status || "pending")
-                      ) : (
-                        // Hiển thị Select dropdown với các trạng thái hợp lệ
-                        <Select
-                          value={application.status || "pending"}
-                          onValueChange={(value) =>
-                            handleStatusChange(application._id, value)
-                          }
-                          disabled={updatingStatus === application._id}
-                        >
-                          <SelectTrigger className="w-[160px]">
-                            <SelectValue>
-                              {statusConfig[application.status || "pending"]
-                                ?.label ||
-                                application.status ||
-                                "Chờ duyệt"}
-                            </SelectValue>
-                          </SelectTrigger>
-                          <SelectContent>
-                            {STATUS_OPTIONS_FOR_SELECT.filter((option) => {
-                              const availableStatuses = getAvailableStatuses(
-                                application.status || "pending"
-                              );
-                              // Luôn hiển thị trạng thái hiện tại và các trạng thái có thể chuyển
-                              return (
-                                option.value === application.status ||
-                                availableStatuses.includes(option.value)
-                              );
-                            }).map((option) => (
-                              <SelectItem
-                                key={option.value}
-                                value={option.value}
-                              >
-                                {option.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="text-sm text-muted-foreground">
-                        {formatDateTime(application.createdAt)}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {application.resume?.url ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewCV(application)}
-                          disabled={loadingCV}
-                        >
-                          <FileText className="h-4 w-4 mr-2" />
-                          {loadingCV ? "Đang tải..." : "Xem CV"}
-                        </Button>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">
-                          Không có tệp
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          router.push(
-                            `/jobs/${application.jobId?._id ?? ""}/applications`
-                          )
-                        }
-                        disabled={!application.jobId?._id}
-                      >
-                        Chi tiết
-                      </Button>
-                    </TableCell>
+
+        {applications.length === 0 ? (
+          <Card>
+            <CardContent className="p-8 text-center text-muted-foreground">
+              <div className="max-w-md mx-auto space-y-4">
+                <UserRound className="h-12 w-12 mx-auto text-gray-300" />
+                <div>
+                  <p className="text-lg font-medium mb-2">Chưa có ứng viên nào</p>
+                  <p className="text-sm">
+                    Khi ứng viên nộp hồ sơ vào tin tuyển dụng, thông tin của họ sẽ xuất hiện ở đây.
+                  </p>
+                </div>
+                <Button variant="outline" onClick={() => router.push("/jobs")}>
+                  Quay lại quản lý tin tuyển dụng
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                Danh sách ứng viên ({applications.length} ứng viên trên trang {pageMeta.page}/
+                {pageMeta.totalPages})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Ứng viên</TableHead>
+                    <TableHead>Công việc</TableHead>
+                    <TableHead>Trạng thái</TableHead>
+                    <TableHead>Thời gian</TableHead>
+                    <TableHead>Tài liệu</TableHead>
+                    <TableHead className="w-[200px]">Hành động</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {applications.map((application) => (
+                    <TableRow key={application._id}>
+                      <TableCell>{renderCandidateInfo(application)}</TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="font-medium">{application.jobId?.title || "Tin đã bị xóa"}</div>
+                          {application.jobId?._id && (
+                            <Button
+                              variant="link"
+                              className="px-0 h-auto text-sm"
+                              onClick={() => router.push(`/jobs/${application.jobId?._id}`)}
+                            >
+                              <Eye className="h-3 w-3 mr-1" />
+                              Xem tin
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const upcoming = getUpcomingInterview(application);
+                          if (upcoming && application.status === "interview") {
+                            return (
+                              <Badge variant="default" className="bg-blue-100 text-blue-700">
+                                Đã lên lịch
+                              </Badge>
+                            );
+                          }
+                          if (FINAL_STATUSES.includes(application.status || "")) {
+                            return renderStatusBadge(application.status || "pending");
+                          }
+                          return (
+                            <Select
+                              value={application.status || "pending"}
+                              onValueChange={(value) => handleStatusChange(application._id, value)}
+                              disabled={updatingStatus === application._id}
+                            >
+                              <SelectTrigger className="w-[160px]">
+                                <SelectValue>
+                                  {statusConfig[application.status || "pending"]?.label ||
+                                    application.status ||
+                                    "Chờ duyệt"}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                {STATUS_OPTIONS_FOR_SELECT.filter((option) => {
+                                  const availableStatuses = getAvailableStatuses(application.status || "pending");
+                                  return option.value === application.status || availableStatuses.includes(option.value);
+                                }).map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          );
+                        })()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm text-muted-foreground">
+                          {getUpcomingInterview(application)?.scheduledAt
+                            ? formatDateTime(getUpcomingInterview(application)!.scheduledAt!)
+                            : formatDateTime(application.createdAt)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {application.resume?.url ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewCV(application)}
+                            disabled={loadingCV}
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            {loadingCV ? "Đang tải..." : "Xem CV"}
+                          </Button>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">Không có tệp</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-2 justify-end">
+                          <Dialog
+                            open={schedulingFor === application._id}
+                            onOpenChange={(open) => setSchedulingFor(open ? application._id : null)}
+                          >
+                            <DialogTrigger asChild>
+                              {(() => {
+                                const upcoming = getUpcomingInterview(application);
+                                const isFinal = FINAL_STATUSES.includes(application.status || "");
+                                if (upcoming) {
+                                  return (
+                                    <Button variant="outline" size="sm" disabled className="gap-2">
+                                      <CalendarClock className="h-4 w-4" />
+                                      Đã lên lịch
+                                    </Button>
+                                  );
+                                }
+                                if (isFinal) {
+                                  return (
+                                    <Button variant="outline" size="sm" disabled className="gap-2">
+                                      <CalendarClock className="h-4 w-4" />
+                                      Đã kết thúc
+                                    </Button>
+                                  );
+                                }
+                                return (
+                                  <Button variant="outline" size="sm" className="gap-2">
+                                    <CalendarClock className="h-4 w-4" />
+                                    Mời phỏng vấn
+                                  </Button>
+                                );
+                              })()}
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-lg">
+                              <DialogHeader>
+                                <DialogTitle>Mời phỏng vấn</DialogTitle>
+                              </DialogHeader>
+                              <div className="space-y-4">
+                                <div className="grid gap-2">
+                                  <Label htmlFor="scheduledAt">Thời gian</Label>
+                                  <Input
+                                    id="scheduledAt"
+                                    type="datetime-local"
+                                    value={scheduleForm.scheduledAt}
+                                    onChange={(e) =>
+                                      setScheduleForm((prev) => ({
+                                        ...prev,
+                                        scheduledAt: e.target.value,
+                                      }))
+                                    }
+                                  />
+                                </div>
+                                <div className="grid gap-2">
+                                  <Label htmlFor="duration">Thời lượng (phút)</Label>
+                                  <Input
+                                    id="duration"
+                                    type="number"
+                                    min={0}
+                                    value={scheduleForm.duration}
+                                    onChange={(e) =>
+                                      setScheduleForm((prev) => ({
+                                        ...prev,
+                                        duration: e.target.value,
+                                      }))
+                                    }
+                                  />
+                                </div>
+                                <div className="grid gap-2">
+                                  <Label htmlFor="type">Hình thức</Label>
+                                  <Select
+                                    value={scheduleForm.type}
+                                    onValueChange={(val) =>
+                                      setScheduleForm((prev) => ({ ...prev, type: val }))
+                                    }
+                                  >
+                                    <SelectTrigger id="type">
+                                      <SelectValue placeholder="Chọn hình thức" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="online">Online</SelectItem>
+                                      <SelectItem value="onsite">Onsite</SelectItem>
+                                      <SelectItem value="phone">Phone</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="grid gap-2">
+                                  <Label htmlFor="location">Địa điểm / Link</Label>
+                                  <Input
+                                    id="location"
+                                    placeholder="Phòng họp / Google Meet link..."
+                                    value={scheduleForm.location}
+                                    onChange={(e) =>
+                                      setScheduleForm((prev) => ({
+                                        ...prev,
+                                        location: e.target.value,
+                                      }))
+                                    }
+                                  />
+                                </div>
+                                <div className="grid gap-2">
+                                  <Label htmlFor="interviewerId">Người phỏng vấn (User ID)</Label>
+                                  <Input
+                                    id="interviewerId"
+                                    placeholder="Optional"
+                                    value={scheduleForm.interviewerId}
+                                    onChange={(e) =>
+                                      setScheduleForm((prev) => ({
+                                        ...prev,
+                                        interviewerId: e.target.value,
+                                      }))
+                                    }
+                                  />
+                                </div>
+                                <div className="grid gap-2">
+                                  <Label htmlFor="note">Ghi chú gửi ứng viên</Label>
+                                  <Textarea
+                                    id="note"
+                                    rows={3}
+                                    value={scheduleForm.note}
+                                    onChange={(e) =>
+                                      setScheduleForm((prev) => ({
+                                        ...prev,
+                                        note: e.target.value,
+                                      }))
+                                    }
+                                  />
+                                </div>
+                                <div className="grid gap-2">
+                                  <Label htmlFor="metadata">
+                                    Metadata tùy biến (JSON) — ví dụ: {"{\"room\":\"A1\"}"}
+                                  </Label>
+                                  <Textarea
+                                    id="metadata"
+                                    rows={3}
+                                    placeholder='{"room":"A1","panel":"Mr A, Ms B"}'
+                                    value={scheduleForm.metadata}
+                                    onChange={(e) =>
+                                      setScheduleForm((prev) => ({
+                                        ...prev,
+                                        metadata: e.target.value,
+                                      }))
+                                    }
+                                  />
+                                </div>
+                              </div>
+                              <DialogFooter className="mt-4">
+                                <Button variant="outline" onClick={() => setSchedulingFor(null)} type="button">
+                                  Đóng
+                                </Button>
+                                <Button onClick={handleScheduleSubmit}>Lưu lịch</Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push(`/jobs/${application.jobId?._id ?? ""}/applications`)}
+                            disabled={!application.jobId?._id}
+                          >
+                            Chi tiết
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
 
-            <div className="flex items-center justify-between mt-4">
-              <div className="text-sm text-muted-foreground">
-                Trang {pageMeta.page} / {pageMeta.totalPages}
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-muted-foreground">
+                  Trang {pageMeta.page} / {pageMeta.totalPages}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange("prev")}
+                    disabled={!pageMeta.hasPrevPage}
+                  >
+                    Trước
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange("next")}
+                    disabled={!pageMeta.hasNextPage}
+                  >
+                    Sau
+                  </Button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange("prev")}
-                  disabled={!pageMeta.hasPrevPage}
-                >
-                  Trước
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange("next")}
-                  disabled={!pageMeta.hasNextPage}
-                >
-                  Sau
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {/* CV Preview Modal */}
       {showPreview && previewUrl && (
@@ -567,9 +822,7 @@ export default function EmployerApplicationsPage() {
                   <Eye className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-semibold text-slate-900">
-                    Xem trước CV
-                  </h3>
+                  <h3 className="text-base font-semibold text-slate-900">Xem trước CV</h3>
                   <p className="text-xs text-slate-500">CV của ứng viên</p>
                 </div>
               </div>
@@ -584,16 +837,10 @@ export default function EmployerApplicationsPage() {
               </Button>
             </div>
             <div className="flex-1 bg-slate-100">
-              <iframe
-                src={previewUrl}
-                title="CV Preview"
-                className="h-full w-full border-0"
-              />
+              <iframe src={previewUrl} title="CV Preview" className="h-full w-full border-0" />
             </div>
             <div className="flex items-center justify-between border-t border-white/40 bg-white/80 px-6 py-4 backdrop-blur-lg">
-              <p className="text-xs font-medium text-slate-500">
-                CV của ứng viên đã ứng tuyển
-              </p>
+              <p className="text-xs font-medium text-slate-500">CV của ứng viên đã ứng tuyển</p>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
@@ -616,6 +863,6 @@ export default function EmployerApplicationsPage() {
           </div>
         </div>
       )}
-    </div>
+    </EmployerShell>
   );
 }

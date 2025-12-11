@@ -24,7 +24,7 @@ class SkillNormalizationService {
       try {
         const genAI = new GoogleGenerativeAI(this.geminiApiKey);
         this.model = genAI.getGenerativeModel({ 
-          model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp' 
+          model: process.env.GEMINI_MODEL
         });
         logger.info('✅ SkillNormalizationService: Gemini model initialized');
       } catch (error) {

@@ -810,34 +810,147 @@ const getAnalytics = asyncHandler(async (req, res) => {
   // Sử dụng ensureProfile thay vì getProfile
   const profile = await EmployerServices.ensureProfile(req.user.id);
 
-  const totalJobs = await Job.countDocuments({ employer: profile._id });
-  const activeJobs = await Job.countDocuments({
-    employer: profile._id,
-    status: 'active',
-  });
-  const totalApplications = await Application.countDocuments({
-    jobId: { $in: await Job.find({ employer: profile._id }).distinct('_id') },
-  });
+  const period = parseInt(req.query.period || '30', 10);
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - period);
 
-  // Enhanced analytics with more details
-  const draftJobs = await Job.countDocuments({
-    employer: profile._id,
-    status: 'draft',
-  });
-  const closedJobs = await Job.countDocuments({
-    employer: profile._id,
-    status: 'closed',
-  });
+  // Jobs list for this employer
+  const jobs = await Job.find({ employer: profile._id }).select('_id title status createdAt').lean();
+  const jobIds = jobs.map(j => j._id);
+
+  const [
+    totalJobs,
+    activeJobs,
+    draftJobs,
+    closedJobs,
+    totalApplications,
+    newApplications7d,
+    appsByDate,
+    statusDistribution,
+    topJobs,
+    jobsByIndustry,
+  ] = await Promise.all([
+    Job.countDocuments({ employer: profile._id }),
+    Job.countDocuments({ employer: profile._id, status: 'active' }),
+    Job.countDocuments({ employer: profile._id, status: 'draft' }),
+    Job.countDocuments({ employer: profile._id, status: 'closed' }),
+    Application.countDocuments({ jobId: { $in: jobIds } }),
+    Application.countDocuments({
+      jobId: { $in: jobIds },
+      createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+    }),
+    Application.aggregate([
+      { $match: { jobId: { $in: jobIds }, createdAt: { $gte: startDate } } },
+      {
+        $group: {
+          _id: { date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { '_id.date': 1 } },
+    ]),
+    Application.aggregate([
+      { $match: { jobId: { $in: jobIds } } },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+        },
+      },
+    ]),
+    Application.aggregate([
+      { $match: { jobId: { $in: jobIds } } },
+      {
+        $group: {
+          _id: '$jobId',
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { count: -1 } },
+      { $limit: 5 },
+      {
+        $lookup: {
+          from: 'jobs',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'job',
+        },
+      },
+      { $unwind: '$job' },
+      {
+        $project: {
+          jobId: '$job._id',
+          title: '$job.title',
+          status: '$job.status',
+          count: 1,
+        },
+      },
+    ]),
+    Job.aggregate([
+      { $match: { employer: profile._id } },
+      {
+        $group: {
+          _id: {
+            industryCode: '$industryCode',
+            category: '$category',
+            industry: '$industry',
+          },
+          count: { $sum: 1 },
+          active: {
+            $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] },
+          },
+        },
+      },
+      { $sort: { count: -1 } },
+    ]),
+  ]);
+
+  // Format jobs by industry
+  const industriesData = jobsByIndustry
+    .filter(item => {
+      // Filter out entries where all industry fields are null/undefined
+      const hasIndustry = item._id.industryCode || item._id.category || item._id.industry;
+      return hasIndustry;
+    })
+    .map(item => {
+      // Determine the best name to display
+      let name = 'Chưa phân loại';
+      if (item._id.industryCode) {
+        name = item._id.industryCode;
+      } else if (item._id.category) {
+        name = item._id.category;
+      } else if (item._id.industry) {
+        name = item._id.industry;
+      }
+      
+      return {
+        industryCode: item._id.industryCode || null,
+        category: item._id.category || null,
+        industry: item._id.industry || null,
+        name: name,
+        count: item.count,
+        active: item.active,
+      };
+    });
 
   return success(res, 'Thống kê tổng hợp thành công', {
+    periodDays: period,
     jobs: {
       total: totalJobs,
       active: activeJobs,
       draft: draftJobs,
       closed: closedJobs,
+      byIndustry: industriesData,
     },
     applications: {
       total: totalApplications,
+      new7d: newApplications7d,
+      perDay: appsByDate.map(item => ({ date: item._id.date, count: item.count })),
+      statusDistribution: statusDistribution.map(s => ({
+        status: s._id,
+        count: s.count,
+      })),
+      topJobs,
     },
     summary: {
       totalJobs,

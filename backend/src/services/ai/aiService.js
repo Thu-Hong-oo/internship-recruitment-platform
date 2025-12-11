@@ -62,7 +62,7 @@ class AIService {
     
     // Respect user's choice from .env, use default if not set
     // Default: gemini-2.0-flash-lite (nhanh nhất) - xem GEMINI_MODEL_COMPARISON.md
-    let modelName = process.env.GEMINI_MODEL || 'gemini-2.0-flash-lite';
+    let modelName = process.env.GEMINI_MODEL
     
     // Check if API key is available
     if (!apiKey) {
@@ -3997,7 +3997,7 @@ LƯU Ý:
         return this.basicSkillGapAnalysis(cvData, jobData);
       }
 
-      const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-pro';
+      const modelName = process.env.GEMINI_MODEL;
       const model = genAI.getGenerativeModel({ model: modelName });
 
       // Extract skills from cvData
@@ -4152,7 +4152,7 @@ Return ONLY valid JSON (no markdown):
         return this.getDefaultLearningRoadmap();
       }
 
-      const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-pro';
+      const modelName = process.env.GEMINI_MODEL;
       const model = genAI.getGenerativeModel({ model: modelName });
 
       // Safely extract skillGaps
@@ -5106,11 +5106,26 @@ Return ONLY valid JSON (no markdown):
         })
       );
 
+      // Guard invalid skills (missing name) to avoid toLowerCase errors
+      const safeRequiredSkills = requiredSkills.filter((s) => s && s.name);
+      const safeNiceToHaveSkills = niceToHaveSkills.filter((s) => s && s.name);
+      if (requiredSkills.length !== safeRequiredSkills.length || niceToHaveSkills.length !== safeNiceToHaveSkills.length) {
+        logger.warn('⚠️ Some job skills missing name, skipping invalid entries', {
+          jobId: jobData?._id || jobData?.id,
+          requiredTotal: requiredSkills.length,
+          requiredValid: safeRequiredSkills.length,
+          niceToHaveTotal: niceToHaveSkills.length,
+          niceToHaveValid: safeNiceToHaveSkills.length,
+        });
+      }
+
       // Check required skills với semantic matching cải tiến
       let requiredMatched = 0;
-      for (const jobSkill of requiredSkills) {
+      for (const jobSkill of safeRequiredSkills) {
         // Use AI-powered normalization (async)
-        const skillName = await this._normalizeSkillName(jobSkill.name.toLowerCase().trim());
+        const rawName = (jobSkill.name || '').toLowerCase().trim();
+        if (!rawName) continue;
+        const skillName = await this._normalizeSkillName(rawName);
         // Improved matching: exact match, substring match, hoặc synonym match
         const isMatched = await Promise.all(
           cvSkillNames.map(async (cvSkill) => {
@@ -5150,8 +5165,10 @@ Return ONLY valid JSON (no markdown):
 
       // Check nice-to-have skills với semantic matching cải tiến
       let niceToHaveMatched = 0;
-      for (const jobSkill of niceToHaveSkills) {
-        const skillName = await this._normalizeSkillName(jobSkill.name.toLowerCase().trim());
+      for (const jobSkill of safeNiceToHaveSkills) {
+        const rawName = (jobSkill.name || '').toLowerCase().trim();
+        if (!rawName) continue;
+        const skillName = await this._normalizeSkillName(rawName);
         // Improved matching: exact match, substring match, hoặc synonym match
         const isMatched = await Promise.all(
           cvSkillNames.map(async (cvSkill) => {

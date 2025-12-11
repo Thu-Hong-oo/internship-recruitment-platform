@@ -33,7 +33,7 @@ class SkillExtractionService {
       try {
         const genAI = new GoogleGenerativeAI(this.geminiApiKey);
         this.model = genAI.getGenerativeModel({
-          model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp'
+          model: process.env.GEMINI_MODEL
         });
         logger.info('✅ SkillExtractionService: Gemini available for optional enhancement');
       } catch (error) {

@@ -3,6 +3,7 @@ const CandidateProfile = require('../../models/CandidateProfile');
 const uploadService = require('../../services/upload/unifiedUploadService');
 const ProfileController = require('./ProfileController'); // Import ProfileController
 const aiService = require('../../services/ai/aiService');
+const { getCVRAGSuggestionService } = require('../../services/ai/cvRAGSuggestionService');
 const { ApiResponse } = require('../../utils/responseHandler');
 const { AppError } = require('../../utils/errors');
 const { logger } = require('../../utils/logger');
@@ -913,6 +914,7 @@ class ResumeController {
 
     const profile = await this.ensureCandidateProfile(req.user.id, req.user);
     let parseResult;
+    let ragSuggestions = null;
 
     // Step 1: Parse CV (phần quan trọng nhất - cần trả về ngay)
     try {
@@ -946,6 +948,24 @@ class ResumeController {
       }
     }
 
+    // RAG suggestions (retrieval + LLM fallback), non-blocking
+    if (parseResult && parseResult.extractedData) {
+      try {
+        const ragService = getCVRAGSuggestionService(aiService);
+        const jobCategory =
+          req.body.jobCategory ||
+          req.body.category ||
+          profile?.targetJob?.category ||
+          null;
+        ragSuggestions = await ragService.getSuggestions(
+          parseResult.extractedData,
+          jobCategory
+        );
+      } catch (e) {
+        logger.warn('⚠️ RAG CV suggestions failed (non-blocking):', e.message);
+      }
+    }
+
     // TỐI ƯU: Trả response ngay sau khi parsing xong (không đợi upload)
     // Upload và update sẽ chạy ở background
     const parsingResponse = {
@@ -954,6 +974,7 @@ class ResumeController {
             extractedData: parseResult.extractedData || {},
             skills: parseResult.skills || [],
             suggestions: parseResult.suggestions || [],
+            ragSuggestions: ragSuggestions || null,
             analyzedAt: new Date(),
           }
         : { error: 'Parsing failed', analyzedAt: new Date() },
@@ -1002,6 +1023,7 @@ class ResumeController {
             extractedData: parseResult.extractedData || {},
             skills: parseResult.skills || [],
             suggestions: parseResult.suggestions || [],
+            ragSuggestions: ragSuggestions || null,
             analyzedAt: new Date(),
           }
         : { error: 'Parsing failed during upload', analyzedAt: new Date() },

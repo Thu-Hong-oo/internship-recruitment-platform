@@ -254,9 +254,16 @@ def main():
     except Exception as e:
         error_result = {
             "success": False,
+            "available": False,
             "error": str(e),
-            "type": type(e).__name__
+            "type": type(e).__name__,
+            "traceback": None
         }
+        # Print error to stderr for debugging
+        import traceback
+        error_result["traceback"] = traceback.format_exc()
+        print(f"Error: {str(e)}", file=sys.stderr)
+        print(traceback.format_exc(), file=sys.stderr)
         print(json.dumps(error_result, ensure_ascii=False))
         sys.exit(1)
 

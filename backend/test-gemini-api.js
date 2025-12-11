@@ -38,7 +38,7 @@ async function testGeminiAPI() {
 
     // Get model (using the same model as in the codebase)
     const model = genAI.getGenerativeModel({
-      model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp'
+      model: process.env.GEMINI_MODEL 
     });
 
     console.log(`📝 Using model: ${model.model}`);

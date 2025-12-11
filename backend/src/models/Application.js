@@ -67,6 +67,8 @@ const ApplicationSchema = new mongoose.Schema(
           type: mongoose.Schema.Types.ObjectId,
           ref: 'User',
         },
+        note: String,
+        metadata: Object, // flexible fields employer wants to store per job/candidate
         feedback: {
           strengths: [String],
           weaknesses: [String],
@@ -191,27 +193,35 @@ ApplicationSchema.methods.scheduleInterview = async function (interviewData) {
     const EmployerProfile = require('./EmployerProfile');
     const Job = require('./Job');
     
+    // jobId có thể đang được populate => cần đảm bảo là ObjectId
+    const jobIdStr = (() => {
+      if (!this.jobId) return null;
+      if (typeof this.jobId === 'string') return this.jobId;
+      if (this.jobId._id) return this.jobId._id.toString();
+      return this.jobId.toString();
+    })();
+
     // Get candidate user ID
     const candidateProfile = await CandidateProfile.findById(this.candidateId);
     if (candidateProfile && candidateProfile.userId) {
       await NotificationService.notifyInterviewScheduled(
         candidateProfile.userId.toString(),
         this._id.toString(),
-        this.jobId.toString(),
+        jobIdStr,
         interviewData.scheduledAt || new Date(),
         'candidate'
       );
     }
     
     // Get employer user ID
-    const job = await Job.findById(this.jobId);
+    const job = await Job.findById(jobIdStr);
     if (job && job.employer) {
       const employerProfile = await EmployerProfile.findById(job.employer);
       if (employerProfile && employerProfile.owner) {
         await NotificationService.notifyInterviewScheduled(
           employerProfile.owner.toString(),
           this._id.toString(),
-          this.jobId.toString(),
+          jobIdStr,
           interviewData.scheduledAt || new Date(),
           'employer'
         );
