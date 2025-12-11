@@ -242,49 +242,8 @@ export default function ProfilePage() {
                   </Badge>
                 </div>
 
-                {/* Profile Completion */}
-                {profile?.progress && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gray-700">
-                        Hoàn thiện hồ sơ
-                      </span>
-                      <span className="text-sm font-bold text-primary">
-                        {profile.progress.profileCompletion}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-primary h-2 rounded-full transition-all duration-300"
-                        style={{
-                          width: `${profile.progress.profileCompletion}%`,
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Job Seeking Status */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">
-                      {settings.jobSeeking
-                        ? "Đang Bật tìm việc"
-                        : "Đang Tắt tìm việc"}
-                    </span>
-                    <Switch
-                      checked={settings.jobSeeking}
-                      onCheckedChange={(checked) =>
-                        handleSettingChange("jobSeeking", checked)
-                      }
-                    />
-                  </div>
-                  <p className="text-xs text-gray-600 leading-relaxed">
-                    Bật tìm việc giúp hồ sơ của bạn nổi bật hơn và được chú ý
-                    nhiều hơn trong danh sách tìm kiếm của NTD.
-                  </p>
-                </div>
-
+                
+                      
                 {/* Profile Visibility */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -297,28 +256,6 @@ export default function ProfilePage() {
                         handleSettingChange("profileVisible", checked)
                       }
                     />
-                  </div>
-                </div>
-
-                {/* Contact Preferences */}
-                <div className="space-y-3">
-                  <h3 className="text-sm font-medium text-foreground">
-                    Khi có cơ hội việc làm phù hợp, NTD sẽ liên hệ và trao đổi
-                    với bạn qua:
-                  </h3>
-                  <div className="space-y-2">
-                    <div className="flex items-center space-x-2">
-                      <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                      <span className="text-xs text-gray-600">
-                        Nhắn tin qua hệ thống InternBridge
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                      <span className="text-xs text-gray-600">
-                        Email và Số điện thoại của bạn
-                      </span>
-                    </div>
                   </div>
                 </div>
               </div>

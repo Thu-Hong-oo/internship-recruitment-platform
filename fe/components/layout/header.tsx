@@ -515,13 +515,6 @@ export default function Header() {
                 Tải lên và quản lý CV
               </Link>
             </div>
-
-            <a
-              href="#"
-              className="text-foreground hover:text-primary transition-colors duration-200"
-            >
-              Cẩm nang nghề nghiệp
-            </a>
           </nav>
 
           {/* User Actions */}
@@ -781,19 +774,13 @@ export default function Header() {
                                 >
                                   <span>Việc làm phù hợp với bạn</span>
                                 </Link>
-                                <Link
-                                  href="#"
-                                  className="flex items-center rounded-md px-2 py-2 hover:bg-muted hover:text-foreground"
-                                >
-                                  <span>Cài đặt gợi ý việc làm</span>
-                                </Link>
                               </div>
                             </AccordionContent>
                           </AccordionItem>
 
                           <AccordionItem value="cv" className="border-0">
                             <AccordionTrigger className="px-2 text-foreground">
-                              Quản lý CV & Cover letter
+                              Quản lý CV
                             </AccordionTrigger>
                             <AccordionContent className="pt-1 pb-2">
                               <div className="space-y-1 text-sm text-muted-foreground">
@@ -802,12 +789,6 @@ export default function Header() {
                                   className="flex items-center rounded-md px-2 py-2 hover:bg-muted hover:text-foreground"
                                 >
                                   <span>CV của tôi</span>
-                                </Link>
-                                <Link
-                                  href="#"
-                                  className="flex items-center rounded-md px-2 py-2 hover:bg-muted hover:text-foreground"
-                                >
-                                  <span>Cover Letter của tôi</span>
                                 </Link>
                                 <Link
                                   href="#"
