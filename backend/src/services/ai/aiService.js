@@ -4447,43 +4447,66 @@ Return ONLY valid JSON (no markdown):
     try {
       const { limit = 10, minScore = 60 } = options;
 
-      if (!job || !candidates || candidates.length === 0) {
-        logger.warn('Invalid input for candidate recommendations', {
+      // Validate job (candidates parameter is kept for backward compatibility but not used)
+      if (!job) {
+        logger.warn('Invalid input for candidate recommendations: job is required', {
           hasJob: !!job,
-          candidatesCount: candidates?.length || 0,
         });
         return [];
       }
 
       // Use NEW candidateRecommendationService.getRecommendations() - self-sufficient
-      const recommendations = await candidateRecommendationService.getRecommendations(
+      // Note: candidateRecommendationService.getRecommendations() is self-sufficient
+      // and fetches candidates internally, so we don't pass candidates array
+      const result = await candidateRecommendationService.getRecommendations(
         job,
-        candidates,
         {
           limit,
           minScore,
-          includeSkillGaps: true,
-          includeTier: true,
+          includeSkillGap: true,
+          tierFilter: ['A', 'B', 'C'],
         }
       );
+      
+      // Extract recommendations from result object
+      const recommendations = result?.recommendations || [];
 
       // Map to legacy format for backward compatibility
-      const validCandidates = recommendations.map((rec, index) => ({
-        candidateId: rec.candidateId,
-        rank: index + 1,
-        score: rec.matchScore,
-        tier: rec.tier,
-        matchDetails: {
-          overall: rec.matchScore,
-          technicalFit: rec.scoreBreakdown?.skills || 0,
-          experienceFit: rec.scoreBreakdown?.experience || 0,
-          educationFit: rec.scoreBreakdown?.education || 0,
-        },
-        strengths: rec.explanation?.split('. ').filter(s => s.includes('Strong') || s.includes('Good')) || [],
-        concerns: rec.skillGaps?.critical?.map(s => `Missing critical skill: ${s}`) || [],
-        skillGaps: rec.skillGaps,
-        interviewQuestions: this.generateInterviewQuestions(job, rec.candidate, { overall: rec.matchScore }),
-      }));
+      const validCandidates = recommendations.map((rec, index) => {
+        // Handle both old format (direct candidateId) and new format (with candidate object)
+        const candidateId = rec.candidateId || rec.candidate?.id || rec.candidate?._id;
+        const candidate = rec.candidate || {};
+        
+        return {
+          candidateId: candidateId,
+          rank: index + 1,
+          score: rec.matchScore || rec.score || 0,
+          tier: rec.tier || 'C',
+          matchDetails: {
+            overall: rec.matchScore || rec.score || 0,
+            technicalFit: rec.scoreBreakdown?.skills || rec.breakdown?.skills?.score || 0,
+            experienceFit: rec.scoreBreakdown?.experience || rec.breakdown?.experience?.score || 0,
+            educationFit: rec.scoreBreakdown?.education || rec.breakdown?.education?.score || 0,
+          },
+          strengths: rec.explanation?.split('. ').filter(s => s.includes('Strong') || s.includes('Good')) || [],
+          concerns: rec.skillGap?.missingSkills?.critical?.map(s => `Missing critical skill: ${s}`) || rec.skillGaps?.critical?.map(s => `Missing critical skill: ${s}`) || [],
+          skillGaps: rec.skillGap || rec.skillGaps,
+          candidate: {
+            id: candidateId,
+            name: candidate.fullName || candidate.name || 'Unknown',
+            email: candidate.email || '',
+            phone: candidate.phone || '',
+            location: candidate.location || '',
+            currentTitle: candidate.currentPosition || candidate.currentTitle || '',
+            yearsExperience: candidate.yearsExperience || 0,
+            education: candidate.education || '',
+            availability: candidate.availability || 'available',
+            expectedSalary: candidate.expectedSalary || null,
+            profileUrl: candidate.profileUrl || `/candidates/${candidateId}`,
+          },
+          interviewQuestions: this.generateInterviewQuestions(job, candidate, { overall: rec.matchScore || rec.score || 0 }),
+        };
+      });
 
       logger.info(`Generated ${validCandidates.length} candidate recommendations using self-sufficient stack`);
       return validCandidates;

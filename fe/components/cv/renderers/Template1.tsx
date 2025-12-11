@@ -315,10 +315,69 @@ export default function Template1Renderer({
     };
   }, []);
 
+  const personalRaw =
+    (data as any).personal ||
+    (data as any).personalInfo ||
+    (data as any).profile ||
+    {};
+  const personal = {
+    name:
+      personalRaw.name || personalRaw.fullName || personalRaw.fullname || "",
+    jobTitle:
+      personalRaw.jobTitle ||
+      personalRaw.position ||
+      personalRaw.title ||
+      personalRaw.targetRole ||
+      "",
+    summary:
+      personalRaw.summary ||
+      personalRaw.bio ||
+      personalRaw.objective ||
+      (data as any).summary ||
+      "",
+    phone: personalRaw.phone || "",
+    email: personalRaw.email || "",
+    website:
+      personalRaw.website ||
+      personalRaw.portfolio ||
+      personalRaw.personalWebsite ||
+      personalRaw.linkedin ||
+      personalRaw.github ||
+      personalRaw.link ||
+      "",
+    address: personalRaw.address || "",
+    avatar: personalRaw.avatar,
+  };
+
+  // Normalize skills (support technical/soft/languages objects)
+  const skillsNormalized: string[] = (() => {
+    const rawBase = (data as any).skills;
+    const raw = Array.isArray(rawBase) ? rawBase : rawBase ? [rawBase] : [];
+    const names: string[] = [];
+    raw.forEach((item: any) => {
+      if (typeof item === "string") {
+        names.push(item);
+      } else if (item?.name) {
+        names.push(item.name);
+      } else {
+        if (Array.isArray(item?.technical)) {
+          item.technical.forEach((t: any) => t?.name && names.push(t.name));
+        }
+        if (Array.isArray(item?.soft)) {
+          item.soft.forEach((t: any) => t?.name && names.push(t.name));
+        }
+        if (Array.isArray(item?.languages)) {
+          item.languages.forEach((t: any) => t?.name && names.push(t.name));
+        }
+      }
+    });
+    return names;
+  })();
+
   const initials =
-    data.personal.name
+    personal.name
       ?.split(" ")
-      .map((w) => w[0])
+      .map((w: string) => w[0])
       .join("")
       .slice(0, 2)
       .toUpperCase() || "NV";
@@ -328,7 +387,7 @@ export default function Template1Renderer({
 
   // Get avatar URL or use default
   const defaultAvatarUrl = "/images/avatar_trang.jpg";
-  const dataAvatar = (data.personal as any).avatar;
+  const dataAvatar = personal.avatar;
   const avatarUrl = previewAvatar || dataAvatar || defaultAvatarUrl;
   const hasCustomAvatar = !!(previewAvatar || dataAvatar);
 
@@ -491,7 +550,7 @@ export default function Template1Renderer({
           <div className="flex flex-col flex-1">
             <InlineText
               path={["personal", "name"]}
-              value={data.personal.name}
+              value={personal.name}
               placeholder="Họ và tên"
               editable={editable}
               onChangeText={onChangeText}
@@ -507,7 +566,7 @@ export default function Template1Renderer({
                 <span className="text-gray-600">📞</span>
                 <InlineText
                   path={["personal", "phone"]}
-                  value={data.personal.phone || ""}
+                  value={personal.phone || ""}
                   placeholder="0123456789"
                   editable={editable}
                   onChangeText={onChangeText}
@@ -519,7 +578,7 @@ export default function Template1Renderer({
                 <span className="text-gray-600">👤</span>
                 <InlineText
                   path={["personal", "jobTitle"]}
-                  value={(data.personal as any).jobTitle || ""}
+                  value={personal.jobTitle || ""}
                   placeholder="Vị trí công việc"
                   editable={editable}
                   onChangeText={onChangeText}
@@ -531,7 +590,7 @@ export default function Template1Renderer({
                 <span className="text-gray-600">📍</span>
                 <InlineText
                   path={["personal", "address"]}
-                  value={data.personal.address || ""}
+                  value={personal.address || ""}
                   placeholder="Địa chỉ"
                   editable={editable}
                   onChangeText={onChangeText}
@@ -555,7 +614,7 @@ export default function Template1Renderer({
                 <span className="text-gray-600">✉️</span>
                 <InlineText
                   path={["personal", "email"]}
-                  value={data.personal.email}
+                  value={personal.email}
                   placeholder="email@example.com"
                   editable={editable}
                   onChangeText={onChangeText}
@@ -584,7 +643,7 @@ export default function Template1Renderer({
             >
               <InlineText
                 path={["personal", "summary"]}
-                value={data.personal.summary || ""}
+                value={personal.summary || ""}
                 placeholder="Trình bày mục tiêu nghề nghiệp..."
                 editable={editable}
                 onChangeText={onChangeText}
@@ -909,7 +968,7 @@ export default function Template1Renderer({
               getSectionTitle={getSectionTitle}
             >
               <div className="flex flex-col gap-3">
-                {(data.skills.length > 0 ? data.skills : [""]).map(
+                {(skillsNormalized.length > 0 ? skillsNormalized : [""]).map(
                   (skill, idx) => {
                     const isActive = isItemActive("skills", idx);
                     return (
@@ -924,7 +983,7 @@ export default function Template1Renderer({
                         <ItemControls
                           section="skills"
                           index={idx}
-                          totalItems={data.skills.length}
+                          totalItems={skillsNormalized.length}
                           editable={editable}
                           onDeleteItem={onDeleteItem}
                           onAddItem={onAddItem}
@@ -1149,7 +1208,7 @@ export default function Template1Renderer({
                         : "transparent",
                   }}
                 >
-                  <SectionWrapper
+                  {/* <SectionWrapper
                     sectionKey="awards"
                     defaultTitle="Danh hiệu và giải thưởng"
                     editable={editable}
@@ -1250,7 +1309,7 @@ export default function Template1Renderer({
                         );
                       })}
                     </div>
-                  </SectionWrapper>
+                  </SectionWrapper> */}
                 </div>
               </div>
             )}
@@ -1290,73 +1349,7 @@ export default function Template1Renderer({
                         ? "#d4d4d4"
                         : "transparent",
                   }}
-                >
-                  <SectionWrapper
-                    sectionKey="hobbies"
-                    defaultTitle="Sở thích"
-                    editable={editable}
-                    onAddItem={onAddItem}
-                    onUpdateSectionTitle={onUpdateSectionTitle}
-                    getSectionTitle={getSectionTitle}
-                  >
-                    <div className="flex flex-col gap-2">
-                      {((data as any).hobbies &&
-                      (data as any).hobbies.length > 0
-                        ? (data as any).hobbies
-                        : [""]
-                      ).map((hobby: string, idx: number) => {
-                        const isActive = isItemActive("hobbies", idx);
-                        return (
-                          <div
-                            key={idx}
-                            className="relative"
-                            onMouseEnter={() =>
-                              editable && setHoveredItem(`hobbies.${idx}`)
-                            }
-                            onMouseLeave={() => setHoveredItem(null)}
-                          >
-                            <ItemControls
-                              section={"hobbies" as any}
-                              index={idx}
-                              totalItems={((data as any).hobbies || []).length}
-                              editable={editable}
-                              onDeleteItem={onDeleteItem}
-                              onAddItem={onAddItem}
-                              onMoveItemUp={onMoveItemUp}
-                              onMoveItemDown={onMoveItemDown}
-                              show={isActive}
-                            />
-                            <div
-                              className={`text-sm flex items-start gap-2 ${
-                                isActive && editable
-                                  ? "border-2 border-dashed rounded p-2"
-                                  : "border-2 border-dashed border-transparent"
-                              } transition-all duration-200 ease-in-out`}
-                              onClick={(e) => e.stopPropagation()}
-                              style={{
-                                borderColor:
-                                  isActive && editable
-                                    ? "#d4d4d4"
-                                    : "transparent",
-                              }}
-                            >
-                              <span className="mr-1">•</span>
-                              <InlineText
-                                path={["hobbies", idx]}
-                                value={hobby || ""}
-                                placeholder="Sở thích"
-                                editable={editable}
-                                onChangeText={onChangeText}
-                                onFocusField={handleFocusField}
-                                onBlurField={handleBlurField}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </SectionWrapper>
-                </div>
+                ></div>
               </div>
             )}
           </div>

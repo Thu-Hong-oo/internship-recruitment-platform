@@ -530,106 +530,76 @@ export default function DashboardPage() {
     originalStatus: s.status, // Keep original for filtering
   })) || [];
 
-  const topJobData = analytics?.applications?.topJobs?.map((j) => ({
+  const topJobData = React.useMemo(() => {
+    const data = analytics?.applications?.topJobs?.map((j: any) => ({
     name: j.title || "Job",
-    value: j.count || 0,
-    jobId: j.jobId || "",
+      value: Number(j.count) || 0,
+      jobId: j.jobId || j._id || "",
   })) || [];
-
-  const industriesData = React.useMemo(() => {
-    const rawData = analytics?.jobs?.byIndustry || [];
-    return rawData
-      .filter((industry) => {
-        if (!industry) return false;
-        const count = typeof industry.count === 'number' ? industry.count : parseInt(String(industry.count || 0)) || 0;
-        return count > 0;
-      })
-      .map((industry) => {
-        // Format name: convert "business-administration" to "Business Administration"
-        const displayName = industry.name
-          ? industry.name
-              .split('-')
-              .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(' ')
-          : industry.name || 'Chưa phân loại';
-        
-        const count = typeof industry.count === 'number' ? industry.count : parseInt(String(industry.count || 0)) || 0;
-        const active = typeof industry.active === 'number' ? industry.active : parseInt(String(industry.active || 0)) || 0;
-        
-        return {
-          ...industry,
-          displayName,
-          count,
-          active,
-        };
-      });
-  }, [analytics?.jobs?.byIndustry]);
-
-  // Get periodDays from backend or use currentPeriod.days as fallback
-  const periodDays = analytics?.periodDays || currentPeriod.days;
-  
+    // Filter out items with value 0 and sort descending
+    const filtered = data
+      .filter(item => item.value > 0 && !isNaN(item.value))
+      .sort((a, b) => b.value - a.value); // Sort descending (largest first)
+    // Debug log
+    console.log('Top jobs chart data:', filtered);
+    console.log('Top jobs sample:', filtered[0]);
+    return filtered;
+  }, [analytics?.applications?.topJobs]);
   // Prepare chart data for industries - calculate directly from analytics
   const industriesChartData = React.useMemo(() => {
     const rawData = analytics?.jobs?.byIndustry || [];
-    if (!rawData || rawData.length === 0) {
-      console.log('No industry data available', { analytics, rawData });
-      return [];
-    }
+  if (!rawData || rawData.length === 0) {
+    return [];
+  }
     
     const processed = rawData
       .map((industry: any) => {
         if (!industry) return null;
         
-        // Ensure count and active are numbers
-        const count = typeof industry.count === 'number' 
-          ? industry.count 
-          : (typeof industry.count === 'string' ? parseInt(industry.count, 10) : Number(industry.count)) || 0;
-        const active = typeof industry.active === 'number' 
-          ? industry.active 
-          : (typeof industry.active === 'string' ? parseInt(industry.active, 10) : Number(industry.active)) || 0;
+      // Parse count and active as numbers
+        const count = Number(industry.count) || 0;
+        const active = Number(industry.active) || 0;
         
-        if (!count || count <= 0 || isNaN(count)) return null;
+      // Skip if no valid count
+      if (count <= 0 || isNaN(count)) return null;
         
         // Format name: convert "business-administration" to "Business Administration"
-        const displayName = industry.name
-          ? industry.name
+      // Use industryCode if name is null
+      const sourceName = industry.name || industry.industryCode || '';
+      const displayName = sourceName
+        ? sourceName
               .split('-')
               .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
               .join(' ')
-          : industry.name || 'Chưa phân loại';
+        : 'Chưa phân loại';
         
-        const result = {
+        return {
           name: displayName.length > 25 ? `${displayName.slice(0, 25)}...` : displayName,
-          value: Number(count), // Ensure it's a number
-          active: Number(active), // Ensure it's a number
+          value: count,
+          active: active,
           fullName: displayName,
           industryCode: industry.industryCode,
           category: industry.category,
         };
-        
-        // Validate the result
-        if (isNaN(result.value) || result.value <= 0) {
-          console.warn('Invalid value in industry data:', industry, result);
-          return null;
-        }
-        
-        return result;
       })
-      .filter((item): item is NonNullable<typeof item> => item !== null && item.value > 0 && !isNaN(item.value))
-      .sort((a, b) => b.value - a.value)
+    .filter((item): item is NonNullable<typeof item> => {
+      return item !== null && item.value > 0 && !isNaN(item.value);
+    })
+    .sort((a, b) => b.value - a.value) // Sort descending (largest first)
       .slice(0, 10);
     
-    console.log('Processed industries chart data:', processed);
-    console.log('Sample data item:', processed[0]);
-    console.log('Data values:', processed.map(d => ({ name: d.name, value: d.value, type: typeof d.value })));
+  // Debug log
+  console.log('Industries chart data processed:', processed);
+  console.log('Industries sample:', processed[0]);
+  console.log('Industries values:', processed.map(item => ({ name: item.name, value: item.value, type: typeof item.value })));
+  
     return processed;
   }, [analytics?.jobs?.byIndustry]);
-  
   // Generate trend data based on selected period
-  const applicationsTrend = generateTrendData(perDayData, periodDays, currentPeriod.groupBy as "day" | "month");
-  const shortlistTrend = generateTrendData(perDayData, periodDays, currentPeriod.groupBy as "day" | "month");
-  const rejectedTrend = generateTrendData(perDayData, periodDays, currentPeriod.groupBy as "day" | "month");
-  const jobsTrend = generateTrendData(perDayData, periodDays, currentPeriod.groupBy as "day" | "month");
+  const applicationsTrend = generateTrendData(perDayData, currentPeriod.days, currentPeriod.groupBy as "day" | "month");
+  const shortlistTrend = generateTrendData(perDayData, currentPeriod.days, currentPeriod.groupBy as "day" | "month");
+  const rejectedTrend = generateTrendData(perDayData, currentPeriod.days, currentPeriod.groupBy as "day" | "month");
+  const jobsTrend = generateTrendData(perDayData, currentPeriod.days, currentPeriod.groupBy as "day" | "month");
 
   // Calculate trends
   const totalApps = analytics?.applications?.total || 0;
@@ -902,16 +872,23 @@ export default function DashboardPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <ReBarChart
                   data={topJobData}
-                  layout="horizontal"
-                  margin={{ top: 8, right: 16, bottom: 8, left: 120 }}
+                  key={`top-jobs-${topJobData.map(d => d.value).join('-')}`}
+                  layout="vertical"
+                  margin={{ top: 10, right: 16, bottom: 10, left: 170 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} />
+                  <XAxis 
+                    type="number"
+                    allowDecimals={false}
+                    tick={{ fontSize: 12 }}
+                    domain={[0, 'dataMax']}
+                  />
                   <YAxis 
                     type="category" 
                     dataKey="name" 
                     tick={{ fontSize: 11 }}
-                    width={110}
+                    width={160}
+                    interval={0}
                     tickFormatter={truncateLabel}
                   />
                   <Tooltip 
@@ -921,11 +898,12 @@ export default function DashboardPage() {
                   <Bar 
                     dataKey="value" 
                     fill="#008e92" 
-                    radius={[8, 8, 0, 0]}
-                    cursor="pointer"
-                    onClick={(data: any) => {
-                      if (data?.jobId) {
-                        router.push(`/jobs/${data.jobId}/applications`);
+                    radius={[0, 8, 8, 0]}
+                    barSize={20}
+                    onClick={(_, index: number) => {
+                      const item = topJobData[index];
+                      if (item?.jobId) {
+                        router.push(`/jobs/${item.jobId}/applications`);
                       }
                     }}
                   />
@@ -955,57 +933,56 @@ export default function DashboardPage() {
             {industriesChartData && industriesChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <ReBarChart
-                  key={`industries-chart-${industriesChartData.length}-${industriesChartData[0]?.value || 0}`}
-                  data={industriesChartData.map(item => ({
-                    ...item,
-                    value: Number(item.value) // Ensure value is definitely a number
-                  }))}
-                  layout="horizontal"
-                  margin={{ top: 8, right: 16, bottom: 8, left: 140 }}
+                  data={industriesChartData}
+                  key={`industries-${industriesChartData.map(d => d.value).join('-')}`}
+                  layout="vertical"
+                  margin={{ top: 10, right: 16, bottom: 10, left: 190 }}
                 >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                    <XAxis 
-                      type="number" 
-                      allowDecimals={false} 
-                      tick={{ fontSize: 12 }}
-                    />
-                    <YAxis 
-                      type="category" 
-                      dataKey="name" 
-                      tick={{ fontSize: 11 }}
-                      width={130}
-                      interval={0}
-                    />
-                    <Tooltip 
-                      contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }}
-                      formatter={(value: any, name: string, props: any) => {
-                        if (name === "value") {
-                          return [`${value} bài đăng (${props.payload.active} đang mở)`, "Tổng số"];
-                        }
-                        return value;
-                      }}
-                      labelFormatter={(label) => `Ngành: ${label}`}
-                    />
-                    <Bar 
-                      dataKey="value" 
-                      fill="#008e92" 
-                      radius={[0, 4, 4, 0]}
-                      cursor="pointer"
-                      onClick={(data: any) => {
-                        if (!data) return;
-                        const params = new URLSearchParams();
-                        if (data.industryCode) {
-                          params.set("industryCode", data.industryCode);
-                        } else if (data.category) {
-                          params.set("category", data.category);
-                        }
-                        if (params.toString()) {
-                          router.push(`/jobs?${params.toString()}`);
-                        }
-                      }}
-                    />
-                  </ReBarChart>
-                </ResponsiveContainer>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis 
+                    type="number" 
+                    allowDecimals={false} 
+                    tick={{ fontSize: 12 }}
+                    domain={[0, 'dataMax']}
+                  />
+                  <YAxis 
+                    type="category" 
+                    dataKey="name" 
+                    tick={{ fontSize: 11 }}
+                    width={180}
+                    interval={0}
+                  />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0" }}
+                    formatter={(value: any, name: string, props: any) => {
+                      if (name === "value") {
+                        return [`${value} bài đăng (${props.payload.active} đang mở)`, "Tổng số"];
+                      }
+                      return value;
+                    }}
+                    labelFormatter={(label) => `Ngành: ${label}`}
+                  />
+                  <Bar 
+                    dataKey="value" 
+                    fill="#008e92" 
+                    radius={[0, 8, 8, 0]}
+                    barSize={18}
+                    onClick={(_, index: number) => {
+                      const item = industriesChartData[index];
+                      if (!item) return;
+                      const params = new URLSearchParams();
+                      if (item.industryCode) {
+                        params.set("industryCode", item.industryCode);
+                      } else if (item.category) {
+                        params.set("category", item.category);
+                      }
+                      if (params.toString()) {
+                        router.push(`/jobs?${params.toString()}`);
+                      }
+                    }}
+                  />
+                </ReBarChart>
+              </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground">
                 <div className="text-center">

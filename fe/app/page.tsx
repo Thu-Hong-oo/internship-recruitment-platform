@@ -9,45 +9,172 @@ import {
   Settings,
   CheckCircle2,
   FileText,
-  BarChart3,
   User,
   Bell,
   Heart,
-  Briefcase,
-  Circle,
-  Sparkles,
   Bookmark,
-  TrendingUp,
-  Target,
-  GraduationCap,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { api } from "@/lib/api";
+import CVPreview from "@/components/cv/CVPreview";
+import { api, candidateService } from "@/lib/api";
 import { savedJobService } from "@/lib/api";
 import type { SavedJob } from "@/lib/api/services/savedJob.service";
+import type { CVData } from "@/lib/mocks/cvSamples";
+import type { ApplicationStatusStat } from "@/lib/api";
 import { getNotifications } from "@/lib/notificationAPI";
 import { AINavigationInput } from "@/components/ai/AINavigationInput";
+import { useToast } from "@/components/ui/use-toast";
+import { ToastAction } from "@/components/ui/toast";
+
+const TEMPLATE_ID_MAP: Record<string, number> = {
+  modern: 1,
+  minimal: 2,
+};
+
+const normalizeContentToCVData = (
+  content: any,
+  templateKey: string
+): CVData => {
+  const templateNum = TEMPLATE_ID_MAP[templateKey] || 1;
+
+  if (content?.personal && typeof content.personal === "object") {
+    return {
+      ...(content as CVData),
+      templateId: content.templateId ?? templateNum,
+    };
+  }
+
+  const personalInfo = content?.personalInfo || {};
+  const skillsRaw = content?.skills || [];
+  const skillsFlattened: string[] = [];
+  const addSkills = (arr: any[]) => {
+    if (!Array.isArray(arr)) return;
+    arr.forEach((s) => {
+      if (typeof s === "string") {
+        skillsFlattened.push(s);
+      } else if (s?.name) {
+        skillsFlattened.push(s.name);
+      }
+    });
+  };
+  if (Array.isArray(skillsRaw)) {
+    skillsRaw.forEach((item: any) => {
+      addSkills(item?.technical || []);
+      addSkills(item?.soft || []);
+      addSkills(item?.languages || []);
+    });
+  } else if (skillsRaw) {
+    addSkills(skillsRaw.technical || []);
+    addSkills(skillsRaw.soft || []);
+    addSkills(skillsRaw.languages || []);
+  }
+
+  return {
+    personal: {
+      name: personalInfo.fullName || "",
+      email: personalInfo.email || "",
+      phone: personalInfo.phone || "",
+      address:
+        typeof personalInfo.address === "string"
+          ? personalInfo.address
+          : personalInfo.address?.street || "",
+      summary:
+        content?.summary ||
+        personalInfo.summary ||
+        personalInfo.bio ||
+        personalInfo.objective ||
+        "",
+      avatar: personalInfo.avatar || undefined,
+      jobTitle:
+        personalInfo.jobTitle ||
+        personalInfo.position ||
+        personalInfo.title ||
+        personalInfo.targetRole ||
+        "",
+      website:
+        personalInfo.website ||
+        personalInfo.portfolio ||
+        personalInfo.personalWebsite ||
+        personalInfo.linkedin ||
+        personalInfo.github ||
+        personalInfo.link ||
+        "",
+    },
+    experience: (content?.experience || []).map((exp: any) => ({
+      company: exp.company || "",
+      role: exp.position || "",
+      startDate: exp.startDate || "",
+      endDate: exp.endDate || "",
+      description: exp.description || "",
+    })),
+    education: (content?.education || []).map((edu: any) => ({
+      school: edu.institution || edu.school || "",
+      degree: edu.degree || "",
+      startDate: edu.startYear || edu.startDate || "",
+      endDate: edu.endYear || edu.endDate || "",
+    })),
+    skills: skillsFlattened,
+    templateId: templateNum,
+    projects: (content?.projects || []).map((proj: any) => ({
+      title: proj.title || "",
+      description: proj.description || "",
+    })),
+    languages: (content?.skills?.languages || []).map((lang: any) => ({
+      name: typeof lang === "string" ? lang : lang.language || lang.name || "",
+      level: lang.level || "",
+    })),
+    certifications: (content?.certifications || []).map((cert: any) => ({
+      name: cert.name || "",
+      issuer: cert.issuer || "",
+      year: cert.issueDate || cert.year || "",
+    })),
+  };
+};
 
 export default function DashboardPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const [matchRate, setMatchRate] = useState(75);
-  const [cvCount, setCvCount] = useState(2);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [appliedJobsCount, setAppliedJobsCount] = useState(3);
-  const [submittedCvsCount, setSubmittedCvsCount] = useState(2);
   const [unreadNotifications, setUnreadNotifications] = useState(4);
   const [savedJobsCount, setSavedJobsCount] = useState(0);
   const [savedJobsList, setSavedJobsList] = useState<SavedJob[]>([]);
   const [onlineCvs, setOnlineCvs] = useState<
     Array<{ templateId: string; resumeId: string; templateName: string }>
   >([]);
+  const [cvDataMap, setCvDataMap] = useState<Record<string, CVData>>({});
+  const [loadingCVs, setLoadingCVs] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingSavedJobs, setLoadingSavedJobs] = useState(false);
+  const [loadingStatusStats, setLoadingStatusStats] = useState(false);
+  const [applicationStatusStats, setApplicationStatusStats] = useState<
+    ApplicationStatusStat[]
+  >([]);
+  const [profileCompletion, setProfileCompletion] = useState(0);
+  const [upcomingDeadlines, setUpcomingDeadlines] = useState<SavedJob[]>([]);
+  const [prevUnreadCount, setPrevUnreadCount] = useState<number | null>(null);
+  const { toast } = useToast();
+
+  // Kiểm tra token ngay lập tức khi component mount
+  useEffect(() => {
+    const token =
+      typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (!token) {
+      router.push("/home");
+      return;
+    }
+    setIsAuthenticated(true);
+  }, [router]);
 
   useEffect(() => {
+    // Chỉ fetch data khi đã xác thực
+    if (!isAuthenticated) return;
+
     const token =
       typeof window !== "undefined" ? localStorage.getItem("token") : null;
     if (!token) {
@@ -59,15 +186,6 @@ export default function DashboardPage() {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-
-        // Fetch CVs count
-        const resumesRes = await api.candidateCV.getResumesAll();
-        if (resumesRes?.success && resumesRes.data) {
-          const current = (resumesRes.data as any).current;
-          const history = (resumesRes.data as any).history || [];
-          const totalCvs = (current ? 1 : 0) + history.length;
-          setCvCount(totalCvs);
-        }
 
         // Fetch applied jobs count
         const applicationsRes = await api.candidateCV.getApplications({
@@ -84,21 +202,106 @@ export default function DashboardPage() {
           limit: 1,
         });
         if (notificationsRes?.success) {
-          setUnreadNotifications(notificationsRes.unreadCount || 0);
+          const newUnread = notificationsRes.unreadCount || 0;
+          setUnreadNotifications(newUnread);
+
+          const hasInitial = prevUnreadCount !== null;
+          if (hasInitial && newUnread > (prevUnreadCount ?? 0)) {
+            const latestUnread =
+              notificationsRes.data?.find((n: any) => !n.isRead) ||
+              notificationsRes.data?.[0];
+
+            toast({
+              title: "Có thông báo mới",
+              description:
+                latestUnread?.title ||
+                `Bạn có ${newUnread} thông báo chưa đọc.`,
+              action: (
+                <ToastAction
+                  altText="Xem thông báo"
+                  onClick={() => router.push("/notifications")}
+                >
+                  Xem
+                </ToastAction>
+              ),
+            });
+          }
+
+          setPrevUnreadCount(newUnread);
         }
 
-        // Fetch saved jobs (3 latest)
-        const savedJobsRes = await api.savedJobs.getSavedJobs({ limit: 3 });
-        if (savedJobsRes?.success) {
-          if (savedJobsRes.pagination) {
-            setSavedJobsCount(savedJobsRes.pagination.total || 0);
+        // Fetch saved jobs (3 latest) - separate loading
+        setLoadingSavedJobs(true);
+        let savedJobsRes: any = null;
+        try {
+          savedJobsRes = await api.savedJobs.getSavedJobs({ limit: 3 });
+          if (savedJobsRes?.success) {
+            if (savedJobsRes.pagination) {
+              setSavedJobsCount(savedJobsRes.pagination.total || 0);
+            }
+            if (savedJobsRes.data) {
+              setSavedJobsList(savedJobsRes.data.slice(0, 3));
+            }
           }
-          if (savedJobsRes.data) {
-            setSavedJobsList(savedJobsRes.data.slice(0, 3));
-          }
+        } catch (err) {
+          console.error("Error fetching saved jobs:", err);
+        } finally {
+          setLoadingSavedJobs(false);
         }
 
-        // Fetch CV online (ResumeBuilder CVs)
+        // Fetch profile completion
+        const profileRes = await api.candidateCV.getMeRaw();
+        if (profileRes?.success && profileRes.data) {
+          const completion = profileRes.data.progress?.profileCompletion || 0;
+          setProfileCompletion(completion);
+        }
+
+        // Fetch application status statistics (candidate)
+        try {
+          setLoadingStatusStats(true);
+          const statusStatsRes =
+            await api.candidateCV.getApplicationStatusStats();
+          if (
+            statusStatsRes?.success &&
+            Array.isArray(statusStatsRes.data?.stats)
+          ) {
+            setApplicationStatusStats(statusStatsRes.data.stats);
+          } else {
+            setApplicationStatusStats([]);
+          }
+        } catch (err) {
+          console.error("Error fetching application status stats:", err);
+          setApplicationStatusStats([]);
+        } finally {
+          setLoadingStatusStats(false);
+        }
+
+        // Filter saved jobs with upcoming deadlines (within 7 days)
+        if (savedJobsRes?.success && savedJobsRes.data) {
+          const now = new Date();
+          const sevenDaysLater = new Date(
+            now.getTime() + 7 * 24 * 60 * 60 * 1000
+          );
+
+          const upcoming = savedJobsRes.data.filter((savedJob: any) => {
+            const deadline = savedJob.jobId?.deadline;
+            if (!deadline) return false;
+            const deadlineDate = new Date(deadline);
+            return deadlineDate >= now && deadlineDate <= sevenDaysLater;
+          });
+
+          // Sort by deadline (soonest first)
+          upcoming.sort((a: any, b: any) => {
+            const dateA = new Date(a.jobId?.deadline || 0).getTime();
+            const dateB = new Date(b.jobId?.deadline || 0).getTime();
+            return dateA - dateB;
+          });
+
+          setUpcomingDeadlines(upcoming.slice(0, 5)); // Top 5
+        }
+
+        // Fetch CV online (ResumeBuilder CVs) - Progressive loading
+        // Load template map first to show CV list immediately
         const templateMapRes = await api.candidateCV.getTemplateResumeMap();
         if (templateMapRes?.success && templateMapRes.data?.map) {
           const map = templateMapRes.data.map;
@@ -136,7 +339,47 @@ export default function DashboardPage() {
             });
           }
 
+          // Hiển thị CV list ngay lập tức (không cần đợi preview)
           setOnlineCvs(cvList.slice(0, 3)); // Hiển thị tối đa 3 CV
+
+          // Load preview data in background (non-blocking)
+          if (cvList.length > 0) {
+            setLoadingCVs(true);
+            // Load previews asynchronously without blocking
+            Promise.all(
+              cvList.slice(0, 3).map(async ({ resumeId, templateId }) => {
+                try {
+                  const resumeRes = await candidateService.getResumeById(
+                    resumeId
+                  );
+                  if (resumeRes?.success && resumeRes.data?.content) {
+                    return {
+                      resumeId,
+                      data: normalizeContentToCVData(
+                        resumeRes.data.content,
+                        templateId
+                      ),
+                    };
+                  }
+                } catch (err) {
+                  console.error(`Không thể tải dữ liệu CV ${resumeId}:`, err);
+                }
+                return null;
+              })
+            )
+              .then((previewResults) => {
+                const newMap: Record<string, CVData> = {};
+                previewResults.forEach((result) => {
+                  if (result) {
+                    newMap[result.resumeId] = result.data;
+                  }
+                });
+                setCvDataMap(newMap);
+              })
+              .finally(() => {
+                setLoadingCVs(false);
+              });
+          }
         }
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
@@ -146,53 +389,83 @@ export default function DashboardPage() {
     };
 
     fetchDashboardData();
-  }, [router]);
+  }, [router, isAuthenticated]);
+
+  // Không render nếu chưa xác thực
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const userName = user?.fullName || user?.firstName || "Ứng Viên";
-
-  // Calculate progress circle
-  const radius = 50;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (matchRate / 100) * circumference;
 
   const primaryColor = "oklch(0.60 0.12 195)";
   const primaryGradient = `linear-gradient(135deg, ${primaryColor} 0%, oklch(0.72 0.08 210) 55%, oklch(0.88 0.03 195) 100%)`;
 
+  const totalApplications = applicationStatusStats.reduce(
+    (sum, item) => sum + (item.count || 0),
+    0
+  );
+
+  const statusLabel = (status: string) => {
+    const map: Record<string, string> = {
+      pending: "Đang chờ",
+      reviewing: "Đang duyệt",
+      shortlisted: "Shortlist",
+      interview: "Phỏng vấn",
+      offer: "Offer",
+      accepted: "Đã nhận offer",
+      rejected: "Từ chối",
+      withdrawn: "Đã rút",
+      hired: "Đã nhận",
+    };
+    return map[status] || status || "Không xác định";
+  };
+
+  const statusColors: Record<string, string> = {
+    pending: "#3b82f6",
+    reviewing: "#06b6d4",
+    shortlisted: "#8b5cf6",
+    interview: "#f97316",
+    offer: "#22c55e",
+    accepted: "#16a34a",
+    rejected: "#ef4444",
+    withdrawn: "#94a3b8",
+    hired: "#0ea5e9",
+  };
+
+  const fallbackColors = [
+    "#6366f1",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#0ea5e9",
+    "#14b8a6",
+    "#a855f7",
+    "#f97316",
+  ];
+
+  const buildDonutGradient = () => {
+    if (totalApplications <= 0 || applicationStatusStats.length === 0) {
+      return "#e5e7eb 0% 100%";
+    }
+    let start = 0;
+    const segments: string[] = [];
+    applicationStatusStats.forEach((item, idx) => {
+      const pct =
+        totalApplications > 0 ? (item.count / totalApplications) * 100 : 0;
+      const color =
+        statusColors[item.status] ||
+        fallbackColors[idx % fallbackColors.length];
+      const end = start + pct;
+      segments.push(`${color} ${start}% ${end}%`);
+      start = end;
+    });
+    return `conic-gradient(${segments.join(", ")})`;
+  };
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,oklch(0.97_0.02_210)_0%,white_30%)]">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-white/40 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between gap-4">
-            {/* Logo */}
-            <Link href="/home" className="flex items-center gap-3">
-              <span className="text-xl font-bold text-slate-900">
-                InternBridge
-              </span>
-            </Link>
-
-            {/* AI Navigation Input */}
-            <div className="flex-1 max-w-2xl">
-              <AINavigationInput
-                frontend="fe"
-                placeholder="Nhập hoặc nói điều bạn muốn làm... (ví dụ: tìm việc IT ở Sài Gòn, về trang chủ)"
-                className="w-full"
-              />
-            </div>
-
-            {/* Settings Icon */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="w-10 h-10"
-              onClick={() => router.push("/profile")}
-            >
-              <Settings className="w-5 h-5" style={{ color: primaryColor }} />
-            </Button>
-          </div>
-        </div>
-      </header>
-
       {/* Welcome Banner */}
       <div
         className="relative overflow-hidden"
@@ -217,6 +490,15 @@ export default function DashboardPage() {
                 Quản lý hồ sơ và theo dõi ứng tuyển của bạn
               </p>
             </div>
+            {/* AI Navigation Input */}
+            <div className="flex-1 max-w-2xl">
+              <AINavigationInput
+                frontend="fe"
+                placeholder="Nhập hoặc nói điều bạn muốn làm... (ví dụ: tìm việc IT ở Sài Gòn, về trang chủ)"
+                className="w-full"
+                variant="banner"
+              />
+            </div>
             <Button
               onClick={() => router.push("/home")}
               className="bg-white text-[oklch(0.60_0.12_195)] hover:bg-white/95 font-semibold shadow-lg"
@@ -238,67 +520,151 @@ export default function DashboardPage() {
           style={{ animation: "float 25s ease-in-out infinite reverse" }}
         />
         <div className="relative z-10 max-w-7xl mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left Column - AI Profile Overview & Analytics */}
-            <div className="lg:col-span-3 space-y-6">
-              {/* AI Profile Overview */}
-              <Card className="border-white/40 bg-white/70 backdrop-blur-xl shadow-[0_20px_50px_rgba(15,45,95,0.08)]">
-                <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold text-slate-900 mb-4">
-                    Tổng Quan Hồ Sơ AI
+          {/* Profile Completion */}
+          {profileCompletion > 0 && profileCompletion < 100 && (
+            <Card className="border-white/40 bg-white/70 backdrop-blur-xl shadow-[0_20px_50px_rgba(15,45,95,0.08)] mb-6">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold text-slate-900">
+                    Hoàn thiện hồ sơ
                   </h3>
-                  <div className="flex flex-col items-center justify-center">
-                    <div className="relative w-32 h-32 mb-4">
-                      <svg
-                        className="transform -rotate-90 w-32 h-32"
-                        viewBox="0 0 120 120"
-                      >
-                        <circle
-                          cx="60"
-                          cy="60"
-                          r={radius}
-                          stroke="currentColor"
-                          strokeWidth="12"
-                          fill="none"
-                          className="text-slate-200"
-                        />
-                        <circle
-                          cx="60"
-                          cy="60"
-                          r={radius}
-                          stroke="currentColor"
-                          strokeWidth="12"
-                          fill="none"
-                          strokeDasharray={circumference}
-                          strokeDashoffset={offset}
-                          strokeLinecap="round"
-                          style={{ color: primaryColor }}
-                          className="transition-all duration-500"
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-2xl font-bold text-slate-900">
-                          {matchRate}%
-                        </span>
-                      </div>
-                    </div>
-                    <p className="text-sm font-medium text-slate-600">
-                      Độ Phù Hợp
-                    </p>
-                  </div>
+                  <span className="text-sm font-semibold text-slate-600">
+                    {profileCompletion}%
+                  </span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
                   <div
-                    onClick={() => router.push("/search")}
-                    className="flex items-center space-x-2 text-[oklch(0.60_0.12_195)] hover:text-[oklch(0.55_0.12_195)] cursor-pointer transition-all duration-300 group"
-                  >
-                    <span className="text-sm font-semibold">Xem tất cả</span>
-                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1.5 transition-transform duration-300" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${profileCompletion}%`,
+                      background: primaryGradient,
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  Hoàn thiện hồ sơ để tăng cơ hội được nhà tuyển dụng chú ý
+                </p>
+                <Button
+                  onClick={() => router.push("/profile")}
+                  variant="ghost"
+                  size="sm"
+                  className="mt-3 text-xs"
+                  style={{ color: primaryColor }}
+                >
+                  Hoàn thiện ngay →
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Middle Column - Job Applications & Submitted CVs */}
-            <div className="lg:col-span-6 space-y-6">
+            <div className="lg:col-span-8 space-y-6">
+              {/* Upcoming Deadlines */}
+              {upcomingDeadlines.length > 0 && (
+                <Card className="border-white/40 bg-white/70 backdrop-blur-xl shadow-[0_20px_50px_rgba(15,45,95,0.08)]">
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-slate-900">
+                        Deadline sắp đến
+                      </h3>
+                      <Badge
+                        className="border-none"
+                        style={{
+                          background: `oklch(0.60 0.12 195 / 0.15)`,
+                          color: primaryColor,
+                        }}
+                      >
+                        {upcomingDeadlines.length} việc
+                      </Badge>
+                    </div>
+                    <div className="space-y-3">
+                      {upcomingDeadlines.map((savedJob) => {
+                        const job = savedJob.jobId;
+                        if (!job) return null;
+                        const deadline = job.deadline
+                          ? new Date(job.deadline)
+                          : null;
+                        const now = new Date();
+                        const daysLeft = deadline
+                          ? Math.ceil(
+                              (deadline.getTime() - now.getTime()) /
+                                (1000 * 60 * 60 * 24)
+                            )
+                          : null;
+                        const isUrgent = daysLeft !== null && daysLeft < 3;
+
+                        return (
+                          <Link
+                            key={savedJob._id}
+                            href={`/jobs/${job._id}`}
+                            className="block"
+                          >
+                            <div
+                              className={`flex items-center justify-between p-3 rounded-lg transition-colors hover:shadow-md ${
+                                isUrgent
+                                  ? "bg-red-50 border border-red-200"
+                                  : "bg-orange-50 border border-orange-200"
+                              }`}
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-slate-900 truncate">
+                                  {job.title}
+                                </p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-xs text-slate-600">
+                                    {job.employer?.company?.name ||
+                                      "Nhà tuyển dụng"}
+                                  </span>
+                                  {deadline && (
+                                    <>
+                                      <span className="text-xs text-slate-400">
+                                        •
+                                      </span>
+                                      <span
+                                        className={`text-xs font-semibold ${
+                                          isUrgent
+                                            ? "text-red-600"
+                                            : "text-orange-600"
+                                        }`}
+                                      >
+                                        {daysLeft === 0
+                                          ? "Hôm nay"
+                                          : daysLeft === 1
+                                          ? "Ngày mai"
+                                          : `${daysLeft} ngày nữa`}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <Badge
+                                className={`border-none flex-shrink-0 ${
+                                  isUrgent
+                                    ? "bg-red-500 text-white"
+                                    : "bg-orange-500 text-white"
+                                }`}
+                              >
+                                {isUrgent ? "Gấp" : "Sắp đến"}
+                              </Badge>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                    <Link href="/jobs/saved-jobs">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full mt-4"
+                        style={{ color: primaryColor }}
+                      >
+                        Xem tất cả →
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Saved Jobs Waiting */}
               <Card className="border-white/40 bg-white/70 backdrop-blur-xl shadow-[0_20px_50px_rgba(15,45,95,0.08)]">
@@ -314,10 +680,23 @@ export default function DashboardPage() {
                     </Link>
                   </div>
                   <div className="space-y-3">
-                    {loading ? (
-                      <div className="text-center py-4 text-slate-500">
-                        Đang tải...
-                      </div>
+                    {loadingSavedJobs ? (
+                      // Skeleton loading for saved jobs
+                      Array.from({ length: 3 }).map((_, idx) => (
+                        <div
+                          key={`skeleton-${idx}`}
+                          className="flex items-center justify-between p-3 rounded-lg border border-slate-200/70 bg-white/60 animate-pulse"
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="w-5 h-5 rounded-full bg-slate-200 flex-shrink-0" />
+                            <div className="flex-1 min-w-0 space-y-2">
+                              <div className="h-4 bg-slate-200 rounded w-3/4" />
+                              <div className="h-3 bg-slate-200 rounded w-1/2" />
+                            </div>
+                          </div>
+                          <div className="w-16 h-6 bg-slate-200 rounded flex-shrink-0" />
+                        </div>
+                      ))
                     ) : savedJobsList.length > 0 ? (
                       savedJobsList.map((savedJob) => {
                         const job = savedJob.jobId;
@@ -375,7 +754,9 @@ export default function DashboardPage() {
                       })
                     ) : (
                       <div className="text-center py-4 text-slate-500">
-                        Chưa có việc làm đã lưu
+                        {loadingSavedJobs
+                          ? "Đang tải việc làm đã lưu..."
+                          : "Chưa có việc làm đã lưu"}
                       </div>
                     )}
                   </div>
@@ -395,46 +776,92 @@ export default function DashboardPage() {
                       </Button>
                     </Link>
                   </div>
-                  <div className="space-y-3">
-                    {loading ? (
-                      <div className="text-center py-4 text-slate-500">
-                        Đang tải...
+                  <div className="space-y-4">
+                    {loading && onlineCvs.length === 0 ? (
+                      // Skeleton loading for CV Online (only on initial load)
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {Array.from({ length: 2 }).map((_, idx) => (
+                          <div
+                            key={`cv-skeleton-${idx}`}
+                            className="overflow-hidden rounded-xl border border-slate-200/70 bg-white/80 animate-pulse"
+                          >
+                            <div className="relative w-full aspect-[3/4] bg-slate-200" />
+                            <div className="p-3 space-y-2">
+                              <div className="h-4 bg-slate-200 rounded w-2/3" />
+                              <div className="h-3 bg-slate-200 rounded w-1/2" />
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     ) : onlineCvs.length > 0 ? (
-                      onlineCvs.map((cv) => (
-                        <Link
-                          key={cv.resumeId}
-                          href={`/my-cv/new?template=${cv.templateId}&resumeId=${cv.resumeId}`}
-                          className="block"
-                        >
-                          <div
-                            className="flex items-center justify-between p-3 rounded-lg transition-colors hover:shadow-md"
-                            style={{
-                              background:
-                                "linear-gradient(135deg, oklch(0.60 0.12 195 / 0.08) 0%, transparent 70%)",
-                            }}
-                          >
-                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                              <FileText
-                                className="w-5 h-5 flex-shrink-0"
-                                style={{ color: primaryColor }}
-                              />
-                              <span className="text-sm font-medium text-slate-700 truncate">
-                                {cv.templateName}
-                              </span>
-                            </div>
-                            <Badge
-                              className="border-none flex-shrink-0"
-                              style={{
-                                background: `oklch(0.60 0.12 195 / 0.15)`,
-                                color: primaryColor,
-                              }}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {onlineCvs.map((cv) => {
+                          const cvData = cvDataMap[cv.resumeId];
+                          const hasPreview = !!cvData;
+
+                          return (
+                            <Link
+                              key={cv.resumeId}
+                              href={`/my-cv/new?template=${cv.templateId}&resumeId=${cv.resumeId}`}
+                              className="block group"
                             >
-                              Online
-                            </Badge>
-                          </div>
-                        </Link>
-                      ))
+                              <div className="overflow-hidden rounded-xl border border-slate-200/70 bg-white/80 transition-all duration-300 hover:shadow-lg hover:border-primary/40">
+                                <div className="relative w-full aspect-[3/4] bg-muted/40 overflow-hidden">
+                                  {hasPreview ? (
+                                    <div className="w-full h-full overflow-hidden bg-white relative">
+                                      <CVPreview
+                                        data={cvData}
+                                        templateId={cv.templateId}
+                                      />
+                                      <div className="absolute top-3 left-3">
+                                        <Badge className="bg-emerald-600/90 text-white border-none px-2.5 py-1 text-[11px] font-medium backdrop-blur">
+                                          CV của bạn
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                  ) : loadingCVs ? (
+                                    <div className="flex h-full items-center justify-center text-slate-500">
+                                      <Loader2 className="h-6 w-6 animate-spin" />
+                                    </div>
+                                  ) : (
+                                    <div className="flex h-full flex-col items-center justify-center gap-2 text-slate-500">
+                                      <FileText
+                                        className="w-8 h-8"
+                                        style={{ color: primaryColor }}
+                                      />
+                                      <span className="text-sm">
+                                        {cv.templateName}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="p-3">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <div className="font-semibold text-sm text-slate-900 truncate">
+                                        {cv.templateName}
+                                      </div>
+                                      <p className="text-[11px] uppercase tracking-[0.16em] text-slate-500">
+                                        InternBridge · CV Builder
+                                      </p>
+                                    </div>
+                                    <Badge
+                                      className="border-none flex-shrink-0"
+                                      style={{
+                                        background: `oklch(0.60 0.12 195 / 0.15)`,
+                                        color: primaryColor,
+                                      }}
+                                    >
+                                      Online
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </div>
+                            </Link>
+                          );
+                        })}
+                      </div>
                     ) : (
                       <div className="text-center py-4 text-slate-500">
                         Chưa có CV online.{" "}
@@ -453,7 +880,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Right Column - Sidebar Navigation */}
-            <div className="lg:col-span-3">
+            <div className="lg:col-span-4">
               <Card className="border-white/40 bg-white/70 backdrop-blur-xl shadow-[0_20px_50px_rgba(15,45,95,0.08)]">
                 <CardContent className="p-6">
                   <h3 className="text-lg font-semibold text-slate-900 mb-4">
@@ -503,7 +930,7 @@ export default function DashboardPage() {
                     </Link>
                     <Link
                       href="/applied-jobs"
-                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-[oklch(0.60_0.12_195/.08)] transition-colors"
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-[oklch(0.60_0.12_195/.08)] transition-colors relative"
                     >
                       <CheckCircle2
                         className="w-5 h-5"
@@ -512,6 +939,11 @@ export default function DashboardPage() {
                       <span className="text-sm font-medium text-slate-700">
                         Việc Làm Đã Ứng Tuyển
                       </span>
+                      {appliedJobsCount > 0 && (
+                        <span className="ml-auto w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center font-semibold">
+                          {appliedJobsCount > 99 ? "99+" : appliedJobsCount}
+                        </span>
+                      )}
                     </Link>
                     <Link
                       href="/profile"
@@ -522,10 +954,99 @@ export default function DashboardPage() {
                         style={{ color: primaryColor }}
                       />
                       <span className="text-sm font-medium text-slate-700">
-                        Quản Lý Thông Tin Tài Khoản
+                        Quản Lý Tài Khoản
                       </span>
                     </Link>
                   </nav>
+                </CardContent>
+              </Card>
+
+              {/* Application Status Statistics */}
+              <Card className="mt-4 border-white/40 bg-white/70 backdrop-blur-xl shadow-[0_20px_50px_rgba(15,45,95,0.08)]">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-slate-900">
+                      Trạng thái ứng tuyển
+                    </h3>
+                    <Badge
+                      className="border-none"
+                      style={{
+                        background: `oklch(0.60 0.12 195 / 0.15)`,
+                        color: primaryColor,
+                      }}
+                    >
+                      {loadingStatusStats
+                        ? "Đang tải..."
+                        : `${totalApplications} đơn`}
+                    </Badge>
+                  </div>
+                  {loadingStatusStats ? (
+                    <div className="flex items-center justify-center py-6 text-slate-500">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    </div>
+                  ) : applicationStatusStats.length === 0 ? (
+                    <div className="text-center text-slate-500">
+                      Chưa có dữ liệu ứng tuyển
+                    </div>
+                  ) : (
+                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                      <div className="flex items-center justify-center w-full lg:w-auto">
+                        <div
+                          className="relative"
+                          style={{ width: 190, height: 190 }}
+                        >
+                          <div
+                            className="w-full h-full rounded-full"
+                            style={{ background: buildDonutGradient() }}
+                          />
+                          <div className="absolute inset-[28%] rounded-full bg-white/90 flex flex-col items-center justify-center text-center px-2">
+                            <span className="text-xl font-semibold text-slate-900">
+                              {totalApplications}
+                            </span>
+                            <span className="text-xs text-slate-500">đơn</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 w-full">
+                        {applicationStatusStats.map((item, idx) => {
+                          const color =
+                            statusColors[item.status] ||
+                            fallbackColors[idx % fallbackColors.length];
+                          const pct =
+                            totalApplications > 0
+                              ? Math.round(
+                                  (item.count / totalApplications) * 100
+                                )
+                              : 0;
+                          return (
+                            <div
+                              key={item.status}
+                              className="flex items-center justify-between p-3 rounded-lg border border-slate-200/70 bg-white/60 gap-3"
+                            >
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <span
+                                  className="w-3 h-3 rounded-sm flex-shrink-0"
+                                  style={{ backgroundColor: color }}
+                                />
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-sm font-semibold text-slate-900 truncate">
+                                    {statusLabel(item.status)}
+                                  </span>
+                                  <span className="text-xs text-slate-500">
+                                    {item.count} đơn
+                                  </span>
+                                </div>
+                              </div>
+                              <span className="text-xs font-semibold text-slate-600 flex-shrink-0">
+                                {pct}%
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>

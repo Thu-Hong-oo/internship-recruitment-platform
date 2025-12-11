@@ -139,6 +139,7 @@ export const getMyJobs = async (
     page?: number;
     limit?: number;
     status?: string;
+    industry?: string;
     sortBy?: string;
     sortOrder?: "asc" | "desc";
   }
@@ -148,6 +149,7 @@ export const getMyJobs = async (
     if (options?.page) params.append("page", options.page.toString());
     if (options?.limit) params.append("limit", options.limit.toString());
     if (options?.status) params.append("status", options.status);
+    if (options?.industry) params.append("industry", options.industry);
     if (options?.sortBy) params.append("sortBy", options.sortBy);
     if (options?.sortOrder) params.append("sortOrder", options.sortOrder);
 

@@ -7,6 +7,7 @@ import {
   viewApplicationResume,
   updateApplicationStatus,
   scheduleInterview,
+  getJobById,
 } from "@/lib/jobAPI";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -152,6 +153,7 @@ export default function JobApplicationsPage() {
   const { toast } = useToast();
 
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
+  const [jobTitle, setJobTitle] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -215,6 +217,24 @@ export default function JobApplicationsPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jobId, statusFilter]);
+
+  // Load job title for context
+  useEffect(() => {
+    const loadJob = async () => {
+      try {
+        const token =
+          localStorage.getItem("token") || sessionStorage.getItem("token");
+        if (!token || !jobId) return;
+        const res = await getJobById(jobId, token);
+        if (res.success && res.data?.title) {
+          setJobTitle(res.data.title);
+        }
+      } catch (e) {
+        // silent fail
+      }
+    };
+    loadJob();
+  }, [jobId]);
 
   const formatDateTime = (value?: string) => {
     if (!value) return "-";

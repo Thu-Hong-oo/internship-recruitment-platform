@@ -1158,9 +1158,12 @@ class AIController {
       }
 
       // Generate recommendations
+      // Note: aiService.getCandidateRecommendations() now uses self-sufficient
+      // candidateRecommendationService which fetches candidates internally
+      // We still pass candidates array for backward compatibility check, but it's not used
       const recommendations = await aiService.getCandidateRecommendations(
         job,
-        candidates,
+        candidates, // Kept for backward compatibility, but service fetches internally
         {
           limit: parseInt(limit),
           minScore: parseInt(minScore),

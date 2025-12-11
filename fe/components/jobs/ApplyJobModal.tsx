@@ -12,18 +12,13 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Loader2, Upload, FileText, Monitor } from "lucide-react";
 import { jobsAPI, api, candidateService } from "@/lib/api";
 import type { ApplyToJobRequest } from "@/lib/api/types";
 import { exportCVOnlineToPDF, validateFile } from "@/utils/cvExport";
 import type { CVData } from "@/lib/mocks/cvSamples";
+import CVPreview from "@/components/cv/CVPreview";
+import { apiClient } from "@/lib/api/client";
 
 const TEMPLATE_ID_MAP: Record<string, number> = {
   modern: 1,
@@ -44,6 +39,30 @@ const normalizeContentToCVData = (
   }
 
   const personalInfo = content?.personalInfo || {};
+  const skillsRaw = content?.skills || [];
+  const skillsFlattened: string[] = [];
+  const addSkills = (arr: any[]) => {
+    if (!Array.isArray(arr)) return;
+    arr.forEach((s) => {
+      if (typeof s === "string") {
+        skillsFlattened.push(s);
+      } else if (s?.name) {
+        skillsFlattened.push(s.name);
+      }
+    });
+  };
+  if (Array.isArray(skillsRaw)) {
+    skillsRaw.forEach((item: any) => {
+      addSkills(item?.technical || []);
+      addSkills(item?.soft || []);
+      addSkills(item?.languages || []);
+    });
+  } else if (skillsRaw) {
+    addSkills(skillsRaw.technical || []);
+    addSkills(skillsRaw.soft || []);
+    addSkills(skillsRaw.languages || []);
+  }
+
   return {
     personal: {
       name: personalInfo.fullName || "",
@@ -53,8 +72,27 @@ const normalizeContentToCVData = (
         typeof personalInfo.address === "string"
           ? personalInfo.address
           : personalInfo.address?.street || "",
-      summary: content?.summary || personalInfo.bio || "",
+      summary:
+        content?.summary ||
+        personalInfo.summary ||
+        personalInfo.bio ||
+        personalInfo.objective ||
+        "",
       avatar: personalInfo.avatar || undefined,
+      jobTitle:
+        personalInfo.jobTitle ||
+        personalInfo.position ||
+        personalInfo.title ||
+        personalInfo.targetRole ||
+        "",
+      website:
+        personalInfo.website ||
+        personalInfo.portfolio ||
+        personalInfo.personalWebsite ||
+        personalInfo.linkedin ||
+        personalInfo.github ||
+        personalInfo.link ||
+        "",
     },
     experience: (content?.experience || []).map((exp: any) => ({
       company: exp.company || "",
@@ -69,9 +107,7 @@ const normalizeContentToCVData = (
       startDate: edu.startYear || edu.startDate || "",
       endDate: edu.endYear || edu.endDate || "",
     })),
-    skills: (content?.skills?.technical || []).map((skill: any) =>
-      typeof skill === "string" ? skill : skill.name || ""
-    ),
+    skills: skillsFlattened,
     templateId: templateNum,
     projects: (content?.projects || []).map((proj: any) => ({
       title: proj.title || "",
@@ -119,12 +155,16 @@ export function ApplyJobModal({
   const [loadingResumes, setLoadingResumes] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resumeOptions, setResumeOptions] = useState<ResumeOption[]>([]);
-  const [showResumeSelect, setShowResumeSelect] = useState(false);
   const [selectedResume, setSelectedResume] = useState<ResumeOption | null>(
     null
   );
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [cvDataMap, setCvDataMap] = useState<Record<string, CVData>>({});
+  const [loadingCVs, setLoadingCVs] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [formData, setFormData] = useState<ApplyToJobRequest>({
     coverLetter: "",
     resumeId: "current",
@@ -134,6 +174,7 @@ export function ApplyJobModal({
       noticePeriod: "",
     },
   });
+  const primaryColor = "oklch(0.65 0.18 195)";
 
   // Check if already applied and load resumes when modal opens
   useEffect(() => {
@@ -143,12 +184,10 @@ export function ApplyJobModal({
         if (!alreadyApplied) {
           loadResumes();
         }
-        setShowResumeSelect(false);
       };
       checkAndLoad();
     } else {
       // Reset when modal closes
-      setShowResumeSelect(false);
       setSelectedResume(null);
       setUploadedFile(null);
       setError(null);
@@ -183,6 +222,8 @@ export function ApplyJobModal({
     try {
       setLoadingResumes(true);
       const options: ResumeOption[] = [];
+      const onlineCvEntries: Array<{ resumeId: string; templateId: string }> =
+        [];
 
       // Load uploaded CVs
       const resumesRes = await api.candidateCV.getResumesAll();
@@ -235,6 +276,10 @@ export function ApplyJobModal({
               resumeId: resumeId as string,
               templateName: templateNameMap[templateId] || templateId,
             });
+            onlineCvEntries.push({
+              resumeId: resumeId as string,
+              templateId,
+            });
           });
         }
       } catch (err) {
@@ -262,6 +307,46 @@ export function ApplyJobModal({
           setFormData((prev) => ({ ...prev, resumeId: firstUploaded.id }));
         }
       }
+
+      // Load CV data for online CVs to render preview
+      if (onlineCvEntries.length > 0) {
+        setLoadingCVs(true);
+        try {
+          const previewPromises = onlineCvEntries.map(
+            async ({ resumeId, templateId }) => {
+              try {
+                const resumeRes = await candidateService.getResumeById(
+                  resumeId
+                );
+                if (resumeRes?.success && resumeRes.data?.content) {
+                  const cvData = normalizeContentToCVData(
+                    resumeRes.data.content,
+                    templateId
+                  );
+                  return { resumeId, cvData };
+                }
+              } catch (error) {
+                console.error(
+                  `Failed to load CV data for resume ${resumeId}`,
+                  error
+                );
+              }
+              return null;
+            }
+          );
+
+          const results = await Promise.all(previewPromises);
+          const newMap: Record<string, CVData> = {};
+          results.forEach((result) => {
+            if (result) {
+              newMap[result.resumeId] = result.cvData;
+            }
+          });
+          setCvDataMap(newMap);
+        } finally {
+          setLoadingCVs(false);
+        }
+      }
     } catch (err: any) {
       console.error("Failed to load resumes:", err);
       const fallbackOption: ResumeOption = {
@@ -278,18 +363,57 @@ export function ApplyJobModal({
     }
   };
 
-  const handleResumeChange = (resumeId: string) => {
-    const selected = resumeOptions.find((opt) => opt.id === resumeId);
-    if (selected) {
-      setSelectedResume(selected);
-      if (selected.type === "file") {
-        // Trigger file input
-        fileInputRef.current?.click();
-      } else {
-        setFormData((prev) => ({ ...prev, resumeId: selected.id }));
-        setShowResumeSelect(false);
-      }
+  const handleCardSelect = (option: ResumeOption) => {
+    setSelectedResume(option);
+    if (option.type === "file") {
+      fileInputRef.current?.click();
+    } else {
+      setFormData((prev) => ({ ...prev, resumeId: option.id }));
     }
+  };
+
+  const handlePreviewUploaded = async (option: ResumeOption, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (option.type !== "uploaded") return;
+    try {
+      setPreviewLoading(true);
+      const token =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      if (!token) {
+        setError("Không tìm thấy token xác thực");
+        return;
+      }
+
+      const url =
+        option.id === "current"
+          ? `${apiClient.getBaseURL()}/candidates/me/resume/view`
+          : `${apiClient.getBaseURL()}/candidates/me/resume/view/${option.id}`;
+
+      const res = await fetch(url, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`${res.status} ${txt}`);
+      }
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      setPreviewUrl(objectUrl);
+      setPreviewOpen(true);
+    } catch (err: any) {
+      setError(err?.message || "Không thể xem CV đã tải lên");
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const closePreview = () => {
+    if (previewUrl && previewUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setPreviewUrl(null);
+    setPreviewOpen(false);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -309,8 +433,8 @@ export function ApplyJobModal({
       type: "file",
       file,
     });
-    setShowResumeSelect(false);
     setError(null);
+    setFormData((prev) => ({ ...prev, resumeId: "file-upload" }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -332,6 +456,16 @@ export function ApplyJobModal({
           if (uploadRes?.success) {
             // Sau khi upload, CV mới sẽ trở thành current
             finalResumeId = "current";
+            
+            // Trigger background matching scores calculation
+            try {
+              const { calculateMatchingScoresImmediate } = await import("@/lib/utils/backgroundMatching");
+              calculateMatchingScoresImmediate().catch((err) => {
+                console.warn("Failed to trigger matching scores calculation:", err);
+              });
+            } catch (err) {
+              console.warn("Failed to load background matching utility:", err);
+            }
           } else {
             throw new Error("Không thể tải lên CV");
           }
@@ -378,6 +512,16 @@ export function ApplyJobModal({
           const uploadRes = await api.candidateCV.uploadCV(formDataUpload);
           if (uploadRes?.success) {
             finalResumeId = "current";
+            
+            // Trigger background matching scores calculation after upload
+            try {
+              const { calculateMatchingScoresImmediate } = await import("@/lib/utils/backgroundMatching");
+              calculateMatchingScoresImmediate().catch((err) => {
+                console.warn("Failed to trigger matching scores calculation:", err);
+              });
+            } catch (err) {
+              console.warn("Failed to load background matching utility:", err);
+            }
           } else {
             throw new Error("Không thể tải lên CV đã export");
           }
@@ -445,8 +589,9 @@ export function ApplyJobModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="w-full sm:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Ứng tuyển công việc</DialogTitle>
           <DialogDescription>
@@ -469,139 +614,189 @@ export function ApplyJobModal({
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Đang tải danh sách CV...
               </div>
-            ) : showResumeSelect ? (
-              <div className="space-y-3">
-                <Select
-                  value={selectedResume?.id || formData.resumeId || "current"}
-                  onValueChange={handleResumeChange}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Chọn CV" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {/* CV Tải Lên */}
-                    {resumeOptions.filter((opt) => opt.type === "uploaded")
-                      .length > 0 && (
-                      <>
-                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-                          📁 CV Tải Lên
-                        </div>
-                        {resumeOptions
-                          .filter((opt) => opt.type === "uploaded")
-                          .map((option) => (
-                            <SelectItem key={option.id} value={option.id}>
-                              {option.isCurrent && "⭐ "}
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                      </>
-                    )}
-
-                    {/* CV Online */}
-                    {resumeOptions.filter((opt) => opt.type === "online")
-                      .length > 0 && (
-                      <>
-                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-                          💻 CV Online
-                        </div>
-                        {resumeOptions
-                          .filter((opt) => opt.type === "online")
-                          .map((option) => (
-                            <SelectItem key={option.id} value={option.id}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                      </>
-                    )}
-
-                    {/* Tải CV từ máy */}
-                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-                      📤 Tải CV từ máy
-                    </div>
-                    <SelectItem value="file-upload">
-                      <div className="flex items-center gap-2">
-                        <Upload className="w-4 h-4" />
-                        Chọn file từ máy tính
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.doc,.docx"
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-                {uploadedFile && (
-                  <div className="flex items-center gap-2 rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
-                    <FileText className="w-4 h-4" />
-                    <span className="flex-1 truncate">{uploadedFile.name}</span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setUploadedFile(null);
-                        setSelectedResume(null);
-                        fileInputRef.current!.value = "";
-                      }}
-                      className="h-6 w-6 p-0"
-                    >
-                      ×
-                    </Button>
-                  </div>
-                )}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setShowResumeSelect(false);
-                    setUploadedFile(null);
-                    fileInputRef.current!.value = "";
-                  }}
-                  className="text-xs"
-                >
-                  Hủy
-                </Button>
-              </div>
             ) : (
-              <div className="flex items-center gap-2">
-                <div className="flex-1 rounded-md border border-input bg-muted/50 px-3 py-2 text-sm">
-                  {selectedResume ? (
-                    <span className="flex items-center gap-2">
-                      {selectedResume.type === "online" && (
-                        <Monitor className="w-4 h-4 text-blue-500" />
+              <div className="space-y-6">
+                {/* Uploaded CVs */}
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-slate-600 uppercase tracking-[0.12em]">
+                    CV tải lên
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+                    {resumeOptions
+                      .filter((opt) => opt.type === "uploaded")
+                      .map((option) => {
+                        const isSelected = selectedResume?.id === option.id;
+                        return (
+                          <div
+                            key={option.id}
+                            onClick={() => handleCardSelect(option)}
+                            className={`group relative w-full rounded-xl border bg-white/90 text-left transition-all ${
+                              isSelected
+                                ? "border-[oklch(0.65_0.18_195)] shadow-lg shadow-[oklch(0.65_0.18_195/.2)]"
+                                : "border-slate-200 hover:border-[oklch(0.65_0.18_195/.6)] hover:shadow"
+                            }`}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                handleCardSelect(option);
+                              }
+                            }}
+                          >
+                            <div className="p-4 flex items-center gap-3">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[oklch(0.65_0.18_195/.08)]">
+                                <FileText
+                                  className="w-5 h-5"
+                                  style={{ color: primaryColor }}
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0 space-y-1">
+                                <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                                  {option.isCurrent && "⭐"}
+                                  <span className="truncate">{option.label}</span>
+                                </div>
+                                <p className="text-xs text-muted-foreground">CV đã tải lên</p>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => handlePreviewUploaded(option, e)}
+                                  disabled={previewLoading}
+                                  className="h-8 px-3 text-xs"
+                                >
+                                  {previewLoading ? (
+                                    <>
+                                      <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                                      Đang mở...
+                                    </>
+                                  ) : (
+                                    "Xem trước"
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                    {/* Upload new CV card */}
+                    <div className="relative flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-slate-300 bg-white/70 p-6 text-center hover:border-[oklch(0.65_0.18_195)] hover:bg-white transition min-h-[150px]">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".pdf,.doc,.docx"
+                        onChange={handleFileSelect}
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                      />
+                      <Upload className="w-6 h-6 text-[oklch(0.65_0.18_195)]" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-semibold text-slate-900">
+                          Tải CV từ máy
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Hỗ trợ PDF, DOC, DOCX (tối đa 10MB)
+                        </p>
+                      </div>
+                      {uploadedFile && (
+                        <div className="flex items-center gap-2 rounded-md border border-input bg-muted/50 px-3 py-2 text-sm w-full">
+                          <FileText className="w-4 h-4" />
+                          <span className="flex-1 truncate">{uploadedFile.name}</span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setUploadedFile(null);
+                              setSelectedResume(null);
+                              if (fileInputRef.current) fileInputRef.current.value = "";
+                            }}
+                            className="h-6 w-6 p-0"
+                          >
+                            ×
+                          </Button>
+                        </div>
                       )}
-                      {selectedResume.type === "file" && (
-                        <Upload className="w-4 h-4 text-green-500" />
-                      )}
-                      {selectedResume.isCurrent && "⭐ "}
-                      {selectedResume.label}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">CV hiện tại</span>
-                  )}
+                    </div>
+                  </div>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowResumeSelect(true)}
-                  disabled={
-                    resumeOptions.filter((opt) => opt.type !== "file").length <=
-                    1
-                  }
-                >
-                  Đổi CV
-                </Button>
+
+                {/* CV Online */}
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-slate-600 uppercase tracking-[0.12em]">
+                    CV Online
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+                    {resumeOptions
+                      .filter((opt) => opt.type === "online")
+                      .map((option) => {
+                        const isSelected = selectedResume?.id === option.id;
+                        const cvData =
+                          option.resumeId ? cvDataMap[option.resumeId] : undefined;
+                        const hasPreview = !!cvData;
+
+                        return (
+                          <div
+                            key={option.id}
+                            onClick={() => handleCardSelect(option)}
+                            className={`group relative w-full overflow-hidden rounded-xl border bg-white/90 text-left transition-all ${
+                              isSelected
+                                ? "border-[oklch(0.65_0.18_195)] shadow-lg shadow-[oklch(0.65_0.18_195/.2)]"
+                                : "border-slate-200 hover:border-[oklch(0.65_0.18_195/.6)] hover:shadow"
+                            }`}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                handleCardSelect(option);
+                              }
+                            }}
+                            style={{
+                              background:
+                                "linear-gradient(135deg, oklch(0.60 0.12 195 / 0.05) 0%, transparent 70%)",
+                            }}
+                          >
+                            <div className="relative w-full aspect-[3/4] bg-muted/30 overflow-hidden">
+                              {hasPreview ? (
+                                <div className="w-full h-full bg-white">
+                                  <CVPreview
+                                    data={cvData}
+                                    templateId={option.templateId || "modern"}
+                                  />
+                                  <div className="absolute top-3 left-3">
+                                    <span className="rounded-full bg-emerald-600/90 px-2.5 py-1 text-[11px] font-medium text-white shadow">
+                                      CV Online
+                                    </span>
+                                  </div>
+                                </div>
+                              ) : loadingCVs ? (
+                                <div className="flex h-full items-center justify-center text-muted-foreground">
+                                  <Loader2 className="h-6 w-6 animate-spin" />
+                                </div>
+                              ) : (
+                                <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
+                                  <Monitor className="w-6 h-6" />
+                                  <span className="text-xs">Không xem trước</span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="p-3 space-y-1">
+                              <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                                {option.isCurrent && "⭐"}
+                                <span className="truncate">{option.label}</span>
+                              </div>
+                              <p className="text-xs text-muted-foreground">CV Online</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
               </div>
             )}
             <p className="text-xs text-muted-foreground">
-              {showResumeSelect
-                ? "Chọn CV bạn muốn sử dụng để ứng tuyển"
-                : "CV hiện tại sẽ được sử dụng. Bấm 'Đổi CV' để chọn CV khác"}
+              Chọn CV để ứng tuyển hoặc tải lên CV mới ngay tại đây.
             </p>
           </div>
 
@@ -737,5 +932,34 @@ export function ApplyJobModal({
         </form>
       </DialogContent>
     </Dialog>
+
+    {/* Preview modal for uploaded CVs */}
+    <Dialog open={previewOpen} onOpenChange={(open) => !open && closePreview()}>
+      <DialogContent className="max-w-4xl h-[80vh]">
+        <DialogHeader>
+          <DialogTitle>Xem trước CV đã tải lên</DialogTitle>
+        </DialogHeader>
+        {previewUrl ? (
+          <div className="flex-1 h-full border rounded-lg overflow-hidden">
+            <iframe
+              src={previewUrl}
+              title="Uploaded CV Preview"
+              className="w-full h-full"
+            />
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-64 text-muted-foreground">
+            <Loader2 className="w-6 h-6 animate-spin mr-2" />
+            Đang tải CV...
+          </div>
+        )}
+        <div className="flex justify-end">
+          <Button onClick={closePreview} variant="outline">
+            Đóng
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

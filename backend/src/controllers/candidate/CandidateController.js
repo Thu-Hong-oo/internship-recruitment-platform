@@ -42,6 +42,8 @@ class CandidateController {
 
     // Application management methods
     this.getApplications = this.applicationController.getApplications;
+    this.getApplicationStatusStats =
+      this.applicationController.getApplicationStatusStats;
     this.applyForJob = this.applicationController.applyForJob;
     this.updateApplication = this.applicationController.updateApplication;
 

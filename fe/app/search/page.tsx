@@ -27,6 +27,7 @@ export default function JobSearchResults() {
     sortBy: "createdAt",
     sortOrder: "desc",
   });
+  const [filtersReady, setFiltersReady] = useState(false);
 
   const buildFiltersFromSearchParams = (): JobFiltersType => {
     const get = (k: string) => searchParams?.get(k) || undefined;
@@ -78,6 +79,7 @@ export default function JobSearchResults() {
   useEffect(() => {
     const urlFilters = buildFiltersFromSearchParams();
     setFilters((prev) => ({ ...prev, ...urlFilters }));
+    setFiltersReady(true);
   }, [searchParams]);
 
   // Location options
@@ -187,9 +189,10 @@ export default function JobSearchResults() {
 
   // Load jobs when filters change
   useEffect(() => {
+    if (!filtersReady) return;
     setCurrentPage(1);
     fetchJobs(1, pageSize, filters);
-  }, [filters]);
+  }, [filters, filtersReady]);
 
   const handleFiltersChange = (newFilters: JobFiltersType) => {
     setFilters(newFilters);

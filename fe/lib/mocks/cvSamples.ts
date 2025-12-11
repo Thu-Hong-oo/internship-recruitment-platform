@@ -5,6 +5,8 @@ export type CVPersonal = {
   address?: string;
   summary?: string;
   avatar?: string;
+  jobTitle?: string;
+  website?: string;
 };
 
 export type CVExperience = {

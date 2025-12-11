@@ -218,6 +218,18 @@ router.delete('/me/:section/:id', candidateController.deleteSectionEntry);
 router.get('/applications', candidateController.getApplications);
 
 /**
+ * @route   GET /api/candidates/applications/status
+ * @desc    Get application status statistics for current candidate
+ * @access  Private (Candidate only)
+ * @query   ?from=YYYY-MM-DD&to=YYYY-MM-DD (optional)
+ * @example GET /api/candidates/applications/status?from=2024-01-01&to=2024-12-31
+ */
+router.get(
+  '/applications/status',
+  candidateController.getApplicationStatusStats
+);
+
+/**
  * @route   POST /api/candidates/applications
  * @desc    Apply for a job
  * @access  Private (Candidate only)

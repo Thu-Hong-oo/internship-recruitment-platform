@@ -58,11 +58,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import EmployerShell from "@/components/layout/EmployerShell";
+import { industryService } from "@/lib/industryAPI";
 
 type Job = {
   _id: string;
   title: string;
   description: string;
+  industryCode?: string;
+  industry?: string;
+  category?: string;
   status: "draft" | "pending" | "approved" | "rejected" | "active" | "closed";
   location: string;
   salary: string;
@@ -79,6 +83,7 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [allJobs, setAllJobs] = useState<Job[]>([]);
   const [deleteJobId, setDeleteJobId] = useState<string | null>(null);
   const [submitJobId, setSubmitJobId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -90,11 +95,23 @@ export default function JobsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [filters, setFilters] = useState({
     status: "all",
+    industry: "all",
     sortBy: "createdAt",
     sortOrder: "desc" as "asc" | "desc",
   });
   const [hasNextPage, setHasNextPage] = useState(false);
   const [hasPrevPage, setHasPrevPage] = useState(false);
+  const [industryOptions, setIndustryOptions] = useState<
+    { code: string; label: string }[]
+  >([]);
+
+  const formatIndustryLabel = (codeOrName?: string) => {
+    if (!codeOrName) return "";
+    return codeOrName
+      .toString()
+      .replace(/-/g, " ")
+      .replace(/\b\w/g, (c: string) => c.toUpperCase());
+  };
 
   const loadJobs = async (page = currentPage, newFilters = filters) => {
     try {
@@ -111,26 +128,46 @@ export default function JobsPage() {
         page,
         limit: pageSize,
         status: newFilters.status === "all" ? undefined : newFilters.status,
+        industry:
+          newFilters.industry === "all" ? undefined : newFilters.industry,
         sortBy: newFilters.sortBy,
         sortOrder: newFilters.sortOrder,
       });
 
       if (result.success) {
-        setJobs(result.data || []);
+        const fetched = (result.data || []) as Job[];
+
+        // Fallback filter by industry on FE (phòng trường hợp backend chưa hỗ trợ)
+        const appliedIndustry =
+          newFilters.industry === "all" ? null : newFilters.industry;
+        const filteredByIndustry = appliedIndustry
+          ? fetched.filter((j) => {
+              const code = j.industryCode || j.industry || j.category;
+              return code === appliedIndustry;
+            })
+          : fetched;
+
+        setAllJobs(fetched);
+        setJobs(filteredByIndustry);
+        // Nếu chưa có options (hoặc rỗng), giữ nguyên; industries sẽ được load từ API riêng.
 
         // Ưu tiên lấy tổng số job từ pagination hoặc statistics nếu có
         const totalFromResponse =
           result.pagination?.total ??
           result.statistics?.total ??
           result.total ??
-          result.data?.length ??
+          fetched.length ??
           0;
 
-        setTotalJobs(totalFromResponse);
+        const totalAfterFilter = appliedIndustry
+          ? filteredByIndustry.length
+          : totalFromResponse;
+
+        setTotalJobs(totalAfterFilter);
         setCurrentPage(result.pagination?.page || page);
         setTotalPages(
           result.pagination?.totalPages ||
-            Math.max(1, Math.ceil(totalFromResponse / pageSize))
+            Math.max(1, Math.ceil(totalAfterFilter / pageSize))
         );
         setHasNextPage(!!result.pagination?.hasNextPage);
         setHasPrevPage(!!result.pagination?.hasPrevPage);
@@ -157,6 +194,30 @@ export default function JobsPage() {
   const handlePageChange = (page: number) => {
     loadJobs(page, filters);
   };
+
+  // Load industry options from API (root industries)
+  useEffect(() => {
+    const loadIndustries = async () => {
+      try {
+        const list = await industryService.getRootIndustries();
+        if (list && list.length > 0) {
+          setIndustryOptions(
+            list.map((it) => ({
+              code: it.code,
+              label:
+                it.name?.vi ||
+                it.name?.en ||
+                formatIndustryLabel(it.code) ||
+                it.code,
+            }))
+          );
+        }
+      } catch (e) {
+        // silent fail
+      }
+    };
+    loadIndustries();
+  }, []);
 
   const handleDeleteJob = async () => {
     if (!deleteJobId) return;
@@ -310,6 +371,26 @@ export default function JobsPage() {
             </div>
 
             <div className="flex items-center gap-2">
+              <label className="text-sm">Ngành:</label>
+              <Select
+                value={filters.industry}
+                onValueChange={(value) => handleFilterChange("industry", value)}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Tất cả" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả</SelectItem>
+                  {industryOptions.map((opt) => (
+                    <SelectItem key={opt.code} value={opt.code}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
               <label className="text-sm">Sắp xếp theo:</label>
               <Select
                 value={filters.sortBy}
@@ -396,6 +477,11 @@ export default function JobsPage() {
                         <div className="font-medium">{job.title}</div>
                         <div className="text-sm text-gray-500 truncate max-w-xs">
                           {job.description}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {formatIndustryLabel(
+                            job.industry || job.category || job.industryCode
+                          ) || "Chưa phân loại"}
                         </div>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {job.skills.slice(0, 3).map((skill) => (

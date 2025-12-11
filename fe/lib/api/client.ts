@@ -65,7 +65,7 @@ export class ApiClient {
   constructor() {
     // Use API_BASE_URL with fallback
     // Only warn at runtime (client-side) if URL is not configured, not at build time
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       const envUrl = process.env.NEXT_PUBLIC_API_URL;
       if (!envUrl) {
         console.warn(
@@ -76,7 +76,7 @@ export class ApiClient {
         );
       }
     }
-    this.baseURL = API_BASE_URL || 'http://localhost:3000/api';
+    this.baseURL = API_BASE_URL || "http://localhost:3000/api";
     this.token = null; // Initialize as null, will be set when needed
   }
 
@@ -105,11 +105,13 @@ export class ApiClient {
     // Ensure baseURL is absolute (starts with http:// or https://)
     // This prevents Next.js from treating it as an internal route
     let url = `${this.baseURL}${endpoint}`;
-    
+
     // If baseURL doesn't start with http:// or https://, it might be relative
     // In Server Components, we need absolute URLs
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      console.warn('API URL is not absolute. This may cause Next.js to route it internally.');
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      console.warn(
+        "API URL is not absolute. This may cause Next.js to route it internally."
+      );
     }
 
     // Debug logging
@@ -148,7 +150,7 @@ export class ApiClient {
       // Use absolute URL to prevent Next.js from intercepting as internal route
       const response = await fetch(url, {
         ...config,
-        cache: 'no-store',
+        cache: "no-store",
         // Remove next: { revalidate: 0 } as it's for Next.js internal routes
         // For external API calls, we just use cache: 'no-store'
       });
@@ -169,15 +171,19 @@ export class ApiClient {
         } catch {
           errorData = {};
         }
-        
+
         console.error("API Error Response:", errorData);
-        
+
         // If the error response has a structured format with success: false,
         // return it instead of throwing (this allows callers to handle it gracefully)
-        if (errorData && typeof errorData === 'object' && errorData.success === false) {
+        if (
+          errorData &&
+          typeof errorData === "object" &&
+          errorData.success === false
+        ) {
           return errorData;
         }
-        
+
         // Otherwise, throw an error with the message
         throw new Error(
           errorData.error ||

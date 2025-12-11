@@ -9,6 +9,8 @@ class ApplicationController {
   constructor() {
     // Bind all methods to preserve this context
     this.getApplications = this.getApplications.bind(this);
+    this.getApplicationStatusStats =
+      this.getApplicationStatusStats.bind(this);
     this.applyForJob = this.applyForJob.bind(this);
     this.updateApplication = this.updateApplication.bind(this);
   }
@@ -70,6 +72,73 @@ class ApplicationController {
           },
         },
         'Applications retrieved successfully'
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/candidates/applications/status
+   * Thống kê số lượng đơn ứng tuyển theo status cho ứng viên hiện tại
+   * Query: ?from=YYYY-MM-DD&to=YYYY-MM-DD (optional)
+   */
+  async getApplicationStatusStats(req, res, next) {
+    try {
+      const { from, to } = req.query;
+
+      // Lấy hồ sơ ứng viên
+      const candidateProfile = await CandidateProfile.findOne({
+        userId: req.user.id,
+      });
+
+      if (!candidateProfile) {
+        return ApiResponse.error(
+          res,
+          'Candidate profile not found. Please complete your profile first.',
+          404
+        );
+      }
+
+      const match = { candidateId: candidateProfile._id };
+
+      if (from || to) {
+        match.createdAt = {};
+        if (from) {
+          const fromDate = new Date(from);
+          if (isNaN(fromDate.getTime())) {
+            return ApiResponse.error(res, 'Invalid start date', 400);
+          }
+          match.createdAt.$gte = fromDate;
+        }
+        if (to) {
+          const toDate = new Date(to);
+          if (isNaN(toDate.getTime())) {
+            return ApiResponse.error(res, 'Invalid end date', 400);
+          }
+          match.createdAt.$lte = toDate;
+        }
+        if (Object.keys(match.createdAt).length === 0) {
+          delete match.createdAt;
+        }
+      }
+
+      const stats = await Application.aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 },
+          },
+        },
+        { $project: { _id: 0, status: '$_id', count: 1 } },
+        { $sort: { status: 1 } },
+      ]);
+
+      return ApiResponse.success(
+        res,
+        { stats },
+        'Application status statistics retrieved successfully'
       );
     } catch (error) {
       next(error);

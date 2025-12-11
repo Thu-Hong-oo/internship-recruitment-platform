@@ -12,16 +12,23 @@ import { createRoot } from "react-dom/client";
 export async function exportCVOnlineToPDF(
   cvData: CVData,
   templateId: string,
-  filename: string = "cv.pdf"
+  filename: string = "cv.pdf",
+  layout?: {
+    page?: { width?: number; height?: number; padding?: number; backgroundColor?: string };
+  }
 ): Promise<File> {
   // Tạo container ẩn để render CV - đảm bảo có đủ kích thước và visibility
   const container = document.createElement("div");
+  const pageWidth = layout?.page?.width ? `${layout.page.width}px` : "794px"; // A4 width
+  const pageHeight = layout?.page?.height ? `${layout.page.height}px` : "1123px"; // A4 height
+  const pageBg = layout?.page?.backgroundColor || "#ffffff";
+
   container.style.position = "fixed";
   container.style.left = "0";
   container.style.top = "0";
-  container.style.width = "794px"; // A4 width in pixels
-  container.style.height = "1123px"; // A4 height in pixels
-  container.style.backgroundColor = "#ffffff";
+  container.style.width = pageWidth;
+  container.style.height = pageHeight;
+  container.style.backgroundColor = pageBg;
   container.style.overflow = "visible";
   container.style.zIndex = "-9999";
   container.style.opacity = "0";
@@ -36,12 +43,19 @@ export async function exportCVOnlineToPDF(
       } catch {}
     }
 
+    // Chuẩn hóa data để renderer nhận đúng template
+    const renderData = {
+      ...cvData,
+      templateId,
+    };
+
     // Render CV vào container sử dụng LivePreview (giống như CVEditor)
     const root = createRoot(container);
     root.render(
       React.createElement(LivePreview, {
-        data: cvData,
+        data: renderData,
         templateId: templateId,
+        layout: layout as any,
         editable: false,
         editingField: null,
         containerRef: () => {},
@@ -71,6 +85,20 @@ export async function exportCVOnlineToPDF(
 
     // Đợi thêm một chút để đảm bảo layout hoàn tất
     await new Promise<void>((resolve) => setTimeout(resolve, 500));
+
+    // Inject CSS reset để bỏ border/outline/background của các input/form khi chụp
+    const styleReset = document.createElement("style");
+    styleReset.innerHTML = `
+      input, textarea, select, button {
+        border: none !important;
+        outline: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        color: inherit !important;
+      }
+      .ui-only, .no-export { display: none !important; }
+    `;
+    container.appendChild(styleReset);
 
     // Đợi tất cả images load
     const images = container.querySelectorAll("img");
@@ -164,9 +192,9 @@ export async function exportCVOnlineToPDF(
     let dataUrl: string | null = null;
     try {
       const rect = targetElement.getBoundingClientRect();
-      const width = Math.max(1, Math.round(rect.width)) || 794;
-      const height = Math.max(1, Math.round(rect.height)) || 1123;
-      const pixelRatio = 1.5; // Higher quality for application
+      const width = Math.max(1, Math.round(rect.width)) || parseInt(pageWidth, 10) || 794;
+      const height = Math.max(1, Math.round(rect.height)) || parseInt(pageHeight, 10) || 1123;
+      const pixelRatio = 2; // tăng độ nét cho xuất PDF
 
       dataUrl = await htmlToImage.toJpeg(targetElement, {
         cacheBust: true,
@@ -210,6 +238,10 @@ export async function exportCVOnlineToPDF(
       });
       dataUrl = canvas.toDataURL("image/jpeg", 0.9);
     } finally {
+      // Remove injected style
+      if (styleReset.parentNode) {
+        styleReset.parentNode.removeChild(styleReset);
+      }
       // Restore original styles
       targetElement.style.visibility = originalVisibility;
       targetElement.style.display = originalDisplay;
