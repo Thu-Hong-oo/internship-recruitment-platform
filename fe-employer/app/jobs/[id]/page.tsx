@@ -199,7 +199,7 @@ export default function JobDetailPage() {
 
     // Only employers should see suggestions
     fetchSuggestions();
-  }, [jobId]);
+  }, [jobId, showSuggestions]);
 
   // Initialize form data from job data
   const initializeFormData = async (job: any) => {

@@ -1,4 +1,5 @@
 import { apiClient } from "./apiClient";
+import { getToken } from "@/lib/userStorage";
 
 export const nlpService = {
   /**
@@ -23,8 +24,12 @@ export const nlpService = {
     if (params?.tier) queryParams.append("tier", params.tier);
 
     const query = queryParams.toString();
+    const token = getToken();
     return apiClient.get(
-      `/nlp/top-candidates/${jobId}${query ? `?${query}` : ""}`
+      `/nlp/top-candidates/${jobId}${query ? `?${query}` : ""}`,
+      token
+        ? { headers: { Authorization: `Bearer ${token}` } }
+        : undefined
     );
   },
 };
