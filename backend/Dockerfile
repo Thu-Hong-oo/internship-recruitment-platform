@@ -11,6 +11,7 @@ WORKDIR /app
 RUN apk add --no-cache \
     python3 \
     py3-pip \
+    gcompat \
     make \
     g++ \
     && ln -sf python3 /usr/bin/python \
