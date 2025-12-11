@@ -125,6 +125,29 @@ const JobSchema = new mongoose.Schema({
     needsReanalysis: { type: Boolean, default: false },
   },
 
+  // Auto-moderation fields
+  moderation: {
+    status: {
+      type: String,
+      enum: ['pending', 'auto_approved', 'auto_rejected', 'manual_review', 'approved', 'rejected'],
+      default: 'pending',
+    },
+    autoModerationScore: { type: Number, min: 0, max: 100 },
+    moderationResult: {
+      action: String, // 'APPROVE', 'REJECT', 'MANUAL_REVIEW'
+      method: String, // 'rule-based', 'hybrid', 'ai'
+      flags: [String], // ['banned_word', 'suspicious_pattern', etc.]
+      reasons: [String], // Lý do cụ thể
+    },
+    moderatedAt: Date,
+    moderatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    moderationError: String, // Nếu moderation fail
+  },
+
 }, {
   timestamps: true,
   // Soft delete fields 
