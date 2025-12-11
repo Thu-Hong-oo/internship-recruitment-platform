@@ -1,21 +1,18 @@
-FROM node:20-alpine
+FROM node:20-bullseye-slim
 
 ARG APP_PATH=backend
 
 WORKDIR /app
 
 # Install build dependencies for native modules (sharp, etc.)
-# Note: canvas has been removed from dependencies due to compilation issues
-# These are needed for node-gyp to compile native code
 # Also install Python and pip for Sentence-BERT service
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
-    py3-pip \
-    gcompat \
-    make \
-    g++ \
+    python3-pip \
+    build-essential \
     && ln -sf python3 /usr/bin/python \
-    && ln -sf pip3 /usr/bin/pip
+    && ln -sf pip3 /usr/bin/pip \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy package files (default path backend, override by setting APP_PATH build-arg)
 COPY ${APP_PATH}/package*.json ./
@@ -35,9 +32,6 @@ COPY ${APP_PATH}/python/requirements.txt /tmp/python-requirements.txt
 RUN pip install --no-cache-dir --upgrade --break-system-packages pip setuptools wheel && \
     pip install --no-cache-dir --break-system-packages --extra-index-url https://download.pytorch.org/whl/cpu \
     -r /tmp/python-requirements.txt
-
-# Remove build dependencies to reduce image size (keep python3 and pip)
-RUN apk del make g++
 
 # Copy application files
 COPY ${APP_PATH}/. .
