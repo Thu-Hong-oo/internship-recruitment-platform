@@ -7,6 +7,7 @@ import {
   deleteJob,
   submitJobForReview,
   getJobApplications,
+  type JobResponse,
 } from "@/lib/jobAPI";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -81,6 +82,17 @@ export default function JobsPage() {
   const [deleteJobId, setDeleteJobId] = useState<string | null>(null);
   const [submitJobId, setSubmitJobId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [moderationResult, setModerationResult] = useState<{
+    type: "approved" | "rejected" | "review";
+    message: string;
+    reviewReasons?: Array<{
+      type: string;
+      message: string;
+      severity: string;
+    }>;
+    reasons?: string[];
+    flags?: string[];
+  } | null>(null);
 
   // Pagination and filters
   const [currentPage, setCurrentPage] = useState(1);
@@ -186,27 +198,86 @@ export default function JobsPage() {
 
     try {
       setActionLoading(submitJobId);
+      setError(null);
+      setModerationResult(null);
       const token =
         localStorage.getItem("token") || sessionStorage.getItem("token");
       if (!token) return;
 
-      const result = await submitJobForReview(
+      const result = (await submitJobForReview(
         submitJobId,
         token,
         "Please review this job posting for approval",
         false
-      );
+      )) as JobResponse;
+
       if (result.success) {
-        setJobs(
-          jobs.map((job) =>
-            job._id === submitJobId
-              ? { ...job, status: "pending" as const }
-              : job
-          )
-        );
+        // Auto-approved
+        if (result.autoApproved) {
+          setModerationResult({
+            type: "approved",
+            message:
+              result.message || "Job đã được tự động duyệt và đăng thành công",
+          });
+          setJobs(
+            jobs.map((job) =>
+              job._id === submitJobId
+                ? { ...job, status: "active" as const }
+                : job
+            )
+          );
+        }
+        // Manual review required
+        else if (result.requiresReview) {
+          setModerationResult({
+            type: "review",
+            message:
+              result.message || "Đã gửi duyệt. Vui lòng chờ admin phê duyệt",
+            reviewReasons: result.reviewReasons || [],
+            reasons: result.warnings || [],
+          });
+          setJobs(
+            jobs.map((job) =>
+              job._id === submitJobId
+                ? { ...job, status: "pending" as const }
+                : job
+            )
+          );
+        }
+        // Default: pending
+        else {
+          setJobs(
+            jobs.map((job) =>
+              job._id === submitJobId
+                ? { ...job, status: "pending" as const }
+                : job
+            )
+          );
+        }
         setSubmitJobId(null);
       } else {
-        setError(result.error || "Không thể gửi duyệt công việc");
+        // Auto-rejected
+        if (result.autoRejected) {
+          setModerationResult({
+            type: "rejected",
+            message:
+              result.message ||
+              "Job không được duyệt do chứa nội dung không phù hợp",
+            reasons: result.reasons || [],
+            flags: result.flags || [],
+          });
+          setJobs(
+            jobs.map((job) =>
+              job._id === submitJobId
+                ? { ...job, status: "rejected" as const }
+                : job
+            )
+          );
+        } else {
+          setError(
+            result.error || result.message || "Không thể gửi duyệt công việc"
+          );
+        }
       }
     } catch (err) {
       setError("Có lỗi xảy ra khi gửi duyệt công việc");
@@ -445,14 +516,16 @@ export default function JobsPage() {
                             <Users className="h-4 w-4" />
                           </Button>
                         )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => router.push(`/jobs/${job._id}/edit`)}
-                          title="Chỉnh sửa"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                        {job.status !== "pending" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.push(`/jobs/${job._id}/edit`)}
+                            title="Chỉnh sửa"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
                         {job.status === "draft" && (
                           <Button
                             variant="outline"
@@ -618,6 +691,106 @@ export default function JobsPage() {
               disabled={!!actionLoading}
             >
               {actionLoading === submitJobId ? "Đang gửi..." : "Gửi duyệt"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Moderation Result Dialog */}
+      <AlertDialog
+        open={!!moderationResult}
+        onOpenChange={() => setModerationResult(null)}
+      >
+        <AlertDialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {moderationResult?.type === "approved" &&
+                "✅ Đã duyệt thành công"}
+              {moderationResult?.type === "rejected" && "❌ Không được duyệt"}
+              {moderationResult?.type === "review" && "⚠️ Cần xem xét"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base">
+              {moderationResult?.message}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {/* Review Reasons */}
+          {moderationResult?.type === "review" &&
+            moderationResult.reviewReasons &&
+            moderationResult.reviewReasons.length > 0 && (
+              <div className="my-4">
+                <h4 className="font-semibold mb-3 text-sm">
+                  Các vấn đề cần lưu ý:
+                </h4>
+                <div className="space-y-2">
+                  {moderationResult.reviewReasons.map((reason, index) => (
+                    <div
+                      key={index}
+                      className={`p-3 rounded-lg border ${
+                        reason.severity === "high"
+                          ? "bg-red-50 border-red-200"
+                          : reason.severity === "medium"
+                          ? "bg-orange-50 border-orange-200"
+                          : "bg-yellow-50 border-yellow-200"
+                      }`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className="text-lg">
+                          {reason.severity === "high" && "🔴"}
+                          {reason.severity === "medium" && "🟠"}
+                          {reason.severity === "low" && "🟡"}
+                        </span>
+                        <p className="text-sm text-gray-700">
+                          {reason.message}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          {/* Rejection Reasons */}
+          {moderationResult?.type === "rejected" &&
+            moderationResult.reasons &&
+            moderationResult.reasons.length > 0 && (
+              <div className="my-4">
+                <h4 className="font-semibold mb-3 text-sm text-red-600">
+                  Lý do từ chối:
+                </h4>
+                <div className="space-y-2">
+                  {moderationResult.reasons.map((reason, index) => (
+                    <div
+                      key={index}
+                      className="p-3 rounded-lg bg-red-50 border border-red-200"
+                    >
+                      <p className="text-sm text-red-700">{reason}</p>
+                    </div>
+                  ))}
+                </div>
+                {moderationResult.flags &&
+                  moderationResult.flags.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs text-gray-500">
+                        Flags: {moderationResult.flags.join(", ")}
+                      </p>
+                    </div>
+                  )}
+              </div>
+            )}
+
+          <AlertDialogFooter>
+            <AlertDialogAction
+              onClick={() => setModerationResult(null)}
+              className={
+                moderationResult?.type === "approved"
+                  ? "bg-green-600 hover:bg-green-700"
+                  : moderationResult?.type === "rejected"
+                  ? "bg-red-600 hover:bg-red-700"
+                  : ""
+              }
+            >
+              Đã hiểu
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

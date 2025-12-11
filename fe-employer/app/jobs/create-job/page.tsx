@@ -2,7 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createJob, CreateJobPayload } from "@/lib/jobAPI";
+import {
+  createJob,
+  CreateJobPayload,
+  submitJobForReview,
+  type JobResponse,
+} from "@/lib/jobAPI";
 import { industryService, Industry } from "@/lib/industryAPI";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,6 +59,19 @@ export default function CreateJobPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [submitAfterCreate, setSubmitAfterCreate] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const [moderationResult, setModerationResult] = useState<{
+    type: "approved" | "rejected" | "review";
+    message: string;
+    reviewReasons?: Array<{
+      type: string;
+      message: string;
+      severity: string;
+    }>;
+    reasons?: string[];
+    flags?: string[];
+  } | null>(null);
 
   const [formData, setFormData] = useState<CreateJobPayload>({
     title: "",
@@ -340,6 +358,62 @@ export default function CreateJobPage() {
       const result = await createJob(payload, token);
 
       if (result.success) {
+        // Nếu chọn gửi duyệt ngay sau khi tạo
+        if (submitAfterCreate && result.data?._id) {
+          try {
+            const submitRes = (await submitJobForReview(
+              result.data._id,
+              token
+            )) as JobResponse;
+
+            if (submitRes.success) {
+              // Auto-approved
+              if (submitRes.autoApproved) {
+                setModerationResult({
+                  type: "approved",
+                  message:
+                    submitRes.message ||
+                    "Job đã được tự động duyệt và đăng thành công",
+                });
+              }
+              // Manual review
+              else if (submitRes.requiresReview) {
+                setModerationResult({
+                  type: "review",
+                  message:
+                    submitRes.message ||
+                    "Đã gửi duyệt. Vui lòng chờ admin phê duyệt",
+                  reviewReasons: submitRes.reviewReasons || [],
+                  reasons: submitRes.warnings || [],
+                });
+              }
+              // Default success message
+              setSubmitMessage(submitRes.message || "Đã gửi duyệt thành công");
+            } else {
+              // Auto-rejected
+              if (submitRes.autoRejected) {
+                setModerationResult({
+                  type: "rejected",
+                  message:
+                    submitRes.message ||
+                    "Job không được duyệt do chứa nội dung không phù hợp",
+                  reasons: submitRes.reasons || [],
+                  flags: submitRes.flags || [],
+                });
+              }
+              setError(
+                submitRes.error ||
+                  submitRes.message ||
+                  "Tạo job thành công nhưng gửi duyệt thất bại"
+              );
+            }
+          } catch (submitErr) {
+            setError(
+              "Tạo job thành công nhưng gửi duyệt thất bại. Vui lòng gửi duyệt thủ công."
+            );
+          }
+        }
+
         setSuccess(true);
         setTimeout(() => router.push("/jobs"), 1500);
       } else {
@@ -358,8 +432,55 @@ export default function CreateJobPage() {
         <Card>
           <CardContent className="p-6 text-center">
             <div className="text-green-600 text-lg font-semibold mb-2">
-              ✅ Tin của bạn đã được lưu nháp!
+              ✅ Tin của bạn đã được tạo thành công
             </div>
+            {submitMessage ? (
+              <p className="text-gray-700 mb-2">{submitMessage}</p>
+            ) : null}
+            {moderationResult?.type === "review" &&
+              moderationResult.reviewReasons &&
+              moderationResult.reviewReasons.length > 0 && (
+                <div className="text-left mt-4 space-y-2">
+                  <p className="font-semibold text-sm text-gray-800">
+                    Các vấn đề cần chỉnh sửa:
+                  </p>
+                  <ul className="space-y-2">
+                    {moderationResult.reviewReasons.map((reason, idx) => (
+                      <li
+                        key={idx}
+                        className={`p-2 rounded border text-sm ${
+                          reason.severity === "high"
+                            ? "bg-red-50 border-red-200 text-red-700"
+                            : reason.severity === "medium"
+                            ? "bg-orange-50 border-orange-200 text-orange-700"
+                            : "bg-yellow-50 border-yellow-200 text-yellow-700"
+                        }`}
+                      >
+                        {reason.message}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            {moderationResult?.type === "rejected" &&
+              moderationResult.reasons &&
+              moderationResult.reasons.length > 0 && (
+                <div className="text-left mt-4 space-y-2">
+                  <p className="font-semibold text-sm text-red-700">
+                    Lý do từ chối:
+                  </p>
+                  <ul className="space-y-2">
+                    {moderationResult.reasons.map((reason, idx) => (
+                      <li
+                        key={idx}
+                        className="p-2 rounded border bg-red-50 border-red-200 text-sm text-red-700"
+                      >
+                        {reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             <p className="text-gray-600">Đang chuyển về trang quản lý tin...</p>
           </CardContent>
         </Card>
@@ -704,7 +825,12 @@ export default function CreateJobPage() {
                 id="positions"
                 type="number"
                 min="1"
-                value={formData.positions === undefined || formData.positions === null ? "" : formData.positions}
+                value={
+                  formData.positions === undefined ||
+                  formData.positions === null
+                    ? ""
+                    : formData.positions
+                }
                 onChange={(e) => {
                   // Cho phép input là "" để user xóa số cũ và nhập số mới
                   const val = e.target.value;
@@ -712,7 +838,10 @@ export default function CreateJobPage() {
                     handleInputChange("positions", undefined);
                   } else {
                     const parsed = parseInt(val, 10);
-                    handleInputChange("positions", isNaN(parsed) || parsed < 1 ? 1 : parsed);
+                    handleInputChange(
+                      "positions",
+                      isNaN(parsed) || parsed < 1 ? 1 : parsed
+                    );
                   }
                 }}
                 required
@@ -828,9 +957,20 @@ export default function CreateJobPage() {
           >
             Hủy
           </Button>
-          <Button type="submit" disabled={loading}>
-            {loading ? "Đang tạo..." : "Tạo bài tuyển dụng"}
-          </Button>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={submitAfterCreate}
+                onChange={(e) => setSubmitAfterCreate(e.target.checked)}
+                className="h-4 w-4"
+              />
+              Gửi duyệt ngay sau khi tạo
+            </label>
+            <Button type="submit" disabled={loading}>
+              {loading ? "Đang tạo..." : "Tạo bài tuyển dụng"}
+            </Button>
+          </div>
         </div>
       </form>
     </div>

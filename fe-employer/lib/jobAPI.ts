@@ -35,6 +35,20 @@ export interface JobResponse {
   data?: any;
   message?: string;
   error?: string;
+  // Moderation fields
+  autoApproved?: boolean;
+  autoRejected?: boolean;
+  requiresReview?: boolean;
+  reviewReasons?: Array<{
+    type: string;
+    message: string;
+    severity: 'high' | 'medium' | 'low';
+  }>;
+  warnings?: string[];
+  reasons?: string[];
+  flags?: string[];
+  moderationScore?: number;
+  moderationMethod?: string;
 }
 
 export interface JobsListResponse {

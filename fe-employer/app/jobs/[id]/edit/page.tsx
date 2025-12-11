@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { CreateJobPayload, updateJob } from "@/lib/jobAPI";
+import { CreateJobPayload, updateJob, type JobResponse } from "@/lib/jobAPI";
 import { industryService, Industry } from "@/lib/industryAPI";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +22,15 @@ import { getCities, getDistricts, getWards } from "@/lib/vietnamAddress";
 import { findOptionByLabelLoose } from "@/lib/addressUtils";
 import { getJobById } from "@/lib/jobAPI";
 import { getToken } from "@/lib/userStorage";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const JOB_LEVELS = [
   { value: "Intern", label: "Thực tập sinh" },
@@ -60,6 +69,18 @@ export default function EditJobPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [moderationResult, setModerationResult] = useState<{
+    type: "approved" | "rejected" | "review";
+    message: string;
+    reviewReasons?: Array<{
+      type: string;
+      message: string;
+      severity: string;
+    }>;
+    reasons?: string[];
+    flags?: string[];
+  } | null>(null);
+  const [redirectAfterModal, setRedirectAfterModal] = useState(false);
 
   const [formData, setFormData] = useState<CreateJobPayload>({
     title: "",
@@ -472,9 +493,46 @@ export default function EditJobPage() {
         return;
       }
 
-      const result = await updateJob(jobId, payload, token);
+      const result = (await updateJob(jobId, payload, token)) as JobResponse;
 
       if (result.success) {
+        // Nếu backend trả về moderation info, hiển thị để employer biết lý do
+        if (result.autoApproved) {
+          setModerationResult({
+            type: "approved",
+            message:
+              result.message || "Job đã được tự động duyệt và đăng thành công",
+          });
+          setRedirectAfterModal(true);
+          return;
+        }
+
+        if (result.autoRejected) {
+          setModerationResult({
+            type: "rejected",
+            message:
+              result.message ||
+              "Job không được duyệt do chứa nội dung không phù hợp",
+            reasons: result.reasons || [],
+            flags: result.flags || [],
+          });
+          setRedirectAfterModal(true);
+          return;
+        }
+
+        if (result.requiresReview) {
+          setModerationResult({
+            type: "review",
+            message:
+              result.message || "Đã gửi duyệt. Vui lòng chờ admin phê duyệt",
+            reviewReasons: result.reviewReasons || [],
+            reasons: result.warnings || [],
+          });
+          setRedirectAfterModal(true);
+          return;
+        }
+
+        // Không có moderation info -> redirect bình thường
         router.push("/jobs");
       } else {
         setError(result.error || "Có lỗi xảy ra khi cập nhật bài tuyển dụng");
@@ -780,7 +838,9 @@ export default function EditJobPage() {
               </Label>
               <Input
                 id="address"
-                value={formData.address}
+                value={
+                  typeof formData.address === "string" ? formData.address : ""
+                }
                 onChange={(e) => handleInputChange("address", e.target.value)}
                 placeholder="Ví dụ: 123 Nguyễn Huệ, Tòa nhà ABC"
               />
@@ -974,6 +1034,118 @@ export default function EditJobPage() {
           </Button>
         </div>
       </form>
+
+      {/* Moderation Result Dialog */}
+      <AlertDialog
+        open={!!moderationResult}
+        onOpenChange={(open) => {
+          if (!open) {
+            setModerationResult(null);
+            if (redirectAfterModal) {
+              router.push("/jobs");
+            }
+          }
+        }}
+      >
+        <AlertDialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {moderationResult?.type === "approved" &&
+                "✅ Đã duyệt thành công"}
+              {moderationResult?.type === "rejected" && "❌ Không được duyệt"}
+              {moderationResult?.type === "review" && "⚠️ Cần xem xét"}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base">
+              {moderationResult?.message}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {/* Review Reasons */}
+          {moderationResult?.type === "review" &&
+            moderationResult.reviewReasons &&
+            moderationResult.reviewReasons.length > 0 && (
+              <div className="my-4">
+                <h4 className="font-semibold mb-3 text-sm">
+                  Các vấn đề cần lưu ý:
+                </h4>
+                <div className="space-y-2">
+                  {moderationResult.reviewReasons.map((reason, index) => (
+                    <div
+                      key={index}
+                      className={`p-3 rounded-lg border ${
+                        reason.severity === "high"
+                          ? "bg-red-50 border-red-200"
+                          : reason.severity === "medium"
+                          ? "bg-orange-50 border-orange-200"
+                          : "bg-yellow-50 border-yellow-200"
+                      }`}
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className="text-lg">
+                          {reason.severity === "high" && "🔴"}
+                          {reason.severity === "medium" && "🟠"}
+                          {reason.severity === "low" && "🟡"}
+                        </span>
+                        <p className="text-sm text-gray-700">
+                          {reason.message}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          {/* Rejection Reasons */}
+          {moderationResult?.type === "rejected" &&
+            moderationResult.reasons &&
+            moderationResult.reasons.length > 0 && (
+              <div className="my-4">
+                <h4 className="font-semibold mb-3 text-sm text-red-600">
+                  Lý do từ chối:
+                </h4>
+                <div className="space-y-2">
+                  {moderationResult.reasons.map((reason, index) => (
+                    <div
+                      key={index}
+                      className="p-3 rounded-lg bg-red-50 border border-red-200"
+                    >
+                      <p className="text-sm text-red-700">{reason}</p>
+                    </div>
+                  ))}
+                </div>
+                {moderationResult.flags &&
+                  moderationResult.flags.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-xs text-gray-500">
+                        Flags: {moderationResult.flags.join(", ")}
+                      </p>
+                    </div>
+                  )}
+              </div>
+            )}
+
+          <AlertDialogFooter>
+            <AlertDialogAction
+              onClick={() => {
+                setModerationResult(null);
+                if (redirectAfterModal) {
+                  router.push("/jobs");
+                }
+              }}
+              className={
+                moderationResult?.type === "approved"
+                  ? "bg-green-600 hover:bg-green-700"
+                  : moderationResult?.type === "rejected"
+                  ? "bg-red-600 hover:bg-red-700"
+                  : ""
+              }
+            >
+              Đã hiểu
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -886,7 +886,6 @@ export default function DashboardPage() {
                   <h3 className="text-lg font-semibold text-slate-900 mb-4">
                     Quản Lý Chung
                   </h3>
-                  <nav className="space-y-2">
                     <Link
                       href="/profile"
                       className="flex items-center gap-3 p-3 rounded-lg hover:bg-[oklch(0.60_0.12_195/.08)] transition-colors"
@@ -896,7 +895,7 @@ export default function DashboardPage() {
                         style={{ color: primaryColor }}
                       />
                       <span className="text-sm font-medium text-slate-700">
-                        Quản Lý Thông Tin
+                        Quản Lý Cá Nhân
                       </span>
                     </Link>
                     <Link
@@ -945,19 +944,6 @@ export default function DashboardPage() {
                         </span>
                       )}
                     </Link>
-                    <Link
-                      href="/profile"
-                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-[oklch(0.60_0.12_195/.08)] transition-colors"
-                    >
-                      <Settings
-                        className="w-5 h-5"
-                        style={{ color: primaryColor }}
-                      />
-                      <span className="text-sm font-medium text-slate-700">
-                        Quản Lý Tài Khoản
-                      </span>
-                    </Link>
-                  </nav>
                 </CardContent>
               </Card>
 
