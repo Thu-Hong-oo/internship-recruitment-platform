@@ -31,8 +31,8 @@ RUN if [ -f package-lock.json ]; then \
 # Install Python dependencies for Sentence-BERT
 # Copy requirements early so pip can install before app files are copied
 COPY ${APP_PATH}/python/requirements.txt /tmp/python-requirements.txt
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu \
+RUN pip install --no-cache-dir --upgrade --break-system-packages pip setuptools wheel && \
+    pip install --no-cache-dir --break-system-packages --extra-index-url https://download.pytorch.org/whl/cpu \
     -r /tmp/python-requirements.txt
 
 # Remove build dependencies to reduce image size (keep python3 and pip)
