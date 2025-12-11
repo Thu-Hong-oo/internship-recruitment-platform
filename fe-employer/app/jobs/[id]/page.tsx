@@ -169,20 +169,43 @@ export default function JobDetailPage() {
           limit: 5,
           minScore: 30,
         });
-        if (res.success && Array.isArray(res.data)) {
-          const mapped = res.data.map((item: any) => ({
-            candidateId: item.candidateId || item.candidate?._id || "",
-            name: item.candidate?.name || item.candidate?.fullName || "Ứng viên",
-            email: item.candidate?.email,
-            score: item.overallScore || item.matchScore || 0,
-            tier: item.tier,
-            matchedSkills:
-              item.breakdown?.skills?.matched ||
-              item.scoreBreakdown?.skillsScore?.details?.matchedSkills?.map(
-                (s: any) => s.skill
-              ) ||
-              [],
-          }));
+
+        const payload = res?.data || res;
+
+        // API returns either an array or { candidates: [...] }
+        const candidates = Array.isArray(payload?.data)
+          ? payload.data
+          : payload?.data?.candidates || payload?.candidates || [];
+
+        if (payload?.success && Array.isArray(candidates)) {
+          const mapped = candidates
+            .map((item: any) => {
+              const candidate =
+                item.candidate ||
+                item.candidateId ||
+                item.candidate_id ||
+                {};
+
+              return {
+                candidateId: candidate._id || item.candidateId || "",
+                name:
+                  candidate.fullName ||
+                  candidate.name ||
+                  candidate.email ||
+                  "Ứng viên",
+                email: candidate.email,
+                score: item.overallScore || item.matchScore || 0,
+                tier: item.tier || item.ranking?.tier,
+                matchedSkills:
+                  item.breakdown?.skills?.matched ||
+                  item.scoreBreakdown?.skillsScore?.details?.matchedSkills?.map(
+                    (s: any) => s.skill || s
+                  ) ||
+                  [],
+              };
+            })
+            // Hide candidates without email so actions remain usable
+            .filter((c: any) => !!c.email);
           setSuggestedCandidates(mapped);
         } else {
           setSuggestionError(res.message || "Không tải được gợi ý ứng viên");
@@ -789,7 +812,7 @@ export default function JobDetailPage() {
             {loadingSuggestions && (
               <p className="text-sm text-gray-600">Đang tải gợi ý ứng viên...</p>
             )}
-            {suggestionError && (
+            {suggestionError && suggestedCandidates.length === 0 && (
               <p className="text-sm text-red-600">{suggestionError}</p>
             )}
             {!loadingSuggestions &&
@@ -798,35 +821,67 @@ export default function JobDetailPage() {
                 <p className="text-sm text-gray-600">Chưa có gợi ý phù hợp.</p>
               )}
             <div className="space-y-3">
-              {suggestedCandidates.map((c) => (
-                <div
-                  key={c.candidateId}
-                  className="border border-blue-100 bg-white rounded-md p-3 flex justify-between items-start"
-                >
-                  <div>
-                    <p className="font-semibold text-gray-900">{c.name}</p>
-                    {c.email && (
-                      <p className="text-sm text-gray-600">{c.email}</p>
-                    )}
-                    {c.matchedSkills && c.matchedSkills.length > 0 && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Kỹ năng khớp: {c.matchedSkills.slice(0, 5).join(", ")}
-                        {c.matchedSkills.length > 5
-                          ? ` +${c.matchedSkills.length - 5}`
-                          : ""}
+              {suggestedCandidates.map((c) => {
+                const mailto = c.email
+                  ? `mailto:${c.email}?subject=Mời ứng tuyển - ${jobData?.title || "Cơ hội mới"}&body=Chào ${c.name},%0D%0AChúng tôi muốn mời bạn ứng tuyển vị trí ${jobData?.title || ""}.`
+                  : undefined;
+
+                return (
+                  <div
+                    key={c.candidateId}
+                    className="border border-blue-100 bg-white rounded-md p-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div className="space-y-1">
+                      <p className="font-semibold text-gray-900 flex items-center gap-2">
+                        {c.name}
+                        {c.tier && (
+                          <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
+                            Tier {c.tier}
+                          </span>
+                        )}
                       </p>
-                    )}
+                      {c.email && (
+                        <p className="text-sm text-gray-600">{c.email}</p>
+                      )}
+                      {c.matchedSkills && c.matchedSkills.length > 0 && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Kỹ năng khớp: {c.matchedSkills.slice(0, 5).join(", ")}
+                          {c.matchedSkills.length > 5
+                            ? ` +${c.matchedSkills.length - 5}`
+                            : ""}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col items-start gap-2 md:items-end">
+                      <div className="text-sm font-semibold text-blue-700">
+                        Điểm: {Math.round(c.score)}%
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            if (mailto) window.open(mailto, "_blank");
+                          }}
+                          disabled={!mailto}
+                        >
+                          Xem hồ sơ
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            if (mailto) window.open(mailto, "_blank");
+                          }}
+                          disabled={!mailto}
+                        >
+                          Mời ứng tuyển
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-blue-700">
-                      Điểm: {Math.round(c.score)}%
-                    </p>
-                    {c.tier && (
-                      <p className="text-xs text-gray-500">Tier {c.tier}</p>
-                    )}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
