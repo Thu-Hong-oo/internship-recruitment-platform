@@ -7,11 +7,14 @@ WORKDIR /app
 # Install build dependencies for native modules (sharp, etc.)
 # Also install Python and pip for Sentence-BERT service
 # Install curl for health checks
+# Install sqlite3 and libsqlite3-dev for ChromaDB
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
     build-essential \
     curl \
+    sqlite3 \
+    libsqlite3-dev \
     && ln -sf python3 /usr/bin/python \
     && ln -sf pip3 /usr/bin/pip \
     && rm -rf /var/lib/apt/lists/*

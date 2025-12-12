@@ -1,37 +1,42 @@
 #!/bin/sh
 # Startup script to start all services in correct order
+# Force output to be unbuffered
+set -e  # Exit on error
 
-echo "🚀 Starting services..."
+echo "🚀 Starting services..." >&2
 
 # Start Python model server in background
-echo "📦 Starting Sentence-BERT model server..."
-python3 python/model_server.py &
+echo "📦 Starting Sentence-BERT model server..." >&2
+python3 python/model_server.py >&2 &
 MODEL_PID=$!
+echo "Model server PID: $MODEL_PID" >&2
 
 # Start ChromaDB embedded server in background
-echo "🗄️ Starting ChromaDB embedded server..."
+echo "🗄️ Starting ChromaDB embedded server..." >&2
 
 # Test if chromadb can be imported
-echo "Testing ChromaDB import..."
-if ! python3 -c "import chromadb; print('ChromaDB import OK')" 2>&1; then
-  echo "❌ ERROR: ChromaDB cannot be imported. Check if it's installed."
-  echo "Run: pip install chromadb"
-else
-  echo "✅ ChromaDB import successful"
-fi
+echo "Testing ChromaDB import..." >&2
+python3 -c "import chromadb; print('ChromaDB import OK')" 2>&1 || {
+  echo "❌ ERROR: ChromaDB cannot be imported. Check if it's installed." >&2
+  echo "Run: pip install chromadb" >&2
+  # Don't exit, continue anyway
+}
 
-# Redirect output to stderr so it appears in logs
-python3 python/chromadb_embedded_server.py >&2 &
+# Start ChromaDB server and capture both stdout and stderr
+echo "Starting ChromaDB embedded server process..." >&2
+python3 -u python/chromadb_embedded_server.py 2>&1 &
 CHROMA_PID=$!
-echo "ChromaDB server PID: $CHROMA_PID"
+echo "ChromaDB server PID: $CHROMA_PID" >&2
 
 # Wait a moment and check if process is still running
-sleep 2
+sleep 3
 if ! kill -0 $CHROMA_PID 2>/dev/null; then
-  echo "❌ ERROR: ChromaDB server process died immediately after start"
-  echo "Check Python errors above"
+  echo "❌ ERROR: ChromaDB server process died immediately after start" >&2
+  echo "Check Python errors above" >&2
+  # Try to see what happened
+  wait $CHROMA_PID 2>&1 || true
 else
-  echo "✅ ChromaDB server process is running (PID: $CHROMA_PID)"
+  echo "✅ ChromaDB server process is running (PID: $CHROMA_PID)" >&2
 fi
 
 # Wait for ChromaDB to be ready
