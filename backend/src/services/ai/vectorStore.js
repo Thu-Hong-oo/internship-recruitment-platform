@@ -18,27 +18,54 @@ class VectorStore {
     if (process.env.CHROMA_URL) {
       // Use provided CHROMA_URL (external server or docker-compose)
       chromaUrl = process.env.CHROMA_URL;
-    } else if (process.env.NODE_ENV === 'production' || process.env.AWS_EXECUTION_ENV) {
+      logger.info(`Using ChromaDB URL from CHROMA_URL: ${chromaUrl}`);
+    } else if (process.env.NODE_ENV === 'production' || 
+               process.env.AWS_EXECUTION_ENV || 
+               process.env.AWS_LAMBDA_FUNCTION_NAME ||
+               process.env._?.includes('apprunner')) {
       // Production/App Runner: use embedded server (runs in same container)
       chromaUrl = 'http://localhost:8001';
+      logger.info('Using ChromaDB embedded server on port 8001 (production mode)');
     } else {
       // Local development: default to docker-compose ChromaDB
       chromaUrl = 'http://localhost:8000';
+      logger.info('Using ChromaDB on port 8000 (local development)');
     }
     
     this.client = new ChromaClient({ path: chromaUrl });
     this.collectionName = process.env.CHROMA_COLLECTION_JOBS || 'jobs';
     this.collectionPromise = null;
     this.isPrecomputed = false;
+    this.chromaUrl = chromaUrl; // Store for debugging
   }
 
   async _getCollection() {
     if (this.collectionPromise) return this.collectionPromise;
-    this.collectionPromise = this.client.getOrCreateCollection({
-      name: this.collectionName,
-      metadata: { description: 'Job embeddings for fast candidate matching' },
-    });
-    return this.collectionPromise;
+    
+    // Retry logic for embedded server (may need time to start)
+    let retries = 3;
+    let lastError;
+    
+    while (retries > 0) {
+      try {
+        this.collectionPromise = this.client.getOrCreateCollection({
+          name: this.collectionName,
+          metadata: { description: 'Job embeddings for fast candidate matching' },
+        });
+        return this.collectionPromise;
+      } catch (error) {
+        lastError = error;
+        retries--;
+        if (retries > 0) {
+          logger.warn(`Failed to connect to ChromaDB at ${this.chromaUrl}, retrying... (${retries} retries left)`);
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+        }
+      }
+    }
+    
+    // If all retries failed, throw error
+    logger.error(`Failed to connect to ChromaDB after retries: ${lastError?.message || lastError}`);
+    throw lastError || new Error(`Failed to connect to ChromaDB at ${this.chromaUrl}`);
   }
 
   _buildJobText(job) {

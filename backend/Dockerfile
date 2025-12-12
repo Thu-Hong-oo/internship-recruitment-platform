@@ -6,6 +6,7 @@ WORKDIR /app
 
 # Install build dependencies for native modules (sharp, etc.)
 # Also install Python and pip for Sentence-BERT service
+# Install curl for health checks
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
@@ -60,7 +61,11 @@ RUN pip cache purge || true && \
 COPY ${APP_PATH}/. .
 
 # Create necessary directories
-RUN mkdir -p /app/uploads /app/logs /app/models/sentence_bert_cache
+RUN mkdir -p /app/uploads /app/logs /app/models/sentence_bert_cache /tmp/chroma_db
+
+# Copy startup script
+COPY ${APP_PATH}/scripts/start-services.sh /app/scripts/start-services.sh
+RUN chmod +x /app/scripts/start-services.sh
 
 # Expose port
 EXPOSE 3000
@@ -69,5 +74,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Start application (Node.js + Python model server + ChromaDB embedded server)
-CMD ["sh", "-c", "python3 python/model_server.py & python3 python/chromadb_embedded_server.py & node server.js"]
+# Start application using startup script
+CMD ["/app/scripts/start-services.sh"]
