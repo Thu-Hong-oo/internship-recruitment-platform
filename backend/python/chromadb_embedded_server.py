@@ -28,11 +28,16 @@ PORT = int(os.getenv('CHROMADB_EMBEDDED_PORT', '8001'))
 
 # Initialize ChromaDB client in embedded mode
 try:
+    # Print immediately (unbuffered)
+    print(f"📁 ChromaDB data directory: {CHROMA_DB_PATH}", file=sys.stderr, flush=True)
+    
     # Create directory if it doesn't exist
     os.makedirs(CHROMA_DB_PATH, exist_ok=True)
     logger.info(f"📁 ChromaDB data directory: {CHROMA_DB_PATH}")
     
+    print("🔧 Initializing ChromaDB PersistentClient...", file=sys.stderr, flush=True)
     logger.info("🔧 Initializing ChromaDB PersistentClient...")
+    
     client = chromadb.PersistentClient(
         path=CHROMA_DB_PATH,
         settings=Settings(
@@ -40,13 +45,19 @@ try:
             allow_reset=True
         )
     )
-    logger.info(f"✅ ChromaDB embedded client initialized at {CHROMA_DB_PATH}")
+    success_msg = f"✅ ChromaDB embedded client initialized at {CHROMA_DB_PATH}"
+    print(success_msg, file=sys.stderr, flush=True)
+    logger.info(success_msg)
 except ImportError as e:
-    logger.error(f"❌ Failed to import chromadb: {e}")
+    error_msg = f"❌ Failed to import chromadb: {e}"
+    print(error_msg, file=sys.stderr, flush=True)
+    logger.error(error_msg)
     logger.error("Make sure chromadb is installed: pip install chromadb")
     sys.exit(1)
 except Exception as e:
-    logger.error(f"❌ Failed to initialize ChromaDB: {e}", exc_info=True)
+    error_msg = f"❌ Failed to initialize ChromaDB: {e}"
+    print(error_msg, file=sys.stderr, flush=True)
+    logger.error(error_msg, exc_info=True)
     sys.exit(1)
 
 
@@ -214,20 +225,30 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
 def run_server():
     """Start the ChromaDB embedded HTTP server"""
     try:
+        # Print startup messages immediately (unbuffered)
+        print(f"🚀 ChromaDB Embedded Server starting on port {PORT}", file=sys.stderr, flush=True)
+        print(f"📁 Database path: {CHROMA_DB_PATH}", file=sys.stderr, flush=True)
+        print(f"🌐 Server will listen on 0.0.0.0:{PORT}", file=sys.stderr, flush=True)
+        
         server = HTTPServer(('0.0.0.0', PORT), ChromaDBHandler)
         logger.info(f"🚀 ChromaDB Embedded Server starting on port {PORT}")
         logger.info(f"📁 Database path: {CHROMA_DB_PATH}")
         logger.info(f"🌐 Server will listen on 0.0.0.0:{PORT}")
+        print(f"✅ ChromaDB Embedded Server is ready and listening on port {PORT}", file=sys.stderr, flush=True)
         server.serve_forever()
     except OSError as e:
-        logger.error(f"❌ Failed to start server on port {PORT}: {e}")
+        error_msg = f"❌ Failed to start server on port {PORT}: {e}"
+        print(error_msg, file=sys.stderr, flush=True)
+        logger.error(error_msg)
         logger.error("Port may be in use or permission denied")
         sys.exit(1)
     except KeyboardInterrupt:
         logger.info("Shutting down ChromaDB Embedded Server...")
         server.shutdown()
     except Exception as e:
-        logger.error(f"❌ Unexpected error: {e}", exc_info=True)
+        error_msg = f"❌ Unexpected error: {e}"
+        print(error_msg, file=sys.stderr, flush=True)
+        logger.error(error_msg, exc_info=True)
         sys.exit(1)
 
 
