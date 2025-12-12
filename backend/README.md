@@ -646,7 +646,11 @@ GEMINI_API_KEY=your_gemini_api_key_here
 PHOBERT_MODEL_PATH=./models/phobert-cv-ner-final
 
 # Sentence-BERT Model
-SBERT_MODEL_NAME=paraphrase-multilingual-mpnet-base-v2
+SBERT_MODEL_NAME=bkai-foundation-models/vietnamese-bi-encoder
+
+# Performance Tuning (optional)
+SENTENCE_BERT_CHECK_TIMEOUT_MS=60000  # 60 seconds for model loading
+PYTHON_CMD=python                      # or 'py' on Windows
 
 # ChromaDB (Vector Database)
 # For Docker: Use http://chromadb:8000 (service name in docker-compose)
@@ -862,6 +866,47 @@ npm test -- tests/services/skillExtractionService.test.js
 npm run test:coverage
 ```
 
+### Performance Testing
+
+**Sentence-BERT Performance Test:**
+
+```bash
+node scripts/test-sentence-bert-performance.js
+```
+
+**Output Example:**
+```
+🔍 Testing Sentence-BERT Performance...
+
+Test 1: Model Availability
+✅ Available: true (150ms)
+
+Test 2: Single Text Encoding
+✅ Embedding dimension: 768
+⏱️ Time: 523ms
+
+Test 3: Batch Encoding (10 texts)
+✅ Encoded 10 texts
+⏱️ Total time: 1234ms
+⏱️ Average per text: 123.40ms
+
+Test 4: Similarity Batch (Job Matching Simulation)
+✅ Compared 1 job skill vs 12 candidate skills
+⏱️ Time: 456ms
+
+Test 5: Multiple Queries Performance Test
+Old Method (Sequential): ⏱️ Time: 1823ms (3 Python calls)
+New Method (Parallel): ⏱️ Time: 645ms (parallel execution)
+🚀 Performance improvement: ~182% faster!
+```
+
+**Important Notes:**
+- **First run**: Slower (~30-60s) due to model download from HuggingFace
+- **Subsequent runs**: Fast (~5-10s) using cached model
+- **Cache location**: `backend/models/sentence_bert_cache/`
+
+See [SENTENCE_BERT_OPTIMIZATION.md](SENTENCE_BERT_OPTIMIZATION.md) for details.
+
 ### AI/NLP Evaluation
 
 **Quick Evaluation** (Fast, uses real services):
@@ -956,6 +1001,139 @@ async extractSkillsFromText(text, options = {}) {
 Full API documentation available at:
 - Swagger UI: `http://localhost:3000/api-docs` (when server running)
 - Postman Collections: Import from `postman/` folder
+
+---
+
+## 🐛 Troubleshooting
+
+### Sentence-BERT Performance Issues
+
+#### ❌ Problem: Job matching takes too long (30+ seconds per job)
+
+**Symptoms:**
+```
+error: ⏱️ Sentence-BERT timeout after 30s
+error: ❌ Python script error (code null)
+```
+
+**Solutions:**
+
+1. **First-time setup** (Model downloading):
+   - ✅ **Expected behavior** - Model downloads from HuggingFace (~200MB)
+   - Check progress: Model will be cached to `backend/models/sentence_bert_cache/`
+   - Subsequent runs will be much faster
+
+2. **Increase timeout** (if needed):
+```bash
+# .env file
+SENTENCE_BERT_CHECK_TIMEOUT_MS=120000  # 2 minutes for first load
+```
+
+3. **Verify cache**:
+```bash
+ls -la backend/models/sentence_bert_cache/
+# Should contain: bkai-foundation-models_vietnamese-bi-encoder/
+```
+
+4. **Test performance**:
+```bash
+node scripts/test-sentence-bert-performance.js
+```
+
+5. **Clear cache and retry** (if corrupted):
+```bash
+rm -rf backend/models/sentence_bert_cache/
+# Restart server to re-download
+```
+
+**Expected Performance:**
+- **First run**: 30-60 seconds (downloading model)
+- **Subsequent runs**: 5-10 seconds per job
+- **After optimization**: ~80% faster
+
+See [SENTENCE_BERT_OPTIMIZATION.md](SENTENCE_BERT_OPTIMIZATION.md) for detailed guide.
+
+### PhoBERT Not Loading
+
+#### ❌ Problem: PhoBERT model not found
+
+**Solution:**
+```bash
+# Check model directory
+ls -la backend/models/phobert-cv-ner-final/
+
+# Should contain:
+# - config.json
+# - pytorch_model.bin
+# - vocab.txt
+```
+
+If missing, download from project repository or train your own model.
+
+### Python Command Not Found
+
+#### ❌ Problem: `Python not found (code 1)`
+
+**Solutions:**
+
+**Windows:**
+```bash
+# Set Python command in .env
+PYTHON_CMD=py
+# or
+PYTHON_CMD=python3
+```
+
+**Linux/Mac:**
+```bash
+# Install Python 3.8+
+sudo apt install python3 python3-pip  # Ubuntu
+brew install python3                   # macOS
+
+# Verify
+python3 --version
+```
+
+### ChromaDB Connection Error
+
+#### ❌ Problem: `ChromaDB client initialization failed`
+
+**Solution:**
+```bash
+# Start ChromaDB with Docker
+docker run -d -p 8000:8000 chromadb/chroma
+
+# Verify connection
+curl http://localhost:8000/api/v1/heartbeat
+```
+
+### High Memory Usage
+
+#### ❌ Problem: Server using too much RAM
+
+**Solutions:**
+
+1. **Reduce batch sizes**:
+```javascript
+// src/config/ai.config.js
+phobert: {
+  batchSize: 8  // Reduce from 16 to 8
+}
+```
+
+2. **Use CPU instead of GPU** (already default):
+```python
+# python/sentence_bert_inference.py
+model = SentenceTransformer(MODEL_NAME, device='cpu')
+```
+
+3. **Limit concurrent job matching**:
+```javascript
+// Process jobs in smaller batches
+const BATCH_SIZE = 5;  // Adjust based on RAM
+```
+
+### API Documentation
 
 ---
 

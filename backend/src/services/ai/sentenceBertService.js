@@ -6,22 +6,28 @@
  * - Semantic similarity calculation
  * - CV-Job matching
  * 
- * Model: paraphrase-multilingual-mpnet-base-v2 (768 dim)
- * Source: sentence-transformers/paraphrase-multilingual-mpnet-base-v2
+ * Model: bkai-foundation-models/vietnamese-bi-encoder (lighter, VN-optimized)
+ * Source: bkai-foundation-models/vietnamese-bi-encoder
  * 
  * NO external API dependency - runs locally with Python
  */
 
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const path = require('path');
 const { logger } = require('../../utils/logger');
 
 class SentenceBertService {
   constructor() {
     this.pythonScript = path.join(__dirname, '../../../python/sentence_bert_inference.py');
-    this.modelName = 'paraphrase-multilingual-mpnet-base-v2';
+    this.modelServerScript = path.join(__dirname, '../../../python/model_server.py');
+    this.modelName = 'bkai-foundation-models/vietnamese-bi-encoder';
     this.embeddingDim = 768;
     this.isAvailable = false;
+    this.modelProcess = null;
+    this.modelReadyPromise = null;
+    this.pendingRequests = new Map(); // id -> {resolve,reject,timeoutId}
+    this.nextRequestId = 1;
+    this.stdoutBuffer = '';
     
     // Check if model is available (non-blocking, reduced load)
     this._checkAvailability();
@@ -31,32 +37,13 @@ class SentenceBertService {
    * Check if Sentence-BERT model is available
    */
   async _checkAvailability() {
+    // Use persistent model server as availability check to avoid spawning per call
     try {
-      // Check if Python script exists first
-      const fs = require('fs');
-      if (!fs.existsSync(this.pythonScript)) {
-        logger.warn(`⚠️ Sentence-BERT script not found: ${this.pythonScript}`);
-        this.isAvailable = false;
-        return;
-      }
-
-      const checkTimeoutMs = parseInt(process.env.SENTENCE_BERT_CHECK_TIMEOUT_MS || '45000', 10);
-      const result = await this._runPython(['--check'], checkTimeoutMs);
-      this.isAvailable = result.success;
-      
-      if (this.isAvailable) {
-        logger.info(`✅ Sentence-BERT model available: ${this.modelName}`);
-      } else {
-        logger.warn('⚠️ Sentence-BERT model not available. Run: pip install sentence-transformers');
-        this.isAvailable = false;
-      }
+      await this._ensureModelServer(parseInt(process.env.SENTENCE_BERT_CHECK_TIMEOUT_MS || '180000', 10));
+      this.isAvailable = true;
+      logger.info(`✅ Sentence-BERT model available (server ready): ${this.modelName}`);
     } catch (error) {
-      // Don't log full error if Python not found (expected on some systems)
-      if (error.message.includes('ENOENT') || error.message.includes('command not found') || error.message.includes('Failed to start Python')) {
-        logger.warn('⚠️ Sentence-BERT unavailable (Python not found). System will use fallback methods.');
-      } else {
-        logger.warn('⚠️ Sentence-BERT check failed:', error.message.substring(0, 100));
-      }
+      logger.warn(`⚠️ Sentence-BERT check failed: ${error.message}`);
       this.isAvailable = false;
     }
   }
@@ -71,22 +58,17 @@ class SentenceBertService {
       throw new Error('Invalid text input');
     }
 
+    // Ensure availability (lazy re-check)
+    if (!this.isAvailable) {
+      await this._checkAvailability();
+    }
     if (!this.isAvailable) {
       throw new Error('Sentence-BERT not available');
     }
 
-    try {
-      const result = await this._runPython(['--encode', text]);
-      
-      if (!result.success || !result.embedding) {
-        throw new Error('Failed to generate embedding');
-      }
-
-      return result.embedding; // Array of 768 floats
-    } catch (error) {
-      logger.warn('⚠️ Sentence-BERT encoding error:', error.message.substring(0, 100));
-      throw error;
-    }
+    // Use batch path to avoid shell argument parsing issues with long text
+    const embeddings = await this.encodeBatch([text]);
+    return embeddings[0];
   }
 
   /**
@@ -100,7 +82,10 @@ class SentenceBertService {
     }
 
     try {
-      const result = await this._runPython(['--encode-batch', JSON.stringify(texts)]);
+      const result = await this._sendToModelServer({
+        action: 'encode_batch',
+        texts
+      });
       
       if (!result.success || !result.embeddings) {
         throw new Error('Failed to generate batch embeddings');
@@ -125,7 +110,11 @@ class SentenceBertService {
     }
 
     try {
-      const result = await this._runPython(['--similarity', text1, text2]);
+      const result = await this._sendToModelServer({
+        action: 'similarity',
+        text1,
+        text2
+      });
       
       if (!result.success || result.similarity === undefined) {
         throw new Error('Failed to calculate similarity');
@@ -150,11 +139,11 @@ class SentenceBertService {
     }
 
     try {
-      const result = await this._runPython([
-        '--similarity-batch', 
-        query, 
-        JSON.stringify(documents)
-      ]);
+      const result = await this._sendToModelServer({
+        action: 'similarity_batch',
+        query,
+        docs: documents
+      });
       
       if (!result.success || !result.similarities) {
         throw new Error('Failed to calculate batch similarities');
@@ -178,10 +167,10 @@ class SentenceBertService {
     }
 
     try {
-      const result = await this._runPython([
-        '--similarity-matrix', 
-        JSON.stringify(texts)
-      ]);
+      const result = await this._sendToModelServer({
+        action: 'similarity_matrix',
+        texts
+      });
       
       if (!result.success || !result.matrix) {
         throw new Error('Failed to calculate similarity matrix');
@@ -195,10 +184,157 @@ class SentenceBertService {
   }
 
   /**
+   * Persistent model server (stdin/stdout) to avoid spawning Python per job
+   */
+  _ensureModelServer(timeoutMs = 120000) {
+    if (this.modelReadyPromise) {
+      return this.modelReadyPromise;
+    }
+
+    this.modelReadyPromise = new Promise((resolve, reject) => {
+      const fs = require('fs');
+      if (!fs.existsSync(this.modelServerScript)) {
+        logger.error(`❌ Model server script not found: ${this.modelServerScript}`);
+        this.modelReadyPromise = null;
+        return reject(new Error('Model server script missing'));
+      }
+
+      const pythonCmd = this._resolvePythonCmd();
+      logger.info(`🚀 Starting SBERT model server: ${pythonCmd} ${this.modelServerScript}`);
+
+      this.modelProcess = spawn(pythonCmd, [this.modelServerScript], {
+        env: { ...process.env, PYTHONUNBUFFERED: '1' },
+        shell: process.platform === 'win32'
+      });
+
+      // Handle stdout lines
+      this.modelProcess.stdout.on('data', (data) => {
+        this.stdoutBuffer += data.toString();
+        const lines = this.stdoutBuffer.split('\n');
+        this.stdoutBuffer = lines.pop(); // keep tail
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          if (trimmed === 'MODEL_READY') {
+            logger.info('✅ SBERT model server ready (persistent process)');
+            this.isAvailable = true;
+            resolve(true);
+            continue;
+          }
+          try {
+            const resp = JSON.parse(trimmed);
+            const pending = this.pendingRequests.get(resp.id);
+            if (pending) {
+              clearTimeout(pending.timeoutId);
+              this.pendingRequests.delete(resp.id);
+              pending.resolve(resp);
+            } else {
+              logger.warn(`⚠️ Received response for unknown request id=${resp.id}`);
+            }
+          } catch (err) {
+            logger.error('❌ Failed to parse model server output:', err.message);
+          }
+        }
+      });
+
+      this.modelProcess.stderr.on('data', (data) => {
+        const msg = data.toString();
+        // Only log first 500 chars to avoid noise
+        logger.warn(`⚠️ Model server stderr: ${msg.substring(0, 500)}`);
+      });
+
+      this.modelProcess.on('close', (code) => {
+        logger.error(`❌ Model server exited with code ${code}`);
+        this.isAvailable = false;
+        this.modelReadyPromise = null;
+        // reject all pending
+        for (const [, pending] of this.pendingRequests.entries()) {
+          clearTimeout(pending.timeoutId);
+          pending.reject(new Error(`Model server exited with code ${code}`));
+        }
+        this.pendingRequests.clear();
+        reject(new Error(`Model server exited with code ${code}`));
+      });
+
+      this.modelProcess.on('error', (err) => {
+        logger.error(`❌ Failed to start model server: ${err.message}`);
+        this.isAvailable = false;
+        this.modelReadyPromise = null;
+        reject(err);
+      });
+
+      // Safety timeout for ready
+      setTimeout(() => {
+        if (!this.isAvailable) {
+          logger.error('⏱️ Model server startup timeout');
+          this.modelReadyPromise = null;
+          reject(new Error('Model server startup timeout'));
+        }
+      }, timeoutMs);
+    });
+
+    return this.modelReadyPromise;
+  }
+
+  _sendToModelServer(payload, timeoutMs = 60000) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        await this._ensureModelServer();
+      } catch (err) {
+        return reject(err);
+      }
+
+      const id = this.nextRequestId++;
+      const message = { id, ...payload };
+      const jsonLine = JSON.stringify(message) + '\n';
+
+      const timeoutId = setTimeout(() => {
+        this.pendingRequests.delete(id);
+        reject(new Error(`Model server timeout after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      this.pendingRequests.set(id, { resolve, reject, timeoutId });
+
+      const ok = this.modelProcess.stdin.write(jsonLine);
+      if (!ok) {
+        this.modelProcess.stdin.once('drain', () => {});
+      }
+    });
+  }
+
+  /**
    * Execute Python script
    * @private
    */
-  _runPython(args, timeoutMs = 30000) {
+  _resolvePythonCmd() {
+    const fs = require('fs');
+    const envCmd = process.env.PYTHON_CMD;
+    const candidates = envCmd
+      ? [envCmd]
+      : process.platform === 'win32'
+        ? ['python', 'py', 'py -3']
+        : ['python3', 'python'];
+
+    for (const cmd of candidates) {
+      try {
+        const result = spawnSync(cmd, ['--version'], {
+          shell: process.platform === 'win32',
+          env: { ...process.env, PYTHONUNBUFFERED: '1' },
+          stdio: 'pipe',
+          timeout: 5000,
+        });
+        if (result.status === 0 || result.error === undefined) {
+          return cmd;
+        }
+      } catch (_) {
+        // continue to next candidate
+      }
+    }
+
+    return candidates[candidates.length - 1];
+  }
+
+  _runPython(args, timeoutMs = 90000) {
     return new Promise((resolve, reject) => {
       // Check if Python script exists
       const fs = require('fs');
@@ -207,18 +343,8 @@ class SentenceBertService {
         return reject(new Error(`Python script not found: ${this.pythonScript}`));
       }
 
-      // Detect Python command based on OS
-      // Windows: try 'python' or 'py', Linux/Mac: try 'python3' then 'python'
-      let pythonCmd = process.env.PYTHON_CMD;
-      if (!pythonCmd) {
-        if (process.platform === 'win32') {
-          // Windows: try 'python' first, then 'py' launcher
-          pythonCmd = 'python';
-        } else {
-          // Linux/Mac: try 'python3' first
-          pythonCmd = 'python3';
-        }
-      }
+      // Resolve Python command with fallbacks (python -> py -> py -3)
+      const pythonCmd = this._resolvePythonCmd();
       
       logger.debug(`🔍 Running: ${pythonCmd} ${this.pythonScript} ${args.join(' ')}`);
       

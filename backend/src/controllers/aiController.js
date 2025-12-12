@@ -1092,7 +1092,8 @@ class AIController {
    * Lấy gợi ý ứng viên phù hợp cho một job (Employer only)
    */
   async getCandidateRecommendations(req, res) {
-    const { jobId, limit = 10, minScore = 60 } = req.body;
+    const { jobId, limit = 10, minScore = 60, useRAG: useRAGBody, noCache: noCacheBody } = req.body;
+    const noCache = req.query.noCache === 'true' || noCacheBody === true;
 
     try {
       const Job = require('../models/Job');
@@ -1115,21 +1116,24 @@ class AIController {
         return ApiResponse.error(res, 'Not authorized to view recommendations for this job', 403);
       }
 
-      // Check cache first
+      // Check cache first (skip if noCache or useRAG)
       const cacheService = getCacheService();
-      const cached = await cacheService.getCachedCandidateRecommendations(jobId);
-      if (cached && cached.length > 0) {
-        logger.info(`Retrieved ${cached.length} candidate recommendations from cache for job ${jobId}`);
-        return ApiResponse.success(
-          res,
-          {
-            recommendations: cached,
-            totalCandidates: cached.length,
-            filteredCount: cached.length,
-            cached: true,
-          },
-          'Candidate recommendations retrieved from cache'
-        );
+      const useRAG = useRAGBody === true || process.env.ENABLE_RAG_RECOMMENDATIONS === 'true';
+      if (!noCache && !useRAG) {
+        const cached = await cacheService.getCachedCandidateRecommendations(jobId);
+        if (cached && cached.length > 0) {
+          logger.info(`Retrieved ${cached.length} candidate recommendations from cache for job ${jobId}`);
+          return ApiResponse.success(
+            res,
+            {
+              recommendations: cached,
+              totalCandidates: cached.length,
+              filteredCount: cached.length,
+              cached: true,
+            },
+            'Candidate recommendations retrieved from cache'
+          );
+        }
       }
 
       // Get all active candidate profiles
@@ -1167,11 +1171,13 @@ class AIController {
         {
           limit: parseInt(limit),
           minScore: parseInt(minScore),
+          useRAG: useRAG, // Pass useRAG option to enable RAG
+          noCache: noCache
         }
       );
 
       // Cache results (1 hour)
-      if (recommendations.length > 0) {
+      if (!noCache && !useRAG && recommendations.length > 0) {
         await cacheService.cacheCandidateRecommendations(jobId, recommendations, 3600);
       }
 
