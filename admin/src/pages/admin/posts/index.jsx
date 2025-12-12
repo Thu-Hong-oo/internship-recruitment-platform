@@ -48,8 +48,6 @@ const SYSTEM_COLORS = {
   cyan: "#13c2c2",
 };
 
-const formatDate = (value) => new Date(value).toLocaleString("vi-VN");
-
 const statusColor = (status) => {
   switch (status) {
     case "active":
@@ -132,7 +130,9 @@ const Jobs = () => {
             )}
             <div>
               <div style={{ fontWeight: 500 }}>
-                {record?.employer?.company?.name || record?.employer?.name || "-"}
+                {record?.employer?.company?.name ||
+                  record?.employer?.name ||
+                  "-"}
               </div>
               {record?.employer?.email && (
                 <div style={{ color: "#667085", fontSize: 12 }}>
@@ -163,9 +163,7 @@ const Jobs = () => {
               </Tag>
             ))}
             {(skills || []).length > 3 ? (
-              <Tag style={{ margin: 0 }}>
-                +{(skills || []).length - 3}
-              </Tag>
+              <Tag style={{ margin: 0 }}>+{(skills || []).length - 3}</Tag>
             ) : null}
           </Space>
         ),
@@ -214,7 +212,9 @@ const Jobs = () => {
         key: "createdAt",
         width: 150,
         render: (v) => (
-          <span style={{ color: "#667085" }}>{moment(v).format("DD/MM/YYYY")}</span>
+          <span style={{ color: "#667085" }}>
+            {moment(v).format("DD/MM/YYYY")}
+          </span>
         ),
       },
       {
@@ -394,7 +394,6 @@ const Jobs = () => {
             Quản lý và theo dõi tất cả bài đăng tuyển dụng trong hệ thống
           </Text>
         </div>
-        
       </div>
 
       {/* Stat Cards */}
