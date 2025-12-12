@@ -179,70 +179,61 @@ export default function JobDetailPage() {
           noCache: true,
         });
 
-<<<<<<< HEAD
-        const payload: any = res?.data || res;
-
-        // API returns either an array or { candidates: [...] }
-        const candidates: any[] = Array.isArray(payload?.data)
-          ? payload.data
-          : payload?.data?.candidates || payload?.candidates || [];
-
-      if (payload?.success !== false && Array.isArray(candidates)) {
-          const normalizeSkills = (list: any) =>
-            Array.isArray(list)
-              ? list
-                  .map((s: any) => (typeof s === "string" ? s : s?.name || s))
-                  .filter(Boolean)
-              : [];
-
-          const extractSkills = (candidate: any) => {
-            const skills: string[] = [];
-            skills.push(...normalizeSkills(candidate.skills));
-            skills.push(...normalizeSkills(candidate.skills?.technical));
-            skills.push(...normalizeSkills(candidate.skills?.soft));
-            skills.push(...normalizeSkills(candidate.cv?.skills));
-            skills.push(...normalizeSkills(candidate.cv?.skills?.technical));
-            skills.push(...normalizeSkills(candidate.cv?.skills?.soft));
-            return Array.from(new Set(skills)).slice(0, 20);
-          };
-
-          const extractExperience = (candidate: any) => {
-            const exp: any[] = [];
-            const cvExp = Array.isArray(candidate.cv?.experience)
-              ? candidate.cv.experience
-              : [];
-            const internships = Array.isArray(candidate.experience?.internships)
-              ? candidate.experience.internships
-              : [];
-            const jobs = Array.isArray(candidate.experience?.jobs)
-              ? candidate.experience.jobs
-              : [];
-            const all = [...cvExp, ...internships, ...jobs];
-            return all
-              .map((e: any) => {
-                const position = e?.position || e?.title;
-                const company = e?.company;
-                return position ? `${position}${company ? " @ " + company : ""}` : null;
-              })
-              .filter(Boolean)
-              .slice(0, 5);
-          };
-
-          const extractEducation = (candidate: any) => {
-            const edu =
-              candidate.cv?.education?.[0] ||
-              candidate.education?.university ||
-              candidate.education?.[0];
-            return {
-              degree: edu?.degree || edu?.type || "",
-              major: edu?.major || edu?.field || "",
-              institution: edu?.institution || edu?.name || "",
-            };
-          };
-
-=======
         const payload = res?.data || res;
         const payloadObj = payload as any;
+
+        // Helper functions
+        const normalizeSkills = (list: any) =>
+          Array.isArray(list)
+            ? list
+                .map((s: any) => (typeof s === "string" ? s : s?.name || s))
+                .filter(Boolean)
+            : [];
+
+        const extractSkills = (candidate: any) => {
+          const skills: string[] = [];
+          skills.push(...normalizeSkills(candidate.skills));
+          skills.push(...normalizeSkills(candidate.skills?.technical));
+          skills.push(...normalizeSkills(candidate.skills?.soft));
+          skills.push(...normalizeSkills(candidate.cv?.skills));
+          skills.push(...normalizeSkills(candidate.cv?.skills?.technical));
+          skills.push(...normalizeSkills(candidate.cv?.skills?.soft));
+          return Array.from(new Set(skills)).slice(0, 20);
+        };
+
+        const extractExperience = (candidate: any) => {
+          const exp: any[] = [];
+          const cvExp = Array.isArray(candidate.cv?.experience)
+            ? candidate.cv.experience
+            : [];
+          const internships = Array.isArray(candidate.experience?.internships)
+            ? candidate.experience.internships
+            : [];
+          const jobs = Array.isArray(candidate.experience?.jobs)
+            ? candidate.experience.jobs
+            : [];
+          const all = [...cvExp, ...internships, ...jobs];
+          return all
+            .map((e: any) => {
+              const position = e?.position || e?.title;
+              const company = e?.company;
+              return position ? `${position}${company ? " @ " + company : ""}` : null;
+            })
+            .filter(Boolean)
+            .slice(0, 5);
+        };
+
+        const extractEducation = (candidate: any) => {
+          const edu =
+            candidate.cv?.education?.[0] ||
+            candidate.education?.university ||
+            candidate.education?.[0];
+          return {
+            degree: edu?.degree || edu?.type || "",
+            major: edu?.major || edu?.field || "",
+            institution: edu?.institution || edu?.name || "",
+          };
+        };
 
         // API returns either an array or { candidates: [...] }
         let candidates: any[] = [];
@@ -255,8 +246,7 @@ export default function JobDetailPage() {
             payloadObj?.data?.candidates || payloadObj?.candidates || [];
         }
 
-        if (payloadObj?.success && Array.isArray(candidates)) {
->>>>>>> 4a0effbbd3cf5d43f5ca8e23915a35d3d4b2e53c
+        if (payloadObj?.success !== false && Array.isArray(candidates)) {
           const mapped = candidates
             .map((item: any) => {
               const candidate =
