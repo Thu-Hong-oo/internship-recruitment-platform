@@ -1,5 +1,6 @@
 const aiService = require('../services/ai/aiService');
 const ragService = require('../services/dataCrawlers/ragService');
+const { getRAGRecommendationService } = require('../services/ai/ragRecommendationService');
 const LearningRoadmap = require('../models/LearningRoadmap');
 const CVMatchingScore = require('../models/CVMatchingScore');
 const Job = require('../models/Job');
@@ -7,6 +8,7 @@ const User = require('../models/User');
 const CandidateProfile = require('../models/CandidateProfile');
 const { logger } = require('../utils/logger');
 const { getCacheService } = require('../config/initializeServices');
+const { getFastMatcherService } = require('../services/ai/fastMatcherService');
 
 /**
  * Recalculate matching scores for a candidate across all active jobs.
@@ -91,7 +93,7 @@ class AdvancedNLPController {
    */
   async calculateMatchingScore(req, res) {
     try {
-      const { cvData, jobId, candidateId, forceRecalculate } = req.body;
+      const { cvData, jobId, candidateId, forceRecalculate, useRAG } = req.body;
       const userId = req.user._id;
 
       // Validate input
@@ -141,6 +143,8 @@ class AdvancedNLPController {
           skills: allSkills,
           resume: candidateProfile.resume?.current,
           extractedText: candidateProfile.resume?.current?.aiAnalysis?.extractedData || {},
+          _id: candidateProfile._id || candidateProfile.id || finalCandidateId,
+          id: candidateProfile._id || candidateProfile.id || finalCandidateId,
         };
       }
 
@@ -160,20 +164,47 @@ class AdvancedNLPController {
         });
       }
 
-      // CACHE DISABLED: Always calculate fresh matching score
-      // Reason: CV data changes frequently, weights updated, algorithm improvements
-      // Old cached results become stale and misleading
-      logger.info(`🔄 Calculating new matching score for candidate ${finalCandidateId} and job ${jobId}`);
-      
-      const matchingResult = await aiService.calculateAdvancedMatchScore(
-        finalCvData,
-        job,
-        {
-          candidateId: finalCandidateId,
-          jobId,
-          saveToDatabase: true,
+      // Decide engine: RAG hybrid if enabled/requested
+      const shouldUseRAG =
+        useRAG === true || process.env.ENABLE_RAG_RECOMMENDATIONS === 'true';
+
+      let matchingResult;
+
+      if (shouldUseRAG) {
+        logger.info(
+          `🔄 Calculating RAG hybrid score for candidate ${finalCandidateId} and job ${jobId}`
+        );
+        const ragRecSvc = getRAGRecommendationService();
+        matchingResult = await ragRecSvc.calculatePairScore(finalCvData, job.toObject ? job.toObject() : job);
+
+        // Persist to CVMatchingScore for visibility/history
+        if (finalCandidateId && jobId) {
+          await CVMatchingScore.deleteMany({ candidateId: finalCandidateId, jobId });
+          await CVMatchingScore.create({
+            ...matchingResult,
+            candidateId: finalCandidateId,
+            jobId,
+            calculationMethod: 'rag-hybrid',
+          });
         }
-      );
+      } else {
+        // CACHE DISABLED: Always calculate fresh matching score
+        // Reason: CV data changes frequently, weights updated, algorithm improvements
+        // Old cached results become stale and misleading
+        logger.info(
+          `🔄 Calculating advanced matching score for candidate ${finalCandidateId} and job ${jobId}`
+        );
+
+        matchingResult = await aiService.calculateAdvancedMatchScore(
+          finalCvData,
+          job,
+          {
+            candidateId: finalCandidateId,
+            jobId,
+            saveToDatabase: true,
+          }
+        );
+      }
 
       res.status(200).json({
         success: true,
@@ -1850,6 +1881,8 @@ class AdvancedNLPController {
         skills: allSkills,
         resume: candidateProfile.resume?.current,
         extractedText: candidateProfile.resume?.current?.aiAnalysis?.extractedData || {},
+        _id: candidateProfile._id || candidateProfile.id || candidateUserId,
+        id: candidateProfile._id || candidateProfile.id || candidateUserId,
       };
 
     // Validate profile data - check if profile is essentially empty
@@ -1909,7 +1942,32 @@ class AdvancedNLPController {
       });
     }
 
-      // 3. Fetch all active jobs
+      // FAST VECTOR PIPELINE (default): encode ứng viên 1 lần, query top-K từ vector DB, chấm chi tiết 4 yếu tố
+      const useFastVector =
+        req.body.useVectorDB !== false &&
+        process.env.ENABLE_FAST_VECTOR_MATCH !== 'false';
+
+      if (useFastVector) {
+        logger.info('🚀 Using fast vector DB pipeline for matching');
+        const fastMatcher = getFastMatcherService();
+        const results = await fastMatcher.matchCandidate(candidateProfile, {
+          topN: 15,
+          vectorTopK: 60,
+          saveScores: true,
+        });
+
+        return res.status(200).json({
+          success: true,
+          message: 'Matching scores calculated successfully (fast vector pipeline)',
+          data: {
+            calculated: results.length,
+            total: results.length,
+            results,
+          },
+        });
+      }
+
+      // Legacy fallback path (kept for compatibility)
       const activeJobs = await Job.find({ status: 'active' })
         .populate('skills')
         .populate('employer', 'companyName')
@@ -1926,15 +1984,13 @@ class AdvancedNLPController {
         });
       }
 
-      // 4. Calculate matching scores for each job (PARALLEL PROCESSING)
       let successCount = 0;
       let errorCount = 0;
       const topMatches = [];
 
-      logger.info(`📊 Starting calculation for ${activeJobs.length} jobs...`);
+      logger.info(`📊 Starting calculation for ${activeJobs.length} jobs (legacy path)...`);
 
-      // Process jobs in parallel batches for better performance
-      const BATCH_SIZE = 5; // Process 5 jobs at a time
+      const BATCH_SIZE = 5; // legacy batch size
       const batches = [];
       
       for (let i = 0; i < activeJobs.length; i += BATCH_SIZE) {
@@ -1970,16 +2026,28 @@ class AdvancedNLPController {
                 employmentType: job.employmentType,
               };
 
-              // Calculate matching score
-              const matchingResult = await aiService.calculateAdvancedMatchScore(
-                cvData,
-                jobData,
-                {
-                  candidateId: candidateUserId,
-                  jobId: job._id,
-                  forceRecalculate: false,
-                }
-              );
+              // Decide engine: RAG hybrid if enabled/requested
+              const shouldUseRAG =
+                req.query.useRAG === 'true' ||
+                req.body?.useRAG === true ||
+                process.env.ENABLE_RAG_RECOMMENDATIONS === 'true';
+
+              let matchingResult;
+
+              if (shouldUseRAG) {
+                const ragRecSvc = getRAGRecommendationService();
+                matchingResult = await ragRecSvc.calculatePairScore(cvData, jobData);
+              } else {
+                matchingResult = await aiService.calculateAdvancedMatchScore(
+                  cvData,
+                  jobData,
+                  {
+                    candidateId: candidateUserId,
+                    jobId: job._id,
+                    forceRecalculate: false,
+                  }
+                );
+              }
 
               logger.info(`✅ [${jobIndex}/${activeJobs.length}] Score: ${matchingResult.overallScore}% - ${job.title}`);
 

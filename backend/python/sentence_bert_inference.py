@@ -27,7 +27,15 @@ except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
 
 # Model name
-MODEL_NAME = "paraphrase-multilingual-mpnet-base-v2"
+# Lighter VN model to reduce RAM/timeouts
+# Alternatives: 'keepitreal/vietnamese-sbert', 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2'
+MODEL_NAME = "bkai-foundation-models/vietnamese-bi-encoder"
+
+# CẢI TIẾN: Cache directory để tránh download model mỗi lần
+import os
+CACHE_DIR = os.path.join(os.path.dirname(__file__), '../models/sentence_bert_cache')
+os.makedirs(CACHE_DIR, exist_ok=True)
+
 model = None
 
 
@@ -43,8 +51,17 @@ def load_model():
             )
         
         try:
-            model = SentenceTransformer(MODEL_NAME)
-            print(f"Model {MODEL_NAME} loaded successfully", file=sys.stderr)
+            # CẢI TIẾN: Tăng timeout cho HuggingFace API và sử dụng cache local
+            import os
+            os.environ['HF_HUB_DOWNLOAD_TIMEOUT'] = '120'  # 2 minutes timeout
+            
+            # Load từ cache directory, tránh download lại
+            model = SentenceTransformer(
+                MODEL_NAME, 
+                cache_folder=CACHE_DIR,
+                device='cpu'  # Force CPU để tránh CUDA overhead
+            )
+            print(f"Model {MODEL_NAME} loaded successfully from cache", file=sys.stderr)
         except Exception as e:
             raise RuntimeError(f"Failed to load model: {str(e)}")
     
@@ -173,15 +190,22 @@ def main():
     parser = argparse.ArgumentParser(description="Sentence-BERT Inference Service")
     parser.add_argument('--check', action='store_true', help='Check model availability')
     parser.add_argument('--encode', type=str, help='Encode single text')
-    parser.add_argument('--encode-batch', type=str, help='Encode multiple texts (JSON array)')
+    parser.add_argument('--encode-batch', nargs='+', help='Encode multiple texts (JSON array or tokens)')
     parser.add_argument('--similarity', nargs=2, metavar=('TEXT1', 'TEXT2'), 
                         help='Calculate similarity between two texts')
-    parser.add_argument('--similarity-batch', nargs=2, metavar=('QUERY', 'DOCS'), 
-                        help='Calculate similarity between query and documents (JSON array)')
+    parser.add_argument('--similarity-batch', nargs='+', metavar=('QUERY', 'DOCS'), 
+                        help='Calculate similarity between query and documents (JSON array or tokens)')
     parser.add_argument('--similarity-matrix', type=str, 
                         help='Calculate similarity matrix (JSON array of texts)')
     
-    args = parser.parse_args()
+    # Use parse_known_args to avoid hard failures with extra tokens from PowerShell
+    args, unknown = parser.parse_known_args()
+    if args.encode_batch and unknown:
+        args.encode_batch = list(args.encode_batch) + unknown
+        unknown = []
+    if args.similarity_batch and unknown:
+        args.similarity_batch = list(args.similarity_batch) + unknown
+        unknown = []
     
     try:
         result = {}
@@ -198,10 +222,17 @@ def main():
             }
         
         elif args.encode_batch:
-            texts = json.loads(args.encode_batch)
+            # PowerShell có thể tách đối số, ghép lại rồi parse JSON.
+            raw_parts = args.encode_batch
+            batch_json = raw_parts[0] if len(raw_parts) == 1 else ' '.join(raw_parts)
+            try:
+                texts = json.loads(batch_json)
+            except Exception:
+                texts = raw_parts
+
             if not isinstance(texts, list):
-                raise ValueError("Input must be a JSON array of strings")
-            
+                texts = [str(texts)]
+
             embeddings = encode_batch(texts)
             result = {
                 "success": True,
@@ -220,11 +251,19 @@ def main():
         
         elif args.similarity_batch:
             query = args.similarity_batch[0]
-            documents = json.loads(args.similarity_batch[1])
-            
+            # Ghép các token docs lại (đã set nargs='+')
+            docs_raw = args.similarity_batch[1:]
+            docs_json = docs_raw[0] if len(docs_raw) == 1 else ' '.join(docs_raw)
+
+            try:
+                documents = json.loads(docs_json)
+            except Exception:
+                # Fallback: coi các token còn lại là danh sách document thô
+                documents = docs_raw
+
             if not isinstance(documents, list):
                 raise ValueError("Documents must be a JSON array of strings")
-            
+
             similarities = calculate_similarity_batch(query, documents)
             result = {
                 "success": True,

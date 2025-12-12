@@ -20,6 +20,7 @@ const { getSentenceBertService } = require('./sentenceBertService');
 const { getEmbeddingCacheService } = require('./embeddingCacheService');
 const { getJobVectorIndexService } = require('./jobVectorIndexService');
 const { getCandidateVectorIndexService } = require('./candidateVectorIndexService');
+const { getRAGMetricsService } = require('./ragMetricsService');
 const { logger } = require('../../utils/logger');
 const CandidateProfile = require('../../models/CandidateProfile');
 const Job = require('../../models/Job');
@@ -42,7 +43,7 @@ class RAGRecommendationService {
     // RAG configuration
     this.config = {
       topKForRerank: 100,        // Re-rank top 100 từ weighted scoring
-      semanticThreshold: 0.70,   // Minimum semantic similarity
+      semanticThreshold: 0.55,   // Minimum semantic similarity (hạ ngưỡng hơn nữa)
       enableCaching: true,        // Cache embeddings
       cacheTTL: 3600 * 24,       // 24 hours cache
       maxDataAgeDays: 90,        // Freshness guardrail
@@ -78,7 +79,7 @@ class RAGRecommendationService {
         includeSkillGap = true,
         filterByAvailability = true,
         filterByLocation = false,
-        filterByFreshness = true
+        filterByFreshness = false
       } = options;
 
       logger.info(`🔍 RAG: Finding candidates for job ${job._id || job.id}`);
@@ -88,6 +89,52 @@ class RAGRecommendationService {
         filterByAvailability,
         filterByLocation: filterByLocation ? job.location : null
       });
+
+      if (!candidates || candidates.length === 0) {
+        logger.warn('⚠️ RAG: No candidates found in CandidateProfile. Falling back to CVMatchingScore applicants for this job.');
+        try {
+          const CVMatchingScore = require('../../models/CVMatchingScore');
+          const fallbackScores = await CVMatchingScore.find({ jobId: job._id || job.id })
+            .sort({ overallScore: -1 })
+            .limit(limit)
+            .populate('candidateId', 'fullName email')
+            .lean();
+
+          if (fallbackScores.length > 0) {
+            const recommendations = fallbackScores.map((s, idx) => ({
+              candidateId: s.candidateId?._id || s.candidateId,
+              matchScore: s.overallScore || 0,
+              tier: s.ranking?.tier || s.overallScore >= 80 ? 'A' : s.overallScore >= 60 ? 'B' : s.overallScore >= 40 ? 'C' : 'D',
+              candidate: {
+                id: s.candidateId?._id || s.candidateId,
+                fullName: s.candidateId?.fullName,
+                email: s.candidateId?.email
+              },
+              method: 'rag-fallback-cv-scores',
+              fallback: true
+            }));
+
+            return {
+              jobId: job._id || job.id,
+              jobTitle: job.title,
+              totalCandidates: fallbackScores.length,
+              recommendations,
+              summary: {
+                tierA: recommendations.filter(r => r.tier === 'A').length,
+                tierB: recommendations.filter(r => r.tier === 'B').length,
+                tierC: recommendations.filter(r => r.tier === 'C').length,
+                averageScore: recommendations.length > 0
+                  ? Math.round(recommendations.reduce((sum, r) => sum + (r.matchScore || 0), 0) / recommendations.length)
+                  : 0
+              },
+              method: 'rag-fallback-cv-scores',
+              timestamp: new Date()
+            };
+          }
+        } catch (fbErr) {
+          logger.warn('⚠️ RAG fallback to CVMatchingScore failed:', fbErr.message);
+        }
+      }
 
       if (filterByFreshness) {
         const before = candidates.length;
@@ -103,6 +150,7 @@ class RAGRecommendationService {
         job,
         { includeExplanation: true }
       );
+      logger.info(`📊 RAG: Weighted results count = ${weightedResults.length}`);
 
       // Filter top K for re-ranking
       const topK = weightedResults
@@ -113,6 +161,17 @@ class RAGRecommendationService {
         .slice(0, this.config.topKForRerank);
 
       logger.info(`✅ RAG: Filtered ${topK.length} candidates for re-ranking`);
+      if (topK.length === 0) {
+        const sampleScores = weightedResults.slice(0, 5).map(r => ({
+          candidateId: r.candidateId,
+          score: r.matchScore,
+          tier: r.tier
+        }));
+        logger.info('ℹ️ RAG: No candidates passed filter. Sample weighted results:', sampleScores);
+        // Fallback: use weighted results even if below minScore/tier filter to avoid empty response
+        topK.push(...weightedResults.slice(0, this.config.topKForRerank));
+        logger.info(`ℹ️ RAG: Fallback using weighted results count = ${topK.length}`);
+      }
 
       if (topK.length === 0) {
         return {
@@ -134,12 +193,6 @@ class RAGRecommendationService {
         job
       );
       const responseTime = Date.now() - startTime;
-      
-      // Track metrics
-      this.metricsService.trackRecommendation('candidate', 'rag-hybrid', responseTime, {
-        recommendations: enrichedRecommendations,
-        totalCandidates: candidates.length
-      });
 
       // STEP 3: Filter và limit final results
       const finalRecommendations = rerankedResults
@@ -156,6 +209,10 @@ class RAGRecommendationService {
 
           const enriched = {
             ...rec,
+            // Gắn method/semantic để client và script nhận diện
+            method: rec.method || 'rag-hybrid',
+            semanticScore: rec.semanticScore ?? 0,
+            weightedScore: rec.weightedScore ?? rec.matchScore,
             candidate: {
               id: candidate._id || candidate.id,
               fullName: candidate.fullName || candidate.cv?.fullName,
@@ -212,6 +269,12 @@ class RAGRecommendationService {
         timestamp: new Date()
       };
 
+      // Track metrics after enrichedRecommendations is defined
+      this.metricsService.trackRecommendation('candidate', 'rag-hybrid', responseTime, {
+        recommendations: enrichedRecommendations,
+        totalCandidates: candidates.length
+      });
+
       logger.info(`✅ RAG: Generated ${result.recommendations.length} recommendations for job ${result.jobId}`);
 
       return result;
@@ -221,6 +284,55 @@ class RAGRecommendationService {
       this.metricsService.trackError('fallback', error);
       throw error;
     }
+  }
+
+  /**
+   * Calculate hybrid RAG score for a single candidate-job pair
+   * Combines weighted match (rule-based) + semantic embedding similarity
+   */
+  async calculatePairScore(candidate, job) {
+    // 1) Weighted score using existing matcher
+    const weightedResult = await this.jobMatcher.calculateMatchScore(candidate, job, {
+      includeExplanation: true
+    });
+
+    // 2) Semantic similarity
+    const jobEmbedding = await this._getJobEmbedding(job);
+    const candidateEmbedding = await this._getCandidateEmbedding(candidate);
+    const semanticScore = this._cosineSimilarity(jobEmbedding, candidateEmbedding);
+
+    // 3) Adaptive hybrid weight (boost semantic when skills are weak/empty)
+    const weightedScoreNormalized = weightedResult.matchScore / 100;
+    const skillCount = this._countSkills(candidate);
+    const semanticWeight =
+      skillCount === 0
+        ? Math.min(0.7, this.hybridWeights.semantic + 0.2)
+        : this.hybridWeights.semantic;
+    const weightedWeight = 1 - semanticWeight;
+    const hybridScore =
+      weightedScoreNormalized * weightedWeight + semanticScore * semanticWeight;
+
+    const overallScore = Math.round(hybridScore * 100);
+
+    return {
+      candidateId: candidate._id || candidate.id,
+      jobId: job._id || job.id,
+      matchScore: overallScore,
+      overallScore,
+      tier: this._calculateTier(hybridScore),
+      semanticScore,
+      weightedScore: weightedResult.matchScore,
+      breakdown: weightedResult.breakdown,
+      explanation: this._generateHybridExplanation(
+        weightedResult,
+        semanticScore,
+        hybridScore
+      ),
+      calculationMethod: 'rag-hybrid',
+      modelVersion: 'rag-1.0',
+      method: 'rag-hybrid',
+      timestamp: new Date()
+    };
   }
 
   /**
@@ -296,12 +408,6 @@ class RAGRecommendationService {
         candidate
       );
       const responseTime = Date.now() - startTime;
-      
-      // Track metrics
-      this.metricsService.trackRecommendation('job', 'rag-hybrid', responseTime, {
-        recommendations: recommendations,
-        totalJobs: jobs.length
-      });
 
       // STEP 3: Format và return
       const recommendations = rerankedResults
@@ -326,6 +432,12 @@ class RAGRecommendationService {
           deadline: item.job.deadline,
           method: 'rag-hybrid'
         }));
+
+      // Track metrics after recommendations is defined
+      this.metricsService.trackRecommendation('job', 'rag-hybrid', responseTime, {
+        recommendations: recommendations,
+        totalJobs: jobs.length
+      });
 
       logger.info(`✅ RAG: Generated ${recommendations.length} job recommendations`);
 
@@ -423,10 +535,13 @@ class RAGRecommendationService {
       const reranked = await this._batchRerankCandidates(weightedResults, candidates, job, jobEmbedding);
 
       // Keep only those not dropped
-      const kept = reranked.filter(r => !r._semanticDropped);
+      let kept = reranked.filter(r => !r._semanticDropped);
 
       // Sort by hybrid score descending
       kept.sort((a, b) => b.matchScore - a.matchScore);
+
+      // Diversity penalty to avoid near-duplicates
+      kept = this._applyDiversityPenalty(kept, 0.92, 0.08);
 
       return kept;
     } catch (error) {
@@ -475,21 +590,30 @@ class RAGRecommendationService {
         // Calculate semantic similarity
         const semanticScore = this._cosineSimilarity(jobEmbedding, embedding);
 
-        // Drop if semantic similarity too low
+        // Nếu semantic thấp hơn ngưỡng, giữ nguyên weighted score (không drop)
         if (semanticScore < this.config.semanticThreshold) {
           reranked.push({
             ...result,
             semanticScore,
-            _semanticDropped: true
+            matchScore: result.matchScore,
+            tier: result.tier,
+            weightedScore: result.matchScore,
+            _embedding: embedding,
+            _semanticDropped: false
           });
           continue;
         }
 
-        // Hybrid score: 60% weighted + 40% semantic
+        // Hybrid score: adaptive semantic weight when skills are weak
         const weightedScoreNormalized = result.matchScore / 100;
+        const skillCount = this._countSkills(candidate);
+        const semanticWeight = skillCount === 0
+          ? Math.min(0.7, this.hybridWeights.semantic + 0.2)
+          : this.hybridWeights.semantic;
+        const weightedWeight = 1 - semanticWeight;
         const hybridScore = (
-          weightedScoreNormalized * this.hybridWeights.weighted +
-          semanticScore * this.hybridWeights.semantic
+          weightedScoreNormalized * weightedWeight +
+          semanticScore * semanticWeight
         );
 
         reranked.push({
@@ -499,7 +623,8 @@ class RAGRecommendationService {
           semanticScore: semanticScore,
           weightedScore: result.matchScore,
           explanation: this._generateHybridExplanation(result, semanticScore, hybridScore),
-          isHiddenGem: semanticScore > weightedScoreNormalized + 0.1
+          isHiddenGem: semanticScore > weightedScoreNormalized + 0.1,
+          _embedding: embedding
         });
       }
     }
@@ -633,12 +758,15 @@ class RAGRecommendationService {
         // Calculate semantic similarity
         const semanticScore = this._cosineSimilarity(embedding, candidateEmbedding);
 
-        // Drop if semantic similarity too low
+        // Nếu semantic thấp, giữ weighted score (không drop)
         if (semanticScore < this.config.semanticThreshold) {
           reranked.push({
             ...result,
             semanticScore,
-            _semanticDropped: true
+            matchScore: result.matchScore,
+            tier: result.tier,
+            weightedScore: result.matchScore,
+            _semanticDropped: false
           });
           continue;
         }
@@ -760,18 +888,39 @@ class RAGRecommendationService {
    */
   _buildCandidateText(candidate) {
     const cv = candidate.cv || candidate;
+    const stringifySkills = (skills) =>
+      Array.isArray(skills)
+        ? skills.map((s) => (typeof s === 'string' ? s : s?.name || s || '')).join(' ')
+        : '';
+
+    const stringifyExperience = (exp) =>
+      Array.isArray(exp)
+        ? exp.map((e) => `${e.position || ''} ${e.description || ''}`).join(' ')
+        : '';
+
+    const stringifyEducation = (edu) =>
+      Array.isArray(edu)
+        ? edu.map((e) => `${e.degree || ''} ${e.major || e.field || ''}`).join(' ')
+        : '';
+
+    const stringifyCerts = (certs) =>
+      Array.isArray(certs) ? certs.map((c) => c.name || '').join(' ') : '';
+
+    const stringifyAwards = (awards) =>
+      Array.isArray(awards) ? awards.map((a) => a.name || '').join(' ') : '';
+
     const parts = [
       candidate.fullName || cv.fullName || '',
       candidate.summary || cv.summary || '',
-      candidate.experience?.map(e => `${e.position} ${e.description || ''}`).join(' ') || 
-        cv.experience?.map(e => `${e.position} ${e.description || ''}`).join(' ') || '',
-      candidate.skills?.map(s => s.name || s).join(' ') || 
-        cv.skills?.map(s => s.name || s).join(' ') || '',
-      candidate.projects?.map(p => `${p.title} ${p.description || ''}`).join(' ') ||
-        cv.projects?.map(p => `${p.title} ${p.description || ''}`).join(' ') || '',
-      candidate.education?.map(e => `${e.degree} ${e.major || ''}`).join(' ') ||
-        cv.education?.map(e => `${e.degree} ${e.major || ''}`).join(' ') || ''
-    ].filter(p => p.length > 0);
+      stringifyExperience(candidate.experience) || stringifyExperience(cv.experience),
+      stringifySkills(candidate.skills) || stringifySkills(cv.skills),
+      stringifyEducation(candidate.education) || stringifyEducation(cv.education),
+      stringifyCerts(candidate.education?.certifications || cv.education?.certifications),
+      stringifyAwards(candidate.education?.awards || cv.education?.awards),
+      candidate.projects?.map((p) => `${p.title} ${p.description || ''}`).join(' ') ||
+        cv.projects?.map((p) => `${p.title} ${p.description || ''}`).join(' ') ||
+        '',
+    ].filter((p) => p.length > 0);
 
     return parts.join(' ').substring(0, 2000); // Limit length
   }
@@ -808,6 +957,55 @@ class RAGRecommendationService {
     if (score >= 0.60) return 'B';
     if (score >= 0.40) return 'C';
     return 'D';
+  }
+
+  /**
+   * Simple skill count helper (supports both array and object form)
+   */
+  _countSkills(candidate) {
+    const cv = candidate.cv || candidate;
+    const skills = candidate.skills || cv.skills;
+    if (!skills) return 0;
+    if (Array.isArray(skills)) return skills.length;
+    const technical = Array.isArray(skills.technical) ? skills.technical.length : 0;
+    const soft = Array.isArray(skills.soft) ? skills.soft.length : 0;
+    const languages = Array.isArray(skills.languages) ? skills.languages.length : 0;
+    return technical + soft + languages;
+  }
+
+  /**
+   * Apply a diversity penalty to avoid near-duplicate candidates
+   */
+  _applyDiversityPenalty(list, similarityThreshold = 0.92, penaltyRatio = 0.08) {
+    const adjusted = [];
+
+    for (const item of list) {
+      let penalized = false;
+      for (const anchor of adjusted) {
+        if (item._embedding && anchor._embedding) {
+          const sim = this._cosineSimilarity(anchor._embedding, item._embedding);
+          if (sim >= similarityThreshold) {
+            penalized = true;
+            break;
+          }
+        }
+      }
+
+      if (penalized) {
+        const penalizedScore = Math.max(0, Math.round(item.matchScore * (1 - penaltyRatio)));
+        adjusted.push({
+          ...item,
+          matchScore: penalizedScore,
+          tier: this._calculateTier(penalizedScore / 100),
+          _diversityPenalized: true
+        });
+      } else {
+        adjusted.push(item);
+      }
+    }
+
+    // Resort after penalties
+    return adjusted.sort((a, b) => b.matchScore - a.matchScore);
   }
 
   /**
@@ -873,9 +1071,18 @@ class RAGRecommendationService {
 
     try {
       const candidates = await CandidateProfile.find(query)
-        .populate('cv')
-        .select('fullName email phone location cv availability expectedSalary summary experience skills projects education')
+        .select('fullName email phone location availability expectedSalary summary experience skills projects education cv')
         .lean();
+
+      if (candidates.length === 0) {
+        logger.warn('⚠️ RAG: No candidates found with availability/searchable filters. Retrying without filters.');
+        const relaxed = await CandidateProfile.find({})
+          .populate('cv')
+          .select('fullName email phone location cv availability expectedSalary summary experience skills projects education')
+          .lean();
+        logger.info(`ℹ️ RAG: Relaxed fetch returned ${relaxed.length} candidates`);
+        return relaxed;
+      }
 
       return candidates;
     } catch (error) {

@@ -13,8 +13,10 @@ const { protect, authorize } = require('../middleware/auth');
 const { getRAGRecommendationService } = require('../services/ai/ragRecommendationService');
 const { getRAGMetricsService } = require('../services/ai/ragMetricsService');
 const { getRAGSyncService } = require('../services/ai/ragSyncService');
+const { getCacheService } = require('../services/cache/cacheService');
 const { ApiResponse } = require('../utils/responseHandler');
 const { logger } = require('../utils/logger');
+const RAG_CACHE_ADMIN_KEY = process.env.RAG_CACHE_ADMIN_KEY;
 
 /**
  * GET /api/rag/metrics
@@ -119,6 +121,39 @@ router.post('/metrics/reset', protect, authorize('admin'), async (req, res) => {
   } catch (error) {
     logger.error('Failed to reset metrics:', error);
     return ApiResponse.error(res, 'Failed to reset metrics', 500);
+  }
+});
+
+/**
+ * DELETE /api/rag/cache/candidates/:jobId/clear
+ * Clear cached candidate recommendations for a job
+ * Access: Admin or Employer
+ */
+router.delete('/cache/candidates/:jobId/clear', async (req, res, next) => {
+  try {
+    // Allow either: 1) privileged header key, or 2) authenticated admin/employer
+    const headerKey = req.headers['x-rag-admin-key'];
+    if (!(headerKey && RAG_CACHE_ADMIN_KEY && headerKey === RAG_CACHE_ADMIN_KEY)) {
+      // Fallback to auth middleware when no valid admin key
+      return protect(req, res, async () => {
+        return authorize('admin', 'employer')(req, res, async () => {
+          const { jobId } = req.params;
+          const cacheService = getCacheService();
+          await cacheService.cacheCandidateRecommendations(jobId, [], 1);
+          logger.info(`🗑️ Cleared candidate recommendations cache for job ${jobId} via auth`);
+          return ApiResponse.success(res, { jobId }, 'Candidate recommendations cache cleared');
+        });
+      });
+    }
+
+    const { jobId } = req.params;
+    const cacheService = getCacheService();
+    await cacheService.cacheCandidateRecommendations(jobId, [], 1);
+    logger.info(`🗑️ Cleared candidate recommendations cache for job ${jobId} via header key`);
+    return ApiResponse.success(res, { jobId }, 'Candidate recommendations cache cleared');
+  } catch (error) {
+    logger.error('Failed to clear candidate recommendations cache:', error);
+    return ApiResponse.error(res, 'Failed to clear candidate recommendations cache', 500);
   }
 });
 

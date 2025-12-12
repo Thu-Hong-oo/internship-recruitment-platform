@@ -196,6 +196,106 @@ class ProfileController {
         }
       }
 
+      // Auto-enrich skills từ text (experience/education/cert/awards)
+      const enrichmentDictionary = {
+        logistics: [
+          'logistics',
+          'xuất nhập khẩu',
+          'chứng từ',
+          'invoice',
+          'packing list',
+          'c/o',
+          'khai báo hải quan',
+          'vận tải',
+          'tracking'
+        ],
+        marketing: [
+          'facebook ads',
+          'google ads',
+          'tiktok ads',
+          'seo',
+          'sem',
+          'content',
+          'analytics',
+          'social media',
+          'remarketing'
+        ],
+        pm: [
+          'jira',
+          'trello',
+          'agile',
+          'scrum',
+          'kanban',
+          'risk management',
+          'timeline',
+          'stakeholder'
+        ],
+        office: ['excel', 'word', 'powerpoint', 'mos', 'toeic'],
+      };
+
+      const textChunks = [];
+      const pushText = (val) => {
+        if (typeof val === 'string' && val.trim()) textChunks.push(val.toLowerCase());
+      };
+
+      // Experience descriptions
+      if (Array.isArray(aiAnalysis.experience)) {
+        aiAnalysis.experience.forEach((exp) => {
+          pushText(exp.description);
+          pushText(exp.position);
+          pushText(exp.company);
+        });
+      }
+      // Education fields
+      if (aiAnalysis.education) {
+        pushText(aiAnalysis.education.major || aiAnalysis.education.field);
+        pushText(aiAnalysis.education.institution);
+        pushText(aiAnalysis.education.degree);
+      }
+      // Certificates
+      if (Array.isArray(aiAnalysis.certificates)) {
+        aiAnalysis.certificates.forEach((c) => pushText(c.name));
+      }
+      // Awards
+      if (Array.isArray(aiAnalysis.awards)) {
+        aiAnalysis.awards.forEach((a) => {
+          pushText(a.name);
+          pushText(a.description);
+        });
+      }
+
+      const detected = new Set();
+      const addSkill = (name) => {
+        if (!name) return;
+        const skillName = name.trim();
+        if (!skillName) return;
+        const lower = skillName.toLowerCase();
+        if (detected.has(lower)) return;
+        if (!profile.skills) profile.skills = { technical: [], soft: [], languages: [] };
+        if (!profile.skills.technical) profile.skills.technical = [];
+        const exists = profile.skills.technical.some(
+          (s) => (s.name || '').toLowerCase() === lower
+        );
+        if (!exists) {
+          profile.skills.technical.push({
+            _id: new mongoose.Types.ObjectId(),
+            name: skillName,
+            level: 'intermediate',
+            verified: false,
+          });
+        }
+        detected.add(lower);
+      };
+
+      const haystack = textChunks.join(' ');
+      Object.values(enrichmentDictionary).forEach((keywords) => {
+        keywords.forEach((kw) => {
+          if (haystack.includes(kw)) {
+            addSkill(kw);
+          }
+        });
+      });
+
       // Experience (array) - FIX: Better duplicate check and preserve description
       if (
         Array.isArray(aiAnalysis.experience) &&

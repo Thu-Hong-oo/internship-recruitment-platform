@@ -266,6 +266,14 @@ router.patch('/applications/:id', candidateController.updateApplication);
 router.get('/jobs', candidateController.getJobs);
 
 /**
+ * @route   GET /api/candidates/jobs/popular-searches
+ * @desc    Get popular search keywords (last 30 days by default)
+ * @access  Private (Candidate only)
+ * @query   ?limit=10&days=30
+ */
+router.get('/jobs/popular-searches', candidateController.getPopularSearches);
+
+/**
  * @route   POST /api/candidates/jobs/:id/action
  * @desc    Handle job actions: save, unsave, apply
  * @access  Private (Candidate only)

@@ -6,7 +6,7 @@ const aiCVEnhancementService = require('./aiCVEnhancementService');
 const { getSkillNormalizationService } = require('./skillNormalizationService');
 const { getSkillExtractionService } = require('./skillExtractionService');
 const jobMatchingService = require('./jobMatchingService');
-const candidateRecommendationService = require('./candidateRecommendationService');
+const { getCandidateRecommendationService } = require('./candidateRecommendationService');
 require('dotenv').config();
 
 // Initialize Gemini with proper model (top-level, but will be recreated in getModel() if needed)
@@ -4458,13 +4458,18 @@ Return ONLY valid JSON (no markdown):
       // Use NEW candidateRecommendationService.getRecommendations() - self-sufficient
       // Note: candidateRecommendationService.getRecommendations() is self-sufficient
       // and fetches candidates internally, so we don't pass candidates array
-      const result = await candidateRecommendationService.getRecommendations(
+      const { useRAG = process.env.ENABLE_RAG_RECOMMENDATIONS === 'true' } = options;
+      const candidateRecSvc = getCandidateRecommendationService();
+      const result = await candidateRecSvc.getRecommendations(
         job,
         {
           limit,
           minScore,
           includeSkillGap: true,
-          tierFilter: ['A', 'B', 'C'],
+          tierFilter: ['A', 'B', 'C', 'D'], // mở rộng để không loại tier D
+          useRAG: useRAG, // Pass useRAG option to enable RAG
+          filterByAvailability: false, // nới lỏng để không lọc mất candidates
+          filterByLocation: false
         }
       );
       
@@ -4482,6 +4487,10 @@ Return ONLY valid JSON (no markdown):
           rank: index + 1,
           score: rec.matchScore || rec.score || 0,
           tier: rec.tier || 'C',
+          semanticScore: rec.semanticScore,       // surfacing semantic info
+          weightedScore: rec.weightedScore,       // keep weighted component if any
+          method: rec.method || result?.method || 'weighted',
+          raw: rec,                                // keep raw for debugging/metrics
           matchDetails: {
             overall: rec.matchScore || rec.score || 0,
             technicalFit: rec.scoreBreakdown?.skills || rec.breakdown?.skills?.score || 0,

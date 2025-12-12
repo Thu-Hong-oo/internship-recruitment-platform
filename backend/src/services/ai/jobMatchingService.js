@@ -194,23 +194,59 @@ class JobMatchingService {
     }
 
     // Method 2: Semantic similarity (optional, slower but more accurate)
-    if (useSemanticSimilarity && this.sentenceBert.isAvailable && missing.length > 0) {
+    if (useSemanticSimilarity && this.sentenceBert.isAvailable && missing.length > 0 && candidateSkillNames.length > 0) {
       try {
-        // Check if missing skills are semantically similar to candidate skills
-        const similarities = await this.sentenceBert.similarityBatch(
-          missing.join(', '),
-          candidateSkillNames
-        );
-
-        // Consider skills with similarity > 0.75 as matched
+        // CẢI TIẾN: Batch all missing skills at once thay vì loop từng skill
+        // => Giảm từ N lần gọi xuống 1 lần duy nhất!
         const semanticThreshold = 0.75;
         const semanticMatched = [];
 
-        for (let i = 0; i < missing.length; i++) {
-          const maxSimilarity = Math.max(...similarities.slice(i * candidateSkillNames.length, (i + 1) * candidateSkillNames.length));
-          
-          if (maxSimilarity >= semanticThreshold) {
-            semanticMatched.push(missing[i]);
+        // Tính similarity matrix một lần cho tất cả missing skills vs candidate skills
+        const allPairs = [];
+        missing.forEach(missingSkill => {
+          candidateSkillNames.forEach(candSkill => {
+            allPairs.push([missingSkill, candSkill]);
+          });
+        });
+
+        // Batch calculate similarities cho tất cả pairs
+        if (allPairs.length > 0) {
+          try {
+            // Process in batches to avoid memory issues
+            const BATCH_SIZE = 50;
+            const allSimilarities = [];
+            
+            for (let i = 0; i < allPairs.length; i += BATCH_SIZE) {
+              const batch = allPairs.slice(i, i + BATCH_SIZE);
+              const queries = batch.map(p => p[0]);
+              const docs = batch.map(p => p[1]);
+              
+              // Calculate similarity for each pair in parallel
+              const batchSims = await Promise.all(
+                batch.map((_, idx) => 
+                  this.sentenceBert.similarityBatch(queries[idx], [docs[idx]])
+                    .then(sims => sims[0])
+                    .catch(() => 0)
+                )
+              );
+              
+              allSimilarities.push(...batchSims);
+            }
+
+            // Group similarities by missing skill
+            let idx = 0;
+            for (const missingSkill of missing) {
+              const skillSimilarities = allSimilarities.slice(idx, idx + candidateSkillNames.length);
+              const maxSimilarity = Math.max(...skillSimilarities, 0);
+              
+              if (maxSimilarity >= semanticThreshold) {
+                semanticMatched.push(missingSkill);
+              }
+              
+              idx += candidateSkillNames.length;
+            }
+          } catch (batchError) {
+            logger.debug('Batch semantic similarity failed:', batchError.message);
           }
         }
 
@@ -226,6 +262,15 @@ class JobMatchingService {
     }
 
     // Calculate score with partial credit for related skills
+    // Handle edge case: if no job skills required, return neutral score
+    if (jobSkillNames.length === 0) {
+      return {
+        score: 0.5, // Neutral score when no requirements
+        matched: [],
+        missing: []
+      };
+    }
+    
     const exactMatchScore = matched.length / jobSkillNames.length;
     const coverageScore = Math.min(1.0, candidateSkillNames.length / jobSkillNames.length);
     
@@ -485,29 +530,32 @@ class JobMatchingService {
       'excel',
     ]);
 
-    // Check if skills already extracted
-    if (data.cv && data.cv.skills && Array.isArray(data.cv.skills)) {
-      return data.cv.skills
+    // Helper: normalize list and keep fallback if stopwords remove everything
+    const normalizeList = (list) => {
+      if (!Array.isArray(list)) return [];
+      const base = list
         .map((s) => (typeof s === 'string' ? s : s.name))
         .filter((s) => s && typeof s === 'string')
         .map((s) => s.toLowerCase().trim())
-        .filter((s) => s && !stopwords.has(s));
+        .filter((s) => s);
+
+      // Primary: remove stopwords
+      const filtered = base.filter((s) => !stopwords.has(s));
+      // Fallback: if everything got removed, keep the base (soft skills) to avoid empty skill set
+      return filtered.length > 0 ? filtered : base;
+    };
+
+    // Check if skills already extracted
+    if (data.cv && data.cv.skills && Array.isArray(data.cv.skills)) {
+      return normalizeList(data.cv.skills);
     }
 
     if (data.requirements && data.requirements.skills && Array.isArray(data.requirements.skills)) {
-      return data.requirements.skills
-        .map((s) => (typeof s === 'string' ? s : s.name))
-        .filter((s) => s && typeof s === 'string')
-        .map((s) => s.toLowerCase().trim())
-        .filter((s) => s && !stopwords.has(s));
+      return normalizeList(data.requirements.skills);
     }
 
     if (data.skills && Array.isArray(data.skills)) {
-      return data.skills
-        .map((s) => (typeof s === 'string' ? s : s.name))
-        .filter((s) => s && typeof s === 'string')
-        .map((s) => s.toLowerCase().trim())
-        .filter((s) => s && !stopwords.has(s));
+      return normalizeList(data.skills);
     }
 
     // Extract from text using PhoBERT
@@ -524,11 +572,7 @@ class JobMatchingService {
         useGemini: false      // NO Gemini dependency
       });
       
-      return extracted
-        .map(s => s.name)
-        .filter(s => s && typeof s === 'string')
-        .map(s => s.toLowerCase().trim())
-        .filter(s => s && !stopwords.has(s));
+      return normalizeList(extracted.map(s => s.name));
     } catch (error) {
       logger.warn('Skill extraction failed:', error.message);
       return [];
@@ -540,7 +584,7 @@ class JobMatchingService {
    */
   _extractExperience(candidate) {
     const cv = candidate.cv || candidate;
-    const experience = cv.experience || [];
+    const experience = Array.isArray(cv.experience) ? cv.experience : [];
 
     let totalYears = 0;
     let level = 'intern';
@@ -563,7 +607,7 @@ class JobMatchingService {
     return {
       totalYears,
       level,
-      positions: experience.map(e => e.position || e.title)
+      positions: experience.map(e => e.position || e.title).filter(Boolean)
     };
   }
 
@@ -609,7 +653,7 @@ class JobMatchingService {
    */
   _extractEducation(candidate) {
     const cv = candidate.cv || candidate;
-    const education = cv.education || [];
+    const education = Array.isArray(cv.education) ? cv.education : [];
 
     if (education.length === 0) {
       return { highestDegree: 'none', major: null };

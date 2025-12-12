@@ -173,11 +173,74 @@ export default function JobDetailPage() {
       setLoadingSuggestions(true);
       setSuggestionError(null);
       try {
-        const res = await nlpService.getTopCandidates(jobId, {
+        const res: any = await nlpService.getTopCandidates(jobId, {
           limit: 5,
           minScore: 30,
+          noCache: true,
         });
 
+<<<<<<< HEAD
+        const payload: any = res?.data || res;
+
+        // API returns either an array or { candidates: [...] }
+        const candidates: any[] = Array.isArray(payload?.data)
+          ? payload.data
+          : payload?.data?.candidates || payload?.candidates || [];
+
+      if (payload?.success !== false && Array.isArray(candidates)) {
+          const normalizeSkills = (list: any) =>
+            Array.isArray(list)
+              ? list
+                  .map((s: any) => (typeof s === "string" ? s : s?.name || s))
+                  .filter(Boolean)
+              : [];
+
+          const extractSkills = (candidate: any) => {
+            const skills: string[] = [];
+            skills.push(...normalizeSkills(candidate.skills));
+            skills.push(...normalizeSkills(candidate.skills?.technical));
+            skills.push(...normalizeSkills(candidate.skills?.soft));
+            skills.push(...normalizeSkills(candidate.cv?.skills));
+            skills.push(...normalizeSkills(candidate.cv?.skills?.technical));
+            skills.push(...normalizeSkills(candidate.cv?.skills?.soft));
+            return Array.from(new Set(skills)).slice(0, 20);
+          };
+
+          const extractExperience = (candidate: any) => {
+            const exp: any[] = [];
+            const cvExp = Array.isArray(candidate.cv?.experience)
+              ? candidate.cv.experience
+              : [];
+            const internships = Array.isArray(candidate.experience?.internships)
+              ? candidate.experience.internships
+              : [];
+            const jobs = Array.isArray(candidate.experience?.jobs)
+              ? candidate.experience.jobs
+              : [];
+            const all = [...cvExp, ...internships, ...jobs];
+            return all
+              .map((e: any) => {
+                const position = e?.position || e?.title;
+                const company = e?.company;
+                return position ? `${position}${company ? " @ " + company : ""}` : null;
+              })
+              .filter(Boolean)
+              .slice(0, 5);
+          };
+
+          const extractEducation = (candidate: any) => {
+            const edu =
+              candidate.cv?.education?.[0] ||
+              candidate.education?.university ||
+              candidate.education?.[0];
+            return {
+              degree: edu?.degree || edu?.type || "",
+              major: edu?.major || edu?.field || "",
+              institution: edu?.institution || edu?.name || "",
+            };
+          };
+
+=======
         const payload = res?.data || res;
         const payloadObj = payload as any;
 
@@ -193,10 +256,19 @@ export default function JobDetailPage() {
         }
 
         if (payloadObj?.success && Array.isArray(candidates)) {
+>>>>>>> 4a0effbbd3cf5d43f5ca8e23915a35d3d4b2e53c
           const mapped = candidates
             .map((item: any) => {
               const candidate =
                 item.candidate || item.candidateId || item.candidate_id || {};
+
+              const skills =
+                item.breakdown?.skills?.matched && Array.isArray(item.breakdown.skills.matched)
+                  ? item.breakdown.skills.matched
+                  : extractSkills(candidate);
+
+              const expList = extractExperience(candidate);
+              const edu = extractEducation(candidate);
 
               return {
                 candidateId: candidate._id || item.candidateId || "",
@@ -206,14 +278,26 @@ export default function JobDetailPage() {
                   candidate.email ||
                   "Ứng viên",
                 email: candidate.email,
+                phone:
+                  candidate.phone || candidate.cv?.phone || candidate.personalInfo?.phone,
+                location:
+                  candidate.location ||
+                  candidate.cv?.location ||
+                  candidate.personalInfo?.address?.city,
                 score: item.overallScore || item.matchScore || 0,
                 tier: item.tier || item.ranking?.tier,
-                matchedSkills:
-                  item.breakdown?.skills?.matched ||
-                  item.scoreBreakdown?.skillsScore?.details?.matchedSkills?.map(
-                    (s: any) => s.skill || s
-                  ) ||
-                  [],
+                matchedSkills: skills,
+                skills,
+                experienceList: expList,
+                education: edu,
+                summary:
+                  candidate.summary ||
+                  candidate.cv?.summary ||
+                  candidate.personalInfo?.bio ||
+                  "",
+                method: item.method,
+                semanticScore: item.semanticScore,
+                weightedScore: item.weightedScore || item.matchScore,
                 raw: item,
               };
             })
@@ -930,6 +1014,12 @@ export default function JobDetailPage() {
                       {selectedCandidate.email}
                     </p>
                   )}
+                  {(selectedCandidate.phone || selectedCandidate.location) && (
+                    <p className="text-sm text-gray-600">
+                      {selectedCandidate.phone ? `${selectedCandidate.phone} · ` : ""}
+                      {selectedCandidate.location || ""}
+                    </p>
+                  )}
                   {selectedCandidate.tier && (
                     <p className="text-sm text-blue-600 mt-1">
                       Tier: {selectedCandidate.tier}
@@ -940,6 +1030,18 @@ export default function JobDetailPage() {
                   <p className="text-sm font-semibold text-blue-700">
                     Điểm: {Math.round(selectedCandidate.score)}%
                   </p>
+                {selectedCandidate.semanticScore !== undefined && (
+                  <p className="text-xs text-gray-600">
+                    Semantic:{" "}
+                    {Math.round((selectedCandidate.semanticScore || 0) * 100) /
+                      100}
+                  </p>
+                )}
+                {selectedCandidate.method && (
+                  <p className="text-xs text-gray-600">
+                    Method: {selectedCandidate.method}
+                  </p>
+                )}
                 </div>
               </div>
 
@@ -953,11 +1055,67 @@ export default function JobDetailPage() {
                   </div>
                 )}
 
-              {selectedCandidate.raw?.scoreBreakdown && (
+              {selectedCandidate.skills && selectedCandidate.skills.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-2">
+                    Kỹ năng
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedCandidate.skills.slice(0, 15).map((skill: string, idx: number) => (
+                      <Badge key={idx} variant="secondary">
+                        {skill}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedCandidate.experienceList &&
+                selectedCandidate.experienceList.length > 0 && (
+                  <div className="text-sm text-gray-700">
+                    <p className="font-medium mb-1">Kinh nghiệm</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      {selectedCandidate.experienceList.map((exp: string, idx: number) => (
+                        <li key={idx}>{exp}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+              {selectedCandidate.education &&
+                (selectedCandidate.education.degree ||
+                  selectedCandidate.education.major ||
+                  selectedCandidate.education.institution) && (
+                  <div className="text-sm text-gray-700">
+                    <p className="font-medium mb-1">Học vấn</p>
+                    <p className="text-gray-600">
+                      {[selectedCandidate.education.degree, selectedCandidate.education.major, selectedCandidate.education.institution]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  </div>
+                )}
+
+              {selectedCandidate.summary && (
+                <div className="text-sm text-gray-700">
+                  <p className="font-medium mb-1">Tóm tắt</p>
+                  <p className="text-gray-600 whitespace-pre-wrap">
+                    {selectedCandidate.summary}
+                  </p>
+                </div>
+              )}
+
+              {selectedCandidate.raw?.scoreBreakdown &&
+                typeof selectedCandidate.raw.scoreBreakdown === "object" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                  {Object.entries(selectedCandidate.raw.scoreBreakdown).map(
+                  {Object.entries(
+                    (selectedCandidate.raw?.scoreBreakdown ?? {}) as Record<string, any>
+                  ).map(
                     ([key, val]: any) => {
-                      const details = val?.details || {};
+                      const details =
+                        val?.details && typeof val.details === "object"
+                          ? val.details
+                          : {};
                       return (
                         <Card key={key} className="border-blue-100">
                           <CardContent className="p-3 space-y-2">
@@ -972,16 +1130,27 @@ export default function JobDetailPage() {
                             </div>
                             {Object.keys(details).length > 0 && (
                               <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
-                                {Object.entries(details).map(([k, v]) => (
+                                {Object.entries(details).map(([k, v]) => {
+                                  const valString = Array.isArray(v)
+                                    ? v.join(", ")
+                                    : v && typeof v === "object"
+                                    ? Object.values(v as Record<string, any>).join(", ")
+                                    : String(v ?? "");
+                                  return (
                                   <li key={k}>
                                     <span className="font-medium">{k}:</span>{" "}
+<<<<<<< HEAD
+                                    {valString}
+=======
                                     {Array.isArray(v)
                                       ? v.join(", ")
                                       : typeof v === "object" && v !== null
                                       ? Object.values(v).join(", ")
                                       : String(v)}
+>>>>>>> 4a0effbbd3cf5d43f5ca8e23915a35d3d4b2e53c
                                   </li>
-                                ))}
+                                  );
+                                })}
                               </ul>
                             )}
                           </CardContent>
@@ -1255,7 +1424,13 @@ export default function JobDetailPage() {
                   value={
                     typeof formData.address === "string"
                       ? formData.address
+<<<<<<< HEAD
+                      : formData.address?.fullAddress ||
+                        formData.address?.street ||
+                        ""
+=======
                       : formData.address?.fullAddress ?? ""
+>>>>>>> 4a0effbbd3cf5d43f5ca8e23915a35d3d4b2e53c
                   }
                   onChange={(e) => handleInputChange("address", e.target.value)}
                   placeholder="Ví dụ: 123 Nguyễn Huệ, Tòa nhà ABC"

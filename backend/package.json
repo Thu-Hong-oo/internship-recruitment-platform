@@ -35,7 +35,11 @@
     "ollama:optimize": "node scripts/optimize-ollama-speed.js",
     "ollama:create-custom": "node scripts/create-custom-ollama-model.js",
     "cleanup:certifications": "node scripts/cleanup-duplicate-certifications.js",
-    "cleanup:certifications:execute": "node scripts/cleanup-duplicate-certifications.js --execute"
+    "cleanup:certifications:execute": "node scripts/cleanup-duplicate-certifications.js --execute",
+    "test:recommendations": "node test-recommendations.js",
+    "test:recommendations:job": "node test-recommendations.js",
+    "test:rag-comparison": "node test-rag-comparison.js",
+    "test:rag-debug": "node test-rag-debug.js"
   },
   "keywords": [
     "internship",

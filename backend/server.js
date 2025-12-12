@@ -40,6 +40,7 @@ const applicationRoutes = require('./src/routes/applications');
 const aiRoutes = require('./src/routes/ai');
 const advancedNLPRoutes = require('./src/routes/advancedNLP');
 const translateRoutes = require('./src/routes/translate');
+const { getVectorStore } = require('./src/services/ai/vectorStore');
 
 // Safe Additional Routes (confirmed models exist)
 const notificationRoutes = require('./src/routes/notifications');
@@ -454,6 +455,16 @@ server.listen(PORT, () => {
   }
 
   logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+
+  // Precompute job embeddings into Chroma on startup (runs once)
+  (async () => {
+    try {
+      const vectorStore = getVectorStore();
+      await vectorStore.precomputeActiveJobs();
+    } catch (err) {
+      logger.warn(`⚠️ Vector precompute skipped: ${err.message}`);
+    }
+  })();
 });
 
 // Export for testing
