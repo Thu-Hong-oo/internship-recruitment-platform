@@ -75,19 +75,19 @@ const Companies = () => {
         </div>
       ),
     },
-    {
-      title: "Địa điểm",
-      dataIndex: "location",
-      key: "location",
+    // {
+    //   title: "Địa điểm",
+    //   dataIndex: "location",
+    //   key: "location",
 
-      render: (_, record) =>
-        record?.fullAddress || record?.location?.headquarters?.city || "-",
-    },
-    {
-      title: "Quy mô",
-      dataIndex: "size",
-      key: "size",
-    },
+    //   render: (_, record) =>
+    //     record?.fullAddress || record?.location?.headquarters?.city || "-",
+    // },
+    // {
+    //   title: "Quy mô",
+    //   dataIndex: "size",
+    //   key: "size",
+    // },
     {
       title: "Đánh giá",
       dataIndex: "rating",
@@ -100,19 +100,19 @@ const Companies = () => {
         </div>
       ),
     },
-    {
-      title: "Thống kê",
-      key: "stats",
-      render: (_, record) => (
-        <div className="text-sm">
-          <div>{record?.stats?.totalJobs ?? 0} bài đăng</div>
-          <div>
-            {record?.stats?.activeJobs ?? record?.stats?.activeInterns ?? 0}{" "}
-            đang hoạt động
-          </div>
-        </div>
-      ),
-    },
+    // {
+    //   title: "Thống kê",
+    //   key: "stats",
+    //   render: (_, record) => (
+    //     <div className="text-sm">
+    //       <div>{record?.stats?.totalJobs ?? 0} bài đăng</div>
+    //       <div>
+    //         {record?.stats?.activeJobs ?? record?.stats?.activeInterns ?? 0}{" "}
+    //         đang hoạt động
+    //       </div>
+    //     </div>
+    //   ),
+    // },
     {
       title: "Trạng thái",
       dataIndex: "status",

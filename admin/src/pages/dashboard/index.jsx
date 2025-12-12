@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Card,
   Row,
@@ -13,13 +13,7 @@ import {
   Button,
   Avatar,
 } from "antd";
-import {
-  Line,
-  Column,
-  Pie,
-  Area,
-  Heatmap,
-} from "@ant-design/plots";
+import { Line, Column, Pie, Area, Heatmap } from "@ant-design/plots";
 import {
   UserOutlined,
   TeamOutlined,
@@ -33,6 +27,10 @@ import {
   AimOutlined,
   FireOutlined,
   EyeOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  ScheduleOutlined,
+  ThunderboltOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import moment from "moment";
@@ -60,11 +58,7 @@ const Dashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
 
-  useEffect(() => {
-    fetchDashboard();
-  }, [period]);
-
-  const fetchDashboard = async () => {
+  const fetchDashboard = useCallback(async () => {
     try {
       setLoading(true);
       const response = await dashboardAPI.getDashboard(period);
@@ -76,7 +70,11 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [period]);
+
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
 
   const handleViewDetail = (type, data) => {
     if (type === "user" && data?._id) {
@@ -92,7 +90,12 @@ const Dashboard = () => {
       navigate(`/admin/companies/${data.employerId}`);
     } else if (type === "users") {
       // Navigate to users list with filter
-      const role = data?.type === "candidate" ? "candidate" : data?.type === "employer" ? "employer" : undefined;
+      const role =
+        data?.type === "candidate"
+          ? "candidate"
+          : data?.type === "employer"
+          ? "employer"
+          : undefined;
       navigate(`/admin/users${role ? `?role=${role}` : ""}`);
     } else if (type === "jobs") {
       navigate("/admin/jobs");
@@ -173,25 +176,47 @@ const Dashboard = () => {
           )
         : 0,
       Icon: AimOutlined,
-      color: SYSTEM_COLORS.error,
+      color: SYSTEM_COLORS.success,
       suffix: "%",
+    },
+    {
+      title: "Số đơn ứng tuyển được chấp nhận",
+      value: stats?.acceptedApplications || 0,
+      Icon: CheckCircleOutlined,
+      color: SYSTEM_COLORS.success,
+      onClick: () => handleViewDetail("applications", { type: "accepted" }),
+    },
+    {
+      title: "Số đơn ứng tuyển bị từ chối",
+      value: stats?.rejectedApplications || 0,
+      Icon: CloseCircleOutlined,
+      color: SYSTEM_COLORS.error,
+      onClick: () => handleViewDetail("applications", { type: "rejected" }),
+    },
+    {
+      title: "Số bài tuyển dụng bị tạm dừng & hết hạn",
+      value: stats?.pausedJobs || 0,
+      Icon: ScheduleOutlined,
+      color: SYSTEM_COLORS.warning,
+      onClick: () => handleViewDetail("jobs", { type: "paused" }),
     },
   ];
 
   // ========== USER GROWTH TREND (Only candidate and employer) ==========
-  const userGrowthData = charts?.userGrowthTrend
-    ?.filter((item) => item._id?.role !== "admin") // Filter out admin
-    .map((item) => ({
-      date: item._id?.date || "",
-      role: item._id?.role || "unknown",
-      count: item.count || 0,
-    })) || [];
+  const userGrowthData =
+    charts?.userGrowthTrend
+      ?.filter((item) => item._id?.role !== "admin") // Filter out admin
+      .map((item) => ({
+        date: item._id?.date || "",
+        role: item._id?.role || "unknown",
+        count: item.count || 0,
+      })) || [];
 
   const roles = [...new Set(userGrowthData.map((item) => item.role))].filter(
     (r) => r !== "admin"
   );
   const dates = [...new Set(userGrowthData.map((item) => item.date))].sort();
-  
+
   const userGrowthByDate = {};
   userGrowthData.forEach((item) => {
     if (!userGrowthByDate[item.date]) {
@@ -213,9 +238,17 @@ const Dashboard = () => {
   // ========== APPLICATION STATUS DISTRIBUTION ==========
   const applicationStatusData =
     charts?.applicationStatusDistribution?.map((item) => ({
-      type: item._id === "pending" ? "Chờ duyệt" : item._id === "accepted" ? "Đã chấp nhận" : item._id === "rejected" ? "Đã từ chối" : item._id,
+      type:
+        item._id === "pending"
+          ? "Chờ duyệt"
+          : item._id === "accepted"
+          ? "Đã chấp nhận"
+          : item._id === "rejected"
+          ? "Đã từ chối"
+          : item._id === "interview"
+          ? "Phỏng vấn"
+          : item._id,
       value: item.count || 0,
-      status: item._id,
     })) || [];
 
   // ========== JOB STATUS DISTRIBUTION ==========
@@ -230,37 +263,63 @@ const Dashboard = () => {
           ? "Bản nháp"
           : item._id === "expired"
           ? "Hết hạn"
+          : item._id === "pending"
+          ? "Chờ duyệt"
+          : item._id === "rejected"
+          ? "Đã từ chối"
           : item._id,
       value: item.count || 0,
-      status: item._id,
     })) || [];
 
   // ========== APPLICATIONS TREND ==========
   const applicationsTrendData =
     charts?.applicationsTrend?.map((item) => ({
       date: moment(item._id?.date).format("DD/MM"),
-      status: item._id?.status === "pending" ? "Chờ duyệt" : item._id?.status === "accepted" ? "Đã chấp nhận" : item._id?.status === "rejected" ? "Đã từ chối" : item._id?.status,
+      status:
+        item._id?.status === "pending"
+          ? "Chờ duyệt"
+          : item._id?.status === "accepted"
+          ? "Đã chấp nhận"
+          : item._id?.status === "rejected"
+          ? "Đã từ chối"
+          : item._id?.status === "interview"
+          ? "Phỏng vấn"
+          : item._id?.status,
       count: item.count || 0,
       rawStatus: item._id?.status,
     })) || [];
 
+  // ========== JOBS POSTED TREND ==========
+  const jobsPostedTrendData =
+    charts?.jobsPostedTrend?.map((item) => ({
+      date: moment(item._id?.date).format("DD/MM"),
+      count: item.count || 0,
+    })) || [];
+
+  // ========== APPLICATION SUCCESS RATE ==========
+  const applicationSuccessRateData =
+    charts?.applicationSuccessRate?.map((item, index) => ({
+      key: index,
+      jobTitle: item.jobTitle || "Unknown",
+      total: item.total || 0,
+      accepted: item.accepted || 0,
+      successRate: item.successRate || 0,
+      jobId: item._id,
+    })) || [];
+
   // ========== TOP INDUSTRIES ==========
   const topIndustriesData =
-    charts?.topIndustries
-      ?.slice(0, 10)
-      .map((item) => ({
-        industry: item._id || "Unknown",
-        count: item.count || 0,
-      })) || [];
+    charts?.topIndustries?.slice(0, 10).map((item) => ({
+      industry: item._id || "Unknown",
+      count: item.count || 0,
+    })) || [];
 
   // ========== TOP SKILLS ==========
   const topSkillsData =
-    charts?.topSkills
-      ?.slice(0, 10)
-      .map((item) => ({
-        skill: item._id || "Unknown",
-        count: item.count || 0,
-      })) || [];
+    charts?.topSkills?.slice(0, 10).map((item) => ({
+      skill: item._id || "Unknown",
+      count: item.count || 0,
+    })) || [];
 
   // ========== JOB LEVEL DISTRIBUTION ==========
   const jobLevelData =
@@ -272,7 +331,14 @@ const Dashboard = () => {
   // ========== JOB TYPE DISTRIBUTION ==========
   const jobTypeData =
     charts?.jobTypeDistribution?.map((item) => ({
-      type: item._id === "Fulltime" ? "Toàn thời gian" : item._id === "Parttime" ? "Bán thời gian" : item._id === "Intern" ? "Thực tập" : item._id,
+      type:
+        item._id === "Fulltime"
+          ? "Toàn thời gian"
+          : item._id === "Parttime"
+          ? "Bán thời gian"
+          : item._id === "Intern"
+          ? "Thực tập"
+          : item._id,
       value: item.count || 0,
       rawType: item._id,
     })) || [];
@@ -290,11 +356,19 @@ const Dashboard = () => {
     })) || [];
 
   // ========== USER ACTIVITY HEATMAP ==========
-  const heatmapData = charts?.userActivityHeatmap?.map((item) => ({
-    day: item._id?.dayOfWeek || 0,
-    hour: item._id?.hour || 0,
-    value: item.count || 0,
-  })) || [];
+  // dayOfWeek from API: 1-7 (Sunday=1, Monday=2, ..., Saturday=7)
+  // Convert to 0-6 (Sunday=0, Monday=1, ..., Saturday=6) to match array index
+  const heatmapData =
+    charts?.userActivityHeatmap?.map((item) => {
+      const dayOfWeek = item._id?.dayOfWeek || 0;
+      // Convert from 1-7 format to 0-6 format
+      const dayIndex = dayOfWeek > 0 ? dayOfWeek - 1 : 0;
+      return {
+        day: dayIndex,
+        hour: item._id?.hour || 0,
+        value: item.count || 0,
+      };
+    }) || [];
 
   const daysOfWeek = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
   const hours = Array.from({ length: 24 }, (_, i) => i);
@@ -312,6 +386,13 @@ const Dashboard = () => {
       });
     });
   });
+
+  const maxHeatValue = Math.max(
+    ...heatmapChartData
+      .map((d) => d.value)
+      .filter((v) => typeof v === "number" && !Number.isNaN(v)),
+    0
+  );
 
   // ========== RECENT ACTIVITIES TABLES ==========
   const recentUsersColumns = [
@@ -337,11 +418,7 @@ const Dashboard = () => {
       render: (role) => (
         <Tag
           color={
-            role === "admin"
-              ? "red"
-              : role === "employer"
-              ? "blue"
-              : "green"
+            role === "admin" ? "red" : role === "employer" ? "blue" : "green"
           }
         >
           {role === "admin"
@@ -417,8 +494,20 @@ const Dashboard = () => {
       width: 100,
       render: (type) =>
         type && (
-          <Tag color={type === "Fulltime" ? "blue" : type === "Parttime" ? "orange" : "green"}>
-            {type === "Fulltime" ? "Toàn thời gian" : type === "Parttime" ? "Bán thời gian" : "Thực tập"}
+          <Tag
+            color={
+              type === "Fulltime"
+                ? "blue"
+                : type === "Parttime"
+                ? "orange"
+                : "green"
+            }
+          >
+            {type === "Fulltime"
+              ? "Toàn thời gian"
+              : type === "Parttime"
+              ? "Bán thời gian"
+              : "Thực tập"}
           </Tag>
         ),
     },
@@ -436,7 +525,11 @@ const Dashboard = () => {
               ? "orange"
               : status === "draft"
               ? "default"
-              : "red"
+              : status === "pending"
+              ? "blue"
+              : status === "rejected"
+              ? "red"
+              : "default"
           }
         >
           {status === "active"
@@ -445,6 +538,10 @@ const Dashboard = () => {
             ? "Tạm dừng"
             : status === "draft"
             ? "Bản nháp"
+            : status === "pending"
+            ? "Chờ duyệt"
+            : status === "rejected"
+            ? "Đã từ chối"
             : status}
         </Tag>
       ),
@@ -503,6 +600,8 @@ const Dashboard = () => {
               ? "green"
               : status === "rejected"
               ? "red"
+              : status === "interview"
+              ? "blue"
               : "orange"
           }
         >
@@ -510,6 +609,8 @@ const Dashboard = () => {
             ? "Đã chấp nhận"
             : status === "rejected"
             ? "Đã từ chối"
+            : status === "interview"
+            ? "Phỏng vấn"
             : "Chờ duyệt"}
         </Tag>
       ),
@@ -545,7 +646,12 @@ const Dashboard = () => {
     roles.forEach((role) => {
       userGrowthChartDataTransformed.push({
         date: item.date,
-        role: role === "candidate" ? "Ứng viên" : role === "employer" ? "Nhà tuyển dụng" : role,
+        role:
+          role === "candidate"
+            ? "Ứng viên"
+            : role === "employer"
+            ? "Nhà tuyển dụng"
+            : role,
         count: item[role] || 0,
       });
     });
@@ -583,62 +689,30 @@ const Dashboard = () => {
     },
   };
 
+  const filteredApplicationData = applicationStatusData.filter(
+    (item) => item.value > 0
+  );
+
   const applicationStatusConfig = {
-    data: applicationStatusData,
+    data: filteredApplicationData,
     angleField: "value",
     colorField: "type",
     radius: 0.85,
     innerRadius: 0.5,
-    label: {
-      type: "outer",
-      content: "{name}\n{value}",
-      style: {
-        fontSize: 12,
-        fontWeight: 500,
-      },
-    },
-    color: [SYSTEM_COLORS.warning, SYSTEM_COLORS.success, SYSTEM_COLORS.error],
-    interactions: [{ type: "element-active" }],
-    statistic: {
-      title: false,
-      content: {
-        style: {
-          whiteSpace: "pre-wrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        },
-        content: "Tổng\n" + applicationStatusData.reduce((sum, item) => sum + item.value, 0),
-      },
-    },
+    label: false,
+    color: ["#faad14", "#1890ff", "#52c41a", "#ff4d4f"],
   };
 
+  const filteredJobStatusData = jobStatusData.filter((item) => item.value > 0);
+
   const jobStatusConfig = {
-    data: jobStatusData,
+    data: filteredJobStatusData,
     angleField: "value",
     colorField: "type",
     radius: 0.85,
     innerRadius: 0.5,
-    label: {
-      type: "outer",
-      content: "{name}\n{value}",
-      style: {
-        fontSize: 12,
-        fontWeight: 500,
-      },
-    },
-    color: [SYSTEM_COLORS.success, SYSTEM_COLORS.warning, "#6b7280", SYSTEM_COLORS.error],
-    interactions: [{ type: "element-active" }],
-    statistic: {
-      title: false,
-      content: {
-        style: {
-          whiteSpace: "pre-wrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        },
-        content: "Tổng\n" + jobStatusData.reduce((sum, item) => sum + item.value, 0),
-      },
-    },
+    label: false,
+    color: ["#52c41a", "#faad14", "#1890ff", "#6b7280", "#ff4d4f", "#9ca3af"],
   };
 
   const applicationsTrendConfig = {
@@ -656,13 +730,46 @@ const Dashboard = () => {
       size: 4,
       shape: "circle",
     },
-    color: [SYSTEM_COLORS.warning, SYSTEM_COLORS.success, SYSTEM_COLORS.error],
+    color: [
+      SYSTEM_COLORS.warning,
+      SYSTEM_COLORS.info,
+      SYSTEM_COLORS.success,
+      SYSTEM_COLORS.error,
+    ],
     legend: {
       position: "top-right",
       itemName: {
         style: {
           fontSize: 12,
         },
+      },
+    },
+  };
+
+  const jobsPostedTrendConfig = {
+    data: jobsPostedTrendData,
+    xField: "date",
+    yField: "count",
+    smooth: true,
+    point: {
+      size: 5,
+      shape: "circle",
+      style: {
+        fill: "#fff",
+        stroke: SYSTEM_COLORS.warning,
+        lineWidth: 2,
+      },
+    },
+    color: SYSTEM_COLORS.warning,
+    area: {
+      style: {
+        fill: `l(270) 0:${SYSTEM_COLORS.warning}20 1:${SYSTEM_COLORS.warning}00`,
+      },
+    },
+    animation: {
+      appear: {
+        animation: "wave-in",
+        duration: 2000,
       },
     },
   };
@@ -703,37 +810,33 @@ const Dashboard = () => {
     },
   };
 
+  const filteredJobLevelData = jobLevelData.filter((item) => item.value > 0);
+
   const jobLevelConfig = {
-    data: jobLevelData,
+    data: filteredJobLevelData,
     angleField: "value",
     colorField: "type",
     radius: 0.85,
     innerRadius: 0.5,
-    label: {
-      type: "outer",
-      content: "{name}\n{value}",
-      style: {
-        fontSize: 12,
-        fontWeight: 500,
-      },
-    },
-    color: [SYSTEM_COLORS.info, SYSTEM_COLORS.success, SYSTEM_COLORS.warning, SYSTEM_COLORS.purple, SYSTEM_COLORS.error],
+    label: false,
+    color: [
+      SYSTEM_COLORS.info,
+      SYSTEM_COLORS.success,
+      SYSTEM_COLORS.warning,
+      SYSTEM_COLORS.purple,
+      SYSTEM_COLORS.error,
+    ],
   };
 
+  const filteredJobTypeData = jobTypeData.filter((item) => item.value > 0);
+
   const jobTypeConfig = {
-    data: jobTypeData,
+    data: filteredJobTypeData,
     angleField: "value",
     colorField: "type",
     radius: 0.85,
     innerRadius: 0.5,
-    label: {
-      type: "outer",
-      content: "{name}\n{value}",
-      style: {
-        fontSize: 12,
-        fontWeight: 500,
-      },
-    },
+    label: false,
     color: [SYSTEM_COLORS.info, SYSTEM_COLORS.success, SYSTEM_COLORS.warning],
   };
 
@@ -742,20 +845,30 @@ const Dashboard = () => {
     xField: "hour",
     yField: "day",
     colorField: "value",
-    color: [
-      "#ebedf0",
-      "#c6e48b",
-      "#7bc96f",
-      "#239a3b",
-      "#196127",
-    ],
-    size: 24,
-    shape: "rect",
-    label: {
-      style: {
-        fill: "#000",
-        fontSize: 10,
-      },
+    color: {
+      range: ["#e5e7eb", "#a5b4fc", "#6366f1", "#4338ca"],
+      domain: [0, Math.max(maxHeatValue, 1)],
+    },
+    size: 18,
+    autoFit: true,
+    pointStyle: {
+      stroke: "#fff",
+      lineWidth: 0.5,
+    },
+    tooltip: {
+      fields: ["day", "hour", "value"],
+      formatter: (datum) => ({
+        name: `${datum.day} - ${datum.hour}`,
+        value: `${datum.value} hoạt động`,
+      }),
+    },
+    xAxis: {
+      label: { autoHide: true, autoRotate: true },
+      title: { text: "Giờ trong ngày" },
+    },
+    yAxis: {
+      label: { style: { fontWeight: 600 } },
+      title: { text: "Ngày trong tuần" },
     },
   };
 
@@ -805,7 +918,7 @@ const Dashboard = () => {
             {statCards.map((stat, index) => {
               const IconComponent = stat.Icon;
               return (
-                <Col xs={24} sm={12} lg={8} xl={6} key={index}>
+                <Col xs={24} sm={12} lg={8} xl={8} key={index}>
                   <Card
                     className="hover:shadow-lg transition-all duration-300 cursor-pointer border"
                     style={{
@@ -831,7 +944,9 @@ const Dashboard = () => {
                       </div>
                       {stat.change !== undefined && (
                         <div className="text-xs text-gray-600 text-right bg-gray-100 px-2 py-1 rounded-lg">
-                          <div className="font-semibold text-green-600">+{stat.change}</div>
+                          <div className="font-semibold text-green-600">
+                            +{stat.change}
+                          </div>
                           <div>{stat.changeLabel}</div>
                         </div>
                       )}
@@ -852,17 +967,20 @@ const Dashboard = () => {
                     />
                     {stat.active !== undefined && (
                       <div className="mt-3 text-xs text-gray-500">
-                        <span className="font-semibold">{stat.active}</span> đang hoạt động
+                        <span className="font-semibold">{stat.active}</span>{" "}
+                        đang hoạt động
                       </div>
                     )}
                     {stat.pending !== undefined && (
                       <div className="mt-3 text-xs text-gray-500">
-                        <span className="font-semibold">{stat.pending}</span> chờ duyệt
+                        <span className="font-semibold">{stat.pending}</span>{" "}
+                        chờ duyệt
                       </div>
                     )}
                     {stat.verified !== undefined && (
                       <div className="mt-3 text-xs text-gray-500">
-                        <span className="font-semibold">{stat.verified}</span> đã xác thực
+                        <span className="font-semibold">{stat.verified}</span>{" "}
+                        đã xác thực
                       </div>
                     )}
                   </Card>
@@ -877,8 +995,12 @@ const Dashboard = () => {
               <Card
                 title={
                   <div className="flex items-center gap-2">
-                    <RiseOutlined style={{ color: SYSTEM_PRIMARY, fontSize: "18px" }} />
-                    <span className="font-semibold">Xu hướng tăng trưởng (Ứng viên & Nhà tuyển dụng)</span>
+                    <RiseOutlined
+                      style={{ color: SYSTEM_PRIMARY, fontSize: "18px" }}
+                    />
+                    <span className="font-semibold">
+                      Xu hướng tăng trưởng (Ứng viên & Nhà tuyển dụng)
+                    </span>
                   </div>
                 }
                 className="h-full shadow-sm"
@@ -895,15 +1017,22 @@ const Dashboard = () => {
               <Card
                 title={
                   <div className="flex items-center gap-2">
-                    <FileTextOutlined style={{ color: SYSTEM_COLORS.warning, fontSize: "18px" }} />
-                    <span className="font-semibold">Trạng thái đơn ứng tuyển</span>
+                    <FileTextOutlined
+                      style={{ color: SYSTEM_COLORS.warning, fontSize: "18px" }}
+                    />
+                    <span className="font-semibold">
+                      Trạng thái đơn ứng tuyển
+                    </span>
                   </div>
                 }
                 className="h-full shadow-sm"
                 bodyStyle={{ padding: "20px" }}
               >
-                {applicationStatusData.length > 0 ? (
-                  <Pie {...applicationStatusConfig} height={320} />
+                {applicationStatusData.filter((item) => item.value > 0).length >
+                0 ? (
+                  <div style={{ width: "100%", height: "320px" }}>
+                    <Pie {...applicationStatusConfig} height={320} />
+                  </div>
                 ) : (
                   <Empty description="Chưa có dữ liệu" />
                 )}
@@ -917,15 +1046,21 @@ const Dashboard = () => {
               <Card
                 title={
                   <div className="flex items-center gap-2">
-                    <BankOutlined style={{ color: SYSTEM_COLORS.purple, fontSize: "18px" }} />
-                    <span className="font-semibold">Trạng thái công việc</span>
+                    <BankOutlined
+                      style={{ color: SYSTEM_COLORS.purple, fontSize: "18px" }}
+                    />
+                    <span className="font-semibold">
+                      Trạng thái các bài đăng tuyển dụng
+                    </span>
                   </div>
                 }
                 className="h-full shadow-sm"
                 bodyStyle={{ padding: "20px" }}
               >
-                {jobStatusData.length > 0 ? (
-                  <Pie {...jobStatusConfig} height={320} />
+                {jobStatusData.filter((item) => item.value > 0).length > 0 ? (
+                  <div style={{ width: "100%", height: "320px" }}>
+                    <Pie {...jobStatusConfig} height={320} />
+                  </div>
                 ) : (
                   <Empty description="Chưa có dữ liệu" />
                 )}
@@ -935,7 +1070,9 @@ const Dashboard = () => {
               <Card
                 title={
                   <div className="flex items-center gap-2">
-                    <BarChartOutlined style={{ color: SYSTEM_COLORS.cyan, fontSize: "18px" }} />
+                    <BarChartOutlined
+                      style={{ color: SYSTEM_COLORS.cyan, fontSize: "18px" }}
+                    />
                     <span className="font-semibold">Xu hướng ứng tuyển</span>
                   </div>
                 }
@@ -944,6 +1081,93 @@ const Dashboard = () => {
               >
                 {applicationsTrendData.length > 0 ? (
                   <Area {...applicationsTrendConfig} height={320} />
+                ) : (
+                  <Empty description="Chưa có dữ liệu" />
+                )}
+              </Card>
+            </Col>
+          </Row>
+
+          {/* Charts Row 3 - New Charts */}
+          <Row gutter={[16, 16]} className="mb-6">
+            <Col xs={24} lg={12}>
+              <Card
+                title={
+                  <div className="flex items-center gap-2">
+                    <ThunderboltOutlined
+                      style={{ color: SYSTEM_COLORS.warning, fontSize: "18px" }}
+                    />
+                    <span className="font-semibold">Xu hướng đăng việc</span>
+                  </div>
+                }
+                className="h-full shadow-sm"
+                bodyStyle={{ padding: "20px" }}
+              >
+                {jobsPostedTrendData.length > 0 ? (
+                  <Area {...jobsPostedTrendConfig} height={320} />
+                ) : (
+                  <Empty description="Chưa có dữ liệu" />
+                )}
+              </Card>
+            </Col>
+            <Col xs={24} lg={12}>
+              <Card
+                title={
+                  <div className="flex items-center gap-2">
+                    <TrophyOutlined
+                      style={{ color: SYSTEM_COLORS.success, fontSize: "18px" }}
+                    />
+                    <span className="font-semibold">
+                      Tỷ lệ thành công ứng tuyển
+                    </span>
+                  </div>
+                }
+                className="h-full shadow-sm"
+                bodyStyle={{ padding: "20px" }}
+              >
+                {applicationSuccessRateData.length > 0 ? (
+                  <Table
+                    dataSource={applicationSuccessRateData}
+                    columns={[
+                      {
+                        title: "Công việc",
+                        dataIndex: "jobTitle",
+                        key: "jobTitle",
+                        ellipsis: true,
+                        width: 200,
+                      },
+                      {
+                        title: "Tổng đơn",
+                        dataIndex: "total",
+                        key: "total",
+                        align: "center",
+                        width: 100,
+                      },
+                      {
+                        title: "Đã chấp nhận",
+                        dataIndex: "accepted",
+                        key: "accepted",
+                        align: "center",
+                        width: 120,
+                        render: (accepted) => (
+                          <Tag color="green">{accepted}</Tag>
+                        ),
+                      },
+                      {
+                        title: "Tỷ lệ",
+                        dataIndex: "successRate",
+                        key: "successRate",
+                        align: "center",
+                        width: 100,
+                        render: (rate) => (
+                          <span className="font-semibold">{rate}%</span>
+                        ),
+                      },
+                    ]}
+                    pagination={false}
+                    size="small"
+                    scroll={{ y: 250 }}
+                  />
                 ) : (
                   <Empty description="Chưa có dữ liệu" />
                 )}
@@ -967,8 +1191,12 @@ const Dashboard = () => {
               <Card
                 title={
                   <div className="flex items-center gap-2">
-                    <BankOutlined style={{ color: SYSTEM_COLORS.success, fontSize: "18px" }} />
-                    <span className="font-semibold">Top 10 ngành nghề</span>
+                    <BankOutlined
+                      style={{ color: SYSTEM_COLORS.success, fontSize: "18px" }}
+                    />
+                    <span className="font-semibold">
+                      Top 10 ngành nghề được đăng tuyển nhiều nhất
+                    </span>
                   </div>
                 }
                 className="h-full shadow-sm"
@@ -985,8 +1213,12 @@ const Dashboard = () => {
               <Card
                 title={
                   <div className="flex items-center gap-2">
-                    <TrophyOutlined style={{ color: SYSTEM_COLORS.error, fontSize: "18px" }} />
-                    <span className="font-semibold">Top 10 kỹ năng</span>
+                    <TrophyOutlined
+                      style={{ color: SYSTEM_COLORS.error, fontSize: "18px" }}
+                    />
+                    <span className="font-semibold">
+                      Top 10 kỹ năng được yêu cầu nhiều nhất
+                    </span>
                   </div>
                 }
                 className="h-full shadow-sm"
@@ -1007,14 +1239,18 @@ const Dashboard = () => {
               <Card
                 title={
                   <div className="flex items-center gap-2">
-                    <AimOutlined style={{ color: SYSTEM_COLORS.info, fontSize: "18px" }} />
-                    <span className="font-semibold">Phân bổ cấp độ công việc</span>
+                    <AimOutlined
+                      style={{ color: SYSTEM_COLORS.info, fontSize: "18px" }}
+                    />
+                    <span className="font-semibold">
+                      Phân bổ cấp độ công việc
+                    </span>
                   </div>
                 }
                 className="h-full shadow-sm"
                 bodyStyle={{ padding: "20px" }}
               >
-                {jobLevelData.length > 0 ? (
+                {filteredJobLevelData.length > 0 ? (
                   <Pie {...jobLevelConfig} height={320} />
                 ) : (
                   <Empty description="Chưa có dữ liệu" />
@@ -1025,14 +1261,18 @@ const Dashboard = () => {
               <Card
                 title={
                   <div className="flex items-center gap-2">
-                    <ClockCircleOutlined style={{ color: SYSTEM_COLORS.warning, fontSize: "18px" }} />
-                    <span className="font-semibold">Phân bổ loại công việc</span>
+                    <ClockCircleOutlined
+                      style={{ color: SYSTEM_COLORS.warning, fontSize: "18px" }}
+                    />
+                    <span className="font-semibold">
+                      Phân bổ loại công việc
+                    </span>
                   </div>
                 }
                 className="h-full shadow-sm"
                 bodyStyle={{ padding: "20px" }}
               >
-                {jobTypeData.length > 0 ? (
+                {filteredJobTypeData.length > 0 ? (
                   <Pie {...jobTypeConfig} height={320} />
                 ) : (
                   <Empty description="Chưa có dữ liệu" />
@@ -1047,8 +1287,12 @@ const Dashboard = () => {
               <Card
                 title={
                   <div className="flex items-center gap-2">
-                    <FireOutlined style={{ color: SYSTEM_COLORS.purple, fontSize: "18px" }} />
-                    <span className="font-semibold">Heatmap hoạt động người dùng (theo giờ trong tuần)</span>
+                    <FireOutlined
+                      style={{ color: SYSTEM_COLORS.purple, fontSize: "18px" }}
+                    />
+                    <span className="font-semibold">
+                      Heatmap hoạt động người dùng (theo giờ trong tuần)
+                    </span>
                   </div>
                 }
                 className="shadow-sm"
@@ -1079,8 +1323,12 @@ const Dashboard = () => {
               <Card
                 title={
                   <div className="flex items-center gap-2">
-                    <BankOutlined style={{ color: SYSTEM_PRIMARY, fontSize: "18px" }} />
-                    <span className="font-semibold">Nhà tuyển dụng hoạt động nhiều nhất</span>
+                    <BankOutlined
+                      style={{ color: SYSTEM_PRIMARY, fontSize: "18px" }}
+                    />
+                    <span className="font-semibold">
+                      Nhà tuyển dụng hoạt động nhiều nhất
+                    </span>
                   </div>
                 }
                 className="shadow-sm"
@@ -1143,9 +1391,7 @@ const Dashboard = () => {
                           type="link"
                           icon={<EyeOutlined />}
                           size="small"
-                          onClick={() =>
-                            handleViewDetail("employer", record)
-                          }
+                          onClick={() => handleViewDetail("employer", record)}
                         >
                           Chi tiết
                         </Button>
@@ -1166,7 +1412,9 @@ const Dashboard = () => {
               <Card
                 title={
                   <div className="flex items-center gap-2">
-                    <UserOutlined style={{ color: SYSTEM_COLORS.success, fontSize: "18px" }} />
+                    <UserOutlined
+                      style={{ color: SYSTEM_COLORS.success, fontSize: "18px" }}
+                    />
                     <span className="font-semibold">Người dùng mới</span>
                   </div>
                 }
@@ -1186,7 +1434,9 @@ const Dashboard = () => {
               <Card
                 title={
                   <div className="flex items-center gap-2">
-                    <FileTextOutlined style={{ color: SYSTEM_PRIMARY, fontSize: "18px" }} />
+                    <FileTextOutlined
+                      style={{ color: SYSTEM_PRIMARY, fontSize: "18px" }}
+                    />
                     <span className="font-semibold">Công việc gần đây</span>
                   </div>
                 }
@@ -1206,7 +1456,9 @@ const Dashboard = () => {
               <Card
                 title={
                   <div className="flex items-center gap-2">
-                    <FileTextOutlined style={{ color: SYSTEM_COLORS.warning, fontSize: "18px" }} />
+                    <FileTextOutlined
+                      style={{ color: SYSTEM_COLORS.warning, fontSize: "18px" }}
+                    />
                     <span className="font-semibold">Đơn ứng tuyển gần đây</span>
                   </div>
                 }
