@@ -179,20 +179,24 @@ export default function JobDetailPage() {
         });
 
         const payload = res?.data || res;
+        const payloadObj = payload as any;
 
         // API returns either an array or { candidates: [...] }
-        const candidates = Array.isArray(payload?.data)
-          ? payload.data
-          : payload?.data?.candidates || payload?.candidates || [];
+        let candidates: any[] = [];
+        if (Array.isArray(payloadObj)) {
+          candidates = payloadObj;
+        } else if (Array.isArray(payloadObj?.data)) {
+          candidates = payloadObj.data;
+        } else {
+          candidates =
+            payloadObj?.data?.candidates || payloadObj?.candidates || [];
+        }
 
-        if (payload?.success && Array.isArray(candidates)) {
+        if (payloadObj?.success && Array.isArray(candidates)) {
           const mapped = candidates
             .map((item: any) => {
               const candidate =
-                item.candidate ||
-                item.candidateId ||
-                item.candidate_id ||
-                {};
+                item.candidate || item.candidateId || item.candidate_id || {};
 
               return {
                 candidateId: candidate._id || item.candidateId || "",
@@ -322,7 +326,8 @@ export default function JobDetailPage() {
         if (res.success && Array.isArray(res.data)) {
           const mapped = res.data.map((item: any) => ({
             candidateId: item.candidateId || item.candidate?._id || "",
-            name: item.candidate?.name || item.candidate?.fullName || "Ứng viên",
+            name:
+              item.candidate?.name || item.candidate?.fullName || "Ứng viên",
             email: item.candidate?.email,
             score: item.overallScore || item.matchScore || 0,
             tier: item.tier,
@@ -755,10 +760,6 @@ export default function JobDetailPage() {
                 </h1>
                 {jobData?.status && getStatusBadge(jobData.status)}
               </div>
-              <p className="text-gray-600">
-                {jobData.company || "Công ty chưa cập nhật"} •{" "}
-                {formatDate(jobData.createdAt)}
-              </p>
             </div>
           </div>
 
@@ -823,7 +824,9 @@ export default function JobDetailPage() {
           </CardHeader>
           <CardContent>
             {loadingSuggestions && (
-              <p className="text-sm text-gray-600">Đang tải gợi ý ứng viên...</p>
+              <p className="text-sm text-gray-600">
+                Đang tải gợi ý ứng viên...
+              </p>
             )}
             {suggestionError && suggestedCandidates.length === 0 && (
               <p className="text-sm text-red-600">{suggestionError}</p>
@@ -839,7 +842,13 @@ export default function JobDetailPage() {
                   ? `${profileBaseUrl}/profile/${c.candidateId}?public=1`
                   : undefined;
                 const mailto = c.email
-                  ? `mailto:${c.email}?subject=Mời ứng tuyển - ${jobData?.title || "Cơ hội mới"}&body=Chào ${c.name},%0D%0AChúng tôi muốn mời bạn ứng tuyển vị trí ${jobData?.title || ""}.`
+                  ? `mailto:${c.email}?subject=Mời ứng tuyển - ${
+                      jobData?.title || "Cơ hội mới"
+                    }&body=Chào ${
+                      c.name
+                    },%0D%0AChúng tôi muốn mời bạn ứng tuyển vị trí ${
+                      jobData?.title || ""
+                    }.`
                   : undefined;
 
                 return (
@@ -901,7 +910,10 @@ export default function JobDetailPage() {
         </Card>
       )}
 
-      <Dialog open={!!selectedCandidate} onOpenChange={() => setSelectedCandidate(null)}>
+      <Dialog
+        open={!!selectedCandidate}
+        onOpenChange={() => setSelectedCandidate(null)}
+      >
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Hồ sơ ứng viên</DialogTitle>
@@ -954,7 +966,8 @@ export default function JobDetailPage() {
                                 {key.replace("Score", "")}
                               </p>
                               <p className="text-blue-700 font-semibold">
-                                {Math.round(val?.score ?? 0)}% (w {val?.weight ?? 0})
+                                {Math.round(val?.score ?? 0)}% (w{" "}
+                                {val?.weight ?? 0})
                               </p>
                             </div>
                             {Object.keys(details).length > 0 && (
@@ -964,7 +977,7 @@ export default function JobDetailPage() {
                                     <span className="font-medium">{k}:</span>{" "}
                                     {Array.isArray(v)
                                       ? v.join(", ")
-                                      : typeof v === "object"
+                                      : typeof v === "object" && v !== null
                                       ? Object.values(v).join(", ")
                                       : String(v)}
                                   </li>
@@ -1239,7 +1252,11 @@ export default function JobDetailPage() {
                 </Label>
                 <Input
                   id="address"
-                  value={formData.address}
+                  value={
+                    typeof formData.address === "string"
+                      ? formData.address
+                      : formData.address?.fullAddress ?? ""
+                  }
                   onChange={(e) => handleInputChange("address", e.target.value)}
                   placeholder="Ví dụ: 123 Nguyễn Huệ, Tòa nhà ABC"
                 />

@@ -118,7 +118,7 @@ export default function Header() {
     const fetchIndustries = async () => {
       // Chỉ fetch khi đã ở client-side
       if (typeof window === "undefined") return;
-      
+
       try {
         setLoadingPositions(true);
         const data = await industriesAPI.getRootIndustries();
@@ -131,7 +131,7 @@ export default function Header() {
         setLoadingPositions(false);
       }
     };
-    
+
     // Chỉ fetch khi component đã mount trên client
     fetchIndustries();
   }, []);
@@ -265,7 +265,7 @@ export default function Header() {
   // Click handlers
   const handleJobPositionClick = (industry: Industry) => {
     const params = new URLSearchParams();
-    params.set("industry", industry.code);
+    params.set("industryCode", industry.code);
     router.push(`/search?${params.toString()}`);
   };
 
