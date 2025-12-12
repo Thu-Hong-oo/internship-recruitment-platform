@@ -1129,15 +1129,11 @@ export default function JobDetailPage() {
                                   return (
                                   <li key={k}>
                                     <span className="font-medium">{k}:</span>{" "}
-<<<<<<< HEAD
-                                    {valString}
-=======
                                     {Array.isArray(v)
                                       ? v.join(", ")
                                       : typeof v === "object" && v !== null
                                       ? Object.values(v).join(", ")
                                       : String(v)}
->>>>>>> 4a0effbbd3cf5d43f5ca8e23915a35d3d4b2e53c
                                   </li>
                                   );
                                 })}
@@ -1414,13 +1410,7 @@ export default function JobDetailPage() {
                   value={
                     typeof formData.address === "string"
                       ? formData.address
-<<<<<<< HEAD
-                      : formData.address?.fullAddress ||
-                        formData.address?.street ||
-                        ""
-=======
                       : formData.address?.fullAddress ?? ""
->>>>>>> 4a0effbbd3cf5d43f5ca8e23915a35d3d4b2e53c
                   }
                   onChange={(e) => handleInputChange("address", e.target.value)}
                   placeholder="Ví dụ: 123 Nguyễn Huệ, Tòa nhà ABC"
