@@ -10,8 +10,23 @@ const Job = require('../../models/Job');
  */
 class VectorStore {
   constructor() {
-    const url = process.env.CHROMA_URL || 'http://localhost:8000';
-    this.client = new ChromaClient({ path: url });
+    // ChromaDB connection logic:
+    // 1. If CHROMA_URL is set → use it (external ChromaDB server)
+    // 2. If CHROMA_URL is not set → use embedded server on port 8001 (for App Runner)
+    // 3. For localhost → default to http://localhost:8000 (requires docker-compose)
+    let chromaUrl;
+    if (process.env.CHROMA_URL) {
+      // Use provided CHROMA_URL (external server or docker-compose)
+      chromaUrl = process.env.CHROMA_URL;
+    } else if (process.env.NODE_ENV === 'production' || process.env.AWS_EXECUTION_ENV) {
+      // Production/App Runner: use embedded server (runs in same container)
+      chromaUrl = 'http://localhost:8001';
+    } else {
+      // Local development: default to docker-compose ChromaDB
+      chromaUrl = 'http://localhost:8000';
+    }
+    
+    this.client = new ChromaClient({ path: chromaUrl });
     this.collectionName = process.env.CHROMA_COLLECTION_JOBS || 'jobs';
     this.collectionPromise = null;
     this.isPrecomputed = false;

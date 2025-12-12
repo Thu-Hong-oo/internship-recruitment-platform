@@ -37,9 +37,10 @@ class VectorStoreService {
       }
 
       // Initialize ChromaDB client
-      this.client = new ChromaClient({
-        path: process.env.CHROMADB_URL || 'http://localhost:8000',
-      });
+      // ChromaDB Node.js client only supports HTTP client mode (server mode)
+      // Default to localhost:8000 for local development
+      const chromaUrl = process.env.CHROMADB_URL || process.env.CHROMA_URL || 'http://localhost:8000';
+      this.client = new ChromaClient({ path: chromaUrl });
 
       logger.info('🔗 Connecting to ChromaDB...');
 

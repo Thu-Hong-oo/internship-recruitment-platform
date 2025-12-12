@@ -32,7 +32,20 @@ class CandidateVectorIndexService {
         return true;
       }
 
-      const chromaUrl = process.env.CHROMADB_URL || 'http://localhost:8000';
+      // ChromaDB connection logic:
+      // 1. If CHROMA_URL is set → use it (external ChromaDB server)
+      // 2. If CHROMA_URL is not set → use embedded server on port 8001 (for App Runner)
+      // 3. For localhost → default to http://localhost:8000 (requires docker-compose)
+      let chromaUrl;
+      if (process.env.CHROMADB_URL || process.env.CHROMA_URL) {
+        chromaUrl = process.env.CHROMADB_URL || process.env.CHROMA_URL;
+      } else if (process.env.NODE_ENV === 'production' || process.env.AWS_EXECUTION_ENV) {
+        // Production/App Runner: use embedded server (runs in same container)
+        chromaUrl = 'http://localhost:8001';
+      } else {
+        // Local development: default to docker-compose ChromaDB
+        chromaUrl = 'http://localhost:8000';
+      }
       
       try {
         this.client = new ChromaClient({

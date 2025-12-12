@@ -28,13 +28,10 @@ class VectorStoreService {
   constructor() {
     try {
       // Initialize ChromaDB client
-      // If CHROMA_URL is set, connect to remote instance
-      // Otherwise, use local instance (default)
+      // ChromaDB Node.js client only supports HTTP client mode (server mode)
+      // Default to localhost:8000 for local development
       const chromaUrl = process.env.CHROMA_URL || 'http://localhost:8000';
-      
-      this.client = new ChromaClient({
-        path: chromaUrl,
-      });
+      this.client = new ChromaClient({ path: chromaUrl });
 
       this.collectionName = process.env.CHROMA_COLLECTION_NAME || 'learning-resources';
       this.collection = null;
