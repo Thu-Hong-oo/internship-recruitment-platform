@@ -1,6 +1,7 @@
 const CandidateProfile = require('../../models/CandidateProfile');
 const Job = require('../../models/Job');
 const SavedJob = require('../../models/SavedJob');
+const SearchLog = require('../../models/SearchLog');
 const { ApiResponse } = require('../../utils/responseHandler');
 const { AppError } = require('../../utils/errors');
 
@@ -8,6 +9,7 @@ class JobController {
   constructor() {
     // Bind all methods to preserve this context
     this.getJobs = this.getJobs.bind(this);
+    this.getPopularSearches = this.getPopularSearches.bind(this);
     this.handleJobAction = this.handleJobAction.bind(this);
   }
 
@@ -40,6 +42,35 @@ class JobController {
         default:
           return this._searchJobs(req, res, next);
       }
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/candidates/jobs/popular-searches
+   * Return top search keywords (recent window)
+   */
+  async getPopularSearches(req, res, next) {
+    try {
+      const limit = parseInt(req.query.limit || '10', 10);
+      const days = parseInt(req.query.days || '30', 10);
+      const since = new Date();
+      since.setDate(since.getDate() - days);
+
+      const popular = await SearchLog.aggregate([
+        { $match: { createdAt: { $gte: since }, keyword: { $exists: true, $ne: '' } } },
+        { $group: { _id: { $toLower: '$keyword' }, count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: limit },
+        { $project: { keyword: '$_id', count: 1, _id: 0 } },
+      ]);
+
+      return ApiResponse.success(
+        res,
+        { popular },
+        'Popular searches retrieved successfully'
+      );
     } catch (error) {
       next(error);
     }
@@ -119,6 +150,27 @@ class JobController {
     if (jobType) filter.jobType = jobType;
     if (salaryMin) filter.salaryMin = { $gte: parseInt(salaryMin) };
     if (salaryMax) filter.salaryMax = { $lte: parseInt(salaryMax) };
+
+    // Log search (non-blocking)
+    SearchLog.create({
+      userId: req.user?.id,
+      candidateId: req.user?.candidateProfile,
+      keyword,
+      filters: {
+        location,
+        industry,
+        jobType,
+        skills: skills ? skills.split(',') : [],
+        salaryMin: salaryMin ? parseInt(salaryMin, 10) : undefined,
+        salaryMax: salaryMax ? parseInt(salaryMax, 10) : undefined,
+      },
+      source: 'candidate',
+      userAgent: req.get('user-agent'),
+      ip: req.ip,
+    }).catch(err => {
+      // best-effort log
+      console.warn('SearchLog create failed:', err.message);
+    });
 
     const jobs = await Job.find(filter)
       .populate('employer', 'company.name company.logo company.industry')

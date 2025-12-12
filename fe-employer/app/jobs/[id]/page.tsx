@@ -179,6 +179,7 @@ export default function JobDetailPage() {
           noCache: true,
         });
 
+<<<<<<< HEAD
         const payload: any = res?.data || res;
 
         // API returns either an array or { candidates: [...] }
@@ -239,13 +240,27 @@ export default function JobDetailPage() {
             };
           };
 
+=======
+        const payload = res?.data || res;
+        const payloadObj = payload as any;
+
+        // API returns either an array or { candidates: [...] }
+        let candidates: any[] = [];
+        if (Array.isArray(payloadObj)) {
+          candidates = payloadObj;
+        } else if (Array.isArray(payloadObj?.data)) {
+          candidates = payloadObj.data;
+        } else {
+          candidates =
+            payloadObj?.data?.candidates || payloadObj?.candidates || [];
+        }
+
+        if (payloadObj?.success && Array.isArray(candidates)) {
+>>>>>>> 4a0effbbd3cf5d43f5ca8e23915a35d3d4b2e53c
           const mapped = candidates
             .map((item: any) => {
               const candidate =
-                item.candidate ||
-                item.candidateId ||
-                item.candidate_id ||
-                {};
+                item.candidate || item.candidateId || item.candidate_id || {};
 
               const skills =
                 item.breakdown?.skills?.matched && Array.isArray(item.breakdown.skills.matched)
@@ -395,7 +410,8 @@ export default function JobDetailPage() {
         if (res.success && Array.isArray(res.data)) {
           const mapped = res.data.map((item: any) => ({
             candidateId: item.candidateId || item.candidate?._id || "",
-            name: item.candidate?.name || item.candidate?.fullName || "Ứng viên",
+            name:
+              item.candidate?.name || item.candidate?.fullName || "Ứng viên",
             email: item.candidate?.email,
             score: item.overallScore || item.matchScore || 0,
             tier: item.tier,
@@ -828,10 +844,6 @@ export default function JobDetailPage() {
                 </h1>
                 {jobData?.status && getStatusBadge(jobData.status)}
               </div>
-              <p className="text-gray-600">
-                {jobData.company || "Công ty chưa cập nhật"} •{" "}
-                {formatDate(jobData.createdAt)}
-              </p>
             </div>
           </div>
 
@@ -896,7 +908,9 @@ export default function JobDetailPage() {
           </CardHeader>
           <CardContent>
             {loadingSuggestions && (
-              <p className="text-sm text-gray-600">Đang tải gợi ý ứng viên...</p>
+              <p className="text-sm text-gray-600">
+                Đang tải gợi ý ứng viên...
+              </p>
             )}
             {suggestionError && suggestedCandidates.length === 0 && (
               <p className="text-sm text-red-600">{suggestionError}</p>
@@ -912,7 +926,13 @@ export default function JobDetailPage() {
                   ? `${profileBaseUrl}/profile/${c.candidateId}?public=1`
                   : undefined;
                 const mailto = c.email
-                  ? `mailto:${c.email}?subject=Mời ứng tuyển - ${jobData?.title || "Cơ hội mới"}&body=Chào ${c.name},%0D%0AChúng tôi muốn mời bạn ứng tuyển vị trí ${jobData?.title || ""}.`
+                  ? `mailto:${c.email}?subject=Mời ứng tuyển - ${
+                      jobData?.title || "Cơ hội mới"
+                    }&body=Chào ${
+                      c.name
+                    },%0D%0AChúng tôi muốn mời bạn ứng tuyển vị trí ${
+                      jobData?.title || ""
+                    }.`
                   : undefined;
 
                 return (
@@ -974,7 +994,10 @@ export default function JobDetailPage() {
         </Card>
       )}
 
-      <Dialog open={!!selectedCandidate} onOpenChange={() => setSelectedCandidate(null)}>
+      <Dialog
+        open={!!selectedCandidate}
+        onOpenChange={() => setSelectedCandidate(null)}
+      >
         <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>Hồ sơ ứng viên</DialogTitle>
@@ -1101,7 +1124,8 @@ export default function JobDetailPage() {
                                 {key.replace("Score", "")}
                               </p>
                               <p className="text-blue-700 font-semibold">
-                                {Math.round(val?.score ?? 0)}% (w {val?.weight ?? 0})
+                                {Math.round(val?.score ?? 0)}% (w{" "}
+                                {val?.weight ?? 0})
                               </p>
                             </div>
                             {Object.keys(details).length > 0 && (
@@ -1115,7 +1139,15 @@ export default function JobDetailPage() {
                                   return (
                                   <li key={k}>
                                     <span className="font-medium">{k}:</span>{" "}
+<<<<<<< HEAD
                                     {valString}
+=======
+                                    {Array.isArray(v)
+                                      ? v.join(", ")
+                                      : typeof v === "object" && v !== null
+                                      ? Object.values(v).join(", ")
+                                      : String(v)}
+>>>>>>> 4a0effbbd3cf5d43f5ca8e23915a35d3d4b2e53c
                                   </li>
                                   );
                                 })}
@@ -1392,9 +1424,13 @@ export default function JobDetailPage() {
                   value={
                     typeof formData.address === "string"
                       ? formData.address
+<<<<<<< HEAD
                       : formData.address?.fullAddress ||
                         formData.address?.street ||
                         ""
+=======
+                      : formData.address?.fullAddress ?? ""
+>>>>>>> 4a0effbbd3cf5d43f5ca8e23915a35d3d4b2e53c
                   }
                   onChange={(e) => handleInputChange("address", e.target.value)}
                   placeholder="Ví dụ: 123 Nguyễn Huệ, Tòa nhà ABC"

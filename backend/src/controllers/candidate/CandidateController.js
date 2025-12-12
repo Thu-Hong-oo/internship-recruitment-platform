@@ -49,6 +49,7 @@ class CandidateController {
 
     // Job management methods
     this.getJobs = this.jobController.getJobs;
+    this.getPopularSearches = this.jobController.getPopularSearches;
     this.handleJobAction = this.jobController.handleJobAction;
 
     // Company management methods

@@ -3,7 +3,10 @@ const { getSentenceBertService } = require('./sentenceBertService');
 const { getVectorStore } = require('./vectorStore');
 const CandidateProfile = require('../../models/CandidateProfile');
 const Job = require('../../models/Job');
+const SavedJob = require('../../models/SavedJob');
+const Application = require('../../models/Application');
 const CVMatchingScore = require('../../models/CVMatchingScore');
+const SearchLog = require('../../models/SearchLog');
 
 function clamp(v, min = 0, max = 100) {
   return Math.max(min, Math.min(max, v));
@@ -121,6 +124,23 @@ function buildCandidateText(profile) {
     .substring(0, 2000);
 }
 
+function cosineSim(a = [], b = []) {
+  if (!a.length || !b.length || a.length !== b.length) return null;
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    const va = a[i];
+    const vb = b[i];
+    if (typeof va !== 'number' || typeof vb !== 'number') return null;
+    dot += va * vb;
+    na += va * va;
+    nb += vb * vb;
+  }
+  if (!na || !nb) return null;
+  return dot / (Math.sqrt(na) * Math.sqrt(nb));
+}
+
 class FastMatcherService {
   constructor() {
     this.vectorStore = getVectorStore();
@@ -141,6 +161,86 @@ class FastMatcherService {
     const ids = (results.ids && results.ids[0]) || [];
     const metas = (results.metadatas && results.metadatas[0]) || [];
     const distances = (results.distances && results.distances[0]) || [];
+    const embedResults = (results.embeddings && results.embeddings[0]) || [];
+
+    // Precompute usable distances (fallback to cosine from embeddings)
+    const computedDistances = ids.map((id, idx) => {
+      let dist = distances[idx];
+      if (dist === undefined || dist === null) {
+        const sim = cosineSim(embedding, embedResults[idx] || []);
+        dist = sim !== null ? 1 - sim : 1;
+      }
+      return dist;
+    });
+
+    // Behavior signals: saved, applied, preferences
+    const candidateId = candidateProfile._id || candidateProfile.id || candidateProfile.userId;
+    const userId = candidateProfile.userId || candidateId;
+    
+    // Get saved/applied jobs
+    const [savedDocs, appliedDocs] = await Promise.all([
+      SavedJob.find({ candidateId }).select('jobId').lean(),
+      Application.find({ candidateId }).select('jobId').lean(),
+    ]);
+    const savedSet = new Set(savedDocs.map(d => d.jobId?.toString()).filter(Boolean));
+    const appliedSet = new Set(appliedDocs.map(d => d.jobId?.toString()).filter(Boolean));
+    const prefJobIds = [...new Set([...savedSet, ...appliedSet])];
+    const prefJobs = prefJobIds.length
+      ? await Job.find({ _id: { $in: prefJobIds } })
+          .select('industry jobType location')
+          .lean()
+      : [];
+
+    // Get search history preferences (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const searchLogs = await SearchLog.find({
+      $or: [{ userId }, { candidateId }],
+      createdAt: { $gte: thirtyDaysAgo },
+    })
+      .select('keyword filters')
+      .lean();
+
+    const topCount = (arr, limit = 3) => {
+      const freq = new Map();
+      arr.filter(Boolean).forEach(val => freq.set(val, (freq.get(val) || 0) + 1));
+      return new Set(
+        [...freq.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, limit)
+          .map(([k]) => k)
+      );
+    };
+
+    // Extract preferences from saved/applied jobs
+    const prefIndustries = topCount(prefJobs.map(j => j.industry));
+    const prefJobTypes = topCount(prefJobs.map(j => j.jobType));
+    const prefLocations = topCount(
+      prefJobs.map(j => (j.location?.city ? j.location.city : j.location))
+    );
+
+    // Extract preferences from search logs
+    const searchKeywords = topCount(
+      searchLogs.map(log => log.keyword).filter(Boolean),
+      5
+    );
+    const searchIndustries = topCount(
+      searchLogs.map(log => log.filters?.industry).filter(Boolean),
+      3
+    );
+    const searchLocations = topCount(
+      searchLogs.map(log => log.filters?.location).filter(Boolean),
+      3
+    );
+    const searchJobTypes = topCount(
+      searchLogs.map(log => log.filters?.jobType).filter(Boolean),
+      2
+    );
+
+    // Merge preferences: saved/applied + search history (search history has lower weight)
+    const allPrefIndustries = new Set([...prefIndustries, ...searchIndustries]);
+    const allPrefJobTypes = new Set([...prefJobTypes, ...searchJobTypes]);
+    const allPrefLocations = new Set([...prefLocations, ...searchLocations]);
 
     // Fetch actual jobs for detail scoring
     const jobs = await Job.find({ _id: { $in: ids } }).lean();
@@ -152,21 +252,59 @@ class FastMatcherService {
       )
     );
 
+    const minDist = computedDistances.length ? Math.min(...computedDistances) : 1;
+    const maxDist = computedDistances.length ? Math.max(...computedDistances) : 1;
+    const distRange = Math.max(maxDist - minDist, 1e-6);
+
     const scored = ids.map((id, idx) => {
       const job = jobsById.get(id);
       const meta = metas[idx] || {};
-      const distance = distances[idx] || 1;
+      const distance = computedDistances[idx] ?? 1;
 
-      const vectorScore = clamp((1 - distance) * 100);
+      // Normalize distance to score 0-100 (best distance -> 100)
+      const vectorScore = clamp(((maxDist - distance) / distRange) * 100);
       const expScore = calcExperienceScore(candidateYears, meta.yearsExp || job?.yearsOfExperience || 0);
       const eduScore = job ? calcEducationScore(candidateProfile, job) : 50;
       const locSalaryScore = job ? calcLocationSalaryScore(candidateProfile, job, meta) : 60;
 
+      // Behavior score: boost saved/applied and preference match
+      let behaviorScore = 0;
+      if (savedSet.has(id)) behaviorScore += 12;
+      if (appliedSet.has(id)) behaviorScore += 8;
+      
+      if (job) {
+        // Boost from saved/applied job preferences (higher weight)
+        if (prefIndustries.has(job.industry)) behaviorScore += 4;
+        if (prefJobTypes.has(job.jobType)) behaviorScore += 3;
+        const jobLoc = job.location?.city || job.location;
+        if (prefLocations.has(jobLoc)) behaviorScore += 3;
+        
+        // Boost from search history preferences (lower weight)
+        if (searchIndustries.has(job.industry)) behaviorScore += 2;
+        if (searchJobTypes.has(job.jobType)) behaviorScore += 1.5;
+        if (searchLocations.has(jobLoc)) behaviorScore += 1.5;
+        
+        // Boost if job title/description matches search keywords
+        if (searchKeywords.size > 0) {
+          const jobText = `${job.title || ''} ${job.description || ''}`.toLowerCase();
+          let keywordMatches = 0;
+          for (const keyword of searchKeywords) {
+            if (jobText.includes(keyword.toLowerCase())) {
+              keywordMatches++;
+            }
+          }
+          if (keywordMatches > 0) {
+            behaviorScore += Math.min(keywordMatches * 1.5, 5); // Max 5 points for keywords
+          }
+        }
+      }
+
       const finalScore = clamp(
         vectorScore * 0.5 +
-          expScore * 0.2 +
-          eduScore * 0.15 +
-          locSalaryScore * 0.15
+          expScore * 0.18 +
+          eduScore * 0.12 +
+          locSalaryScore * 0.15 +
+          behaviorScore * 1
       );
 
       return {
@@ -176,6 +314,7 @@ class FastMatcherService {
         expScore,
         eduScore,
         locSalaryScore,
+        behaviorScore,
         meta,
       };
     });
@@ -193,12 +332,15 @@ class FastMatcherService {
             $set: {
               candidateId: candidateProfile.userId,
               jobId: item.jobId,
-              score: item.finalScore,
-              vectorScore: item.vectorScore,
-              experienceScore: item.expScore,
-              educationScore: item.eduScore,
-              locationSalaryScore: item.locSalaryScore,
+              overallScore: item.finalScore, // Use overallScore to match model schema
+              scoreBreakdown: {
+                skillsScore: { score: item.vectorScore, weight: 0.5 },
+                experienceScore: { score: item.expScore, weight: 0.2 },
+                educationScore: { score: item.eduScore, weight: 0.15 },
+                locationSalaryScore: { score: item.locSalaryScore, weight: 0.15 },
+              },
               calculationMethod: 'vector-fast',
+              calculatedAt: new Date(),
               updatedAt: new Date(),
             },
           },

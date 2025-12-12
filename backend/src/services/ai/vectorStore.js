@@ -171,7 +171,8 @@ class VectorStore {
       queryEmbeddings: [embedding],
       nResults,
       // Chroma 1.8+ tự trả ids, chỉ include field được phép
-      include: ['metadatas', 'distances'],
+      // Include embeddings để fallback tính cos-sim nếu distances rỗng
+      include: ['metadatas', 'distances', 'embeddings'],
     });
   }
 }

@@ -75,44 +75,7 @@ const Companies = () => {
         </div>
       ),
     },
-    {
-      title: "Địa điểm",
-      dataIndex: "location",
-      key: "location",
-
-      render: (_, record) =>
-        record?.fullAddress || record?.location?.headquarters?.city || "-",
-    },
-    {
-      title: "Quy mô",
-      dataIndex: "size",
-      key: "size",
-    },
-    {
-      title: "Đánh giá",
-      dataIndex: "rating",
-      key: "rating",
-      render: (rating) => (
-        <div className="flex items-center">
-          <StarOutlined className="text-yellow-400 mr-1" />
-          <span>{rating?.overall ?? rating?.average ?? 0}</span>
-          <span className="text-gray-500 ml-1">({rating?.count ?? 0})</span>
-        </div>
-      ),
-    },
-    {
-      title: "Thống kê",
-      key: "stats",
-      render: (_, record) => (
-        <div className="text-sm">
-          <div>{record?.stats?.totalJobs ?? 0} bài đăng</div>
-          <div>
-            {record?.stats?.activeJobs ?? record?.stats?.activeInterns ?? 0}{" "}
-            đang hoạt động
-          </div>
-        </div>
-      ),
-    },
+   
     {
       title: "Trạng thái",
       dataIndex: "status",
@@ -199,11 +162,7 @@ const Companies = () => {
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <Button type="primary" icon={<PlusOutlined />}>
-          Thêm công ty
-        </Button>
-      </div>
+      
 
       <Row gutter={[16, 16]} className="mb-6">
         {stats.map((stat, index) => (
