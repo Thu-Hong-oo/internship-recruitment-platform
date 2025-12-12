@@ -297,7 +297,7 @@ const Jobs = () => {
 
       if (!response.success) {
         throw new Error(
-          response.error || "Không thể tải danh sách công việc"
+          response.error || "Không thể tải danh sách bài đăng tuyển dụng"
         );
       }
 
@@ -313,7 +313,7 @@ const Jobs = () => {
       const errorMessage =
         e?.response?.data?.error ||
         e?.message ||
-        "Có lỗi xảy ra khi tải danh sách công việc";
+        "Có lỗi xảy ra khi tải danh sách bài đăng tuyển dụng";
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -357,7 +357,7 @@ const Jobs = () => {
 
   const statCards = [
     {
-      title: "Tổng công việc",
+      title: "Tổng bài đăng tuyển dụng",
       value: stats?.totalJobs || 0,
       Icon: FileTextOutlined,
       color: SYSTEM_COLORS.info,
@@ -388,23 +388,13 @@ const Jobs = () => {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
           <Title level={2} style={{ margin: 0, color: "#1f2937" }}>
-            Quản lý công việc
+            Quản lý bài đăng tuyển dụng
           </Title>
           <Text type="secondary" style={{ fontSize: 14 }}>
-            Quản lý và theo dõi tất cả công việc trong hệ thống
+            Quản lý và theo dõi tất cả bài đăng tuyển dụng trong hệ thống
           </Text>
         </div>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          size="large"
-          style={{
-            background: `linear-gradient(135deg, ${SYSTEM_PRIMARY} 0%, ${SYSTEM_COLORS.info} 100%)`,
-            border: "none",
-          }}
-        >
-          Thêm công việc
-        </Button>
+        
       </div>
 
       {/* Stat Cards */}
@@ -495,7 +485,7 @@ const Jobs = () => {
               </Form.Item>
             </Col>
             <Col xs={24} sm={12} md={6}>
-              <Form.Item label="Loại công việc" name="jobType">
+              <Form.Item label="Loại bài đăng tuyển dụng" name="jobType">
                 <Select
                   options={[
                     { label: "Tất cả", value: "all" },
@@ -618,7 +608,7 @@ const Jobs = () => {
             showSizeChanger: true,
             pageSizeOptions: ["10", "20", "50"],
             showTotal: (total, range) =>
-              `${range[0]}-${range[1]} của ${total} công việc`,
+              `${range[0]}-${range[1]} của ${total} bài đăng tuyển dụng`,
           }}
           onChange={(pag) => onTableChange(pag)}
           scroll={{ x: 1200 }}
