@@ -1408,7 +1408,7 @@ const Dashboard = () => {
 
           {/* Recent Activities */}
           <Row gutter={[16, 16]}>
-            <Col xs={24} lg={8}>
+            <Col xs={24} lg={12}>
               <Card
                 title={
                   <div className="flex items-center gap-2">
@@ -1430,7 +1430,7 @@ const Dashboard = () => {
                 />
               </Card>
             </Col>
-            <Col xs={24} lg={8}>
+            <Col xs={24} lg={12}>
               <Card
                 title={
                   <div className="flex items-center gap-2">
@@ -1452,7 +1452,9 @@ const Dashboard = () => {
                 />
               </Card>
             </Col>
-            <Col xs={24} lg={8}>
+          </Row>
+          <Row gutter={[16, 16]}>
+            <Col xs={24}>
               <Card
                 title={
                   <div className="flex items-center gap-2">
