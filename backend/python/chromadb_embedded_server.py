@@ -14,10 +14,11 @@ from urllib.parse import urlparse, parse_qs
 import chromadb
 from chromadb.config import Settings
 
-# Setup logging
+# Setup logging - output to stderr so it appears in container logs
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stderr  # Output to stderr so it appears in logs
 )
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,9 @@ PORT = int(os.getenv('CHROMADB_EMBEDDED_PORT', '8001'))
 try:
     # Create directory if it doesn't exist
     os.makedirs(CHROMA_DB_PATH, exist_ok=True)
+    logger.info(f"📁 ChromaDB data directory: {CHROMA_DB_PATH}")
     
+    logger.info("🔧 Initializing ChromaDB PersistentClient...")
     client = chromadb.PersistentClient(
         path=CHROMA_DB_PATH,
         settings=Settings(
@@ -38,8 +41,12 @@ try:
         )
     )
     logger.info(f"✅ ChromaDB embedded client initialized at {CHROMA_DB_PATH}")
+except ImportError as e:
+    logger.error(f"❌ Failed to import chromadb: {e}")
+    logger.error("Make sure chromadb is installed: pip install chromadb")
+    sys.exit(1)
 except Exception as e:
-    logger.error(f"❌ Failed to initialize ChromaDB: {e}")
+    logger.error(f"❌ Failed to initialize ChromaDB: {e}", exc_info=True)
     sys.exit(1)
 
 
@@ -206,14 +213,22 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
 
 def run_server():
     """Start the ChromaDB embedded HTTP server"""
-    server = HTTPServer(('0.0.0.0', PORT), ChromaDBHandler)
-    logger.info(f"🚀 ChromaDB Embedded Server starting on port {PORT}")
-    logger.info(f"📁 Database path: {CHROMA_DB_PATH}")
     try:
+        server = HTTPServer(('0.0.0.0', PORT), ChromaDBHandler)
+        logger.info(f"🚀 ChromaDB Embedded Server starting on port {PORT}")
+        logger.info(f"📁 Database path: {CHROMA_DB_PATH}")
+        logger.info(f"🌐 Server will listen on 0.0.0.0:{PORT}")
         server.serve_forever()
+    except OSError as e:
+        logger.error(f"❌ Failed to start server on port {PORT}: {e}")
+        logger.error("Port may be in use or permission denied")
+        sys.exit(1)
     except KeyboardInterrupt:
         logger.info("Shutting down ChromaDB Embedded Server...")
         server.shutdown()
+    except Exception as e:
+        logger.error(f"❌ Unexpected error: {e}", exc_info=True)
+        sys.exit(1)
 
 
 if __name__ == '__main__':

@@ -10,8 +10,29 @@ MODEL_PID=$!
 
 # Start ChromaDB embedded server in background
 echo "🗄️ Starting ChromaDB embedded server..."
-python3 python/chromadb_embedded_server.py &
+
+# Test if chromadb can be imported
+echo "Testing ChromaDB import..."
+if ! python3 -c "import chromadb; print('ChromaDB import OK')" 2>&1; then
+  echo "❌ ERROR: ChromaDB cannot be imported. Check if it's installed."
+  echo "Run: pip install chromadb"
+else
+  echo "✅ ChromaDB import successful"
+fi
+
+# Redirect output to stderr so it appears in logs
+python3 python/chromadb_embedded_server.py >&2 &
 CHROMA_PID=$!
+echo "ChromaDB server PID: $CHROMA_PID"
+
+# Wait a moment and check if process is still running
+sleep 2
+if ! kill -0 $CHROMA_PID 2>/dev/null; then
+  echo "❌ ERROR: ChromaDB server process died immediately after start"
+  echo "Check Python errors above"
+else
+  echo "✅ ChromaDB server process is running (PID: $CHROMA_PID)"
+fi
 
 # Wait for ChromaDB to be ready
 echo "⏳ Waiting for ChromaDB embedded server to be ready..."
