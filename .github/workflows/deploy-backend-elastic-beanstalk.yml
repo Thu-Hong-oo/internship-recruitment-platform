@@ -47,6 +47,52 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
+      - name: Check if EB Application exists
+        id: check-eb-app
+        run: |
+          APP_EXISTS=$(aws elasticbeanstalk describe-applications \
+            --application-names ${{ env.EB_APPLICATION_NAME }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Applications[0].ApplicationName' \
+            --output text 2>/dev/null || echo "None")
+          
+          if [ "$APP_EXISTS" = "None" ] || [ -z "$APP_EXISTS" ]; then
+            echo "Application does not exist. Will create it."
+            echo "app_exists=false" >> $GITHUB_OUTPUT
+          else
+            echo "Application exists: $APP_EXISTS"
+            echo "app_exists=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create EB Application if not exists
+        if: steps.check-eb-app.outputs.app_exists == 'false'
+        run: |
+          echo "Creating Elastic Beanstalk application: ${{ env.EB_APPLICATION_NAME }}"
+          aws elasticbeanstalk create-application \
+            --application-name ${{ env.EB_APPLICATION_NAME }} \
+            --description "Internship Recruitment Platform Backend" \
+            --region ${{ env.AWS_REGION }}
+          
+          echo "✅ Application created successfully"
+
+      - name: Check if EB Environment exists
+        id: check-eb-env
+        run: |
+          ENV_EXISTS=$(aws elasticbeanstalk describe-environments \
+            --application-name ${{ env.EB_APPLICATION_NAME }} \
+            --environment-names ${{ env.EB_ENVIRONMENT_NAME }} \
+            --region ${{ env.AWS_REGION }} \
+            --query 'Environments[0].EnvironmentName' \
+            --output text 2>/dev/null || echo "None")
+          
+          if [ "$ENV_EXISTS" = "None" ] || [ -z "$ENV_EXISTS" ]; then
+            echo "Environment does not exist. Will need to create it manually first."
+            echo "env_exists=false" >> $GITHUB_OUTPUT
+          else
+            echo "Environment exists: $ENV_EXISTS"
+            echo "env_exists=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Generate Dockerrun.aws.json
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -78,6 +124,7 @@ jobs:
           EOF
 
       - name: Deploy to EB using EB CLI
+        if: steps.check-eb-env.outputs.env_exists == 'true'
         uses: einaregilsson/beanstalk-deploy@v22
         with:
           aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -87,4 +134,17 @@ jobs:
           version_label: ${{ github.sha }}
           region: ${{ env.AWS_REGION }}
           deployment_package: backend/Dockerrun.aws.json
+          wait_for_environment_ready: true
+
+      - name: Error if environment not found
+        if: steps.check-eb-env.outputs.env_exists == 'false'
+        run: |
+          echo "❌ Environment '${{ env.EB_ENVIRONMENT_NAME }}' does not exist."
+          echo "Please create it manually in AWS Console first:"
+          echo "1. Go to Elastic Beanstalk Console"
+          echo "2. Select application: ${{ env.EB_APPLICATION_NAME }}"
+          echo "3. Click 'Create environment'"
+          echo "4. Choose 'Docker' platform"
+          echo "5. Configure and create environment"
+          exit 1
 
