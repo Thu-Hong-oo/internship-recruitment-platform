@@ -200,11 +200,21 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                     )
                     logger.info(f"Created new collection: {collection_name}")
                 
+                # ChromaDB client expects embedding_function field
+                # Return None or empty object to match ChromaDB server format
+                embedding_func = None
+                try:
+                    # Try to get embedding function from collection if available
+                    if hasattr(collection, 'embedding_function'):
+                        embedding_func = collection.embedding_function
+                except:
+                    pass
+                
                 return {
                     'name': collection.name,
                     'metadata': collection.metadata or {},
                     'id': str(collection.id),
-                    'embedding_function': None  # ChromaDB client expects this field
+                    'embedding_function': embedding_func  # ChromaDB client expects this field
                 }
             except Exception as e:
                 logger.error(f"Error creating/getting collection: {e}")
