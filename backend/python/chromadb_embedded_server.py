@@ -121,7 +121,8 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                 self.wfile.write(json.dumps({
                     'name': collection.name,
                     'metadata': collection.metadata or {},
-                    'id': str(collection.id)
+                    'id': str(collection.id),
+                    'embedding_function': None  # ChromaDB client expects this field
                 }).encode())
             except Exception as e:
                 self.send_error(404, str(e))
@@ -155,7 +156,8 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                     'name': collection.name,
                     'metadata': collection.metadata or {},
                     'tenant': 'default_tenant',
-                    'database': 'default_database'
+                    'database': 'default_database',
+                    'embedding_function': None  # ChromaDB client expects this field
                 }
                 self.wfile.write(json.dumps(response).encode())
             except Exception as e:
@@ -201,7 +203,8 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                 return {
                     'name': collection.name,
                     'metadata': collection.metadata or {},
-                    'id': str(collection.id)
+                    'id': str(collection.id),
+                    'embedding_function': None  # ChromaDB client expects this field
                 }
             except Exception as e:
                 logger.error(f"Error creating/getting collection: {e}")
@@ -256,7 +259,8 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                     'name': result['name'],
                     'metadata': result['metadata'],
                     'tenant': 'default_tenant',
-                    'database': 'default_database'
+                    'database': 'default_database',
+                    'embedding_function': None  # ChromaDB client expects this field
                 }
                 self.wfile.write(json.dumps(response).encode())
             except Exception as e:
