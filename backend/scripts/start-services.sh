@@ -81,24 +81,27 @@ else
 fi
 
 # Wait for ChromaDB to be ready
-echo "⏳ Waiting for ChromaDB embedded server to be ready..."
-MAX_WAIT=30
+echo "⏳ Waiting for ChromaDB embedded server to be ready..." >&2
+MAX_WAIT=60
 ELAPSED=0
 CHROMA_READY=false
 
 while [ $ELAPSED -lt $MAX_WAIT ]; do
-  if curl -f -s http://localhost:8001/api/v1/heartbeat > /dev/null 2>&1; then
-    echo "✅ ChromaDB embedded server is ready!"
+  # Try both v1 and v2 heartbeat endpoints
+  if curl -f -s http://localhost:8001/api/v1/heartbeat > /dev/null 2>&1 || \
+     curl -f -s http://localhost:8001/api/v2/heartbeat > /dev/null 2>&1; then
+    echo "✅ ChromaDB embedded server is ready!" >&2
     CHROMA_READY=true
     break
   fi
-  echo "   Waiting for ChromaDB... (${ELAPSED}s elapsed)"
+  echo "   Waiting for ChromaDB... (${ELAPSED}s elapsed)" >&2
   sleep 2
   ELAPSED=$((ELAPSED + 2))
 done
 
 if [ "$CHROMA_READY" = "false" ]; then
-  echo "⚠️ Warning: ChromaDB embedded server may not be ready, but continuing..."
+  echo "⚠️ Warning: ChromaDB embedded server may not be ready after ${MAX_WAIT}s, but continuing..." >&2
+  echo "   Node.js server will retry connection with exponential backoff" >&2
 fi
 
 # Start Node.js server

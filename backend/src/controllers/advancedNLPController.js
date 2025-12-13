@@ -1949,22 +1949,34 @@ class AdvancedNLPController {
 
       if (useFastVector) {
         logger.info('🚀 Using fast vector DB pipeline for matching');
-        const fastMatcher = getFastMatcherService();
-        const results = await fastMatcher.matchCandidate(candidateProfile, {
-          topN: 15,
-          vectorTopK: 60,
-          saveScores: true,
-        });
+        try {
+          const fastMatcher = getFastMatcherService();
+          logger.info('FastMatcher service obtained, calling matchCandidate...');
+          const results = await fastMatcher.matchCandidate(candidateProfile, {
+            topN: 15,
+            vectorTopK: 60,
+            saveScores: true,
+          });
+          logger.info(`FastMatcher returned ${results?.length || 0} results`);
 
-        return res.status(200).json({
-          success: true,
-          message: 'Matching scores calculated successfully (fast vector pipeline)',
-          data: {
-            calculated: results.length,
-            total: results.length,
-            results,
-          },
-        });
+          return res.status(200).json({
+            success: true,
+            message: 'Matching scores calculated successfully (fast vector pipeline)',
+            data: {
+              calculated: results.length,
+              total: results.length,
+              results,
+            },
+          });
+        } catch (fastVectorError) {
+          logger.error('Fast vector pipeline failed:', {
+            error: fastVectorError.message,
+            stack: fastVectorError.stack,
+            name: fastVectorError.name
+          });
+          // Don't throw, fall through to legacy path
+          logger.warn('Falling back to legacy matching pipeline');
+        }
       }
 
       // Legacy fallback path (kept for compatibility)
