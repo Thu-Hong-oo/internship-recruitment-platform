@@ -34,9 +34,28 @@ RUN if [ -f package-lock.json ]; then \
 # Install Python dependencies for Sentence-BERT
 # Copy requirements early so pip can install before app files are copied
 COPY ${APP_PATH}/python/requirements.txt /tmp/python-requirements.txt
+
+# Build pysqlite3 with newer SQLite for ChromaDB compatibility
+# ChromaDB requires sqlite3 >= 3.35.0, but Debian bullseye has 3.34.x
+# Download and compile SQLite 3.42+ then build pysqlite3 with it
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    wget \
+    && cd /tmp && \
+    wget -q https://www.sqlite.org/2023/sqlite-autoconf-3420000.tar.gz && \
+    tar -xzf sqlite-autoconf-3420000.tar.gz && \
+    cd sqlite-autoconf-3420000 && \
+    ./configure --prefix=/usr/local && \
+    make -j$(nproc) && make install && \
+    cd / && rm -rf /tmp/sqlite-autoconf-3420000* && \
+    ldconfig && \
+    export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH && \
+    export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH && \
+    pip install --no-cache-dir --no-binary pysqlite3 pysqlite3 && \
     pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu \
-    -r /tmp/python-requirements.txt
+    -r /tmp/python-requirements.txt && \
+    apt-get purge -y wget && apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
 
 # Pre-download Sentence-BERT model to avoid runtime download/timeout
 # Use cache folder to save disk space and set HF_HOME to /app/models
