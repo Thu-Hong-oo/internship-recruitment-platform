@@ -9,6 +9,7 @@ import {
   TrendingUp,
   TrendingDown,
 } from "lucide-react";
+import { ComparisonChart } from "./ComparisonChart";
 
 interface MatchScoreCardProps {
   score: number;
@@ -75,35 +76,14 @@ export function MatchScoreCard({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Overall Score */}
-        <div className="text-center">
-          <div className="text-5xl font-bold mb-2">{score}%</div>
-          <p className={`text-sm ${config.textColor}`}>{config.label}</p>
-          <Progress value={score} className="mt-4 h-3" />
-        </div>
-
-        {/* Breakdown Scores */}
-        {breakdown && (
-          <div className="space-y-3 pt-4 border-t">
-            <h4 className="font-semibold text-sm">Score Breakdown</h4>
-            {Object.entries(breakdown).map(([key, value]) => {
-              if (value === undefined) return null;
-              const label = key
-                .replace("Score", "")
-                .replace(/([A-Z])/g, " $1")
-                .trim();
-              return (
-                <div key={key} className="space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span className="capitalize">{label}</span>
-                    <span className="font-semibold">{value}%</span>
-                  </div>
-                  <Progress value={value} className="h-2" />
-                </div>
-              );
-            })}
-          </div>
-        )}
+        {/* Comparison Chart - Full version */}
+        <ComparisonChart
+          score={score}
+          tier={tier}
+          breakdown={breakdown}
+          compact={false}
+          showLabel={true}
+        />
 
         {/* Strengths */}
         {strengths && strengths.length > 0 && (

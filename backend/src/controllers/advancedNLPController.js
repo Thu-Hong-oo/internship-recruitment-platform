@@ -450,7 +450,16 @@ class AdvancedNLPController {
       })
         .sort({ overallScore: -1 })
         .limit(parseInt(limit))
-        .populate('jobId')
+        .populate({
+          path: 'jobId',
+          populate: {
+            path: 'employer',
+            populate: {
+              path: 'company',
+              select: 'name logo'
+            }
+          }
+        })
         .lean();
 
       res.status(200).json({
@@ -732,10 +741,49 @@ class AdvancedNLPController {
         .sort({ createdAt: -1 })
         .populate('targetJobId', 'title company');
 
+      // Calculate and update progress for each roadmap if needed
+      const roadmapsWithProgress = roadmaps.map((roadmap) => {
+        // If progress is 0 but we have completed resources, recalculate
+        if (roadmap.progress.overallProgress === 0 && roadmap.progress.completedResources.length > 0) {
+          let totalResources = 0;
+          if (roadmap.phases && roadmap.phases.length > 0) {
+            roadmap.phases.forEach((phase) => {
+              if (phase.weeks) {
+                phase.weeks.forEach((week) => {
+                  if (week.resources) {
+                    totalResources += week.resources.length;
+                  }
+                });
+              }
+            });
+          } else if (roadmap.weeks) {
+            roadmap.weeks.forEach((week) => {
+              if (week.resources) {
+                totalResources += week.resources.length;
+              }
+            });
+          }
+          
+          if (totalResources > 0) {
+            roadmap.progress.overallProgress = Math.round(
+              (roadmap.progress.completedResources.length / totalResources) * 100
+            );
+            // Save updated progress (async, don't wait)
+            roadmap.save().catch((err) => {
+              logger.warn('Failed to save updated progress for roadmap', {
+                roadmapId: roadmap._id,
+                error: err.message,
+              });
+            });
+          }
+        }
+        return roadmap;
+      });
+
       res.status(200).json({
         success: true,
-        data: roadmaps,
-        total: roadmaps.length,
+        data: roadmapsWithProgress,
+        total: roadmapsWithProgress.length,
       });
     } catch (error) {
       logger.error('Error fetching roadmaps:', error);
@@ -780,7 +828,16 @@ class AdvancedNLPController {
       }
 
       if (resourceId) {
-        await roadmap.markResourceCompleted(resourceId);
+        // Ensure resourceId is stored as string for consistency
+        const resourceIdStr = String(resourceId);
+        await roadmap.markResourceCompleted(resourceIdStr);
+        logger.info('Resource marked as completed', {
+          roadmapId: roadmap._id,
+          resourceId: resourceIdStr,
+          weekNumber,
+          phaseNumber,
+          totalCompleted: roadmap.progress.completedResources.length,
+        });
       }
 
       if (phaseNumber) {
@@ -863,6 +920,228 @@ class AdvancedNLPController {
       res.status(500).json({
         success: false,
         message: 'Error updating progress',
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * @route   POST /api/nlp/learning-roadmap/:roadmapId/complete
+   * @desc    Mark roadmap as completed and sync skills to profile
+   * @access  Private (Candidate/Intern)
+   */
+  async completeRoadmap(req, res) {
+    try {
+      const { roadmapId } = req.params;
+
+      const roadmap = await LearningRoadmap.findById(roadmapId);
+
+      if (!roadmap) {
+        return res.status(404).json({
+          success: false,
+          message: 'Roadmap not found',
+        });
+      }
+
+      // Check ownership
+      if (roadmap.candidateId.toString() !== req.user._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied',
+        });
+      }
+
+      // Mark roadmap as completed
+      roadmap.status = 'completed';
+      roadmap.progress.overallProgress = 100;
+      roadmap.progress.completedAt = new Date();
+
+      // Sync learned skills into candidate profile (avoid duplicates, upgrade level if needed)
+      const syncedSkills = [];
+      try {
+        const profile = await CandidateProfile.findOne({
+          userId: roadmap.candidateId,
+        });
+
+        if (profile) {
+          const currentTechSkills = profile.skills?.technical || [];
+          const skillGaps = roadmap.skillGaps || [];
+
+          skillGaps.forEach((gap) => {
+            const name = (gap.skill || '').trim();
+            if (!name) return;
+
+            const existing = currentTechSkills.find(
+              (s) => s.name && s.name.toLowerCase() === name.toLowerCase()
+            );
+
+            if (existing) {
+              // Upgrade level if target level is higher/defined
+              if (gap.targetLevel) {
+                existing.level = gap.targetLevel;
+              }
+              syncedSkills.push({ name, action: 'upgraded', level: existing.level });
+            } else {
+              currentTechSkills.push({
+                name,
+                level: gap.targetLevel || 'intermediate',
+                verified: false,
+              });
+              syncedSkills.push({ name, action: 'added', level: gap.targetLevel || 'intermediate' });
+            }
+          });
+
+          profile.skills = {
+            ...profile.skills,
+            technical: currentTechSkills,
+          };
+
+          await profile.save();
+          logger.info(`Synced ${syncedSkills.length} skills to profile for roadmap ${roadmapId}`);
+        }
+      } catch (syncError) {
+        logger.warn('Failed to sync roadmap skills to profile', {
+          error: syncError.message,
+          roadmapId,
+        });
+        // Continue even if sync fails
+      }
+
+      await roadmap.save();
+
+      // Recalculate candidate-job matching so employer recommendations stay fresh
+      recalcAllMatchesForCandidate(roadmap.candidateId).catch((err) => {
+        logger.warn('Failed to recalc matches after roadmap completion', {
+          error: err.message,
+          roadmapId,
+        });
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Roadmap completed successfully. Skills have been synced to your profile.',
+        data: {
+          roadmap,
+          syncedSkills,
+        },
+      });
+    } catch (error) {
+      logger.error('Error completing roadmap:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error completing roadmap',
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * @route   POST /api/nlp/learning-roadmap/:roadmapId/sync-week-skill
+   * @desc    Sync skill to profile when a week is completed
+   * @access  Private (Candidate/Intern)
+   */
+  async syncWeekSkill(req, res) {
+    try {
+      const { roadmapId } = req.params;
+      const { weekNumber, phaseNumber, skill } = req.body;
+
+      if (!skill) {
+        return res.status(400).json({
+          success: false,
+          message: 'Skill name is required',
+        });
+      }
+
+      const roadmap = await LearningRoadmap.findById(roadmapId);
+
+      if (!roadmap) {
+        return res.status(404).json({
+          success: false,
+          message: 'Roadmap not found',
+        });
+      }
+
+      // Check ownership
+      if (roadmap.candidateId.toString() !== req.user._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied',
+        });
+      }
+
+      // Sync skill to profile
+      try {
+        const profile = await CandidateProfile.findOne({
+          userId: roadmap.candidateId,
+        });
+
+        if (profile) {
+          const currentTechSkills = profile.skills?.technical || [];
+          const skillName = skill.trim().toLowerCase();
+          
+          // Check if skill already exists
+          const existing = currentTechSkills.find(
+            (s) => s.name && s.name.toLowerCase() === skillName
+          );
+
+          if (existing) {
+            // Skill already exists, no need to add again
+            return res.status(200).json({
+              success: true,
+              message: 'Skill already exists in profile',
+              data: {
+                skill: existing.name,
+                action: 'already_exists',
+              },
+            });
+          } else {
+            // Add new skill
+            currentTechSkills.push({
+              name: skill,
+              level: 'intermediate', // Default level for learned skills
+              verified: false,
+            });
+
+            profile.skills = {
+              ...profile.skills,
+              technical: currentTechSkills,
+            };
+
+            await profile.save();
+            logger.info(`Synced skill "${skill}" to profile for roadmap ${roadmapId}, week ${weekNumber}`);
+
+            return res.status(200).json({
+              success: true,
+              message: `Skill "${skill}" has been added to your profile`,
+              data: {
+                skill: skill,
+                action: 'added',
+              },
+            });
+          }
+        } else {
+          return res.status(404).json({
+            success: false,
+            message: 'Candidate profile not found',
+          });
+        }
+      } catch (syncError) {
+        logger.warn('Failed to sync week skill to profile', {
+          error: syncError.message,
+          roadmapId,
+          skill,
+        });
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to sync skill to profile',
+          error: syncError.message,
+        });
+      }
+    } catch (error) {
+      logger.error('Error syncing week skill:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error syncing skill',
         error: error.message,
       });
     }
@@ -1950,24 +2229,24 @@ class AdvancedNLPController {
       if (useFastVector) {
         logger.info('🚀 Using fast vector DB pipeline for matching');
         try {
-          const fastMatcher = getFastMatcherService();
+        const fastMatcher = getFastMatcherService();
           logger.info('FastMatcher service obtained, calling matchCandidate...');
-          const results = await fastMatcher.matchCandidate(candidateProfile, {
-            topN: 15,
-            vectorTopK: 60,
-            saveScores: true,
-          });
+        const results = await fastMatcher.matchCandidate(candidateProfile, {
+          topN: 15,
+          vectorTopK: 60,
+          saveScores: true,
+        });
           logger.info(`FastMatcher returned ${results?.length || 0} results`);
 
-          return res.status(200).json({
-            success: true,
-            message: 'Matching scores calculated successfully (fast vector pipeline)',
-            data: {
-              calculated: results.length,
-              total: results.length,
-              results,
-            },
-          });
+        return res.status(200).json({
+          success: true,
+          message: 'Matching scores calculated successfully (fast vector pipeline)',
+          data: {
+            calculated: results.length,
+            total: results.length,
+            results,
+          },
+        });
         } catch (fastVectorError) {
           logger.error('Fast vector pipeline failed:', {
             error: fastVectorError.message,
