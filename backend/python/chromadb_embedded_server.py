@@ -179,6 +179,9 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
         except:
             data = {}
         
+        # Log all POST requests for debugging
+        logger.info(f"POST {path} - Collection: {data.get('collection_name') or data.get('name') or 'N/A'}")
+        
         # Helper function to handle collection creation/getting
         def handle_collection_request(collection_name, metadata):
             """Handle collection get or create"""
@@ -265,11 +268,21 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
         if '/query' in path:
             try:
                 collection_name = data.get('collection_name') or data.get('name')
-                query_embeddings = data.get('query_embeddings', [])
-                n_results = data.get('n_results', 10)
+                # Support both camelCase (from ChromaDB client) and snake_case
+                query_embeddings = data.get('queryEmbeddings') or data.get('query_embeddings', [])
+                n_results = data.get('nResults') or data.get('n_results', 10)
                 where = data.get('where')
                 include = data.get('include', ['metadatas', 'distances'])
                 
+                if not collection_name:
+                    self.send_error(400, 'Collection name is required')
+                    return
+                
+                if not query_embeddings:
+                    self.send_error(400, 'queryEmbeddings or query_embeddings is required')
+                    return
+                
+                logger.info(f"Querying collection '{collection_name}': n_results={n_results}, embeddings_count={len(query_embeddings)}")
                 collection = client.get_collection(name=collection_name)
                 results = collection.query(
                     query_embeddings=query_embeddings,
@@ -278,13 +291,16 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                     include=include
                 )
                 
+                result_count = len(results.get('ids', [])[0] if results.get('ids') else [])
+                logger.info(f"✅ Query returned {result_count} results from collection '{collection_name}'")
+                
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 self.wfile.write(json.dumps(results).encode())
             except Exception as e:
-                logger.error(f"Error querying collection: {e}")
+                logger.error(f"Error querying collection: {e}", exc_info=True)
                 self.send_error(500, str(e))
             return
         
@@ -296,6 +312,15 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                 embeddings = data.get('embeddings', [])
                 metadatas = data.get('metadatas', [])
                 
+                if not collection_name:
+                    self.send_error(400, 'Collection name is required')
+                    return
+                
+                if not ids or not embeddings:
+                    self.send_error(400, 'ids and embeddings are required')
+                    return
+                
+                logger.info(f"Upsert/Add to collection '{collection_name}': {len(ids)} items")
                 collection = client.get_collection(name=collection_name)
                 
                 if '/upsert' in path:
@@ -304,12 +329,14 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                         embeddings=embeddings,
                         metadatas=metadatas
                     )
+                    logger.info(f"✅ Upserted {len(ids)} items to collection '{collection_name}'")
                 else:
                     collection.add(
                         ids=ids,
                         embeddings=embeddings,
                         metadatas=metadatas
                     )
+                    logger.info(f"✅ Added {len(ids)} items to collection '{collection_name}'")
                 
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
@@ -317,7 +344,7 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(json.dumps({'success': True}).encode())
             except Exception as e:
-                logger.error(f"Error adding to collection: {e}")
+                logger.error(f"Error adding to collection: {e}", exc_info=True)
                 self.send_error(500, str(e))
             return
         
