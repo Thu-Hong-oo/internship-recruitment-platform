@@ -152,7 +152,18 @@ class FastMatcherService {
     const vectorTopK = opts.vectorTopK || 60;
     const saveScores = opts.saveScores ?? true;
 
-    await this.vectorStore.ensurePrecomputed();
+    try {
+      logger.info('FastMatcher: Ensuring jobs are precomputed in ChromaDB...');
+      await this.vectorStore.ensurePrecomputed();
+      logger.info('FastMatcher: Jobs precomputed successfully');
+    } catch (error) {
+      logger.error('FastMatcher: Failed to ensure precomputed jobs:', {
+        error: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      throw error;
+    }
 
     const text = buildCandidateText(candidateProfile);
     const embedding = await this.sbert.encode(text);

@@ -283,8 +283,22 @@ class VectorStore {
   }
 
   async ensurePrecomputed() {
-    if (this.isPrecomputed) return;
-    await this.precomputeActiveJobs();
+    if (this.isPrecomputed) {
+      logger.info('Jobs already precomputed, skipping...');
+      return;
+    }
+    logger.info('Jobs not precomputed yet, starting precompute...');
+    try {
+      await this.precomputeActiveJobs();
+      logger.info('Precompute completed successfully');
+    } catch (error) {
+      logger.error('Precompute failed:', {
+        error: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      throw error;
+    }
   }
 
   /**
