@@ -287,9 +287,53 @@ LearningRoadmapSchema.methods.updateProgress = function (weekNumber) {
 };
 
 LearningRoadmapSchema.methods.markResourceCompleted = function (resourceId) {
-  if (!this.progress.completedResources.includes(resourceId)) {
-    this.progress.completedResources.push(resourceId);
+  // Normalize resourceId to string for consistent comparison
+  const resourceIdStr = String(resourceId);
+  
+  // Check if already completed (compare as strings)
+  const isAlreadyCompleted = this.progress.completedResources.some(
+    (id) => String(id) === resourceIdStr
+  );
+  
+  if (!isAlreadyCompleted) {
+    this.progress.completedResources.push(resourceIdStr);
   }
+  
+  // Recalculate overall progress based on completed resources
+  let totalResources = 0;
+  if (this.phases && this.phases.length > 0) {
+    this.phases.forEach((phase) => {
+      if (phase.weeks) {
+        phase.weeks.forEach((week) => {
+          if (week.resources) {
+            totalResources += week.resources.length;
+          }
+        });
+      }
+    });
+  } else if (this.weeks) {
+    this.weeks.forEach((week) => {
+      if (week.resources) {
+        totalResources += week.resources.length;
+      }
+    });
+  }
+  
+  // Calculate progress based on resources if available
+  if (totalResources > 0) {
+    this.progress.overallProgress = Math.round(
+      (this.progress.completedResources.length / totalResources) * 100
+    );
+  } else {
+    // Fallback to week-based calculation
+    const totalWeeks = this.totalWeeks || 0;
+    if (totalWeeks > 0) {
+      this.progress.overallProgress = Math.round(
+        (this.progress.completedWeeks.length / totalWeeks) * 100
+      );
+    }
+  }
+  
   this.progress.lastUpdatedAt = new Date();
   return this.save();
 };

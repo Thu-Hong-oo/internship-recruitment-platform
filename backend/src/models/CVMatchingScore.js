@@ -185,7 +185,7 @@ const CVMatchingScoreSchema = new mongoose.Schema(
     calculatedAt: { type: Date, default: Date.now, index: true },
     calculationMethod: {
       type: String,
-      enum: ['nlp-basic', 'nlp-advanced', 'ml-model', 'hybrid'],
+      enum: ['nlp-basic', 'nlp-advanced', 'ml-model', 'hybrid', 'vector-fast', 'rag-hybrid'],
       default: 'nlp-advanced',
     },
     modelVersion: String,

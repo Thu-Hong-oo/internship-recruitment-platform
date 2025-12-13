@@ -6,29 +6,20 @@ import PageLayout from "@/components/layout/PageLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MatchScoreCard } from "@/components/ai/MatchScoreCard";
+import { RadarChart } from "@/components/ai/RadarChart";
+import { ComparisonChart } from "@/components/ai/ComparisonChart";
 import {
   Loader2,
   Briefcase,
   MapPin,
   DollarSign,
-  Search,
   TrendingUp,
-  Filter,
   GraduationCap,
 } from "lucide-react";
 import { nlpService, candidateService } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { EmptyProfileState } from "@/components/profile/EmptyProfileState";
 import UploadCVModal from "@/components/cv/UploadCVModal";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -41,9 +32,7 @@ export default function JobRecommendationsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [jobs, setJobs] = useState<any[]>([]);
   const [filteredJobs, setFilteredJobs] = useState<any[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [tierFilter, setTierFilter] = useState<string>("all");
-  const [minScore, setMinScore] = useState(30);
+  // Removed searchQuery, tierFilter, minScore - no filtering needed
   const [isUpdatingMatches, setIsUpdatingMatches] = useState(false);
   const [isProfileEmpty, setIsProfileEmpty] = useState(false);
   const [profileEmptyMessage, setProfileEmptyMessage] = useState<string>("");
@@ -53,6 +42,7 @@ export default function JobRecommendationsPage() {
   const [roadmapProgress, setRoadmapProgress] = useState(0);
   const [roadmapProgressMessage, setRoadmapProgressMessage] = useState("Đang khởi tạo...");
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
+  const [selectedJob, setSelectedJob] = useState<any>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -75,8 +65,9 @@ export default function JobRecommendationsPage() {
   }, []);
 
   useEffect(() => {
-    filterJobs();
-  }, [searchQuery, tierFilter, jobs]);
+    // No filtering - just show all jobs
+    setFilteredJobs(jobs);
+  }, [jobs]);
 
   const fetchJobRecommendations = async () => {
     setIsLoading(true);
@@ -84,7 +75,7 @@ export default function JobRecommendationsPage() {
     try {
       const response = await nlpService.getBestMatches({
         limit: 20,
-        minScore,
+        minScore: 30, // Default minimum
       });
       
       // Check if response indicates profile is empty (success: false)
@@ -128,23 +119,7 @@ export default function JobRecommendationsPage() {
     }
   };
 
-  const filterJobs = () => {
-    let filtered = [...jobs];
-
-    if (searchQuery) {
-      filtered = filtered.filter(
-        (item) =>
-          item.job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.job.company.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
-
-    if (tierFilter !== "all") {
-      filtered = filtered.filter((item) => item.tier === tierFilter);
-    }
-
-    setFilteredJobs(filtered);
-  };
+  // Removed filterJobs - no filtering needed, just show all jobs
 
   const handleViewJob = (jobId: string) => {
     router.push(`/jobs/${jobId}`);
@@ -492,67 +467,26 @@ export default function JobRecommendationsPage() {
                     </h1>
                   </div>
                   <p className="text-muted-foreground max-w-2xl">
-                    Danh sách xếp hạng theo mức độ phù hợp hồ sơ. Bạn có thể tìm kiếm và chọn điểm tối thiểu.
+                    Danh sách xếp hạng theo mức độ phù hợp hồ sơ.
                   </p>
                 </div>
 
-                <div className="w-full md:w-[440px]">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* Search */}
-                    <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 shadow-xs border">
-                      <Search className="w-4 h-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Tìm theo tên việc làm hoặc công ty..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="border-none shadow-none h-8 px-0 focus-visible:ring-0 text-sm"
-                      />
-                    </div>
-
-                    {/* Min score */}
-                    <div className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 shadow-xs border">
-                      <Filter className="w-4 h-4 text-muted-foreground" />
-                      <Select
-                        value={minScore.toString()}
-                        onValueChange={(value) => setMinScore(parseInt(value))}
-                      >
-                        <SelectTrigger className="border-none shadow-none h-8 px-0 text-sm">
-                          <SelectValue placeholder="Điểm tối thiểu" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="30">Điểm ≥ 30%</SelectItem>
-                          <SelectItem value="40">Điểm ≥ 40%</SelectItem>
-                          <SelectItem value="50">Điểm ≥ 50%</SelectItem>
-                          <SelectItem value="60">Điểm ≥ 60%</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex items-center justify-between gap-2">
-                    <p className="text-xs text-muted-foreground">
-                      Đang hiển thị{" "}
-                      <span className="font-semibold">
-                        {filteredJobs.length} việc làm
-                      </span>{" "}
-                      với điểm ≥ {minScore}%.
-                    </p>
-                    <Button
-                      onClick={refreshJobMatchesAndRecommendations}
-                      variant="outline"
-                      size="sm"
-                      disabled={isUpdatingMatches || isLoading}
-                    >
-                      {isUpdatingMatches ? (
-                        <span className="flex items-center gap-1">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          Đang cập nhật...
-                        </span>
-                      ) : (
-                        "Cập nhật gợi ý"
-                      )}
-                    </Button>
-                  </div>
+                <div className="flex items-center gap-3">
+                  <Button
+                    onClick={refreshJobMatchesAndRecommendations}
+                    variant="outline"
+                    size="sm"
+                    disabled={isUpdatingMatches || isLoading}
+                  >
+                    {isUpdatingMatches ? (
+                      <span className="flex items-center gap-1">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Đang cập nhật...
+                      </span>
+                    ) : (
+                      "Cập nhật gợi ý"
+                    )}
+                  </Button>
                 </div>
               </div>
             </CardContent>
@@ -635,7 +569,14 @@ export default function JobRecommendationsPage() {
                   typeof companyName === "string" && companyName.length > 0
                     ? companyName.charAt(0).toUpperCase()
                     : "C";
-                const companyLogo = (item.job as any).companyLogo as string | undefined;
+                // Get company logo - handle both string and object
+                let companyLogo: string | undefined = undefined;
+                const logoRaw = (item.job as any).companyLogo;
+                if (typeof logoRaw === "string" && logoRaw.trim() !== "") {
+                  companyLogo = logoRaw.trim();
+                } else if (logoRaw && typeof logoRaw === "object" && logoRaw.url) {
+                  companyLogo = logoRaw.url;
+                }
                 const tier =
                   item.overallScore >= 80
                     ? "A"
@@ -693,9 +634,13 @@ export default function JobRecommendationsPage() {
                               </p>
                             </div>
                             <div className="flex flex-col items-end gap-2">
-                              <Badge variant="outline" className="text-xs">
-                                Điểm phù hợp {item.overallScore}%
-                              </Badge>
+                              <ComparisonChart
+                                score={item.overallScore}
+                                tier={tier}
+                                breakdown={item.breakdown}
+                                compact={true}
+                                showLabel={false}
+                              />
                               {deadline && (
                                 <span className="text-[11px] text-muted-foreground">
                                   Hạn nộp:{" "}
@@ -753,7 +698,10 @@ export default function JobRecommendationsPage() {
                           {/* Actions */}
                           <div className="flex flex-wrap gap-2 pt-1">
                             <Button
-                              onClick={() => handleViewJob(item.job._id)}
+                              onClick={() => {
+                                setSelectedJob(item);
+                                handleViewJob(item.job._id);
+                              }}
                               size="sm"
                             >
                               Xem chi tiết
@@ -814,21 +762,19 @@ export default function JobRecommendationsPage() {
             {/* Match Score Summary */}
             <div className="lg:col-span-1">
               <div className="sticky top-4">
-                {filteredJobs[0] && (
-                  <MatchScoreCard
-                    score={filteredJobs[0].overallScore}
+                {(selectedJob || filteredJobs[0]) && (
+                  <RadarChart
+                    score={(selectedJob || filteredJobs[0]).overallScore}
                     tier={
-                      filteredJobs[0].overallScore >= 80
+                      (selectedJob || filteredJobs[0]).overallScore >= 80
                         ? "A"
-                        : filteredJobs[0].overallScore >= 70
+                        : (selectedJob || filteredJobs[0]).overallScore >= 70
                           ? "B"
-                          : filteredJobs[0].overallScore >= 60
+                          : (selectedJob || filteredJobs[0]).overallScore >= 60
                             ? "C"
                             : "D"
                     }
-                    breakdown={filteredJobs[0].breakdown}
-                    strengths={filteredJobs[0].strengths}
-                    concerns={filteredJobs[0].concerns}
+                    breakdown={(selectedJob || filteredJobs[0]).breakdown}
                   />
                 )}
               </div>

@@ -120,6 +120,30 @@ router.put(
 );
 
 /**
+ * @route   POST /api/nlp/learning-roadmap/:roadmapId/complete
+ * @desc    Mark roadmap as completed and sync skills to profile
+ * @access  Private (Candidate/Intern)
+ */
+router.post(
+  '/learning-roadmap/:roadmapId/complete',
+  protect,
+  authorize('intern', 'candidate'),
+  advancedNLPController.completeRoadmap
+);
+
+/**
+ * @route   POST /api/nlp/learning-roadmap/:roadmapId/sync-week-skill
+ * @desc    Sync skill to profile when a week is completed
+ * @access  Private (Candidate/Intern)
+ */
+router.post(
+  '/learning-roadmap/:roadmapId/sync-week-skill',
+  protect,
+  authorize('intern', 'candidate'),
+  advancedNLPController.syncWeekSkill
+);
+
+/**
  * @route   PUT /api/nlp/learning-roadmap/:roadmapId/customize
  * @desc    Customize roadmap structure
  * @access  Private (Candidate/Intern)
