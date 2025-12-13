@@ -33,19 +33,64 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build, tag, and push image to Amazon ECR
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
+          DOCKER_BUILDKIT: 1
         run: |
           cd backend
-          docker build -t $ECR_REPOSITORY:$IMAGE_TAG --build-arg APP_PATH=. .
-          docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          # Build with cache from ECR (faster builds by reusing layers)
+          # Cache is stored in ECR as a separate image tag
+          echo "🔨 Building Docker image..."
+          docker buildx build \
+            --platform linux/amd64 \
+            --tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            --tag $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            --build-arg APP_PATH=. \
+            --build-arg BUILDKIT_INLINE_CACHE=1 \
+            --cache-from type=registry,ref=$ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            --cache-from type=registry,ref=$ECR_REGISTRY/$ECR_REPOSITORY:buildcache \
+            --cache-to type=inline \
+            --push \
+            --progress=plain \
+            .
+          
+          echo "✅ Image built and pushed successfully"
+          echo "📦 Image tags: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG, $ECR_REGISTRY/$ECR_REPOSITORY:latest"
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          
+          # Verify images were pushed
+          echo "🔍 Verifying images in ECR..."
+          sleep 2  # Wait a moment for ECR to update
+          aws ecr describe-images \
+            --repository-name $ECR_REPOSITORY \
+            --region ${{ env.AWS_REGION }} \
+            --query 'sort_by(imageDetails,& imagePushedAt)[-2:].[imageTags[0], imagePushedAt]' \
+            --output table
+
+      - name: Verify image exists in ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          echo "🔍 Verifying images in ECR..."
+          aws ecr describe-images \
+            --repository-name ${{ env.ECR_REPOSITORY }} \
+            --region ${{ env.AWS_REGION }} \
+            --image-ids imageTag=latest \
+            --query 'imageDetails[0].imageTags' \
+            --output table || echo "⚠️ Warning: latest tag not found"
+          
+          aws ecr describe-images \
+            --repository-name ${{ env.ECR_REPOSITORY }} \
+            --region ${{ env.AWS_REGION }} \
+            --image-ids imageTag=${{ github.sha }} \
+            --query 'imageDetails[0].imageTags' \
+            --output table || echo "⚠️ Warning: SHA tag not found"
 
       - name: Deploy to App Runner
         env:
@@ -59,14 +104,29 @@ jobs:
             --output text)
           
           if [ -z "$SERVICE_ARN" ]; then
-            echo "Service not found. Please create it manually first."
+            echo "❌ Service not found. Please create it manually first."
             exit 1
           fi
           
-          # Start deployment
+          echo "📦 Updating App Runner to use latest image..."
+          
+          # Get current service configuration
+          CURRENT_CONFIG=$(aws apprunner describe-service \
+            --service-arn "$SERVICE_ARN" \
+            --region ${{ env.AWS_REGION }} \
+            --output json)
+          
+          # Extract current image identifier (should be :latest)
+          CURRENT_IMAGE=$(echo "$CURRENT_CONFIG" | jq -r '.Service.SourceConfiguration.ImageRepository.ImageIdentifier')
+          echo "Current image: $CURRENT_IMAGE"
+          
+          # Update service to trigger deployment with new image
+          # App Runner will automatically pull the latest tag
           aws apprunner start-deployment \
             --service-arn "$SERVICE_ARN" \
             --region ${{ env.AWS_REGION }}
+          
+          echo "✅ Deployment triggered. App Runner will pull latest image from ECR."
 
       - name: Wait for deployment
         run: |
