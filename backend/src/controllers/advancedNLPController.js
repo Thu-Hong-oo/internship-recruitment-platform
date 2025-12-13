@@ -276,11 +276,15 @@ class AdvancedNLPController {
    * @route   GET /api/nlp/top-candidates/:jobId
    * @desc    Get top candidates for a job (For Employers)
    * @access  Private (Employer only)
+   * @note    Uses ChromaDB vector matching for accurate scoring
    */
   async getTopCandidates(req, res) {
     try {
       const { jobId } = req.params;
-      const { limit = 20, minScore = 70, tier } = req.query;
+      const { limit = 20, minScore = 60, tier, useVector } = req.query;
+      
+      // Default to using vector matching (ChromaDB) unless explicitly disabled
+      const shouldUseVector = useVector !== 'false' && useVector !== false;
 
       // Check authentication
       if (!req.user || !req.user._id) {
@@ -316,6 +320,192 @@ class AdvancedNLPController {
           message: 'Access denied - You can only view candidates for jobs you posted',
         });
       }
+
+      // Use vector matching from ChromaDB (default behavior)
+      if (shouldUseVector) {
+        try {
+          logger.info('🔍 Using FastMatcher (ChromaDB) for candidate recommendations', { jobId });
+          
+          // Use FastMatcherService.matchJob (same logic as matchCandidate but reversed)
+          const fastMatcher = getFastMatcherService();
+          const matchResults = await fastMatcher.matchJob(job, {
+            topN: parseInt(limit),
+            minScore: parseInt(minScore),
+            saveScores: true,
+          });
+
+          if (matchResults && matchResults.length > 0) {
+            // Map results to expected format
+            const candidates = await Promise.all(
+              matchResults.map(async (result) => {
+                // result.candidateId should be CandidateProfile._id from fastMatcherService
+                const candidateProfileId = result.candidateId;
+                
+                // Get candidate profile to get user info
+                const candidateProfile = await CandidateProfile.findById(candidateProfileId)
+                  .populate('userId', 'fullName email profile')
+                  .lean();
+                
+                if (!candidateProfile) {
+                  logger.warn('Candidate profile not found', { candidateProfileId });
+                  return null;
+                }
+                
+                const candidateUser = candidateProfile.userId;
+                
+                return {
+                  _id: candidateProfileId,
+                  candidateId: candidateProfileId, // CandidateProfile._id
+                  candidate: {
+                    _id: candidateUser?._id || candidateProfile.userId,
+                    fullName: candidateUser?.fullName || candidateProfile.fullName || 'Unknown',
+                    email: candidateUser?.email || candidateProfile.personalInfo?.email || '',
+                    profile: candidateUser?.profile,
+                  },
+                  overallScore: result.finalScore || 0,
+                  tier: result.finalScore >= 80 ? 'A' : result.finalScore >= 70 ? 'B' : result.finalScore >= 60 ? 'C' : 'D',
+                  ranking: {
+                    tier: result.finalScore >= 80 ? 'A' : result.finalScore >= 70 ? 'B' : result.finalScore >= 60 ? 'C' : 'D',
+                  },
+                  scoreBreakdown: {
+                    skillsScore: { score: result.vectorScore || 0, weight: 0.5 },
+                    experienceScore: { score: result.expScore || 0, weight: 0.18 },
+                    educationScore: { score: result.eduScore || 0, weight: 0.12 },
+                    locationSalaryScore: { score: result.locSalaryScore || 0, weight: 0.15 },
+                  },
+                  calculationMethod: 'vector-fast',
+                  calculatedAt: new Date(),
+                };
+              })
+            );
+
+            // Filter out null results
+            const validCandidates = candidates.filter(c => c !== null);
+
+            logger.info('✅ FastMatcher completed', {
+              jobId,
+              candidatesFound: validCandidates.length,
+              method: 'vector-fast',
+            });
+
+            return res.status(200).json({
+              success: true,
+              data: {
+                candidates: validCandidates,
+                statistics: {
+                  totalCandidates: validCandidates.length,
+                  averageScore: validCandidates.length > 0
+                    ? Math.round(validCandidates.reduce((sum, c) => sum + (c.overallScore || 0), 0) / validCandidates.length)
+                    : 0,
+                  tierBreakdown: {
+                    A: validCandidates.filter(c => c.tier === 'A' || c.ranking?.tier === 'A').length,
+                    B: validCandidates.filter(c => c.tier === 'B' || c.ranking?.tier === 'B').length,
+                    C: validCandidates.filter(c => c.tier === 'C' || c.ranking?.tier === 'C').length,
+                    D: validCandidates.filter(c => c.tier === 'D' || c.ranking?.tier === 'D').length,
+                  },
+                },
+                total: validCandidates.length,
+                totalApplications: validCandidates.length,
+                minScoreFilter: parseInt(minScore),
+                method: 'chromadb-vector-fast',
+              },
+            });
+          }
+
+          // Fallback to RAG if FastMatcher returns no results
+          logger.info('⚠️ FastMatcher returned no results, trying RAG service...');
+          const { getRAGRecommendationService } = require('../services/ai/ragRecommendationService');
+          const ragService = getRAGRecommendationService();
+          
+          const ragResults = await ragService.getCandidateRecommendations(job, {
+            limit: parseInt(limit),
+            minScore: parseInt(minScore),
+            tierFilter: tier ? [tier.toUpperCase()] : ['A', 'B', 'C'],
+            includeSkillGap: true,
+            filterByAvailability: true,
+            filterByLocation: false,
+          });
+
+          if (ragResults && ragResults.recommendations && ragResults.recommendations.length > 0) {
+            // Map RAG results to expected format
+            const candidates = await Promise.all(
+              ragResults.recommendations.map(async (rec) => {
+                // rec.candidateId should be CandidateProfile._id
+                const candidateProfileId = rec.candidateId || rec.candidate?._id || rec.candidate?.id;
+                
+                // Get candidate profile to get user info
+                const candidateProfile = await CandidateProfile.findById(candidateProfileId)
+                  .populate('userId', 'fullName email profile')
+                  .lean();
+                
+                if (!candidateProfile) {
+                  logger.warn('Candidate profile not found in RAG results', { candidateProfileId });
+                  return null;
+                }
+                
+                const candidateUser = candidateProfile.userId;
+                
+                return {
+                  _id: candidateProfileId,
+                  candidateId: {
+                    _id: candidateUser?._id || candidateProfile.userId || candidateProfileId,
+                    fullName: candidateUser?.fullName || candidateProfile.fullName || 'Unknown',
+                    email: candidateUser?.email || candidateProfile.personalInfo?.email || candidateProfile.email || '',
+                    profile: candidateUser?.profile,
+                  },
+                  overallScore: rec.matchScore || rec.score || 0,
+                  tier: rec.tier || (rec.matchScore >= 80 ? 'A' : rec.matchScore >= 70 ? 'B' : rec.matchScore >= 60 ? 'C' : 'D'),
+                  ranking: {
+                    tier: rec.tier || (rec.matchScore >= 80 ? 'A' : rec.matchScore >= 70 ? 'B' : rec.matchScore >= 60 ? 'C' : 'D'),
+                  },
+                  scoreBreakdown: rec.breakdown || {},
+                  insights: rec.explanation || rec.insights || '',
+                  calculationMethod: rec.calculationMethod || 'rag-hybrid',
+                  calculatedAt: rec.timestamp || new Date(),
+                };
+              })
+            );
+            
+            // Filter out null results
+            const validCandidates = candidates.filter(c => c !== null);
+
+            logger.info('✅ ChromaDB vector matching completed', {
+              jobId,
+              candidatesFound: validCandidates.length,
+              method: 'rag-hybrid',
+            });
+
+            return res.status(200).json({
+              success: true,
+              data: {
+                candidates: validCandidates,
+                statistics: {
+                  totalCandidates: validCandidates.length,
+                  averageScore: validCandidates.length > 0
+                    ? Math.round(validCandidates.reduce((sum, c) => sum + (c.overallScore || 0), 0) / validCandidates.length)
+                    : 0,
+                  tierBreakdown: {
+                    A: validCandidates.filter(c => c.tier === 'A' || c.ranking?.tier === 'A').length,
+                    B: validCandidates.filter(c => c.tier === 'B' || c.ranking?.tier === 'B').length,
+                    C: validCandidates.filter(c => c.tier === 'C' || c.ranking?.tier === 'C').length,
+                    D: validCandidates.filter(c => c.tier === 'D' || c.ranking?.tier === 'D').length,
+                  },
+                },
+                total: validCandidates.length,
+                totalApplications: validCandidates.length,
+                minScoreFilter: parseInt(minScore),
+                method: 'chromadb-vector-matching',
+              },
+            });
+          }
+        } catch (vectorError) {
+          logger.warn('⚠️ ChromaDB vector matching failed, falling back to CVMatchingScore:', vectorError.message);
+          // Fall through to CVMatchingScore query below
+        }
+      }
+
+      // Fallback: Use existing CVMatchingScore if vector matching fails or is disabled
+      logger.info('📊 Using CVMatchingScore database query', { jobId });
 
       // Build query
       const query = {
@@ -356,6 +546,7 @@ class AdvancedNLPController {
           total: topCandidates.length,
           totalApplications,
           minScoreFilter: parseInt(minScore),
+          method: 'cvmatching-score-database',
         },
       });
     } catch (error) {
@@ -2410,6 +2601,149 @@ class AdvancedNLPController {
       res.status(500).json({
         success: false,
         message: 'Error calculating job matches',
+        error: error.message,
+      });
+    }
+  }
+
+  /**
+   * @route   POST /api/nlp/top-candidates/:jobId/invite
+   * @desc    Send invitation email to candidate for a job
+   * @access  Private (Employer only)
+   */
+  async inviteCandidate(req, res) {
+    try {
+      const { jobId } = req.params;
+      const { candidateId, message } = req.body;
+
+      if (!candidateId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Candidate ID is required',
+        });
+      }
+
+      // Check authentication
+      if (!req.user || !req.user._id) {
+        return res.status(401).json({
+          success: false,
+          message: 'Authentication required',
+        });
+      }
+
+      // Verify job belongs to employer
+      const job = await Job.findById(jobId).populate('postedBy', 'fullName email');
+      if (!job) {
+        return res.status(404).json({
+          success: false,
+          message: 'Job not found',
+        });
+      }
+
+      // Check if current user is employer and owns this job
+      if (job.postedBy.toString() !== req.user._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied - You can only invite candidates for jobs you posted',
+        });
+      }
+
+      // Get candidate info
+      // candidateId could be CandidateProfile._id or User._id
+      let candidateProfile = await CandidateProfile.findById(candidateId)
+        .populate('userId', 'fullName email')
+        .lean();
+
+      // If not found by _id, try finding by userId
+      if (!candidateProfile) {
+        candidateProfile = await CandidateProfile.findOne({ userId: candidateId })
+          .populate('userId', 'fullName email')
+          .lean();
+      }
+
+      if (!candidateProfile || !candidateProfile.userId) {
+        return res.status(404).json({
+          success: false,
+          message: 'Candidate not found',
+        });
+      }
+
+      const candidateUser = candidateProfile.userId;
+      const candidateEmail = candidateUser.email;
+      const candidateName = candidateUser.fullName || candidateEmail;
+
+      // Get employer info
+      const EmployerProfile = require('../models/EmployerProfile');
+      const employerProfile = await EmployerProfile.findOne({ owner: req.user._id })
+        .populate('company', 'name logo')
+        .lean();
+
+      const companyName = employerProfile?.company?.name || job.postedBy?.company || 'Công ty';
+      const employerName = req.user.fullName || req.user.email;
+
+      // Build job application link
+      const frontendUrl = process.env.FRONTEND_CANDIDATE_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+      const jobApplicationLink = `${frontendUrl}/jobs/${jobId}`;
+
+      // Get job location (handle both string and object)
+      const jobLocation = job.location?.fullAddress || job.location?.city || job.location || null;
+
+      // Send invitation email using template
+      const emailService = require('../services/notification/emailService');
+      
+      try {
+        await emailService.sendJobInvitationEmail({
+          candidateName,
+          candidateEmail,
+          companyName,
+          companyLogo: employerProfile?.company?.logo || null,
+          jobTitle: job.title,
+          jobLocation,
+          salaryMin: job.salaryMin,
+          salaryMax: job.salaryMax,
+          currency: job.currency || 'VND',
+          jobDescription: job.description || job.requirements || null,
+          invitationLink: jobApplicationLink,
+          employerName,
+          employerEmail: req.user.email,
+        });
+
+        logger.info('✅ Invitation email sent successfully', {
+          jobId,
+          candidateId,
+          candidateEmail,
+          employerId: req.user._id,
+        });
+
+        return res.status(200).json({
+          success: true,
+          message: 'Email mời ứng tuyển đã được gửi thành công',
+          data: {
+            candidateEmail,
+            candidateName,
+            jobTitle: job.title,
+            sentAt: new Date(),
+          },
+        });
+      } catch (emailError) {
+        logger.error('❌ Failed to send invitation email:', {
+          error: emailError.message,
+          jobId,
+          candidateId,
+          candidateEmail,
+        });
+
+        return res.status(500).json({
+          success: false,
+          message: 'Không thể gửi email. Vui lòng thử lại sau.',
+          error: emailError.message,
+        });
+      }
+    } catch (error) {
+      logger.error('Error sending invitation:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error sending invitation',
         error: error.message,
       });
     }

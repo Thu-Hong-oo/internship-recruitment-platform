@@ -281,6 +281,7 @@ export default function SkillRoadmapsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   const [roadmaps, setRoadmaps] = useState<RoadmapListItem[]>([]);
   const [popularRoadmaps, setPopularRoadmaps] = useState<RoadmapListItem[]>([]);

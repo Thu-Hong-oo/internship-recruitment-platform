@@ -333,6 +333,28 @@ export const nlpService = {
     return apiClient.post(`/nlp/recalculate-scores/${jobId}`);
   },
 
+  /**
+   * Send invitation email to candidate for a job (Employer only)
+   */
+  async inviteCandidate(
+    jobId: string,
+    params: {
+      candidateId: string;
+      message?: string;
+    }
+  ): Promise<{
+    success: boolean;
+    message: string;
+    data?: {
+      candidateEmail: string;
+      candidateName: string;
+      jobTitle: string;
+      sentAt: string;
+    };
+  }> {
+    return apiClient.post(`/nlp/top-candidates/${jobId}/invite`, params);
+  },
+
   // ============================================
   // Learning Roadmap APIs
   // ============================================
