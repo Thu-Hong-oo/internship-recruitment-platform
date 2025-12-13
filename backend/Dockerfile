@@ -49,9 +49,14 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     make -j$(nproc) && make install && \
     cd / && rm -rf /tmp/sqlite-autoconf-3420000* && \
     ldconfig && \
+    # Build pysqlite3 with the new SQLite
     export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH && \
     export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH && \
+    export SQLITE_LIBDIR=/usr/local/lib && \
+    export SQLITE_INCDIR=/usr/local/include && \
     pip install --no-cache-dir --no-binary pysqlite3 pysqlite3 && \
+    # Verify pysqlite3 uses new SQLite
+    python3 -c "import pysqlite3; conn = pysqlite3.connect(':memory:'); v = conn.execute('SELECT sqlite_version()').fetchone()[0]; conn.close(); print(f'✅ pysqlite3 uses SQLite {v}'); assert tuple(map(int, v.split('.'))) >= (3, 35, 0), f'SQLite {v} < 3.35.0'" && \
     pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu \
     -r /tmp/python-requirements.txt && \
     apt-get purge -y wget && apt-get autoremove -y && \

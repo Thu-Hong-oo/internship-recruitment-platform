@@ -13,13 +13,31 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
 # Try to use pysqlite3 if available (better for ChromaDB)
+# This MUST be done before importing chromadb
 try:
     import pysqlite3
     sys.modules['sqlite3'] = pysqlite3
-    print("✅ Using pysqlite3 for better SQLite support", file=sys.stderr, flush=True)
+    # Verify SQLite version
+    conn = pysqlite3.connect(':memory:')
+    version = conn.execute('SELECT sqlite_version()').fetchone()[0]
+    conn.close()
+    version_tuple = tuple(map(int, version.split('.')))
+    print(f"✅ Using pysqlite3 with SQLite {version}", file=sys.stderr, flush=True)
+    if version_tuple < (3, 35, 0):
+        print(f"❌ ERROR: SQLite {version} < 3.35.0 required by ChromaDB", file=sys.stderr, flush=True)
+        sys.exit(1)
 except ImportError:
-    print("⚠️ pysqlite3 not available, using system sqlite3", file=sys.stderr, flush=True)
-    pass
+    # Fallback to system sqlite3, but check version
+    import sqlite3
+    conn = sqlite3.connect(':memory:')
+    version = conn.execute('SELECT sqlite_version()').fetchone()[0]
+    conn.close()
+    version_tuple = tuple(map(int, version.split('.')))
+    print(f"⚠️ pysqlite3 not available, using system sqlite3 {version}", file=sys.stderr, flush=True)
+    if version_tuple < (3, 35, 0):
+        print(f"❌ ERROR: System SQLite {version} < 3.35.0 required by ChromaDB", file=sys.stderr, flush=True)
+        print("💡 Solution: pysqlite3 should be built with SQLite >= 3.35.0", file=sys.stderr, flush=True)
+        sys.exit(1)
 
 import chromadb
 from chromadb.config import Settings

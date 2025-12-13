@@ -4,7 +4,12 @@
 # Don't exit on error - we want to see all errors
 set +e
 
+# Set LD_LIBRARY_PATH to use newer SQLite from /usr/local/lib
+export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
+export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH
+
 echo "🚀 Starting services..." >&2
+echo "📚 LD_LIBRARY_PATH: $LD_LIBRARY_PATH" >&2
 
 # Start Python model server in background
 echo "📦 Starting Sentence-BERT model server..." >&2
@@ -15,9 +20,44 @@ echo "Model server PID: $MODEL_PID" >&2
 # Start ChromaDB embedded server in background
 echo "🗄️ Starting ChromaDB embedded server..." >&2
 
+# Test SQLite version and pysqlite3
+echo "Testing SQLite version..." >&2
+python3 -c "
+import sys
+try:
+    import pysqlite3 as sqlite3
+    sys.modules['sqlite3'] = sqlite3
+    print('✅ Using pysqlite3', file=sys.stderr)
+except ImportError:
+    import sqlite3
+    print('⚠️ Using system sqlite3', file=sys.stderr)
+
+conn = sqlite3.connect(':memory:')
+version = conn.execute('SELECT sqlite_version()').fetchone()[0]
+conn.close()
+print(f'📊 SQLite version: {version}', file=sys.stderr)
+if tuple(map(int, version.split('.'))) < (3, 35, 0):
+    print(f'❌ ERROR: SQLite {version} < 3.35.0 required by ChromaDB', file=sys.stderr)
+    sys.exit(1)
+else:
+    print(f'✅ SQLite version OK', file=sys.stderr)
+" 2>&1 || {
+  echo "❌ ERROR: SQLite version check failed" >&2
+  # Continue anyway, but ChromaDB will fail
+}
+
 # Test if chromadb can be imported
 echo "Testing ChromaDB import..." >&2
-python3 -c "import chromadb; print('ChromaDB import OK')" 2>&1 || {
+python3 -c "
+import sys
+try:
+    import pysqlite3 as sqlite3
+    sys.modules['sqlite3'] = sqlite3
+except ImportError:
+    pass
+import chromadb
+print('✅ ChromaDB import OK', file=sys.stderr)
+" 2>&1 || {
   echo "❌ ERROR: ChromaDB cannot be imported. Check if it's installed." >&2
   echo "Run: pip install chromadb" >&2
   # Don't exit, continue anyway
