@@ -88,3 +88,24 @@ curl http://localhost:8000/api/v1/heartbeat
 
 Sau khi deploy, production sẽ hoạt động giống local! 🎉
 
+## 🔬 Debug Tool
+
+Để so sánh response format giữa local và production:
+
+```bash
+# Test local ChromaDB server (chính thức)
+node backend/scripts/test-chromadb-response.js --local
+
+# Test embedded server (custom Python)
+node backend/scripts/test-chromadb-response.js --embedded
+
+# Test cả hai để so sánh
+node backend/scripts/test-chromadb-response.js --local --embedded
+```
+
+Tool này sẽ:
+- Test heartbeat endpoint
+- Test `getOrCreateCollection()` qua ChromaDB client
+- Test raw HTTP response để xem format thực tế
+- So sánh `embedding_function` field giữa 2 servers
+

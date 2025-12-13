@@ -119,22 +119,29 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 # Get embedding_function if available
-                # Return empty dict {} instead of None - ChromaDB client may expect an object
                 embedding_func = {}
                 try:
                     if hasattr(collection, 'embedding_function') and collection.embedding_function is not None:
                         embedding_func = collection.embedding_function
                 except:
                     pass
-                # If embedding_func is None, use empty dict
                 if embedding_func is None:
                     embedding_func = {}
-                    
+                
+                # Match ChromaDB official server format
                 response = {
                     'name': collection.name,
                     'metadata': collection.metadata or {},
                     'id': str(collection.id),
-                    'embedding_function': embedding_func  # ChromaDB client expects this field
+                    'configuration_json': {
+                        'embedding_function': {
+                            'type': 'unknown' if embedding_func == {} else 'known',
+                            'name': 'default' if embedding_func != {} else None,
+                            'config': embedding_func if embedding_func != {} else {}
+                        }
+                    },
+                    # Top-level embedding_function for backward compatibility
+                    'embedding_function': embedding_func
                 }
                 logger.info(f"GET v1 Collection response: name={response['name']}, id={response['id']}, has_embedding_func={embedding_func is not None}")
                 self.wfile.write(json.dumps(response).encode())
@@ -165,25 +172,31 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 # Get embedding_function if available
-                # Return empty dict {} instead of None - ChromaDB client may expect an object
                 embedding_func = {}
                 try:
                     if hasattr(collection, 'embedding_function') and collection.embedding_function is not None:
                         embedding_func = collection.embedding_function
                 except:
                     pass
-                # If embedding_func is None, use empty dict
                 if embedding_func is None:
                     embedding_func = {}
-                    
-                # Return v2 format
+                
+                # Match ChromaDB official server format
                 response = {
                     'id': str(collection.id),
                     'name': collection.name,
                     'metadata': collection.metadata or {},
                     'tenant': 'default_tenant',
                     'database': 'default_database',
-                    'embedding_function': embedding_func  # ChromaDB client expects this field
+                    'configuration_json': {
+                        'embedding_function': {
+                            'type': 'unknown' if embedding_func == {} else 'known',
+                            'name': 'default' if embedding_func != {} else None,
+                            'config': embedding_func if embedding_func != {} else {}
+                        }
+                    },
+                    # Top-level embedding_function for backward compatibility
+                    'embedding_function': embedding_func
                 }
                 logger.info(f"GET v2 Collection response: name={response['name']}, id={response['id']}, has_embedding_func={embedding_func is not None}")
                 self.wfile.write(json.dumps(response).encode())
@@ -239,15 +252,26 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                     pass
                 
                 # Return format matching ChromaDB server response
-                # ChromaDB client expects embedding_function to be present
-                # Try returning empty dict {} instead of None - some client versions may expect an object
-                # If embedding_func is None, return empty dict to match ChromaDB server format
+                # ChromaDB server returns configuration_json with embedding_function inside
+                # Not at top level! Match the official server format
+                # Top-level embedding_function is not required, but we include it for compatibility
                 embedding_function_value = embedding_func if embedding_func is not None else {}
                 
+                # Match ChromaDB official server format
+                # Official server has: configuration_json.embedding_function, not top-level
                 result = {
                     'name': collection.name,
                     'metadata': collection.metadata or {},
                     'id': str(collection.id),
+                    # Include configuration_json to match official server format
+                    'configuration_json': {
+                        'embedding_function': {
+                            'type': 'unknown' if embedding_function_value == {} else 'known',
+                            'name': 'default' if embedding_function_value != {} else None,
+                            'config': embedding_function_value if embedding_function_value != {} else {}
+                        }
+                    },
+                    # Top-level embedding_function for backward compatibility (can be omitted)
                     'embedding_function': embedding_function_value
                 }
                 
@@ -303,10 +327,8 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 # ChromaDB v2 returns collection in a specific format
-                # ChromaDB client expects embedding_function to be present
-                # Try returning empty dict {} instead of None - some client versions may expect an object
-                embedding_func = result.get('embedding_function')
-                # If embedding_func is None or empty, return empty dict to match ChromaDB server format
+                # Match official server format: configuration_json.embedding_function, not top-level
+                embedding_func = result.get('embedding_function', {})
                 embedding_function_value = embedding_func if embedding_func and embedding_func != {} else {}
                 
                 response = {
@@ -315,6 +337,15 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                     'metadata': result['metadata'],
                     'tenant': 'default_tenant',
                     'database': 'default_database',
+                    # Include configuration_json to match official server format
+                    'configuration_json': result.get('configuration_json', {
+                        'embedding_function': {
+                            'type': 'unknown',
+                            'name': None,
+                            'config': {}
+                        }
+                    }),
+                    # Top-level embedding_function for backward compatibility (optional)
                     'embedding_function': embedding_function_value
                 }
                 # Log full response for debugging (but truncate if too long)
