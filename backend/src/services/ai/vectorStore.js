@@ -48,6 +48,8 @@ class VectorStore {
     
     while (retries > 0) {
       try {
+        logger.info(`Attempting to getOrCreateCollection: ${this.collectionName} from ${this.chromaUrl}`);
+        
         this.collectionPromise = this.client.getOrCreateCollection({
           name: this.collectionName,
           metadata: { description: 'Job embeddings for fast candidate matching' },
@@ -60,7 +62,16 @@ class VectorStore {
         }
         
         // Check if collection has required properties (for debugging)
-        logger.info(`Collection created/retrieved: name=${collection.name || 'N/A'}, id=${collection.id || 'N/A'}`);
+        logger.info(`Collection created/retrieved: name=${collection.name || 'N/A'}, id=${collection.id || 'N/A'}, type=${typeof collection}, hasEmbeddingFunction=${collection.embedding_function !== undefined}`);
+        
+        // Try to access embedding_function to see if it causes error
+        try {
+          const ef = collection.embedding_function;
+          logger.info(`Collection.embedding_function accessed successfully: ${ef === null ? 'null' : ef === undefined ? 'undefined' : typeof ef}`);
+        } catch (efError) {
+          logger.error(`Error accessing collection.embedding_function: ${efError.message}`);
+          // Don't throw, just log - collection might still work
+        }
         
         return this.collectionPromise;
       } catch (error) {
@@ -223,14 +234,33 @@ class VectorStore {
    * @param {number} nResults
    */
   async queryTopN(embedding, nResults = 60) {
-    const collection = await this._getCollection();
-    return collection.query({
-      queryEmbeddings: [embedding],
-      nResults,
-      // Chroma 1.8+ tự trả ids, chỉ include field được phép
-      // Include embeddings để fallback tính cos-sim nếu distances rỗng
-      include: ['metadatas', 'distances', 'embeddings'],
-    });
+    try {
+      const collection = await this._getCollection();
+      
+      // Verify collection is valid
+      if (!collection) {
+        throw new Error('Collection is undefined after getOrCreateCollection');
+      }
+      
+      // Log collection properties for debugging
+      logger.info(`Querying collection: name=${collection.name || 'N/A'}, id=${collection.id || 'N/A'}, hasEmbeddingFunction=${collection.embedding_function !== undefined}`);
+      
+      return collection.query({
+        queryEmbeddings: [embedding],
+        nResults,
+        // Chroma 1.8+ tự trả ids, chỉ include field được phép
+        // Include embeddings để fallback tính cos-sim nếu distances rỗng
+        include: ['metadatas', 'distances', 'embeddings'],
+      });
+    } catch (error) {
+      logger.error('Error in queryTopN:', {
+        error: error.message,
+        stack: error.stack,
+        chromaUrl: this.chromaUrl,
+        collectionName: this.collectionName,
+      });
+      throw error;
+    }
   }
 }
 
