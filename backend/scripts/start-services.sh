@@ -1,7 +1,8 @@
 #!/bin/sh
 # Startup script to start all services in correct order
 # Force output to be unbuffered
-set -e  # Exit on error
+# Don't exit on error - we want to see all errors
+set +e
 
 echo "🚀 Starting services..." >&2
 

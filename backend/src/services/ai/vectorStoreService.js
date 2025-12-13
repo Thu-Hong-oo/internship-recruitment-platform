@@ -28,9 +28,26 @@ class VectorStoreService {
   constructor() {
     try {
       // Initialize ChromaDB client
-      // ChromaDB Node.js client only supports HTTP client mode (server mode)
-      // Default to localhost:8000 for local development
-      const chromaUrl = process.env.CHROMA_URL || 'http://localhost:8000';
+      // ChromaDB connection logic:
+      // 1. If CHROMA_URL is set → use it (external ChromaDB server)
+      // 2. If CHROMA_URL is not set → use embedded server on port 8001 (for App Runner)
+      // 3. For localhost → default to http://localhost:8000 (requires docker-compose)
+      let chromaUrl;
+      if (process.env.CHROMA_URL) {
+        chromaUrl = process.env.CHROMA_URL;
+        logger.info(`Using ChromaDB URL from CHROMA_URL: ${chromaUrl}`);
+      } else if (process.env.NODE_ENV === 'production' || 
+                 process.env.AWS_EXECUTION_ENV || 
+                 process.env.AWS_LAMBDA_FUNCTION_NAME ||
+                 process.env._?.includes('apprunner')) {
+        // Production/App Runner: use embedded server (runs in same container)
+        chromaUrl = 'http://localhost:8001';
+        logger.info('Using ChromaDB embedded server on port 8001 (production mode)');
+      } else {
+        // Local development: default to docker-compose ChromaDB
+        chromaUrl = 'http://localhost:8000';
+        logger.info('Using ChromaDB on port 8000 (local development)');
+      }
       this.client = new ChromaClient({ path: chromaUrl });
 
       this.collectionName = process.env.CHROMA_COLLECTION_NAME || 'learning-resources';
