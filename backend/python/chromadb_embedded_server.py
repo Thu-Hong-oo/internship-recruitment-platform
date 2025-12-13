@@ -119,12 +119,17 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 # Get embedding_function if available
-                embedding_func = None
+                # Return empty dict {} instead of None - ChromaDB client may expect an object
+                embedding_func = {}
                 try:
                     if hasattr(collection, 'embedding_function') and collection.embedding_function is not None:
                         embedding_func = collection.embedding_function
                 except:
                     pass
+                # If embedding_func is None, use empty dict
+                if embedding_func is None:
+                    embedding_func = {}
+                    
                 response = {
                     'name': collection.name,
                     'metadata': collection.metadata or {},
@@ -160,12 +165,17 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 # Get embedding_function if available
-                embedding_func = None
+                # Return empty dict {} instead of None - ChromaDB client may expect an object
+                embedding_func = {}
                 try:
                     if hasattr(collection, 'embedding_function') and collection.embedding_function is not None:
                         embedding_func = collection.embedding_function
                 except:
                     pass
+                # If embedding_func is None, use empty dict
+                if embedding_func is None:
+                    embedding_func = {}
+                    
                 # Return v2 format
                 response = {
                     'id': str(collection.id),
@@ -229,15 +239,20 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                     pass
                 
                 # Return format matching ChromaDB server response
+                # ChromaDB client expects embedding_function to be present
+                # Try returning empty dict {} instead of None - some client versions may expect an object
+                # If embedding_func is None, return empty dict to match ChromaDB server format
+                embedding_function_value = embedding_func if embedding_func is not None else {}
+                
                 result = {
                     'name': collection.name,
                     'metadata': collection.metadata or {},
                     'id': str(collection.id),
-                    'embedding_function': embedding_func  # Can be None, ChromaDB client handles it
+                    'embedding_function': embedding_function_value
                 }
                 
                 # Log response for debugging
-                logger.info(f"Collection response: name={result['name']}, id={result['id']}, has_embedding_func={embedding_func is not None}")
+                logger.info(f"Collection response: name={result['name']}, id={result['id']}, embedding_function={'present' if embedding_func is not None else 'null'}")
                 
                 return result
             except Exception as e:
@@ -288,18 +303,26 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 # ChromaDB v2 returns collection in a specific format
-                # Use same embedding_function from result (can be None)
+                # ChromaDB client expects embedding_function to be present
+                # Try returning empty dict {} instead of None - some client versions may expect an object
+                embedding_func = result.get('embedding_function')
+                # If embedding_func is None or empty, return empty dict to match ChromaDB server format
+                embedding_function_value = embedding_func if embedding_func and embedding_func != {} else {}
+                
                 response = {
                     'id': result['id'],
                     'name': result['name'],
                     'metadata': result['metadata'],
                     'tenant': 'default_tenant',
                     'database': 'default_database',
-                    'embedding_function': result.get('embedding_function')  # Use from result
+                    'embedding_function': embedding_function_value
                 }
-                # Log full response for debugging
-                logger.info(f"V2 Collection response: {json.dumps(response)}")
-                self.wfile.write(json.dumps(response).encode())
+                # Log full response for debugging (but truncate if too long)
+                response_str = json.dumps(response)
+                logger.info(f"V2 Collection response: name={response['name']}, id={response['id']}, embedding_function={embedding_func is not None}")
+                if len(response_str) < 500:
+                    logger.info(f"Full V2 response: {response_str}")
+                self.wfile.write(response_str.encode())
             except Exception as e:
                 logger.error(f"Error in v2 collection request: {e}")
                 self.send_error(500, str(e))

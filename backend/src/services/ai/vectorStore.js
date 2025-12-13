@@ -50,37 +50,85 @@ class VectorStore {
       try {
         logger.info(`Attempting to getOrCreateCollection: ${this.collectionName} from ${this.chromaUrl}`);
         
-        this.collectionPromise = this.client.getOrCreateCollection({
+        // Create promise but don't await yet - we'll handle errors
+        const collectionPromise = this.client.getOrCreateCollection({
           name: this.collectionName,
           metadata: { description: 'Job embeddings for fast candidate matching' },
         });
         
         // Verify collection object is valid
-        const collection = await this.collectionPromise;
+        let collection;
+        try {
+          collection = await collectionPromise;
+        } catch (parseError) {
+          // If parsing fails, it might be because of embedding_function
+          logger.error(`Error parsing collection response: ${parseError.message}`, {
+            error: parseError.message,
+            stack: parseError.stack,
+            name: parseError.name
+          });
+          
+          // Check if it's the embedding_function error
+          if (parseError.message && parseError.message.includes('embedding_function')) {
+            logger.error('ChromaDB client failed to parse collection due to embedding_function issue');
+            logger.error('This suggests the embedded server response format may not match ChromaDB client expectations');
+          }
+          
+          throw parseError;
+        }
+        
         if (!collection) {
           throw new Error('getOrCreateCollection returned undefined/null');
         }
         
         // Check if collection has required properties (for debugging)
-        logger.info(`Collection created/retrieved: name=${collection.name || 'N/A'}, id=${collection.id || 'N/A'}, type=${typeof collection}, hasEmbeddingFunction=${collection.embedding_function !== undefined}`);
+        logger.info(`Collection created/retrieved: name=${collection.name || 'N/A'}, id=${collection.id || 'N/A'}, type=${typeof collection}`);
         
-        // Try to access embedding_function to see if it causes error
+        // Safely check embedding_function - wrap in try-catch to prevent errors
+        let hasEmbeddingFunction = false;
+        let embeddingFunctionValue = null;
         try {
-          const ef = collection.embedding_function;
-          logger.info(`Collection.embedding_function accessed successfully: ${ef === null ? 'null' : ef === undefined ? 'undefined' : typeof ef}`);
+          // Use optional chaining if available, otherwise try-catch
+          if (collection.embedding_function !== undefined) {
+            hasEmbeddingFunction = true;
+            embeddingFunctionValue = collection.embedding_function;
+            logger.info(`Collection.embedding_function: ${embeddingFunctionValue === null ? 'null' : embeddingFunctionValue === undefined ? 'undefined' : typeof embeddingFunctionValue}`);
+          } else {
+            logger.info('Collection.embedding_function is undefined (this is OK for embedded mode)');
+          }
         } catch (efError) {
-          logger.error(`Error accessing collection.embedding_function: ${efError.message}`);
-          // Don't throw, just log - collection might still work
+          // If accessing embedding_function causes an error, log it but don't fail
+          logger.warn(`Warning: Could not access collection.embedding_function: ${efError.message}`);
+          logger.warn('Collection may still work, but ChromaDB client may have issues');
         }
         
+        // Store the promise for reuse
+        this.collectionPromise = collectionPromise;
         return this.collectionPromise;
       } catch (error) {
         lastError = error;
-        logger.error(`ChromaDB getOrCreateCollection error (attempt ${4 - retries}/3):`, {
-          error: error.message,
-          stack: error.stack,
-          chromaUrl: this.chromaUrl
-        });
+        
+        // Check if error is related to embedding_function
+        const isEmbeddingFunctionError = error.message && (
+          error.message.includes('embedding_function') ||
+          error.message.includes('Cannot read properties of undefined')
+        );
+        
+        if (isEmbeddingFunctionError) {
+          logger.error(`ChromaDB embedding_function error (attempt ${4 - retries}/3):`, {
+            error: error.message,
+            stack: error.stack,
+            chromaUrl: this.chromaUrl,
+            suggestion: 'The embedded server response may not match ChromaDB client expectations'
+          });
+        } else {
+          logger.error(`ChromaDB getOrCreateCollection error (attempt ${4 - retries}/3):`, {
+            error: error.message,
+            stack: error.stack,
+            chromaUrl: this.chromaUrl
+          });
+        }
+        
         retries--;
         if (retries > 0) {
           logger.warn(`Failed to connect to ChromaDB at ${this.chromaUrl}, retrying... (${retries} retries left)`);
@@ -118,6 +166,17 @@ class VectorStore {
   async precomputeActiveJobs() {
     try {
       const collection = await this._getCollection();
+      
+      // Double-check collection is valid before using it
+      if (!collection) {
+        throw new Error('Collection is undefined after _getCollection()');
+      }
+      
+      // Verify collection has required methods
+      if (typeof collection.upsert !== 'function') {
+        throw new Error('Collection does not have upsert method - invalid collection object');
+      }
+      
       const jobs = await Job.find({ status: 'active' }).lean();
       if (!jobs.length) {
         logger.warn('⚠️ No active jobs to precompute');
@@ -242,8 +301,17 @@ class VectorStore {
         throw new Error('Collection is undefined after getOrCreateCollection');
       }
       
-      // Log collection properties for debugging
-      logger.info(`Querying collection: name=${collection.name || 'N/A'}, id=${collection.id || 'N/A'}, hasEmbeddingFunction=${collection.embedding_function !== undefined}`);
+      // Verify collection has required methods
+      if (typeof collection.query !== 'function') {
+        throw new Error('Collection does not have query method - invalid collection object');
+      }
+      
+      // Log collection properties for debugging (safely)
+      try {
+        logger.info(`Querying collection: name=${collection.name || 'N/A'}, id=${collection.id || 'N/A'}`);
+      } catch (logError) {
+        logger.warn(`Could not log collection properties: ${logError.message}`);
+      }
       
       return collection.query({
         queryEmbeddings: [embedding],
