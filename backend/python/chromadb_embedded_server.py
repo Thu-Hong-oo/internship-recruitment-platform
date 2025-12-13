@@ -297,7 +297,8 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                     'database': 'default_database',
                     'embedding_function': result.get('embedding_function')  # Use from result
                 }
-                logger.info(f"V2 Collection response: name={response['name']}, id={response['id']}, has_embedding_func={response['embedding_function'] is not None}")
+                # Log full response for debugging
+                logger.info(f"V2 Collection response: {json.dumps(response)}")
                 self.wfile.write(json.dumps(response).encode())
             except Exception as e:
                 logger.error(f"Error in v2 collection request: {e}")
