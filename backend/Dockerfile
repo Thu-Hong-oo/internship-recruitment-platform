@@ -8,8 +8,10 @@ WORKDIR /app
 # Also install Python and pip for Sentence-BERT service
 # Install curl for health checks
 # Install sqlite3 and libsqlite3-dev for ChromaDB
+# Install python3-dev for building pysqlite3 (needs Python.h)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
+    python3-dev \
     python3-pip \
     build-essential \
     curl \
