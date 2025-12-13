@@ -11,6 +11,16 @@ import json
 import logging
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
+
+# Try to use pysqlite3 if available (better for ChromaDB)
+try:
+    import pysqlite3
+    sys.modules['sqlite3'] = pysqlite3
+    print("✅ Using pysqlite3 for better SQLite support", file=sys.stderr, flush=True)
+except ImportError:
+    print("⚠️ pysqlite3 not available, using system sqlite3", file=sys.stderr, flush=True)
+    pass
+
 import chromadb
 from chromadb.config import Settings
 
