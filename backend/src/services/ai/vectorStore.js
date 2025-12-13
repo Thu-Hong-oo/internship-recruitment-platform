@@ -52,9 +52,24 @@ class VectorStore {
           name: this.collectionName,
           metadata: { description: 'Job embeddings for fast candidate matching' },
         });
+        
+        // Verify collection object is valid
+        const collection = await this.collectionPromise;
+        if (!collection) {
+          throw new Error('getOrCreateCollection returned undefined/null');
+        }
+        
+        // Check if collection has required properties (for debugging)
+        logger.info(`Collection created/retrieved: name=${collection.name || 'N/A'}, id=${collection.id || 'N/A'}`);
+        
         return this.collectionPromise;
       } catch (error) {
         lastError = error;
+        logger.error(`ChromaDB getOrCreateCollection error (attempt ${4 - retries}/3):`, {
+          error: error.message,
+          stack: error.stack,
+          chromaUrl: this.chromaUrl
+        });
         retries--;
         if (retries > 0) {
           logger.warn(`Failed to connect to ChromaDB at ${this.chromaUrl}, retrying... (${retries} retries left)`);

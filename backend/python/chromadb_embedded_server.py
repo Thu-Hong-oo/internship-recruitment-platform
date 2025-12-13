@@ -118,12 +118,21 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                 self.send_header('Content-Type', 'application/json')
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
-                self.wfile.write(json.dumps({
+                # Get embedding_function if available
+                embedding_func = None
+                try:
+                    if hasattr(collection, 'embedding_function') and collection.embedding_function is not None:
+                        embedding_func = collection.embedding_function
+                except:
+                    pass
+                response = {
                     'name': collection.name,
                     'metadata': collection.metadata or {},
                     'id': str(collection.id),
-                    'embedding_function': None  # ChromaDB client expects this field
-                }).encode())
+                    'embedding_function': embedding_func  # ChromaDB client expects this field
+                }
+                logger.info(f"GET v1 Collection response: name={response['name']}, id={response['id']}, has_embedding_func={embedding_func is not None}")
+                self.wfile.write(json.dumps(response).encode())
             except Exception as e:
                 self.send_error(404, str(e))
             return
@@ -150,6 +159,13 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                 self.send_header('Content-Type', 'application/json')
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
+                # Get embedding_function if available
+                embedding_func = None
+                try:
+                    if hasattr(collection, 'embedding_function') and collection.embedding_function is not None:
+                        embedding_func = collection.embedding_function
+                except:
+                    pass
                 # Return v2 format
                 response = {
                     'id': str(collection.id),
@@ -157,8 +173,9 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                     'metadata': collection.metadata or {},
                     'tenant': 'default_tenant',
                     'database': 'default_database',
-                    'embedding_function': None  # ChromaDB client expects this field
+                    'embedding_function': embedding_func  # ChromaDB client expects this field
                 }
+                logger.info(f"GET v2 Collection response: name={response['name']}, id={response['id']}, has_embedding_func={embedding_func is not None}")
                 self.wfile.write(json.dumps(response).encode())
             except Exception as e:
                 logger.error(f"Error getting v2 collection: {e}")
@@ -201,21 +218,28 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                     logger.info(f"Created new collection: {collection_name}")
                 
                 # ChromaDB client expects embedding_function field
-                # Return None or empty object to match ChromaDB server format
+                # Return empty dict or None to match ChromaDB server format
+                # ChromaDB client may access embedding_function property, so we need to provide it
                 embedding_func = None
                 try:
                     # Try to get embedding function from collection if available
-                    if hasattr(collection, 'embedding_function'):
+                    if hasattr(collection, 'embedding_function') and collection.embedding_function is not None:
                         embedding_func = collection.embedding_function
                 except:
                     pass
                 
-                return {
+                # Return format matching ChromaDB server response
+                result = {
                     'name': collection.name,
                     'metadata': collection.metadata or {},
                     'id': str(collection.id),
-                    'embedding_function': embedding_func  # ChromaDB client expects this field
+                    'embedding_function': embedding_func  # Can be None, ChromaDB client handles it
                 }
+                
+                # Log response for debugging
+                logger.info(f"Collection response: name={result['name']}, id={result['id']}, has_embedding_func={embedding_func is not None}")
+                
+                return result
             except Exception as e:
                 logger.error(f"Error creating/getting collection: {e}")
                 raise
@@ -264,14 +288,16 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 # ChromaDB v2 returns collection in a specific format
+                # Use same embedding_function from result (can be None)
                 response = {
                     'id': result['id'],
                     'name': result['name'],
                     'metadata': result['metadata'],
                     'tenant': 'default_tenant',
                     'database': 'default_database',
-                    'embedding_function': None  # ChromaDB client expects this field
+                    'embedding_function': result.get('embedding_function')  # Use from result
                 }
+                logger.info(f"V2 Collection response: name={response['name']}, id={response['id']}, has_embedding_func={response['embedding_function'] is not None}")
                 self.wfile.write(json.dumps(response).encode())
             except Exception as e:
                 logger.error(f"Error in v2 collection request: {e}")
