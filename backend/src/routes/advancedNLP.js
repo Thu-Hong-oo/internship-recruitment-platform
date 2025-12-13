@@ -45,6 +45,18 @@ router.get(
 );
 
 /**
+ * @route   POST /api/nlp/top-candidates/:jobId/invite
+ * @desc    Send invitation email to candidate for a job
+ * @access  Private (Employer only)
+ */
+router.post(
+  '/top-candidates/:jobId/invite',
+  protect,
+  authorize('employer'),
+  advancedNLPController.inviteCandidate
+);
+
+/**
  * @route   GET /api/nlp/best-matches
  * @desc    Get best job matches for candidate
  * @access  Private (Candidate/Intern)

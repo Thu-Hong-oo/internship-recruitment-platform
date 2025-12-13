@@ -1,6 +1,7 @@
 const { logger } = require('../../utils/logger');
 const { getSentenceBertService } = require('./sentenceBertService');
 const { getVectorStore } = require('./vectorStore');
+const { getCandidateVectorIndexService } = require('./candidateVectorIndexService');
 const CandidateProfile = require('../../models/CandidateProfile');
 const Job = require('../../models/Job');
 const SavedJob = require('../../models/SavedJob');
@@ -106,18 +107,56 @@ function calcLocationSalaryScore(candidateProfile, job, meta) {
 }
 
 function buildCandidateText(profile) {
-  const skills =
-    profile.skills?.technical?.map(s => s.name || s) ||
-    profile.skills?.soft?.map(s => s.name || s) ||
-    [];
+  // Extract skills from all categories
+  const allSkills = [];
+  if (profile.skills) {
+    if (Array.isArray(profile.skills)) {
+      allSkills.push(...profile.skills.map(s => s.name || s));
+    } else {
+      // Skills is an object with technical, soft, languages
+      if (profile.skills.technical) {
+        allSkills.push(...profile.skills.technical.map(s => s.name || s));
+      }
+      if (profile.skills.soft) {
+        allSkills.push(...profile.skills.soft.map(s => s.name || s));
+      }
+      if (profile.skills.languages) {
+        allSkills.push(...profile.skills.languages.map(s => s.name || s));
+      }
+    }
+  }
+  
   const summary = profile.summary || profile.personalInfo?.summary || '';
+  
+  // Experience from internships and full-time
   const exp = (profile.experience?.internships || [])
     .concat(profile.experience?.fullTime || [])
-    .concat(profile.experience?.projects || [])
     .map(e => `${e.position || ''} ${e.company || ''} ${e.description || ''}`)
     .join(' ');
+  
+  // Projects
+  const projects = (profile.projects || [])
+    .map(p => `${p.name || ''} ${p.description || ''} ${(p.technologies || []).join(' ')}`)
+    .join(' ');
+  
+  // Education - structure is object with university and certifications
+  let education = '';
+  if (profile.education) {
+    const eduParts = [];
+    if (profile.education.university) {
+      const uni = profile.education.university;
+      eduParts.push(`${uni.degree || ''} ${uni.major || ''} ${uni.field || ''} ${uni.institution || ''} ${uni.name || ''}`);
+    }
+    if (Array.isArray(profile.education.certifications)) {
+      const certs = profile.education.certifications
+        .map(c => `${c.name || ''} ${c.issuer || ''} ${c.institution || ''} ${c.degree || ''} ${c.field || ''}`)
+        .join(' ');
+      if (certs) eduParts.push(certs);
+    }
+    education = eduParts.join(' ');
+  }
 
-  return [skills.join(' '), summary, exp]
+  return [allSkills.join(' '), summary, exp, projects, education]
     .filter(Boolean)
     .join(' ')
     .toLowerCase()
@@ -141,10 +180,40 @@ function cosineSim(a = [], b = []) {
   return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
+function buildJobText(job) {
+  const skills = job.requiredSkills?.map(s => s.name || s) || [];
+  const description = job.description || '';
+  
+  // Handle requirements - could be string or array
+  let requirements = '';
+  if (Array.isArray(job.requirements)) {
+    requirements = job.requirements.join(' ');
+  } else if (typeof job.requirements === 'string') {
+    requirements = job.requirements;
+  }
+  
+  const title = job.title || '';
+
+  return [title, description, requirements, skills.join(' ')]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+    .substring(0, 2000);
+}
+
 class FastMatcherService {
   constructor() {
     this.vectorStore = getVectorStore();
     this.sbert = getSentenceBertService();
+    this.candidateVectorIndex = null; // Lazy init
+  }
+
+  async _getCandidateVectorIndex() {
+    if (!this.candidateVectorIndex) {
+      this.candidateVectorIndex = getCandidateVectorIndexService();
+      await this.candidateVectorIndex.initialize();
+    }
+    return this.candidateVectorIndex;
   }
 
   async matchCandidate(candidateProfile, opts = {}) {
@@ -154,7 +223,7 @@ class FastMatcherService {
 
     try {
       logger.info('FastMatcher: Ensuring jobs are precomputed in ChromaDB...');
-      await this.vectorStore.ensurePrecomputed();
+    await this.vectorStore.ensurePrecomputed();
       logger.info('FastMatcher: Jobs precomputed successfully');
     } catch (error) {
       logger.error('FastMatcher: Failed to ensure precomputed jobs:', {
@@ -366,6 +435,282 @@ class FastMatcherService {
     );
 
     return top;
+  }
+
+  /**
+   * Match candidates for a job (reverse of matchCandidate)
+   * Uses ChromaDB candidate collection to find best matching candidates
+   */
+  async matchJob(job, opts = {}) {
+    const topN = opts.topN || 20;
+    const vectorTopK = opts.vectorTopK || 100;
+    const saveScores = opts.saveScores ?? true;
+    const minScore = opts.minScore || 50;
+
+    try {
+      logger.info('FastMatcher: Matching candidates for job', { jobId: job._id || job.id });
+
+      // Get candidate vector index and ensure it's initialized
+      const candidateVectorIndex = await this._getCandidateVectorIndex();
+      
+      // Ensure candidates are precomputed in ChromaDB
+      try {
+        logger.info('FastMatcher: Ensuring candidates are precomputed in ChromaDB...');
+        await candidateVectorIndex.ensurePrecomputed();
+        logger.info('FastMatcher: Candidates precomputed successfully');
+      } catch (error) {
+        logger.error('FastMatcher: Failed to ensure precomputed candidates:', {
+          error: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+        throw error;
+      }
+
+      if (!candidateVectorIndex.initialized) {
+        logger.warn('⚠️ Candidate vector index not initialized, falling back to database query');
+        return [];
+      }
+
+      // Build job text and get embedding
+      const jobText = buildJobText(job);
+      const jobEmbedding = await this.sbert.encode(jobText);
+
+      // Query candidate collection - lấy topK candidates không filter
+      // Sau đó tính cosine similarity trực tiếp từ embeddings (giống matchCandidate)
+      const vectorResults = await candidateVectorIndex.searchSimilarCandidates(jobEmbedding, {
+        topK: vectorTopK,
+        minScore: 0, // Bỏ minScore filter, sẽ filter sau khi tính cosine similarity
+        filters: {}, // Bỏ filter để tìm được nhiều hơn, filter sau khi fetch
+      });
+
+      if (!vectorResults || vectorResults.length === 0) {
+        logger.warn('⚠️ No candidates found from vector search', {
+          jobId: job._id || job.id,
+          jobTitle: job.title,
+          topK: vectorTopK,
+          suggestion: 'Vector search returned empty. This could be due to ChromaDB query issue.'
+        });
+        return [];
+      }
+      
+      logger.info('✅ Vector search found candidates (before similarity calculation)', {
+        count: vectorResults.length,
+        sampleDistances: vectorResults.slice(0, 3).map(r => ({
+          candidateId: r.candidateId,
+          distance: r.distance?.toFixed(4),
+          similarity: r.similarity?.toFixed(4)
+        }))
+      });
+      
+      // Lấy candidates từ database
+      const candidateIds = vectorResults.map(r => r.candidateId);
+      const candidates = await CandidateProfile.find({
+        _id: { $in: candidateIds },
+        status: 'active',
+      })
+        .select('fullName email phone location availability expectedSalary summary experience skills projects education personalInfo userId settings')
+        .lean();
+      
+      // Tạo map candidateId -> candidate
+      const candidatesMap = new Map(candidates.map(c => [c._id.toString(), c]));
+      
+      // Batch encode candidates để tối ưu performance
+      const candidateTexts = [];
+      const candidateIndexMap = []; // Map index trong array -> candidateId
+      
+      for (const vectorResult of vectorResults) {
+        const candidate = candidatesMap.get(vectorResult.candidateId);
+        if (!candidate) continue;
+        
+        const candidateText = buildCandidateText(candidate);
+        candidateTexts.push(candidateText);
+        candidateIndexMap.push({
+          candidateId: vectorResult.candidateId,
+          candidate,
+          vectorResult
+        });
+      }
+      
+      // Batch encode tất cả candidate texts cùng lúc (nhanh hơn nhiều)
+      const candidateEmbeddings = await this.sbert.encodeBatch(candidateTexts);
+      
+      // Tính cosine similarity cho mỗi candidate
+      const candidatesWithSimilarity = candidateIndexMap.map((item, index) => {
+        const candidateEmbedding = candidateEmbeddings[index];
+        
+        // Tính cosine similarity trực tiếp (giống matchCandidate)
+        const cosineSimilarity = cosineSim(jobEmbedding, candidateEmbedding);
+        let similarity = cosineSimilarity !== null ? cosineSimilarity : 0;
+        
+        // Normalize similarity để có sự phân biệt rõ ràng hơn
+        // Cosine similarity thường trong range [-1, 1], nhưng với normalized embeddings thường [0, 1]
+        // Nếu similarity quá thấp (< 0.3), có thể do không match tốt
+        // Scale similarity để tăng sự phân biệt: similarity = (similarity - min) / (max - min)
+        // Nhưng giữ nguyên để tránh làm sai lệch kết quả
+        
+        return {
+          candidate: item.candidate,
+          similarity,
+          candidateId: item.candidate._id || item.candidate.userId,
+          vectorResult: item.vectorResult
+        };
+      });
+      
+      // Log similarity scores để debug
+      logger.info('📊 Cosine similarity scores:', {
+        jobId: job._id || job.id,
+        jobTitle: job.title,
+        similarities: candidatesWithSimilarity
+          .slice(0, 10)
+          .map(item => ({
+            candidateId: item.candidateId,
+            similarity: item.similarity?.toFixed(4),
+            vectorScore: Math.round(item.similarity * 100)
+          }))
+      });
+      
+      // Filter null results
+      const validCandidates = candidatesWithSimilarity.filter(Boolean);
+      
+      // Filter và sort theo similarity
+      const filteredCandidates = validCandidates
+        .filter(item => item.similarity >= 0.2) // Min similarity threshold
+        .sort((a, b) => b.similarity - a.similarity)
+        .slice(0, vectorTopK);
+      
+      logger.info('✅ Calculated cosine similarity for candidates', {
+        beforeFilter: validCandidates.length,
+        afterFilter: filteredCandidates.length,
+        topSimilarities: filteredCandidates.slice(0, 5).map(r => ({
+          candidateId: r.candidateId,
+          similarity: r.similarity?.toFixed(4)
+        }))
+      });
+      
+      if (filteredCandidates.length === 0) {
+        logger.warn('⚠️ No candidates passed similarity threshold after cosine calculation');
+        return [];
+      }
+
+      // Filter candidates: ưu tiên available nhưng không bắt buộc
+      const availableCandidates = filteredCandidates.filter(item => {
+        const c = item.candidate;
+        return c.availability === 'available' || c.availability === 'open_to_opportunities' ||
+               (c.settings && c.settings.searchable !== false);
+      });
+      
+      // Nếu có available thì dùng, không thì dùng tất cả
+      const finalCandidates = availableCandidates.length > 0 ? availableCandidates : filteredCandidates;
+
+      if (candidates.length === 0) {
+        logger.warn('⚠️ No active candidates found after filtering');
+        return [];
+      }
+
+      // Create map for quick lookup
+      const candidatesById = new Map(finalCandidates.map(item => [item.candidate._id.toString(), item.candidate]));
+      const vectorResultsByCandidateId = new Map(
+        finalCandidates.map(item => [item.candidateId.toString(), { similarity: item.similarity }])
+      );
+
+      // Calculate detailed scores for each candidate
+      const jobYears = job.yearsOfExperience || 0;
+      const jobLocation = job.location?.city || job.location || '';
+
+      const scored = finalCandidates.map((item) => {
+        const candidate = item.candidate;
+        const vectorResult = vectorResultsByCandidateId.get(candidate._id.toString());
+        const vectorSimilarity = vectorResult?.similarity || item.similarity || 0;
+        const vectorScore = Math.round(vectorSimilarity * 100);
+
+        // Calculate experience score
+        const candidateYears = yearsFromExperience(
+          (candidate.experience?.internships || []).concat(
+            candidate.experience?.fullTime || []
+          )
+        );
+        const expScore = calcExperienceScore(candidateYears, jobYears);
+
+        // Calculate education score
+        const eduScore = calcEducationScore(candidate, job);
+
+        // Calculate location/salary score
+        const locSalaryScore = calcLocationSalaryScore(candidate, job, {
+          location: jobLocation,
+          salaryMin: job.salaryMin,
+          salaryMax: job.salaryMax,
+        });
+
+        // Calculate final score (weighted)
+        // Bỏ base score để có sự phân biệt rõ ràng hơn giữa các candidates
+        const finalScore = clamp(
+          vectorScore * 0.5 +
+            expScore * 0.18 +
+            eduScore * 0.12 +
+            locSalaryScore * 0.15
+        );
+
+        return {
+          candidateId: candidate._id || candidate.userId,
+          candidate: candidate,
+          finalScore: Math.round(finalScore),
+          vectorScore,
+          expScore,
+          eduScore,
+          locSalaryScore,
+          similarity: vectorSimilarity,
+        };
+      });
+
+      // Filter by minScore and sort
+      const top = scored
+        .filter(item => item.finalScore >= minScore)
+        .sort((a, b) => b.finalScore - a.finalScore)
+        .slice(0, topN);
+
+      // Save scores to database if requested
+      if (saveScores && top.length > 0) {
+        const bulkOps = top.map(item => ({
+          updateOne: {
+            filter: {
+              candidateId: item.candidateId,
+              jobId: job._id || job.id,
+            },
+            update: {
+              $set: {
+                candidateId: item.candidateId,
+                jobId: job._id || job.id,
+                overallScore: item.finalScore,
+                scoreBreakdown: {
+                  skillsScore: { score: item.vectorScore, weight: 0.5 },
+                  experienceScore: { score: item.expScore, weight: 0.18 },
+                  educationScore: { score: item.eduScore, weight: 0.12 },
+                  locationSalaryScore: { score: item.locSalaryScore, weight: 0.15 },
+                },
+                ranking: {
+                  tier: item.finalScore >= 80 ? 'A' : item.finalScore >= 70 ? 'B' : item.finalScore >= 60 ? 'C' : 'D',
+                },
+                calculationMethod: 'vector-fast',
+                calculatedAt: new Date(),
+                updatedAt: new Date(),
+              },
+            },
+            upsert: true,
+          },
+        }));
+        await CVMatchingScore.bulkWrite(bulkOps, { ordered: false });
+      }
+
+      logger.info(
+        `✅ Fast match calculated for job ${job._id || job.id}: ${top.length} candidates found`
+      );
+
+      return top;
+    } catch (error) {
+      logger.error('❌ FastMatcher.matchJob error:', error);
+      throw error;
+    }
   }
 }
 

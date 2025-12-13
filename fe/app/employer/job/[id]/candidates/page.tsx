@@ -42,6 +42,7 @@ import {
   ArrowLeft,
   FileText,
   Lightbulb,
+  Loader2,
 } from "lucide-react";
 import { MatchScoreCard } from "@/components/ai/MatchScoreCard";
 import { nlpService, jobService } from "@/lib/api";
@@ -354,7 +355,14 @@ export default function CandidateRecommendationsPage() {
                   <Card
                     key={candidate.candidateId}
                     className="hover:shadow-lg transition-shadow cursor-pointer"
-                    onClick={() => setSelectedCandidate(candidate)}
+                    onClick={(e) => {
+                      // Only set selected candidate if click is not on a button or interactive element
+                      const target = e.target as HTMLElement;
+                      if (target.closest('button') || target.closest('a') || target.closest('[role="button"]')) {
+                        return;
+                      }
+                      setSelectedCandidate(candidate);
+                    }}
                   >
                     <CardContent className="pt-6">
                       <div className="flex items-start gap-4">
@@ -416,7 +424,7 @@ export default function CandidateRecommendationsPage() {
                               )}
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <Mail className="w-4 h-4" />
-                              <span className="truncate">{candidate.candidate.email}</span>
+                              <span className="truncate" style={{ userSelect: 'text' }}>{candidate.candidate.email}</span>
                             </div>
                           </div>
 
@@ -472,8 +480,15 @@ export default function CandidateRecommendationsPage() {
                           </div>
 
                           {/* Actions */}
-                          <div className="flex gap-2 pt-3 border-t">
+                          <div 
+                            className="flex gap-2 pt-3 border-t"
+                            onClick={(e) => {
+                              // Stop all clicks in action area from bubbling to Card
+                              e.stopPropagation();
+                            }}
+                          >
                             <Button
+                              type="button"
                               size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -484,6 +499,7 @@ export default function CandidateRecommendationsPage() {
                               View Profile
                             </Button>
                             <Button
+                              type="button"
                               size="sm"
                               variant="outline"
                               onClick={(e) => {
@@ -499,15 +515,70 @@ export default function CandidateRecommendationsPage() {
                               Download CV
                             </Button>
                             <Button
+                              type="button"
                               size="sm"
-                              variant="outline"
-                              onClick={(e) => {
+                              variant="default"
+                              onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
+                                // Prevent all default behaviors and event propagation
+                                e.preventDefault();
                                 e.stopPropagation();
-                                window.location.href = `mailto:${candidate.candidate.email}`;
+                                
+                                // Get candidate ID - handle different response structures
+                                // candidateId could be:
+                                // 1. String (direct ID)
+                                // 2. Object with _id property (from populate)
+                                // 3. In candidate._id field
+                                let candidateIdToUse: string | null = null;
+                                
+                                if (typeof candidate.candidateId === 'string') {
+                                  candidateIdToUse = candidate.candidateId;
+                                } else if (candidate.candidateId && typeof candidate.candidateId === 'object' && (candidate.candidateId as any)?._id) {
+                                  candidateIdToUse = (candidate.candidateId as any)._id.toString();
+                                } else if ((candidate.candidate as any)?._id) {
+                                  candidateIdToUse = (candidate.candidate as any)._id.toString();
+                                } else if (candidate._id) {
+                                  candidateIdToUse = candidate._id.toString();
+                                }
+                                
+                                if (!candidateIdToUse) {
+                                  console.error('Candidate ID not found:', candidate);
+                                  toast({
+                                    title: "Lỗi",
+                                    description: "Không tìm thấy ID ứng viên",
+                                    variant: "destructive",
+                                  });
+                                  return;
+                                }
+
+                                try {
+                                  const response = await nlpService.inviteCandidate(jobId, {
+                                    candidateId: candidateIdToUse,
+                                  });
+                                  
+                                  if (response.success) {
+                                    toast({
+                                      title: "✅ Đã gửi email mời ứng tuyển",
+                                      description: `Email đã được gửi đến ${candidate.candidate?.email || candidate.candidate?.name || 'ứng viên'}`,
+                                    });
+                                  } else {
+                                    toast({
+                                      title: "Lỗi",
+                                      description: response.message || "Không thể gửi email",
+                                      variant: "destructive",
+                                    });
+                                  }
+                                } catch (error: any) {
+                                  console.error("Error inviting candidate:", error);
+                                  toast({
+                                    title: "Lỗi",
+                                    description: error?.response?.data?.message || error?.message || "Không thể gửi email. Vui lòng thử lại.",
+                                    variant: "destructive",
+                                  });
+                                }
                               }}
                             >
                               <Mail className="mr-2 h-4 w-4" />
-                              Contact
+                              Mời ứng tuyển
                             </Button>
                           </div>
                         </div>

@@ -172,7 +172,7 @@ class CandidateVectorIndexService {
       const {
         topK = 100,
         filters = {},
-        minScore = 0.7
+        minScore = 0.2  // Giảm từ 0.7 xuống 0.2 để tìm được nhiều candidates hơn
       } = options;
 
       // Build where clause
@@ -184,19 +184,60 @@ class CandidateVectorIndexService {
         where.availability = { $in: Array.isArray(filters.availability) ? filters.availability : [filters.availability] };
       }
 
-      // Query ChromaDB
+      // Query ChromaDB - include embeddings để tính cosine similarity trực tiếp
       const results = await this.candidateCollection.query({
         queryEmbeddings: [queryEmbedding],
         nResults: topK,
         where: Object.keys(where).length > 0 ? where : undefined,
+        include: ['metadatas', 'distances', 'embeddings'], // Include embeddings để tính cosine similarity
+      });
+
+      logger.debug('🔍 Vector search query results:', {
+        hasIds: !!results.ids,
+        idsLength: results.ids?.[0]?.length || 0,
+        hasDistances: !!results.distances,
+        distancesLength: results.distances?.[0]?.length || 0,
+        topK,
+        minScore
       });
 
       // Format results
       const candidates = [];
       if (results.ids && results.ids[0]) {
+        const sampleDistances = [];
         for (let i = 0; i < results.ids[0].length; i++) {
-          const distance = results.distances?.[0]?.[i] || 0;
-          const similarity = 1 - distance;
+          const distance = results.distances?.[0]?.[i] ?? null;
+          
+          // ChromaDB mặc định dùng L2 distance (Euclidean) cho embeddings
+          // L2 distance: 0 = identical, càng lớn càng khác nhau (không giới hạn trên)
+          // Với normalized embeddings (Sentence-BERT), L2 distance thường trong range 0-2
+          // Convert L2 distance to similarity (0-1 scale)
+          let similarity;
+          if (distance === null || distance === undefined) {
+            similarity = 0;
+          } else {
+            // Normalize L2 distance to similarity
+            // Với normalized embeddings, distance thường 0-2
+            // Dùng: similarity = 1 - min(distance / maxDistance, 1)
+            // Hoặc: similarity = exp(-distance) hoặc 1/(1+distance)
+            
+            // Thử nhiều cách normalize để tìm cách tốt nhất
+            if (distance <= 2) {
+              // Có thể là normalized embeddings, dùng linear scaling
+              similarity = Math.max(0, 1 - (distance / 2));
+            } else {
+              // Distance lớn, dùng exponential decay
+              similarity = Math.exp(-distance / 2); // Scale down để similarity không quá nhỏ
+            }
+            
+            // Đảm bảo similarity trong range [0, 1]
+            similarity = Math.max(0, Math.min(1, similarity));
+          }
+
+          // Log sample distances để debug
+          if (i < 5) {
+            sampleDistances.push({ distance, similarity, candidateId: results.ids[0][i] });
+          }
 
           if (similarity >= minScore) {
             candidates.push({
@@ -207,6 +248,18 @@ class CandidateVectorIndexService {
             });
           }
         }
+        
+        logger.info('📊 Vector search results:', {
+          totalResults: results.ids[0].length,
+          passedMinScore: candidates.length,
+          minScore,
+          sampleDistances: sampleDistances.slice(0, 3)
+        });
+      } else {
+        logger.warn('⚠️ ChromaDB query returned no IDs', {
+          hasResults: !!results,
+          resultsKeys: results ? Object.keys(results) : []
+        });
       }
 
       // Sort by similarity descending
@@ -312,11 +365,18 @@ class CandidateVectorIndexService {
     try {
       logger.info('🔄 Starting candidate index sync...');
 
+      // Query candidates - include all active candidates, not just those with specific availability
+      // Also include candidates without availability field set
       const activeCandidates = await CandidateProfile.find({
-        availability: { $in: ['available', 'open_to_opportunities'] }
+        $or: [
+          { availability: { $in: ['available', 'open_to_opportunities'] } },
+          { availability: { $exists: false } },
+          { availability: null },
+          { status: 'active' }
+        ],
+        status: { $ne: 'inactive' } // Exclude explicitly inactive
       })
-        .populate('cv')
-        .select('_id fullName email location cv availability summary experience skills projects education updatedAt')
+        .select('_id fullName email location availability summary experience skills projects education personalInfo updatedAt userId')
         .lean();
 
       logger.info(`📊 Found ${activeCandidates.length} active candidates to index`);
@@ -333,24 +393,116 @@ class CandidateVectorIndexService {
   }
 
   /**
+   * Ensure candidates are precomputed in ChromaDB
+   * Similar to vectorStore.ensurePrecomputed() for jobs
+   */
+  async ensurePrecomputed() {
+    try {
+      if (!this.initialized) {
+        const initialized = await this.initialize();
+        if (!initialized) {
+          logger.warn('⚠️ Cannot ensure precomputed: ChromaDB not initialized');
+          return false;
+        }
+      }
+
+      // Check if collection has candidates
+      try {
+        const count = await this.candidateCollection.count();
+        if (count > 0) {
+          logger.info(`✅ Candidates already indexed (${count} candidates)`);
+          return true;
+        }
+      } catch (error) {
+        // Collection might not exist or be empty, continue to sync
+        logger.debug('Collection count check failed, will sync candidates:', error.message);
+      }
+
+      // Sync all candidates
+      logger.info('🔄 Candidates not precomputed, starting sync...');
+      const result = await this.syncAllCandidates();
+      
+      if (result.indexed > 0) {
+        logger.info(`✅ Precomputed ${result.indexed} candidates successfully`);
+        return true;
+      } else {
+        logger.warn('⚠️ No candidates were indexed during precompute');
+        return false;
+      }
+    } catch (error) {
+      logger.error('❌ Failed to ensure precomputed candidates:', {
+        error: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Build text representation of candidate for embedding
    */
   _buildCandidateText(candidate) {
-    const cv = candidate.cv || candidate;
-    const parts = [
-      candidate.fullName || cv.fullName || '',
-      candidate.summary || cv.summary || '',
-      candidate.experience?.map(e => `${e.position} ${e.description || ''}`).join(' ') || 
-        cv.experience?.map(e => `${e.position} ${e.description || ''}`).join(' ') || '',
-      candidate.skills?.map(s => s.name || s).join(' ') || 
-        cv.skills?.map(s => s.name || s).join(' ') || '',
-      candidate.projects?.map(p => `${p.title} ${p.description || ''}`).join(' ') ||
-        cv.projects?.map(p => `${p.title} ${p.description || ''}`).join(' ') || '',
-      candidate.education?.map(e => `${e.degree} ${e.major || ''}`).join(' ') ||
-        cv.education?.map(e => `${e.degree} ${e.major || ''}`).join(' ') || ''
-    ].filter(p => p.length > 0);
+    // Candidate object structure (no cv sub-document)
+    const stringifySkills = (skills) => {
+      if (!skills) return '';
+      // Handle CandidateProfile skills structure: { technical: [], soft: [], languages: [] }
+      if (typeof skills === 'object' && !Array.isArray(skills)) {
+        const allSkills = [
+          ...(skills.technical || []),
+          ...(skills.soft || []),
+          ...(skills.languages || [])
+        ];
+        return allSkills.map((s) => (typeof s === 'string' ? s : s?.name || s?.title || s || '')).filter(Boolean).join(' ');
+      }
+      if (Array.isArray(skills)) {
+        return skills.map((s) => (typeof s === 'string' ? s : s?.name || s?.title || s || '')).filter(Boolean).join(' ');
+      }
+      return '';
+    };
 
-    return parts.join(' ').substring(0, 2000);
+    const stringifyExperience = (exp) => {
+      if (!exp) return '';
+      // Handle both direct array and nested structure
+      if (Array.isArray(exp)) {
+        return exp.map((e) => `${e.position || e.title || ''} ${e.description || e.responsibilities || ''} ${e.company || ''}`).filter(Boolean).join(' ');
+      }
+      // Handle nested structure: { internships: [], fullTime: [] }
+      if (exp.internships || exp.fullTime) {
+        const internships = exp.internships || [];
+        const fullTime = exp.fullTime || [];
+        const allExp = [...internships, ...fullTime];
+        return allExp.map((e) => `${e.position || e.title || ''} ${e.description || e.responsibilities || ''} ${e.company || ''}`).filter(Boolean).join(' ');
+      }
+      return '';
+    };
+
+    const stringifyEducation = (edu) => {
+      if (!edu) return '';
+      if (Array.isArray(edu)) {
+        return edu.map((e) => `${e.degree || ''} ${e.major || e.field || ''} ${e.school || e.institution || ''}`).filter(Boolean).join(' ');
+      }
+      return '';
+    };
+
+    const parts = [
+      candidate.fullName || candidate.personalInfo?.fullName || '',
+      candidate.summary || candidate.personalInfo?.summary || '',
+      stringifyExperience(candidate.experience),
+      stringifySkills(candidate.skills),
+      stringifyEducation(candidate.education),
+      candidate.projects?.map((p) => `${p.title || p.name || ''} ${p.description || ''}`).filter(Boolean).join(' ') || '',
+    ].filter((p) => p && p.length > 0);
+
+    const text = parts.join(' ').substring(0, 2000);
+    
+    // Ensure we always return a non-empty string
+    if (!text || text.trim().length === 0) {
+      // Fallback: use at least the candidate name or ID
+      return candidate.fullName || candidate.email || candidate._id?.toString() || 'candidate';
+    }
+    
+    return text;
   }
 
   /**

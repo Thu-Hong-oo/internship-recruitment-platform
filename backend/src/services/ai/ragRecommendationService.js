@@ -887,42 +887,64 @@ class RAGRecommendationService {
    * Build text representation of candidate for embedding
    */
   _buildCandidateText(candidate) {
-    const cv = candidate.cv || candidate;
-    const stringifySkills = (skills) =>
-      Array.isArray(skills)
-        ? skills.map((s) => (typeof s === 'string' ? s : s?.name || s || '')).join(' ')
-        : '';
+    // Candidate object structure (no cv sub-document)
+    const stringifySkills = (skills) => {
+      if (!skills) return '';
+      if (Array.isArray(skills)) {
+        return skills.map((s) => (typeof s === 'string' ? s : s?.name || s?.title || s || '')).filter(Boolean).join(' ');
+      }
+      return '';
+    };
 
-    const stringifyExperience = (exp) =>
-      Array.isArray(exp)
-        ? exp.map((e) => `${e.position || ''} ${e.description || ''}`).join(' ')
-        : '';
+    const stringifyExperience = (exp) => {
+      if (!exp) return '';
+      if (Array.isArray(exp)) {
+        const internships = exp.internships || [];
+        const fullTime = exp.fullTime || [];
+        const allExp = [...internships, ...fullTime];
+        return allExp.map((e) => `${e.position || e.title || ''} ${e.description || e.responsibilities || ''} ${e.company || ''}`).filter(Boolean).join(' ');
+      }
+      return '';
+    };
 
-    const stringifyEducation = (edu) =>
-      Array.isArray(edu)
-        ? edu.map((e) => `${e.degree || ''} ${e.major || e.field || ''}`).join(' ')
-        : '';
+    const stringifyEducation = (edu) => {
+      if (!edu) return '';
+      if (Array.isArray(edu)) {
+        return edu.map((e) => `${e.degree || ''} ${e.major || e.field || ''} ${e.school || e.institution || ''}`).filter(Boolean).join(' ');
+      }
+      return '';
+    };
 
-    const stringifyCerts = (certs) =>
-      Array.isArray(certs) ? certs.map((c) => c.name || '').join(' ') : '';
+    const stringifyCerts = (certs) => {
+      if (!certs || !Array.isArray(certs)) return '';
+      return certs.map((c) => c.name || c.title || '').filter(Boolean).join(' ');
+    };
 
-    const stringifyAwards = (awards) =>
-      Array.isArray(awards) ? awards.map((a) => a.name || '').join(' ') : '';
+    const stringifyAwards = (awards) => {
+      if (!awards || !Array.isArray(awards)) return '';
+      return awards.map((a) => a.name || a.title || '').filter(Boolean).join(' ');
+    };
 
     const parts = [
-      candidate.fullName || cv.fullName || '',
-      candidate.summary || cv.summary || '',
-      stringifyExperience(candidate.experience) || stringifyExperience(cv.experience),
-      stringifySkills(candidate.skills) || stringifySkills(cv.skills),
-      stringifyEducation(candidate.education) || stringifyEducation(cv.education),
-      stringifyCerts(candidate.education?.certifications || cv.education?.certifications),
-      stringifyAwards(candidate.education?.awards || cv.education?.awards),
-      candidate.projects?.map((p) => `${p.title} ${p.description || ''}`).join(' ') ||
-        cv.projects?.map((p) => `${p.title} ${p.description || ''}`).join(' ') ||
-        '',
-    ].filter((p) => p.length > 0);
+      candidate.fullName || candidate.personalInfo?.fullName || '',
+      candidate.summary || candidate.personalInfo?.summary || '',
+      stringifyExperience(candidate.experience),
+      stringifySkills(candidate.skills),
+      stringifyEducation(candidate.education),
+      stringifyCerts(candidate.education?.certifications),
+      stringifyAwards(candidate.education?.awards),
+      candidate.projects?.map((p) => `${p.title || p.name || ''} ${p.description || ''}`).filter(Boolean).join(' ') || '',
+    ].filter((p) => p && p.length > 0);
 
-    return parts.join(' ').substring(0, 2000); // Limit length
+    const text = parts.join(' ').substring(0, 2000); // Limit length
+    
+    // Ensure we always return a non-empty string
+    if (!text || text.trim().length === 0) {
+      // Fallback: use at least the candidate name or ID
+      return candidate.fullName || candidate.email || candidate._id?.toString() || 'candidate';
+    }
+    
+    return text;
   }
 
   /**
@@ -1071,14 +1093,13 @@ class RAGRecommendationService {
 
     try {
       const candidates = await CandidateProfile.find(query)
-        .select('fullName email phone location availability expectedSalary summary experience skills projects education cv')
+        .select('fullName email phone location availability expectedSalary summary experience skills projects education personalInfo')
         .lean();
 
       if (candidates.length === 0) {
         logger.warn('⚠️ RAG: No candidates found with availability/searchable filters. Retrying without filters.');
         const relaxed = await CandidateProfile.find({})
-          .populate('cv')
-          .select('fullName email phone location cv availability expectedSalary summary experience skills projects education')
+          .select('fullName email phone location availability expectedSalary summary experience skills projects education personalInfo')
           .lean();
         logger.info(`ℹ️ RAG: Relaxed fetch returned ${relaxed.length} candidates`);
         return relaxed;

@@ -902,7 +902,7 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
           </div>
           <div className="space-y-6 lg:sticky lg:top-20 h-fit">
             {/* Matching Score Card - Only show if user is logged in */}
-            {user && (
+            {/* {user && (
               <Card className="border-primary/20">
                 <CardContent className="p-6">
                   {loadingMatchingScore ? (
@@ -948,7 +948,7 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
                   )}
                 </CardContent>
               </Card>
-            )}
+            )} */}
 
             <Card>
               <CardContent className="p-6 space-y-3">

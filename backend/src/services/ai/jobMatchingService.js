@@ -554,6 +554,18 @@ class JobMatchingService {
       return normalizeList(data.requirements.skills);
     }
 
+    // Handle CandidateProfile skills structure: { technical: [], soft: [], languages: [] }
+    if (data.skills && typeof data.skills === 'object' && !Array.isArray(data.skills)) {
+      const allSkills = [
+        ...(data.skills.technical || []),
+        ...(data.skills.soft || []),
+        ...(data.skills.languages || [])
+      ];
+      if (allSkills.length > 0) {
+        return normalizeList(allSkills);
+      }
+    }
+
     if (data.skills && Array.isArray(data.skills)) {
       return normalizeList(data.skills);
     }
