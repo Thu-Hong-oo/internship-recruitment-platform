@@ -109,7 +109,7 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
             }).encode())
             return
         
-        # Get collection endpoint
+        # Get collection endpoint - API v1
         if path.startswith('/api/v1/collections/'):
             collection_name = path.split('/')[-1]
             try:
@@ -124,6 +124,42 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                     'id': str(collection.id)
                 }).encode())
             except Exception as e:
+                self.send_error(404, str(e))
+            return
+        
+        # Get collection endpoint - API v2
+        # Format: /api/v2/tenants/{tenant}/databases/{database}/collections/{name}
+        if '/api/v2/' in path and '/collections/' in path:
+            try:
+                # Extract collection name from path
+                parts = path.split('/')
+                if 'collections' in parts:
+                    idx = parts.index('collections')
+                    if idx + 1 < len(parts):
+                        collection_name = parts[idx + 1]
+                    else:
+                        self.send_error(404, 'Collection name not found in path')
+                        return
+                else:
+                    self.send_error(404, 'Invalid v2 collection path')
+                    return
+                
+                collection = client.get_collection(name=collection_name)
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                # Return v2 format
+                response = {
+                    'id': str(collection.id),
+                    'name': collection.name,
+                    'metadata': collection.metadata or {},
+                    'tenant': 'default_tenant',
+                    'database': 'default_database'
+                }
+                self.wfile.write(json.dumps(response).encode())
+            except Exception as e:
+                logger.error(f"Error getting v2 collection: {e}")
                 self.send_error(404, str(e))
             return
         
@@ -143,12 +179,10 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
         except:
             data = {}
         
-        # Create or get collection (getOrCreateCollection)
-        if path == '/api/v1/collections' or path.startswith('/api/v1/collections'):
+        # Helper function to handle collection creation/getting
+        def handle_collection_request(collection_name, metadata):
+            """Handle collection get or create"""
             try:
-                collection_name = data.get('name') or path.split('/')[-1]
-                metadata = data.get('metadata', {})
-                
                 # Try to get existing collection first, create if not exists
                 try:
                     collection = client.get_collection(name=collection_name)
@@ -161,21 +195,73 @@ class ChromaDBHandler(BaseHTTPRequestHandler):
                     )
                     logger.info(f"Created new collection: {collection_name}")
                 
+                return {
+                    'name': collection.name,
+                    'metadata': collection.metadata or {},
+                    'id': str(collection.id)
+                }
+            except Exception as e:
+                logger.error(f"Error creating/getting collection: {e}")
+                raise
+        
+        # Create or get collection (getOrCreateCollection) - API v1
+        if path == '/api/v1/collections' or path.startswith('/api/v1/collections'):
+            try:
+                collection_name = data.get('name') or path.split('/')[-1]
+                metadata = data.get('metadata', {})
+                result = handle_collection_request(collection_name, metadata)
+                
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
-                self.wfile.write(json.dumps({
-                    'name': collection.name,
-                    'metadata': collection.metadata or {},
-                    'id': str(collection.id)
-                }).encode())
+                self.wfile.write(json.dumps(result).encode())
             except Exception as e:
-                logger.error(f"Error creating/getting collection: {e}")
+                logger.error(f"Error in v1 collection request: {e}")
                 self.send_error(500, str(e))
             return
         
-        # Query collection
+        # Create or get collection - API v2 (with tenants/databases)
+        # Format: /api/v2/tenants/{tenant}/databases/{database}/collections
+        if '/api/v2/' in path and '/collections' in path:
+            try:
+                # Extract collection name from request body or path
+                collection_name = data.get('name')
+                if not collection_name:
+                    # Try to extract from path: /api/v2/tenants/.../databases/.../collections/{name}
+                    parts = path.split('/')
+                    if 'collections' in parts:
+                        idx = parts.index('collections')
+                        if idx + 1 < len(parts):
+                            collection_name = parts[idx + 1]
+                
+                if not collection_name:
+                    # Default collection name if not provided
+                    collection_name = data.get('collection_name', 'default_collection')
+                
+                metadata = data.get('metadata', {})
+                result = handle_collection_request(collection_name, metadata)
+                
+                # Return v2 format response
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                # ChromaDB v2 returns collection in a specific format
+                response = {
+                    'id': result['id'],
+                    'name': result['name'],
+                    'metadata': result['metadata'],
+                    'tenant': 'default_tenant',
+                    'database': 'default_database'
+                }
+                self.wfile.write(json.dumps(response).encode())
+            except Exception as e:
+                logger.error(f"Error in v2 collection request: {e}")
+                self.send_error(500, str(e))
+            return
+        
+        # Query collection - support both v1 and v2
         if '/query' in path:
             try:
                 collection_name = data.get('collection_name') or data.get('name')
