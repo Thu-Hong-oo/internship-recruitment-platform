@@ -1,8 +1,7 @@
 /**
  * 🤖 Dialogflow Service (CX + optional ES)
  *
- * - Default: CX (projectLocationAgentSessionPath)
- * - Optional: ES (projectAgentSessionPath) when DIALOGFLOW_MODE=ES
+ * - ES (projectAgentSessionPath) when DIALOGFLOW_MODE=ES
  * - Fallback: rule-based handled in dialogflowIntentService
  */
 
