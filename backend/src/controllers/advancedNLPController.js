@@ -2842,8 +2842,8 @@ class AdvancedNLPController {
       const companyName = employerProfile?.company?.name || job.postedBy?.company || 'Công ty';
       const employerName = req.user.fullName || req.user.email;
 
-      // Build job application link
-      const frontendUrl = process.env.FRONTEND_CANDIDATE_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+      // Build job application link - Use candidate frontend URL
+      const frontendUrl = process.env.FRONTEND_CANDIDATE_URL || process.env.FRONTEND_URL || 'https://internbridge.web.app';
       const jobApplicationLink = `${frontendUrl}/jobs/${jobId}`;
 
       // Get job location (handle both string and object)

@@ -1092,7 +1092,7 @@ export default function JobDetailPage() {
                               if (invitedCandidates.has(c.candidateId)) {
                                 toast({
                                   title: "Đã gửi lời mời",
-                                  description: `Bạn đã gửi lời mời đến ${c.name} rồi.`,
+                                  description: `Bạn đã gửi lời gitđến ${c.name} rồi.`,
                                 });
                                 return;
                               }
