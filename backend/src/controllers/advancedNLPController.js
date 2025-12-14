@@ -86,6 +86,107 @@ async function recalcAllMatchesForCandidate(candidateUserId) {
  * Handles matching score and learning roadmap generation
  */
 class AdvancedNLPController {
+  constructor() {
+    // Bind methods to preserve 'this' context when passed to Express routes
+    this.getTopCandidates = this.getTopCandidates.bind(this);
+    this.getBestJobMatches = this.getBestJobMatches.bind(this);
+    this.calculateMatchingScore = this.calculateMatchingScore.bind(this);
+    this.getMatchingScore = this.getMatchingScore.bind(this);
+    this.inviteCandidate = this.inviteCandidate.bind(this);
+  }
+
+  /**
+   * Helper function to format candidate profile data for employer view
+   * Extracts relevant information from CandidateProfile for display
+   */
+  _formatCandidateProfileForEmployer(candidateProfile) {
+    if (!candidateProfile) return null;
+
+    const profile = candidateProfile;
+    const candidateUser = profile.userId; // Populated user object
+    
+    return {
+      personalInfo: {
+        fullName: candidateUser?.fullName || profile.personalInfo?.fullName || profile.fullName || 'Unknown',
+        email: candidateUser?.email || profile.personalInfo?.email || null,
+        bio: profile.personalInfo?.bio || null,
+        avatar: candidateUser?.avatar || profile.personalInfo?.avatar || null,
+        linkedin: profile.personalInfo?.linkedin || null,
+        github: profile.personalInfo?.github || null,
+        website: profile.personalInfo?.website || null,
+      },
+      education: {
+        university: profile.education?.university ? {
+          name: profile.education.university.name || null,
+          major: profile.education.university.major || null,
+          degree: profile.education.university.degree || null,
+          graduationYear: profile.education.university.graduationYear || null,
+          gpa: profile.education.university.gpa || null,
+        } : null,
+        certifications: (profile.education?.certifications || []).slice(0, 5).map(cert => ({
+          name: cert.name || null,
+          issuer: cert.issuer || null,
+          issueDate: cert.issueDate || null,
+        })),
+      },
+      skills: {
+        technical: (profile.skills?.technical || []).slice(0, 10).map(skill => ({
+          name: skill.name || null,
+          level: skill.level || null,
+          verified: skill.verified || false,
+        })),
+        soft: (profile.skills?.soft || []).slice(0, 5).map(skill => ({
+          name: skill.name || null,
+          level: skill.level || null,
+        })),
+        languages: (profile.skills?.languages || []).map(lang => ({
+          name: lang.name || null,
+          level: lang.level || null,
+        })),
+      },
+      experience: {
+        internships: (profile.experience?.internships || [])
+          .sort((a, b) => (b.endDate || b.startDate || 0) - (a.endDate || a.startDate || 0))
+          .slice(0, 3)
+          .map(intern => ({
+            company: intern.company || null,
+            position: intern.position || null,
+            startDate: intern.startDate || null,
+            endDate: intern.endDate || null,
+            description: intern.description || null,
+          })),
+        projects: (profile.experience?.projects || [])
+          .sort((a, b) => (b.endDate || b.startDate || 0) - (a.endDate || a.startDate || 0))
+          .slice(0, 3)
+          .map(project => ({
+            title: project.title || project.name || null,
+            description: project.description || null,
+            technologies: project.technologies || [],
+            url: project.url || null,
+          })),
+      },
+      preferences: {
+        locations: profile.preferences?.locations || [],
+        internshipTypes: profile.preferences?.internshipTypes || [],
+        industries: profile.preferences?.industries || [],
+        availableFrom: profile.preferences?.availableFrom || null,
+        minSalary: profile.preferences?.minSalary || null,
+        maxSalary: profile.preferences?.maxSalary || null,
+      },
+      resume: profile.resume?.current ? {
+        url: profile.resume.current.url || null,
+        filename: profile.resume.current.filename || profile.resume.current.displayName || null,
+        updatedAt: profile.resume.current.updatedAt || null,
+      } : null,
+      progress: {
+        profileCompletion: profile.progress?.profileCompletion || 0,
+      },
+      analytics: {
+        viewCount: profile.analytics?.viewCount || 0,
+      },
+    };
+  }
+
   /**
    * @route   POST /api/nlp/matching-score
    * @desc    Calculate advanced matching score between CV and Job
@@ -285,6 +386,9 @@ class AdvancedNLPController {
       
       // Default to using vector matching (ChromaDB) unless explicitly disabled
       const shouldUseVector = useVector !== 'false' && useVector !== false;
+      
+      // Store reference to helper method to avoid 'this' context issues in Promise.all
+      const formatProfile = this._formatCandidateProfileForEmployer.bind(this);
 
       // Check authentication
       if (!req.user || !req.user._id) {
@@ -353,15 +457,19 @@ class AdvancedNLPController {
                 
                 const candidateUser = candidateProfile.userId;
                 
+                // Format candidate profile data for employer view
+                const profileData = formatProfile(candidateProfile);
+                
                 return {
                   _id: candidateProfileId,
                   candidateId: candidateProfileId, // CandidateProfile._id
                   candidate: {
                     _id: candidateUser?._id || candidateProfile.userId,
-                    fullName: candidateUser?.fullName || candidateProfile.fullName || 'Unknown',
+                    fullName: candidateUser?.fullName || candidateProfile.personalInfo?.fullName || candidateProfile.fullName || 'Unknown',
                     email: candidateUser?.email || candidateProfile.personalInfo?.email || '',
                     profile: candidateUser?.profile,
                   },
+                  profile: profileData, // Add full profile data for employer
                   overallScore: result.finalScore || 0,
                   tier: result.finalScore >= 80 ? 'A' : result.finalScore >= 70 ? 'B' : result.finalScore >= 60 ? 'C' : 'D',
                   ranking: {
@@ -445,14 +553,18 @@ class AdvancedNLPController {
                 
                 const candidateUser = candidateProfile.userId;
                 
+                // Format candidate profile data for employer view
+                const profileData = formatProfile(candidateProfile);
+                
                 return {
                   _id: candidateProfileId,
                   candidateId: {
                     _id: candidateUser?._id || candidateProfile.userId || candidateProfileId,
-                    fullName: candidateUser?.fullName || candidateProfile.fullName || 'Unknown',
+                    fullName: candidateUser?.fullName || candidateProfile.personalInfo?.fullName || candidateProfile.fullName || 'Unknown',
                     email: candidateUser?.email || candidateProfile.personalInfo?.email || candidateProfile.email || '',
                     profile: candidateUser?.profile,
                   },
+                  profile: profileData, // Add full profile data for employer
                   overallScore: rec.matchScore || rec.score || 0,
                   tier: rec.tier || (rec.matchScore >= 80 ? 'A' : rec.matchScore >= 70 ? 'B' : rec.matchScore >= 60 ? 'C' : 'D'),
                   ranking: {
@@ -535,15 +647,40 @@ class AdvancedNLPController {
         .populate('candidateId', 'fullName email profile')
         .lean();
 
+      // Enrich candidates with profile data
+      const enrichedCandidates = await Promise.all(
+        topCandidates.map(async (candidate) => {
+          // candidateId in CVMatchingScore references User, not CandidateProfile
+          const userId = candidate.candidateId?._id || candidate.candidateId;
+          
+          // Find CandidateProfile by userId
+          const candidateProfile = await CandidateProfile.findOne({ userId })
+            .populate('userId', 'fullName email profile')
+            .lean();
+          
+          if (candidateProfile) {
+            // Format candidate profile data for employer view
+            const profileData = formatProfile(candidateProfile);
+            return {
+              ...candidate,
+              profile: profileData, // Add full profile data for employer
+            };
+          }
+          
+          // If no profile found, return candidate as-is
+          return candidate;
+        })
+      );
+
       // Get statistics
       const statistics = await CVMatchingScore.getMatchStatistics(jobId);
 
       res.status(200).json({
         success: true,
         data: {
-          candidates: topCandidates,
+          candidates: enrichedCandidates,
           statistics,
-          total: topCandidates.length,
+          total: enrichedCandidates.length,
           totalApplications,
           minScoreFilter: parseInt(minScore),
           method: 'cvmatching-score-database',
@@ -2641,7 +2778,31 @@ class AdvancedNLPController {
       }
 
       // Check if current user is employer and owns this job
-      if (job.postedBy.toString() !== req.user._id.toString()) {
+      // job.postedBy can be ObjectId or populated object
+      const postedByUserId = job.postedBy?._id || job.postedBy;
+      let isOwner = false;
+      
+      if (postedByUserId) {
+        isOwner = postedByUserId.toString() === req.user._id.toString();
+      }
+      
+      // Also check via employer profile owner (in case postedBy is different or job was posted by team member)
+      if (!isOwner && job.employer) {
+        const EmployerProfile = require('../models/EmployerProfile');
+        const employerProfile = await EmployerProfile.findById(job.employer).select('owner');
+        if (employerProfile && employerProfile.owner) {
+          const employerOwnerId = employerProfile.owner._id || employerProfile.owner;
+          isOwner = employerOwnerId.toString() === req.user._id.toString();
+        }
+      }
+
+      if (!isOwner) {
+        logger.warn('Access denied for job invitation', {
+          jobId,
+          userId: req.user._id,
+          postedBy: job.postedBy?._id || job.postedBy,
+          employer: job.employer,
+        });
         return res.status(403).json({
           success: false,
           message: 'Access denied - You can only invite candidates for jobs you posted',
@@ -2681,8 +2842,8 @@ class AdvancedNLPController {
       const companyName = employerProfile?.company?.name || job.postedBy?.company || 'Công ty';
       const employerName = req.user.fullName || req.user.email;
 
-      // Build job application link
-      const frontendUrl = process.env.FRONTEND_CANDIDATE_URL || process.env.FRONTEND_URL || 'http://localhost:3000';
+      // Build job application link - Use candidate frontend URL
+      const frontendUrl = process.env.FRONTEND_CANDIDATE_URL || process.env.FRONTEND_URL || 'https://internbridge.web.app';
       const jobApplicationLink = `${frontendUrl}/jobs/${jobId}`;
 
       // Get job location (handle both string and object)
@@ -2690,8 +2851,11 @@ class AdvancedNLPController {
 
       // Send invitation email using template
       const emailService = require('../services/notification/emailService');
+      const NotificationService = require('../services/notification/notificationService');
+      const { NOTIFICATION_TYPES, NOTIFICATION_PRIORITY } = require('../constants/common.constants');
       
       try {
+        // Send email invitation
         await emailService.sendJobInvitationEmail({
           candidateName,
           candidateEmail,
@@ -2708,6 +2872,31 @@ class AdvancedNLPController {
           employerEmail: req.user.email,
         });
 
+        // Create in-app notification and send via socket using helper method
+        try {
+          await NotificationService.notifyJobInvitation(
+            candidateUser._id,
+            req.user._id,
+            job._id,
+            job.title,
+            companyName,
+            jobApplicationLink
+          );
+
+          logger.info('✅ Invitation notification sent via socket', {
+            jobId,
+            candidateId: candidateUser._id,
+            employerId: req.user._id,
+          });
+        } catch (notificationError) {
+          // Log but don't fail the request if notification fails
+          logger.warn('⚠️ Failed to send invitation notification', {
+            error: notificationError.message,
+            jobId,
+            candidateId: candidateUser._id,
+          });
+        }
+
         logger.info('✅ Invitation email sent successfully', {
           jobId,
           candidateId,
@@ -2722,6 +2911,7 @@ class AdvancedNLPController {
             candidateEmail,
             candidateName,
             jobTitle: job.title,
+            notificationSent: true,
             sentAt: new Date(),
           },
         });
