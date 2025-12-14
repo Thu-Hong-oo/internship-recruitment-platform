@@ -25,7 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Trash2, Undo2, Pencil } from "lucide-react";
+import { Loader2, Trash2, Undo2, Pencil, Save } from "lucide-react";
 
 type Resource = {
   type: string;
@@ -237,6 +237,12 @@ export default function RoadmapDetailPage() {
     });
   };
 
+  const handleSave = async () => {
+    // Lưu đã được thực hiện tự động qua handleCustomize
+    // Chỉ cần redirect về trang danh sách
+    router.push("/roadmaps");
+  };
+
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-10 flex items-center gap-3">
@@ -266,7 +272,7 @@ export default function RoadmapDetailPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-10 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 py-10 space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold">
@@ -286,6 +292,19 @@ export default function RoadmapDetailPage() {
           >
             <Undo2 className="h-4 w-4 mr-1" />
             Hoàn tác
+          </Button>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={handleSave}
+            disabled={saving}
+          >
+            {saving ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4 mr-1" />
+            )}
+            Lưu
           </Button>
           <Select
             onValueChange={(v) => setSelectedPhase(Number(v))}
@@ -322,154 +341,159 @@ export default function RoadmapDetailPage() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{editingResourceIndex === null ? "Thêm tài nguyên" : "Cập nhật tài nguyên"}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <Label>Tiêu đề</Label>
-              <Input
-                value={resourceForm.title}
-                onChange={(e) =>
-                  setResourceForm({ ...resourceForm, title: e.target.value })
-                }
-                placeholder="Ví dụ: React for Beginners"
-              />
-            </div>
-            <div>
-              <Label>URL</Label>
-              <Input
-                value={resourceForm.url || ""}
-                onChange={(e) =>
-                  setResourceForm({ ...resourceForm, url: e.target.value })
-                }
-                placeholder="https://..."
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <Label>Loại</Label>
-              <Select
-                value={resourceForm.type}
-                onValueChange={(v) => setResourceForm({ ...resourceForm, type: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="course">Khóa học</SelectItem>
-                  <SelectItem value="video">Video</SelectItem>
-                  <SelectItem value="article">Bài viết</SelectItem>
-                  <SelectItem value="project">Dự án</SelectItem>
-                  <SelectItem value="documentation">Tài liệu</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Độ khó</Label>
-              <Select
-                value={resourceForm.difficulty}
-                onValueChange={(v) =>
-                  setResourceForm({ ...resourceForm, difficulty: v })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="beginner">Beginner</SelectItem>
-                  <SelectItem value="intermediate">Intermediate</SelectItem>
-                  <SelectItem value="advanced">Advanced</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Thời lượng (tuỳ chọn)</Label>
-              <Input
-                value={resourceForm.duration || ""}
-                onChange={(e) =>
-                  setResourceForm({ ...resourceForm, duration: e.target.value })
-                }
-                placeholder="10 hours, 2 weeks..."
-              />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={addResource} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {editingResourceIndex === null
-                ? "Thêm tài nguyên vào tuần đã chọn"
-                : "Cập nhật tài nguyên"}
-            </Button>
-            {editingResourceIndex !== null && (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setEditingResourceIndex(null);
-                  setResourceForm(defaultResource);
-                }}
-              >
-                Hủy chỉnh sửa
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Bên trái: Form thêm tài nguyên và tuần */}
+        <div className="lg:col-span-1 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>{editingResourceIndex === null ? "Thêm tài nguyên" : "Cập nhật tài nguyên"}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-3">
+                <div>
+                  <Label>Tiêu đề</Label>
+                  <Input
+                    value={resourceForm.title}
+                    onChange={(e) =>
+                      setResourceForm({ ...resourceForm, title: e.target.value })
+                    }
+                    placeholder="Ví dụ: React for Beginners"
+                  />
+                </div>
+                <div>
+                  <Label>URL</Label>
+                  <Input
+                    value={resourceForm.url || ""}
+                    onChange={(e) =>
+                      setResourceForm({ ...resourceForm, url: e.target.value })
+                    }
+                    placeholder="https://..."
+                  />
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <Label>Loại</Label>
+                  <Select
+                    value={resourceForm.type}
+                    onValueChange={(v) => setResourceForm({ ...resourceForm, type: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="course">Khóa học</SelectItem>
+                      <SelectItem value="video">Video</SelectItem>
+                      <SelectItem value="article">Bài viết</SelectItem>
+                      <SelectItem value="project">Dự án</SelectItem>
+                      <SelectItem value="documentation">Tài liệu</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Độ khó</Label>
+                  <Select
+                    value={resourceForm.difficulty}
+                    onValueChange={(v) =>
+                      setResourceForm({ ...resourceForm, difficulty: v })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="beginner">Beginner</SelectItem>
+                      <SelectItem value="intermediate">Intermediate</SelectItem>
+                      <SelectItem value="advanced">Advanced</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Thời lượng (tuỳ chọn)</Label>
+                  <Input
+                    value={resourceForm.duration || ""}
+                    onChange={(e) =>
+                      setResourceForm({ ...resourceForm, duration: e.target.value })
+                    }
+                    placeholder="10 hours, 2 weeks..."
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={addResource} disabled={saving} className="w-full">
+                  {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  {editingResourceIndex === null
+                    ? "Thêm tài nguyên vào tuần đã chọn"
+                    : "Cập nhật tài nguyên"}
+                </Button>
+                {editingResourceIndex !== null && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setEditingResourceIndex(null);
+                      setResourceForm(defaultResource);
+                    }}
+                  >
+                    Hủy
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Thêm tuần</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-3">
+                <div>
+                  <Label>Tiêu đề/Focus</Label>
+                  <Input
+                    value={weekForm.focus || ""}
+                    onChange={(e) =>
+                      setWeekForm({ ...weekForm, focus: e.target.value })
+                    }
+                    placeholder="Week focus..."
+                  />
+                </div>
+                <div>
+                  <Label>Thời lượng</Label>
+                  <Input
+                    value={weekForm.timeCommitment || ""}
+                    onChange={(e) =>
+                      setWeekForm({ ...weekForm, timeCommitment: e.target.value })
+                    }
+                    placeholder="5-8 hours/week"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>Mục tiêu học (mỗi dòng một mục)</Label>
+                <Textarea
+                  value={(weekForm.learningObjectives || []).join("\n")}
+                  onChange={(e) =>
+                    setWeekForm({
+                      ...weekForm,
+                      learningObjectives: e.target.value
+                        .split("\n")
+                        .map((s) => s.trim())
+                        .filter(Boolean),
+                    })
+                  }
+                  rows={3}
+                />
+              </div>
+              <Button onClick={addWeek} disabled={saving} className="w-full">
+                {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Thêm tuần vào phase đã chọn
               </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Thêm tuần</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <Label>Tiêu đề/Focus</Label>
-              <Input
-                value={weekForm.focus || ""}
-                onChange={(e) =>
-                  setWeekForm({ ...weekForm, focus: e.target.value })
-                }
-                placeholder="Week focus..."
-              />
-            </div>
-            <div>
-              <Label>Thời lượng</Label>
-              <Input
-                value={weekForm.timeCommitment || ""}
-                onChange={(e) =>
-                  setWeekForm({ ...weekForm, timeCommitment: e.target.value })
-                }
-                placeholder="5-8 hours/week"
-              />
-            </div>
-          </div>
-          <div>
-            <Label>Mục tiêu học (mỗi dòng một mục)</Label>
-            <Textarea
-              value={(weekForm.learningObjectives || []).join("\n")}
-              onChange={(e) =>
-                setWeekForm({
-                  ...weekForm,
-                  learningObjectives: e.target.value
-                    .split("\n")
-                    .map((s) => s.trim())
-                    .filter(Boolean),
-                })
-              }
-              rows={3}
-            />
-          </div>
-          <Button onClick={addWeek} disabled={saving}>
-            {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Thêm tuần vào phase đã chọn
-          </Button>
-        </CardContent>
-      </Card>
-
-      <div className="space-y-4">
+        {/* Bên phải: Danh sách các phase */}
+        <div className="lg:col-span-2 space-y-4">
         {roadmap.phases?.map((phase) => (
           <Card key={phase.phaseNumber}>
             <CardHeader className="flex flex-row items-center justify-between gap-2">
@@ -580,6 +604,7 @@ export default function RoadmapDetailPage() {
             </CardContent>
           </Card>
         ))}
+        </div>
       </div>
 
       <AlertDialog

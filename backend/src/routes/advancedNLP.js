@@ -45,6 +45,18 @@ router.get(
 );
 
 /**
+ * @route   POST /api/nlp/top-candidates/:jobId/invite
+ * @desc    Send invitation email to candidate for a job
+ * @access  Private (Employer only)
+ */
+router.post(
+  '/top-candidates/:jobId/invite',
+  protect,
+  authorize('employer'),
+  advancedNLPController.inviteCandidate
+);
+
+/**
  * @route   GET /api/nlp/best-matches
  * @desc    Get best job matches for candidate
  * @access  Private (Candidate/Intern)
@@ -117,6 +129,30 @@ router.put(
   protect,
   authorize('intern', 'candidate'),
   advancedNLPController.updateRoadmapProgress
+);
+
+/**
+ * @route   POST /api/nlp/learning-roadmap/:roadmapId/complete
+ * @desc    Mark roadmap as completed and sync skills to profile
+ * @access  Private (Candidate/Intern)
+ */
+router.post(
+  '/learning-roadmap/:roadmapId/complete',
+  protect,
+  authorize('intern', 'candidate'),
+  advancedNLPController.completeRoadmap
+);
+
+/**
+ * @route   POST /api/nlp/learning-roadmap/:roadmapId/sync-week-skill
+ * @desc    Sync skill to profile when a week is completed
+ * @access  Private (Candidate/Intern)
+ */
+router.post(
+  '/learning-roadmap/:roadmapId/sync-week-skill',
+  protect,
+  authorize('intern', 'candidate'),
+  advancedNLPController.syncWeekSkill
 );
 
 /**

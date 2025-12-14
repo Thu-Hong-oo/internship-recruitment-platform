@@ -107,6 +107,11 @@ class EmailService {
     const mailOptions = EmailTemplate.testEmail(email);
     return this.sendMail(mailOptions);
   }
+
+  async sendJobInvitationEmail(data) {
+    const mailOptions = EmailTemplate.jobInvitationEmail(data);
+    return this.sendMail(mailOptions);
+  }
 }
 
 module.exports = new EmailService();

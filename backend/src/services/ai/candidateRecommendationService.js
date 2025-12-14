@@ -171,8 +171,7 @@ class CandidateRecommendationService {
 
     try {
       const candidates = await CandidateProfile.find(query)
-        .populate('cv')
-        .select('fullName email phone location cv availability expectedSalary')
+        .select('fullName email phone location availability expectedSalary summary experience skills projects education personalInfo')
         .lean();
 
       return candidates;
@@ -335,7 +334,7 @@ class CandidateRecommendationService {
    */
   async getCandidateMatchDetails(candidateId, jobId) {
     try {
-      const candidate = await CandidateProfile.findById(candidateId).populate('cv');
+      const candidate = await CandidateProfile.findById(candidateId);
       const Job = require('../../models/Job');
       const job = await Job.findById(jobId);
 

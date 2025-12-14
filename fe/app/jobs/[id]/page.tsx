@@ -24,7 +24,8 @@ import { ApplyButton } from "@/components/jobs/ApplyButton";
 import { SaveJobButton } from "@/components/jobs/SaveJobButton";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { MatchScoreCard } from "@/components/ai/MatchScoreCard";
+import { RadarChart } from "@/components/ai/RadarChart";
+import { ComparisonChart } from "@/components/ai/ComparisonChart";
 import type { MatchingScore } from "@/lib/api/services/nlp.service";
 import {
   Dialog,
@@ -901,7 +902,7 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
           </div>
           <div className="space-y-6 lg:sticky lg:top-20 h-fit">
             {/* Matching Score Card - Only show if user is logged in */}
-            {user && (
+            {/* {user && (
               <Card className="border-primary/20">
                 <CardContent className="p-6">
                   {loadingMatchingScore ? (
@@ -912,12 +913,10 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
                       </p>
                     </div>
                   ) : matchingScore ? (
-                    <MatchScoreCard
+                    <RadarChart
                       score={matchingScore.overallScore}
                       tier={matchingScore.tier}
                       breakdown={matchingScore.breakdown}
-                      strengths={matchingScore.strengths}
-                      concerns={matchingScore.concerns}
                     />
                   ) : (
                     <div className="space-y-4">
@@ -949,7 +948,7 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
                   )}
                 </CardContent>
               </Card>
-            )}
+            )} */}
 
             <Card>
               <CardContent className="p-6 space-y-3">
@@ -1060,40 +1059,72 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
             <p className="text-sm text-muted-foreground">Đang tải gợi ý...</p>
           ) : bestMatches.length ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {bestMatches.map((item) => (
-                <Card key={item.job._id} className="h-full">
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="font-semibold line-clamp-2">
-                          {item.job.title}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {item.job.company}
-                        </p>
+              {bestMatches.map((item) => {
+                // Parse location to get city only (last part after comma, or full if no comma)
+                const location = item.job.location || "";
+                const city = location.includes(",")
+                  ? location.split(",").pop()?.trim() || location
+                  : location || "Đang cập nhật";
+                
+                // Get company logo
+                const logoUrl = (item.job as any).companyLogo;
+
+                return (
+                  <Card key={item.job._id} className="h-full border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center overflow-hidden border border-slate-200 flex-shrink-0">
+                          {logoUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={logoUrl}
+                              alt={item.job.company || "Logo"}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <Briefcase className="w-5 h-5 text-slate-400" />
+                          )}
+                        </div>
+                        <div className="space-y-1 flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <h3 className="font-semibold leading-tight line-clamp-2 flex-1">
+                              {item.job.title}
+                            </h3>
+                            <Badge variant="outline" className="flex-shrink-0">
+                              {item.tier}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground line-clamp-1">
+                            {item.job.company}
+                          </p>
+                        </div>
                       </div>
-                      <Badge variant="outline">{item.tier}</Badge>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <MapPin className="w-4 h-4" />
-                      <span>{item.job.location || "Đang cập nhật"}</span>
-                    </div>
-                    <div className="text-sm">
-                      <span className="font-semibold text-primary">
-                        {Math.round(item.overallScore)}%
-                      </span>{" "}
-                      phù hợp
-                    </div>
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => router.push(`/jobs/${item.job._id}`)}
-                    >
-                      Xem chi tiết
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <MapPin className="w-4 h-4 flex-shrink-0" />
+                        <span className="line-clamp-1">{city}</span>
+                      </div>
+
+                      {/* Comparison Chart - Compact version */}
+                      <ComparisonChart
+                        score={item.overallScore}
+                        tier={item.tier}
+                        breakdown={item.breakdown}
+                        compact={true}
+                        showLabel={true}
+                      />
+
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => router.push(`/jobs/${item.job._id}`)}
+                      >
+                        Xem chi tiết
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">

@@ -203,7 +203,8 @@ export const nlpService = {
 
     const mapped = (raw.data || [])
       .map((item) => {
-        const job = item.job || item.jobId || {};
+        // Backend returns jobId (populated), not job
+        const job = item.jobId || item.job || {};
         if (!job || !job._id) return null; // skip invalid
 
         const scoreBreakdown = item.scoreBreakdown || {};
@@ -216,10 +217,36 @@ export const nlpService = {
           job.company ||
           job.companyName ||
           job.employer?.company?.name ||
+          (job.employer as any)?.companyName ||
           "Nhà tuyển dụng";
-        const logoRaw = job.employer?.company?.logo as any;
-        const companyLogo =
-          (logoRaw && typeof logoRaw === "object" ? logoRaw.url : logoRaw) || "";
+        
+        // Try multiple paths for logo
+        // Backend formatMinimalEmployer returns logo as string URL
+        let companyLogo = "";
+        const logoPaths = [
+          job.employer?.company?.logo, // String URL (from formatMinimalEmployer)
+          (job.employer as any)?.company?.logo, // Alternative path
+          (job as any).companyLogo, // Direct on job
+          (job as any).logo, // Direct logo
+          (job as any).postedBy?.avatar, // Fallback to postedBy avatar
+        ];
+        
+        for (const logoRaw of logoPaths) {
+          if (logoRaw) {
+            // Handle string URL (most common from backend)
+            if (typeof logoRaw === "string" && logoRaw.trim() !== "") {
+              companyLogo = logoRaw.trim();
+              break;
+            } 
+            // Handle object with url property
+            else if (typeof logoRaw === "object" && logoRaw !== null) {
+              if (logoRaw.url && typeof logoRaw.url === "string" && logoRaw.url.trim() !== "") {
+                companyLogo = logoRaw.url.trim();
+                break;
+              }
+            }
+          }
+        }
 
         // Salary
         const salary =
@@ -234,13 +261,23 @@ export const nlpService = {
         // Location / city shorthand
         const location = job.location || job.address?.fullAddress || "";
 
+        // Debug: Log logo extraction for troubleshooting
+        if (!companyLogo && job.employer?.company) {
+          console.debug('Logo extraction debug:', {
+            employer: job.employer,
+            company: job.employer.company,
+            logoRaw: job.employer.company.logo,
+            logoType: typeof job.employer.company.logo,
+          });
+        }
+
         return {
           overallScore,
           job: {
             _id: job._id,
             title: job.title,
             company: companyName,
-            companyLogo,
+            companyLogo: companyLogo || undefined, // Only include if not empty
             location,
             salary,
           },
@@ -294,6 +331,28 @@ export const nlpService = {
     message: string;
   }> {
     return apiClient.post(`/nlp/recalculate-scores/${jobId}`);
+  },
+
+  /**
+   * Send invitation email to candidate for a job (Employer only)
+   */
+  async inviteCandidate(
+    jobId: string,
+    params: {
+      candidateId: string;
+      message?: string;
+    }
+  ): Promise<{
+    success: boolean;
+    message: string;
+    data?: {
+      candidateEmail: string;
+      candidateName: string;
+      jobTitle: string;
+      sentAt: string;
+    };
+  }> {
+    return apiClient.post(`/nlp/top-candidates/${jobId}/invite`, params);
   },
 
   // ============================================
@@ -499,5 +558,19 @@ export const nlpService = {
     };
   }> {
     return apiClient.get("/nlp/rag-health");
+  },
+
+  /**
+   * Complete roadmap and sync skills to profile
+   */
+  async completeRoadmap(roadmapId: string): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      roadmap: any;
+      syncedSkills: Array<{ name: string; action: string; level: string }>;
+    };
+  }> {
+    return apiClient.post(`/nlp/learning-roadmap/${roadmapId}/complete`);
   },
 };

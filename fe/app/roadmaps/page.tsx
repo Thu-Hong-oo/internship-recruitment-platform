@@ -14,7 +14,7 @@ import {
   FileText,
   PlayCircle,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { PageLayout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -23,8 +23,16 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { api, nlpService } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 type RoadmapDifficulty = "beginner" | "intermediate" | "advanced" | "mixed";
 
@@ -273,6 +281,7 @@ export default function SkillRoadmapsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   const [roadmaps, setRoadmaps] = useState<RoadmapListItem[]>([]);
   const [popularRoadmaps, setPopularRoadmaps] = useState<RoadmapListItem[]>([]);
@@ -282,49 +291,89 @@ export default function SkillRoadmapsPage() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"my" | "popular">("my");
+  const [weekCompletedModal, setWeekCompletedModal] = useState<{
+    open: boolean;
+    skill?: string;
+    weekNumber?: number;
+    phaseNumber?: number;
+  }>({ open: false });
 
   const selectedIdFromUrl = searchParams.get("id");
 
-  // Fetch my roadmaps
-  useEffect(() => {
-    if (!user) return;
-    
-    const fetchMyRoadmaps = async () => {
-      try {
-        setLoadingList(true);
-        setError(null);
-        // Use NLP API: GET /api/nlp/my-roadmaps
-        const response = await nlpService.getMyRoadmaps();
-        const items: any[] = response.data || [];
+  // Fetch my roadmaps - expose function for refetching
+  const fetchMyRoadmaps = useCallback(async () => {
+    try {
+      setLoadingList(true);
+      setError(null);
+      // Use NLP API: GET /api/nlp/my-roadmaps
+      const response = await nlpService.getMyRoadmaps();
+      const items: any[] = response.data || [];
 
-        if (!items || items.length === 0) {
-          setRoadmaps([]);
-        } else {
-          setRoadmaps(
-            items.map((rm) => ({
+      if (!items || items.length === 0) {
+        setRoadmaps([]);
+      } else {
+        setRoadmaps(
+          items.map((rm) => {
+            // Calculate progress if not provided or if it's 0 but we have completed resources
+            let progress = rm.progress?.overall || 0;
+            
+            // If progress is 0 but we have completed resources, calculate it
+            if (progress === 0 && rm.progress?.completedResources?.length > 0) {
+              // Count total resources
+              let totalResources = 0;
+              if (rm.phases && rm.phases.length > 0) {
+                rm.phases.forEach((phase: any) => {
+                  if (phase.weeks) {
+                    phase.weeks.forEach((week: any) => {
+                      if (week.resources) {
+                        totalResources += week.resources.length;
+                      }
+                    });
+                  }
+                });
+              } else if (rm.weeks) {
+                rm.weeks.forEach((week: any) => {
+                  if (week.resources) {
+                    totalResources += week.resources.length;
+                  }
+                });
+              }
+              
+              if (totalResources > 0) {
+                progress = Math.round(
+                  (rm.progress.completedResources.length / totalResources) * 100
+                );
+              }
+            }
+            
+            return {
               _id: rm._id,
               targetJobTitle: rm.targetJobId?.title || rm.targetRole,
               targetRole: rm.targetRole,
               duration: rm.timeframe || 12,
               difficulty: (rm.difficulty || "intermediate") as RoadmapDifficulty,
-              progress: rm.progress?.overall || 0,
+              progress: progress,
               createdAt: rm.createdAt,
-            }))
-          );
-          // Auto-select first roadmap if none selected
-          if (!selectedIdFromUrl && items.length > 0) {
-            handleSelectRoadmap(items[0]._id, false);
-          }
+            };
+          })
+        );
+        // Auto-select first roadmap if none selected
+        if (!selectedIdFromUrl && items.length > 0) {
+          handleSelectRoadmap(items[0]._id, false);
         }
-      } catch (e: any) {
-        console.error("Failed to load my roadmaps:", e);
-        setRoadmaps([]);
-        setError("Không thể tải danh sách lộ trình của bạn.");
-      } finally {
-        setLoadingList(false);
       }
-    };
+    } catch (e: any) {
+      console.error("Failed to load my roadmaps:", e);
+      setRoadmaps([]);
+      setError("Không thể tải danh sách lộ trình của bạn.");
+    } finally {
+      setLoadingList(false);
+    }
+  }, [selectedIdFromUrl]);
 
+  // Fetch my roadmaps on mount and when user changes
+  useEffect(() => {
+    if (!user) return;
     fetchMyRoadmaps();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
@@ -445,9 +494,39 @@ export default function SkillRoadmapsPage() {
 
   const computeOverallProgress = (roadmap: Roadmap | null): number => {
     if (!roadmap) return 0;
-    if (roadmap.progress?.overallProgress != null) {
-      return roadmap.progress.overallProgress;
+    if (roadmap.progress?.overallProgress != null && roadmap.progress.overallProgress > 0) {
+      // If progress was already computed and > 0, use it
+      // But we'll recalculate if resources changed
     }
+    
+    // Count total resources across all phases and weeks
+    let totalResources = 0;
+    let completedResources = roadmap.progress?.completedResources?.length ?? 0;
+    
+    if (roadmap.phases && roadmap.phases.length > 0) {
+      roadmap.phases.forEach((phase) => {
+        if (phase.weeks) {
+          phase.weeks.forEach((week) => {
+            if (week.resources) {
+              totalResources += week.resources.length;
+            }
+          });
+        }
+      });
+    } else if (roadmap.weeks) {
+      roadmap.weeks.forEach((week) => {
+        if (week.resources) {
+          totalResources += week.resources.length;
+        }
+      });
+    }
+    
+    // If we have resources, calculate based on completed resources
+    if (totalResources > 0) {
+      return Math.round((completedResources / totalResources) * 100);
+    }
+    
+    // Fallback to week-based calculation
     const totalWeeks =
       roadmap.phases?.reduce(
         (acc, p) => acc + (p.weeks ? p.weeks.length : 0),
@@ -490,7 +569,111 @@ export default function SkillRoadmapsPage() {
 
   const isResourceCompleted = (roadmap: Roadmap, resourceId?: string) => {
     if (!resourceId) return false;
-    return roadmap.progress?.completedResources?.includes(resourceId) ?? false;
+    // Normalize to string for comparison
+    const resourceIdStr = String(resourceId);
+    const completedResources = (roadmap.progress?.completedResources || []).map((id: any) => String(id));
+    return completedResources.includes(resourceIdStr);
+  };
+
+  // Check if a week is completed (all resources are completed)
+  const checkWeekCompleted = (
+    roadmap: Roadmap,
+    phaseNumber: number | undefined,
+    weekNumber: number
+  ): { isCompleted: boolean; skill?: string } => {
+    console.log('🔎 checkWeekCompleted called:', {
+      phaseNumber,
+      weekNumber,
+      hasPhases: !!roadmap.phases,
+      phasesCount: roadmap.phases?.length || 0,
+      hasWeeks: !!roadmap.weeks,
+      weeksCount: roadmap.weeks?.length || 0,
+    });
+    
+    let targetWeek: any = null;
+    
+    // Find the week
+    if (phaseNumber && roadmap.phases) {
+      const phase = roadmap.phases.find((p: any) => p.phaseNumber === phaseNumber);
+      console.log('🔎 Phase found:', {
+        phaseNumber,
+        found: !!phase,
+        weeksInPhase: phase?.weeks?.length || 0,
+      });
+      
+      if (phase?.weeks) {
+        targetWeek = phase.weeks.find((w: any) => w.weekNumber === weekNumber);
+        console.log('🔎 Week found in phase:', {
+          weekNumber,
+          found: !!targetWeek,
+          resourcesInWeek: targetWeek?.resources?.length || 0,
+        });
+      }
+    } else if (roadmap.weeks) {
+      targetWeek = roadmap.weeks.find((w: any) => w.weekNumber === weekNumber);
+      console.log('🔎 Week found in roadmap.weeks:', {
+        weekNumber,
+        found: !!targetWeek,
+        resourcesInWeek: targetWeek?.resources?.length || 0,
+      });
+    }
+    
+    if (!targetWeek || !targetWeek.resources || targetWeek.resources.length === 0) {
+      console.log('⚠️ No target week or no resources found');
+      return { isCompleted: false };
+    }
+    
+    // Check if all resources are completed
+    // Convert all IDs to strings for comparison (handle both ObjectId and string)
+    const allResourceIds = targetWeek.resources
+      .map((r: any) => {
+        const id = r._id || r.id;
+        return id ? String(id) : null;
+      })
+      .filter(Boolean);
+    
+    const completedResourceIds = (roadmap.progress?.completedResources || [])
+      .map((id: any) => String(id))
+      .filter(Boolean);
+    
+    console.log('Resource completion check:', {
+      weekNumber,
+      phaseNumber,
+      allResourceIds,
+      completedResourceIds,
+      totalResources: allResourceIds.length,
+      completedCount: completedResourceIds.length,
+    });
+    
+    const allCompleted = allResourceIds.length > 0 && 
+      allResourceIds.every((id: string) => 
+        completedResourceIds.includes(id)
+      );
+    
+    if (!allCompleted) {
+      return { isCompleted: false };
+    }
+    
+    // Extract skill from week focus or title
+    // Examples: "figma", "TUẦN 1 figma", "Week 1: Figma Fundamentals"
+    const focus = (targetWeek.focus || targetWeek.title || "").trim();
+    if (!focus) {
+      return { isCompleted: true };
+    }
+    
+    // Remove common prefixes (tuần, week, etc.) and extract skill name
+    const normalized = focus.toLowerCase()
+      .replace(/^(tuần|week)\s*\d+\s*:?\s*/i, '') // Remove "TUẦN 1:" or "Week 1:"
+      .replace(/^[:\-]\s*/, '') // Remove leading colon/dash
+      .trim();
+    
+    // Capitalize first letter for better display
+    const skill = normalized.charAt(0).toUpperCase() + normalized.slice(1);
+    
+    return {
+      isCompleted: true,
+      skill: skill || undefined,
+    };
   };
 
   const handleMarkResourceCompleted = async (
@@ -500,30 +683,62 @@ export default function SkillRoadmapsPage() {
     resourceId?: string
   ) => {
     if (!resourceId) return;
-    // Cập nhật UI trước cho mượt
-    setSelectedRoadmap((prev) => {
-      if (!prev || prev._id !== roadmap._id) return prev;
+    
+    // Helper function to update roadmap progress
+    const updateRoadmapProgress = (prev: Roadmap): Roadmap => {
       const already =
         prev.progress?.completedResources?.includes(resourceId) ?? false;
       if (already) return prev;
-      const next: Roadmap = {
-        ...prev,
-        progress: {
-          completedWeeks: prev.progress?.completedWeeks ?? [],
-          completedResources: [
-            ...(prev.progress?.completedResources ?? []),
-            resourceId,
-          ],
-          currentPhase: prev.progress?.currentPhase ?? phaseNumber,
-          currentWeek: prev.progress?.currentWeek ?? weekNumber,
-          overallProgress: computeOverallProgress(prev),
-        },
+      
+      const updatedProgress = {
+        completedWeeks: prev.progress?.completedWeeks ?? [],
+        completedResources: [
+          ...(prev.progress?.completedResources ?? []),
+          resourceId,
+        ],
+        currentPhase: prev.progress?.currentPhase ?? phaseNumber,
+        currentWeek: prev.progress?.currentWeek ?? weekNumber,
+        overallProgress: 0, // Will be computed below
       };
-      return next;
+      
+      // Create updated roadmap with new progress
+      const updated: Roadmap = {
+        ...prev,
+        progress: updatedProgress,
+      };
+      
+      // Compute overall progress with updated roadmap
+      updatedProgress.overallProgress = computeOverallProgress(updated);
+      updated.progress = updatedProgress;
+      
+      return updated;
+    };
+    
+    // Cập nhật selectedRoadmap
+    setSelectedRoadmap((prev) => {
+      if (!prev || prev._id !== roadmap._id) return prev;
+      return updateRoadmapProgress(prev);
+    });
+    
+    // Cập nhật roadmaps list trong sidebar ngay lập tức
+    setRoadmaps((prevList) => {
+      return prevList.map((item) => {
+        if (item._id !== roadmap._id) return item;
+        
+        // Use the roadmap parameter directly (it's the current state)
+        // Update the roadmap and compute new progress
+        const updated = updateRoadmapProgress(roadmap);
+        const newProgress = updated.progress?.overallProgress ?? item.progress;
+        
+        return {
+          ...item,
+          progress: newProgress,
+        };
+      });
     });
 
     try {
-      await api.client.put(
+      const response = await api.client.put(
         `/nlp/learning-roadmap/${roadmap._id}/progress`,
         {
           roadmapId: roadmap._id,
@@ -532,8 +747,132 @@ export default function SkillRoadmapsPage() {
           phaseNumber,
         }
       );
+      
+      // Nếu API trả về roadmap đã cập nhật, dùng nó để sync
+      console.log('📥 API Response received:', {
+        success: response.data?.success,
+        hasData: !!response.data?.data,
+        weekNumber,
+        phaseNumber,
+        resourceId,
+      });
+      
+      if (response.data?.success && response.data?.data) {
+        const updatedRoadmap = response.data.data;
+        const newProgress = updatedRoadmap.progress?.overallProgress ?? 
+                           computeOverallProgress(updatedRoadmap);
+        
+        console.log('📊 Updated roadmap info:', {
+          roadmapId: updatedRoadmap._id,
+          completedResources: updatedRoadmap.progress?.completedResources?.length || 0,
+          totalResources: updatedRoadmap.phases?.reduce((acc: number, p: any) => 
+            acc + (p.weeks?.reduce((wAcc: number, w: any) => 
+              wAcc + (w.resources?.length || 0), 0) || 0), 0) || 0,
+          weekNumber,
+          phaseNumber,
+        });
+        
+        // Cập nhật lại selectedRoadmap từ response
+        if (selectedRoadmap?._id === roadmap._id) {
+          setSelectedRoadmap(updatedRoadmap);
+        }
+        
+        // Cập nhật lại roadmaps list từ response
+        setRoadmaps((prevList) => {
+          return prevList.map((item) => {
+            if (item._id !== roadmap._id) return item;
+            return {
+              ...item,
+              progress: newProgress,
+            };
+          });
+        });
+        
+        // Kiểm tra xem tuần đã hoàn thành chưa (tất cả resources đã completed)
+        // Gọi ngay sau khi API response thành công, sử dụng updatedRoadmap từ response
+        console.log('🔍 Starting week completed check...');
+        const weekCompleted = checkWeekCompleted(updatedRoadmap, phaseNumber, weekNumber);
+        console.log('🔍 Week completed check result:', {
+          weekNumber,
+          phaseNumber,
+          isCompleted: weekCompleted.isCompleted,
+          skill: weekCompleted.skill,
+          roadmapId: roadmap._id,
+          completedResourcesCount: updatedRoadmap.progress?.completedResources?.length || 0,
+          totalResourcesInWeek: updatedRoadmap.phases?.[phaseNumber - 1]?.weeks?.[weekNumber - 1]?.resources?.length || 0,
+        });
+        
+        if (weekCompleted.isCompleted && weekCompleted.skill) {
+          // Tự động sync skill vào profile
+          try {
+            console.log('✅ Syncing skill to profile:', weekCompleted.skill);
+            const syncResponse = await api.client.post(
+              `/nlp/learning-roadmap/${roadmap._id}/sync-week-skill`,
+              {
+                weekNumber,
+                phaseNumber,
+                skill: weekCompleted.skill,
+              }
+            );
+            
+            console.log('✅ Sync response:', syncResponse.data);
+            
+            if (syncResponse.data?.success) {
+              // Hiển thị modal thông báo
+              setWeekCompletedModal({
+                open: true,
+                skill: weekCompleted.skill,
+                weekNumber,
+                phaseNumber,
+              });
+              
+              // Cũng hiển thị toast để người dùng biết ngay
+              toast({
+                title: "🎉 Hoàn thành tuần học!",
+                description: `Kỹ năng "${weekCompleted.skill}" đã được tự động bổ sung vào hồ sơ của bạn.`,
+                duration: 5000,
+              });
+            }
+          } catch (syncError) {
+            console.error("❌ Failed to sync week skill:", syncError);
+            toast({
+              title: "Lỗi",
+              description: "Không thể đồng bộ kỹ năng vào hồ sơ. Vui lòng thử lại.",
+              variant: "destructive",
+            });
+          }
+        } else if (weekCompleted.isCompleted && !weekCompleted.skill) {
+          // Tuần đã hoàn thành nhưng không extract được skill
+          console.warn('⚠️ Week completed but no skill extracted', {
+            weekNumber,
+            phaseNumber,
+            weekFocus: updatedRoadmap.phases?.[phaseNumber - 1]?.weeks?.[weekNumber - 1]?.focus,
+            weekTitle: updatedRoadmap.phases?.[phaseNumber - 1]?.weeks?.[weekNumber - 1]?.title,
+          });
+        } else {
+          console.log('⏳ Week not yet completed', {
+            weekNumber,
+            phaseNumber,
+            isCompleted: weekCompleted.isCompleted,
+          });
+        }
+        
+        // Refetch danh sách roadmaps để đảm bảo sync với server
+        // Điều này đảm bảo khi reload trang, progress vẫn đúng
+        if (user && fetchMyRoadmaps) {
+          // Sử dụng setTimeout để tránh blocking UI update
+          setTimeout(() => {
+            fetchMyRoadmaps().catch((refreshError) => {
+              console.error("Failed to refresh roadmaps list:", refreshError);
+              // Không cần hiển thị error, vì UI đã được cập nhật ở trên
+            });
+          }, 500);
+        }
+      }
     } catch (e) {
       console.error("Failed to update resource progress", e);
+      // Rollback UI changes on error
+      // TODO: Could implement undo here if needed
     }
   };
 
@@ -550,6 +889,66 @@ export default function SkillRoadmapsPage() {
       return <FileText className="w-3.5 h-3.5" />;
     if (resource.source === "youtube") return <Youtube className="w-3.5 h-3.5" />;
     return <BookOpen className="w-3.5 h-3.5" />;
+  };
+
+  const handleCompleteRoadmap = async (roadmap: Roadmap) => {
+    if (!roadmap._id) return;
+    
+    try {
+      const response = await nlpService.completeRoadmap(roadmap._id);
+      
+      if (response.success) {
+        const syncedSkills = response.data?.syncedSkills || [];
+        const skillsCount = syncedSkills.length;
+        
+        // Cập nhật selectedRoadmap
+        setSelectedRoadmap((prev) => {
+          if (!prev || prev._id !== roadmap._id) return prev;
+          return {
+            ...prev,
+            status: 'completed',
+            progress: {
+              ...prev.progress,
+              overallProgress: 100,
+              completedAt: new Date().toISOString(),
+            },
+          };
+        });
+        
+        // Cập nhật roadmaps list
+        setRoadmaps((prevList) => {
+          return prevList.map((item) => {
+            if (item._id !== roadmap._id) return item;
+            return {
+              ...item,
+              progress: 100,
+            };
+          });
+        });
+        
+        // Hiển thị thông báo thành công
+        toast({
+          title: "🎉 Hoàn thành lộ trình!",
+          description: skillsCount > 0 
+            ? `Đã bổ sung ${skillsCount} kỹ năng vào hồ sơ của bạn: ${syncedSkills.slice(0, 3).map(s => s.name).join(", ")}${skillsCount > 3 ? "..." : ""}`
+            : "Lộ trình đã được đánh dấu hoàn thành.",
+          duration: 5000,
+        });
+      } else {
+        toast({
+          title: "Lỗi",
+          description: response.message || "Không thể hoàn thành lộ trình. Vui lòng thử lại.",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error("Failed to complete roadmap:", error);
+      toast({
+        title: "Lỗi",
+        description: error?.message || "Không thể hoàn thành lộ trình. Vui lòng thử lại.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -874,6 +1273,30 @@ export default function SkillRoadmapsPage() {
                             nghiệp của bạn.
                           </p>
                         </div>
+                        {/* Complete Roadmap Button */}
+                        {selectedRoadmap.status !== 'completed' && (
+                          <div className="mt-3">
+                            <Button
+                              onClick={() => handleCompleteRoadmap(selectedRoadmap)}
+                              className="w-full bg-[oklch(0.60_0.12_195)] hover:bg-[oklch(0.56_0.11_195)] text-white shadow-lg shadow-[oklch(0.60_0.12_195/_0.3)]"
+                              size="sm"
+                            >
+                              <CheckCircle2 className="w-4 h-4 mr-2" />
+                              Hoàn thành lộ trình và cập nhật kỹ năng
+                            </Button>
+                            <p className="mt-1 text-[10px] text-slate-500 text-center">
+                              Tất cả kỹ năng từ lộ trình sẽ được tự động bổ sung vào hồ sơ của bạn (không cần học hết 100%)
+                            </p>
+                          </div>
+                        )}
+                        {selectedRoadmap.status === 'completed' && (
+                          <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded-lg">
+                            <p className="text-xs text-green-700 font-medium flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3" />
+                              Lộ trình đã hoàn thành
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -1076,11 +1499,27 @@ export default function SkillRoadmapsPage() {
                                                             type="button"
                                                             onClick={(ev) => {
                                                               ev.stopPropagation();
+                                                              const resourceId = res._id || res.id;
+                                                              if (!resourceId) {
+                                                                console.error('Resource missing ID:', res);
+                                                                toast({
+                                                                  title: "Lỗi",
+                                                                  description: "Resource không có ID. Vui lòng thử lại.",
+                                                                  variant: "destructive",
+                                                                });
+                                                                return;
+                                                              }
+                                                              console.log('Marking resource as completed:', {
+                                                                resourceId,
+                                                                resourceTitle: res.title,
+                                                                weekNumber: week.weekNumber,
+                                                                phaseNumber: phase.phaseNumber,
+                                                              });
                                                               handleMarkResourceCompleted(
                                                                 selectedRoadmap,
                                                                 phase.phaseNumber,
                                                                 week.weekNumber,
-                                                                res._id
+                                                                resourceId
                                                               );
                                                             }}
                                                             className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 transition-colors ${
@@ -1244,6 +1683,68 @@ export default function SkillRoadmapsPage() {
           </div>
         </div>
       </div>
+
+      {/* Modal thông báo hoàn thành tuần học */}
+      <Dialog
+        open={weekCompletedModal.open}
+        onOpenChange={(open) =>
+          setWeekCompletedModal({ ...weekCompletedModal, open })
+        }
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-full bg-[oklch(0.97_0.02_210)]">
+              <CheckCircle2 className="w-10 h-10 text-[oklch(0.60_0.12_195)]" />
+            </div>
+            <DialogTitle className="text-center text-xl font-semibold text-slate-900">
+              🎉 Hoàn thành tuần học!
+            </DialogTitle>
+            <DialogDescription className="text-center text-slate-600 pt-2">
+              {weekCompletedModal.weekNumber && (
+                <p className="mb-2">
+                  Bạn đã hoàn thành tất cả tài liệu học tập của{" "}
+                  <span className="font-semibold text-[oklch(0.60_0.12_195)]">
+                    Tuần {weekCompletedModal.weekNumber}
+                  </span>
+                  {weekCompletedModal.phaseNumber && (
+                    <span className="text-slate-500">
+                      {" "}
+                      (Phase {weekCompletedModal.phaseNumber})
+                    </span>
+                  )}
+                  .
+                </p>
+              )}
+              {weekCompletedModal.skill && (
+                <div className="mt-4 p-4 bg-[oklch(0.97_0.02_210)] rounded-lg border border-[oklch(0.90_0.03_220)]">
+                  <p className="text-sm font-medium text-slate-700 mb-2">
+                    Kỹ năng đã được tự động bổ sung:
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-[oklch(0.60_0.12_195)] text-white border-0 px-3 py-1 text-sm font-semibold">
+                      {weekCompletedModal.skill}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-3">
+                    Kỹ năng này đã được tự động thêm vào hồ sơ của bạn và sẽ
+                    giúp bạn phù hợp hơn với các công việc yêu cầu kỹ năng này.
+                  </p>
+                </div>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center mt-6">
+            <Button
+              onClick={() =>
+                setWeekCompletedModal({ ...weekCompletedModal, open: false })
+              }
+              className="bg-[oklch(0.60_0.12_195)] hover:bg-[oklch(0.56_0.11_195)] text-white"
+            >
+              Tuyệt vời!
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </PageLayout>
   );
 }

@@ -42,6 +42,7 @@ import {
   ArrowLeft,
   FileText,
   Lightbulb,
+  Loader2,
 } from "lucide-react";
 import { MatchScoreCard } from "@/components/ai/MatchScoreCard";
 import { nlpService, jobService } from "@/lib/api";
@@ -49,6 +50,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { MatchingScore } from "@/lib/api/services/nlp.service";
 
 interface CandidateRecommendation extends MatchingScore {
+  _id?: string; // Add _id to interface
   candidate: {
     _id: string;
     name: string;
@@ -88,6 +90,142 @@ export default function CandidateRecommendationsPage() {
       fetchJobDetails();
       fetchCandidates();
     }
+    
+    // CRITICAL: Intercept ALL mailto: navigation attempts - MUST RUN FIRST
+    const originalOpen = window.open;
+    const originalLocationAssign = window.location.assign;
+    const originalLocationReplace = window.location.replace;
+    const originalLocationHref = Object.getOwnPropertyDescriptor(window.location, 'href');
+    
+    // Override window.open to block mailto:
+    window.open = function(url?: string | URL, target?: string, features?: string) {
+      if (typeof url === 'string' && url.startsWith('mailto:')) {
+        console.warn('🚫 Blocked mailto: via window.open', url);
+        return null;
+      }
+      if (url instanceof URL && url.protocol === 'mailto:') {
+        console.warn('🚫 Blocked mailto: via window.open (URL object)');
+        return null;
+      }
+      return originalOpen.call(window, url, target, features);
+    };
+    
+    // Override location.assign to block mailto:
+    window.location.assign = function(url: string | URL) {
+      const urlStr = typeof url === 'string' ? url : url.toString();
+      if (urlStr.startsWith('mailto:')) {
+        console.warn('🚫 Blocked mailto: via location.assign', urlStr);
+        return;
+      }
+      return originalLocationAssign.call(window.location, url);
+    };
+    
+    // Override location.replace to block mailto:
+    window.location.replace = function(url: string | URL) {
+      const urlStr = typeof url === 'string' ? url : url.toString();
+      if (urlStr.startsWith('mailto:')) {
+        console.warn('🚫 Blocked mailto: via location.replace', urlStr);
+        return;
+      }
+      return originalLocationReplace.call(window.location, url);
+    };
+    
+    // Override location.href setter to block mailto:
+    if (originalLocationHref && originalLocationHref.set) {
+      Object.defineProperty(window.location, 'href', {
+        get: originalLocationHref.get,
+        set: function(value: string) {
+          if (value.startsWith('mailto:')) {
+            console.warn('🚫 Blocked mailto: via location.href setter', value);
+            return;
+          }
+          originalLocationHref.set!.call(window.location, value);
+        },
+        configurable: true,
+      });
+    }
+    
+    // Intercept ALL clicks - CRITICAL
+    const preventMailto = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      
+      // Block if clicking on invite button
+      if (target.closest('button[data-invite-button]') || target.closest('[data-invite-button]')) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        console.log('🚫 Blocked click on invite button');
+        return false;
+      }
+      
+      // Block if clicking on email display
+      if (target.textContent?.includes('@') && target.closest('[data-email-display]')) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        console.log('🚫 Blocked click on email display');
+        return false;
+      }
+      
+      // Check if target or parent has mailto: href
+      const link = target.closest('a[href^="mailto:"]');
+      if (link) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        console.warn('🚫 Blocked mailto: link click', link.getAttribute('href'));
+        return false;
+      }
+    };
+    
+    // Monitor for mailto: navigation - check very frequently
+    const checkMailto = setInterval(() => {
+      if (window.location.href.startsWith('mailto:')) {
+        console.warn('🚫 Blocked mailto: navigation detected', window.location.href);
+        const currentPath = window.location.pathname + window.location.search;
+        window.history.replaceState(null, '', currentPath);
+      }
+    }, 10); // Check every 10ms
+    
+    // Intercept before navigation
+    const preventNavigation = (e: BeforeUnloadEvent) => {
+      if (window.location.href.startsWith('mailto:')) {
+        e.preventDefault();
+        const currentPath = window.location.pathname + window.location.search;
+        window.history.replaceState(null, '', currentPath);
+        return (e.returnValue = '');
+      }
+    };
+    
+    // Also intercept popstate
+    const preventPopState = (e: PopStateEvent) => {
+      if (window.location.href.startsWith('mailto:')) {
+        e.preventDefault();
+        const currentPath = window.location.pathname + window.location.search;
+        window.history.replaceState(null, '', currentPath);
+      }
+    };
+    
+    // Add listeners with capture phase to catch early
+    document.addEventListener('click', preventMailto, true);
+    document.addEventListener('mousedown', preventMailto, true);
+    window.addEventListener('beforeunload', preventNavigation);
+    window.addEventListener('popstate', preventPopState);
+    
+    return () => {
+      clearInterval(checkMailto);
+      document.removeEventListener('click', preventMailto, true);
+      document.removeEventListener('mousedown', preventMailto, true);
+      window.removeEventListener('beforeunload', preventNavigation);
+      window.removeEventListener('popstate', preventPopState);
+      // Restore original functions
+      window.open = originalOpen;
+      window.location.assign = originalLocationAssign;
+      window.location.replace = originalLocationReplace;
+      if (originalLocationHref) {
+        Object.defineProperty(window.location, 'href', originalLocationHref);
+      }
+    };
   }, [jobId]);
 
   useEffect(() => {
@@ -226,6 +364,23 @@ export default function CandidateRecommendationsPage() {
 
   return (
     <PageLayout>
+      <style jsx global>{`
+        /* Disable ALL mailto links on this page */
+        a[href^="mailto:"] {
+          pointer-events: none !important;
+          cursor: default !important;
+        }
+        a[href^="mailto:"]:hover {
+          text-decoration: none !important;
+        }
+        /* Prevent browser from auto-linking emails */
+        [data-email-display] {
+          pointer-events: none !important;
+        }
+        [data-email-display] * {
+          pointer-events: none !important;
+        }
+      `}</style>
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header */}
         <div className="mb-8">
@@ -354,7 +509,14 @@ export default function CandidateRecommendationsPage() {
                   <Card
                     key={candidate.candidateId}
                     className="hover:shadow-lg transition-shadow cursor-pointer"
-                    onClick={() => setSelectedCandidate(candidate)}
+                    onClick={(e) => {
+                      // Only set selected candidate if click is not on a button or interactive element
+                      const target = e.target as HTMLElement;
+                      if (target.closest('button') || target.closest('a') || target.closest('[role="button"]')) {
+                        return;
+                      }
+                      setSelectedCandidate(candidate);
+                    }}
                   >
                     <CardContent className="pt-6">
                       <div className="flex items-start gap-4">
@@ -414,9 +576,20 @@ export default function CandidateRecommendationsPage() {
                                   </span>
                                 </div>
                               )}
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground" data-email-display>
                               <Mail className="w-4 h-4" />
-                              <span className="truncate">{candidate.candidate.email}</span>
+                              <span 
+                                className="truncate" 
+                                style={{ 
+                                  userSelect: 'text',
+                                  pointerEvents: 'none',
+                                  textDecoration: 'none',
+                                  color: 'inherit'
+                                }}
+                                data-email={candidate.candidate.email}
+                              >
+                                {candidate.candidate.email}
+                              </span>
                             </div>
                           </div>
 
@@ -472,8 +645,15 @@ export default function CandidateRecommendationsPage() {
                           </div>
 
                           {/* Actions */}
-                          <div className="flex gap-2 pt-3 border-t">
+                          <div 
+                            className="flex gap-2 pt-3 border-t"
+                            onClick={(e) => {
+                              // Stop all clicks in action area from bubbling to Card
+                              e.stopPropagation();
+                            }}
+                          >
                             <Button
+                              type="button"
                               size="sm"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -484,6 +664,7 @@ export default function CandidateRecommendationsPage() {
                               View Profile
                             </Button>
                             <Button
+                              type="button"
                               size="sm"
                               variant="outline"
                               onClick={(e) => {
@@ -499,15 +680,102 @@ export default function CandidateRecommendationsPage() {
                               Download CV
                             </Button>
                             <Button
+                              type="button"
                               size="sm"
-                              variant="outline"
-                              onClick={(e) => {
+                              variant="default"
+                              data-invite-button
+                              onClick={async (e: React.MouseEvent<HTMLButtonElement>) => {
+                                // Prevent all default behaviors and event propagation
+                                e.preventDefault();
                                 e.stopPropagation();
-                                window.location.href = `mailto:${candidate.candidate.email}`;
+                                
+                                // Get candidate ID - handle different response structures
+                                // candidateId could be:
+                                // 1. String (direct ID)
+                                // 2. Object with _id property (from populate)
+                                // 3. In candidate._id field
+                                let candidateIdToUse: string | null = null;
+                                
+                                if (typeof candidate.candidateId === 'string') {
+                                  candidateIdToUse = candidate.candidateId;
+                                } else if (candidate.candidateId && typeof candidate.candidateId === 'object' && (candidate.candidateId as any)?._id) {
+                                  candidateIdToUse = (candidate.candidateId as any)._id.toString();
+                                } else if ((candidate.candidate as any)?._id) {
+                                  candidateIdToUse = (candidate.candidate as any)._id.toString();
+                                } else if (candidate._id) {
+                                  candidateIdToUse = candidate._id.toString();
+                                }
+                                
+                                if (!candidateIdToUse) {
+                                  console.error('Candidate ID not found:', candidate);
+                                  toast({
+                                    title: "Lỗi",
+                                    description: "Không tìm thấy ID ứng viên",
+                                    variant: "destructive",
+                                  });
+                                  return;
+                                }
+
+                                // CRITICAL: Prevent any mailto navigation before API call
+                                const currentHref = window.location.href;
+                                
+                                try {
+                                  console.log('📧 Calling inviteCandidate API...', {
+                                    jobId,
+                                    candidateId: candidateIdToUse,
+                                    candidateEmail: candidate.candidate?.email
+                                  });
+                                  
+                                  const response = await nlpService.inviteCandidate(jobId, {
+                                    candidateId: candidateIdToUse,
+                                  });
+                                  
+                                  // Check if location was changed to mailto: (browser extension might have done this)
+                                  if (window.location.href.startsWith('mailto:')) {
+                                    console.warn('🚫 Browser extension tried to open mailto: - blocking and restoring');
+                                    window.history.replaceState(null, '', currentHref);
+                                  }
+                                  
+                                  if (response.success) {
+                                    toast({
+                                      title: "✅ Đã gửi email mời ứng tuyển",
+                                      description: `Email đã được gửi đến ${candidate.candidate?.email || candidate.candidate?.name || 'ứng viên'}`,
+                                    });
+                                    console.log('✅ Email sent successfully via backend service');
+                                  } else {
+                                    toast({
+                                      title: "Lỗi",
+                                      description: response.message || "Không thể gửi email",
+                                      variant: "destructive",
+                                    });
+                                  }
+                                } catch (error: any) {
+                                  console.error("❌ Error inviting candidate:", error);
+                                  
+                                  // Check if location was changed to mailto: during error
+                                  if (window.location.href.startsWith('mailto:')) {
+                                    console.warn('🚫 Browser extension tried to open mailto: during error - blocking and restoring');
+                                    window.history.replaceState(null, '', currentHref);
+                                  }
+                                  
+                                  toast({
+                                    title: "Lỗi",
+                                    description: error?.response?.data?.message || error?.message || "Không thể gửi email. Vui lòng thử lại.",
+                                    variant: "destructive",
+                                  });
+                                }
+                                
+                                // Final check - restore location if it was changed
+                                setTimeout(() => {
+                                  if (window.location.href.startsWith('mailto:')) {
+                                    console.warn('🚫 Final check: mailto: detected - restoring location');
+                                    window.history.replaceState(null, '', currentHref);
+                                  }
+                                }, 100);
                               }}
                             >
                               <Mail className="mr-2 h-4 w-4" />
-                              Contact
+                              Mời ứng tuyển
                             </Button>
                           </div>
                         </div>
