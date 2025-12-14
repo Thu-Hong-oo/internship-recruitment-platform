@@ -25,6 +25,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL;
+
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -111,7 +114,7 @@ export default function LoginPage() {
     setSubmitting(true);
 
     try {
-      const res = await fetch("http://localhost:3000/api/auth/login", {
+      const res = await fetch(`${API_BASE_URL}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),

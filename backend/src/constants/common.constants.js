@@ -315,6 +315,7 @@ module.exports = {
     NEW_MESSAGE: 'NEW_MESSAGE',
     SKILL_RECOMMENDATION: 'SKILL_RECOMMENDATION',
     JOB_MATCH: 'JOB_MATCH',
+    JOB_INVITATION: 'JOB_INVITATION', // Employer invites candidate to apply
     SYSTEM: 'SYSTEM',
   },
 
