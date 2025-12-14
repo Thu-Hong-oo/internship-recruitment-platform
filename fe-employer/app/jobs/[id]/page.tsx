@@ -37,10 +37,24 @@ import {
   Clock,
   Building,
   Users,
+  Download,
+  ExternalLink,
+  FileText,
+  GraduationCap,
+  Award,
+  Globe,
+  Linkedin,
+  Github,
+  User,
+  Mail,
+  Check,
+  Loader2,
 } from "lucide-react";
 import { getCities, getDistricts, getWards } from "@/lib/vietnamAddress";
 import { findOptionByLabelLoose } from "@/lib/addressUtils";
 import { getToken } from "@/lib/userStorage";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
 
 const JOB_LEVELS = [
   { value: "Intern", label: "Thực tập sinh" },
@@ -93,6 +107,13 @@ export default function JobDetailPage() {
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<any | null>(null);
+  const [invitingCandidates, setInvitingCandidates] = useState<Set<string>>(
+    new Set()
+  );
+  const [invitedCandidates, setInvitedCandidates] = useState<Set<string>>(
+    new Set()
+  );
+  const { toast } = useToast();
 
   const [jobData, setJobData] = useState<any>(null);
   const [formData, setFormData] = useState<CreateJobPayload>({
@@ -190,7 +211,22 @@ export default function JobDetailPage() {
                 .filter(Boolean)
             : [];
 
-        const extractSkills = (candidate: any) => {
+        const extractSkills = (item: any) => {
+          // Use profile data if available (new format)
+          if (item.profile?.skills) {
+            const skills: string[] = [];
+            const technical = item.profile.skills.technical || [];
+            const soft = item.profile.skills.soft || [];
+            const languages = item.profile.skills.languages || [];
+
+            skills.push(...technical.map((s: any) => s.name || s));
+            skills.push(...soft.map((s: any) => s.name || s));
+            skills.push(...languages.map((s: any) => s.name || s));
+            return Array.from(new Set(skills)).slice(0, 20);
+          }
+
+          // Fallback to old format
+          const candidate = item.candidate || item;
           const skills: string[] = [];
           skills.push(...normalizeSkills(candidate.skills));
           skills.push(...normalizeSkills(candidate.skills?.technical));
@@ -201,7 +237,16 @@ export default function JobDetailPage() {
           return Array.from(new Set(skills)).slice(0, 20);
         };
 
-        const extractExperience = (candidate: any) => {
+        const extractExperience = (item: any) => {
+          // Use profile data if available (new format)
+          if (item.profile?.experience) {
+            const internships = item.profile.experience.internships || [];
+            const projects = item.profile.experience.projects || [];
+            return [...internships, ...projects].slice(0, 5);
+          }
+
+          // Fallback to old format
+          const candidate = item.candidate || item;
           const exp: any[] = [];
           const cvExp = Array.isArray(candidate.cv?.experience)
             ? candidate.cv.experience
@@ -217,13 +262,30 @@ export default function JobDetailPage() {
             .map((e: any) => {
               const position = e?.position || e?.title;
               const company = e?.company;
-              return position ? `${position}${company ? " @ " + company : ""}` : null;
+              return position
+                ? `${position}${company ? " @ " + company : ""}`
+                : null;
             })
             .filter(Boolean)
             .slice(0, 5);
         };
 
-        const extractEducation = (candidate: any) => {
+        const extractEducation = (item: any) => {
+          // Use profile data if available (new format)
+          if (item.profile?.education) {
+            const uni = item.profile.education.university;
+            return {
+              degree: uni?.degree || "",
+              major: uni?.major || "",
+              institution: uni?.name || "",
+              graduationYear: uni?.graduationYear || null,
+              gpa: uni?.gpa || null,
+              certifications: item.profile.education.certifications || [],
+            };
+          }
+
+          // Fallback to old format
+          const candidate = item.candidate || item;
           const edu =
             candidate.cv?.education?.[0] ||
             candidate.education?.university ||
@@ -232,6 +294,9 @@ export default function JobDetailPage() {
             degree: edu?.degree || edu?.type || "",
             major: edu?.major || edu?.field || "",
             institution: edu?.institution || edu?.name || "",
+            graduationYear: null,
+            gpa: null,
+            certifications: [],
           };
         };
 
@@ -249,59 +314,89 @@ export default function JobDetailPage() {
         if (payloadObj?.success !== false && Array.isArray(candidates)) {
           const mapped = candidates
             .map((item: any) => {
+              // Use new profile structure if available
+              const profile = item.profile;
               const candidate =
                 item.candidate || item.candidateId || item.candidate_id || {};
 
-              const skills =
-                item.breakdown?.skills?.matched && Array.isArray(item.breakdown.skills.matched)
-                  ? item.breakdown.skills.matched
-                  : extractSkills(candidate);
-
-              const expList = extractExperience(candidate);
-              const edu = extractEducation(candidate);
+              // Extract data from profile (new format) or fallback to old format
+              const personalInfo =
+                profile?.personalInfo || candidate.personalInfo || {};
+              const skills = extractSkills(item);
+              const expList = extractExperience(item);
+              const edu = extractEducation(item);
 
               return {
-                candidateId: candidate._id || item.candidateId || "",
+                candidateId:
+                  candidate._id || item.candidateId || item._id || "",
                 name:
+                  personalInfo.fullName ||
                   candidate.fullName ||
                   candidate.name ||
                   candidate.email ||
                   "Ứng viên",
-                email: candidate.email,
+                email: personalInfo.email || candidate.email,
                 phone:
-                  candidate.phone || candidate.cv?.phone || candidate.personalInfo?.phone,
+                  personalInfo.phone || candidate.phone || candidate.cv?.phone,
                 location:
+                  personalInfo.address?.city ||
                   candidate.location ||
-                  candidate.cv?.location ||
-                  candidate.personalInfo?.address?.city,
+                  candidate.cv?.location,
+                avatar: personalInfo.avatar,
+                bio: personalInfo.bio,
+                linkedin: personalInfo.linkedin,
+                github: personalInfo.github,
+                website: personalInfo.website,
                 score: item.overallScore || item.matchScore || 0,
                 tier: item.tier || item.ranking?.tier,
                 matchedSkills: skills,
                 skills,
                 experienceList: expList,
+                experience: profile?.experience || null, // Full experience data
                 education: edu,
                 summary:
+                  personalInfo.bio ||
                   candidate.summary ||
                   candidate.cv?.summary ||
-                  candidate.personalInfo?.bio ||
                   "",
-                method: item.method,
+                resume: profile?.resume || null, // Resume data
+                preferences: profile?.preferences || null, // Preferences data
+                progress: profile?.progress || null, // Progress data
+                analytics: profile?.analytics || null, // Analytics data
+                method: item.method || item.calculationMethod,
                 semanticScore: item.semanticScore,
                 weightedScore: item.weightedScore || item.matchScore,
+                scoreBreakdown: item.scoreBreakdown || null,
                 raw: item,
               };
             })
             // Hide candidates without email so actions remain usable
             .filter((c: any) => !!c.email);
           setSuggestedCandidates(mapped);
+          // Only set error if no candidates found and it's not a successful response
+          if (mapped.length === 0 && payloadObj?.success === false) {
+            setSuggestionError(
+              payloadObj?.message || "Không tải được gợi ý ứng viên"
+            );
+          }
         } else {
-          setSuggestionError(res.message || "Không tải được gợi ý ứng viên");
+          // Only set error if response indicates failure
+          if (payloadObj?.success === false) {
+            setSuggestionError(
+              payloadObj?.message ||
+                res?.message ||
+                "Không tải được gợi ý ứng viên"
+            );
+          }
         }
       } catch (err: any) {
+        // Only set error in catch block - this means request actually failed
         setSuggestionError(
           err?.response?.data?.message ||
+            err?.message ||
             "Không thể tải gợi ý ứng viên cho job này"
         );
+        setSuggestedCandidates([]); // Clear candidates on error
       } finally {
         setLoadingSuggestions(false);
       }
@@ -897,89 +992,192 @@ export default function JobDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/* Loading Skeleton */}
             {loadingSuggestions && (
-              <p className="text-sm text-gray-600">
-                Đang tải gợi ý ứng viên...
-              </p>
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="border border-blue-100 bg-white rounded-md p-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div className="space-y-2 flex-1">
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-6 w-32" />
+                        <Skeleton className="h-5 w-16 rounded-full" />
+                      </div>
+                      <Skeleton className="h-4 w-48" />
+                      <Skeleton className="h-3 w-64" />
+                    </div>
+                    <div className="flex flex-col items-start gap-2 md:items-end">
+                      <Skeleton className="h-5 w-20" />
+                      <div className="flex gap-2">
+                        <Skeleton className="h-8 w-24" />
+                        <Skeleton className="h-8 w-28" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
-            {suggestionError && suggestedCandidates.length === 0 && (
-              <p className="text-sm text-red-600">{suggestionError}</p>
-            )}
+
+            {/* Error Message - Only show after loading is complete */}
+            {!loadingSuggestions &&
+              suggestionError &&
+              suggestedCandidates.length === 0 && (
+                <p className="text-sm text-red-600">{suggestionError}</p>
+              )}
+
+            {/* Empty State - Only show after loading is complete and no error */}
             {!loadingSuggestions &&
               !suggestionError &&
               suggestedCandidates.length === 0 && (
                 <p className="text-sm text-gray-600">Chưa có gợi ý phù hợp.</p>
               )}
-            <div className="space-y-3">
-              {suggestedCandidates.map((c) => {
-                const profileLink = c.candidateId
-                  ? `${profileBaseUrl}/profile/${c.candidateId}?public=1`
-                  : undefined;
-                const mailto = c.email
-                  ? `mailto:${c.email}?subject=Mời ứng tuyển - ${
-                      jobData?.title || "Cơ hội mới"
-                    }&body=Chào ${
-                      c.name
-                    },%0D%0AChúng tôi muốn mời bạn ứng tuyển vị trí ${
-                      jobData?.title || ""
-                    }.`
-                  : undefined;
 
-                return (
-                  <div
-                    key={c.candidateId}
-                    className="border border-blue-100 bg-white rounded-md p-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
-                  >
-                    <div className="space-y-1">
-                      <p className="font-semibold text-gray-900 flex items-center gap-2">
-                        {c.name}
-                        {c.tier && (
-                          <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
-                            Tier {c.tier}
-                          </span>
-                        )}
-                      </p>
-                      {c.email && (
-                        <p className="text-sm text-gray-600">{c.email}</p>
-                      )}
-                      {c.matchedSkills && c.matchedSkills.length > 0 && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          Kỹ năng khớp: {c.matchedSkills.slice(0, 5).join(", ")}
-                          {c.matchedSkills.length > 5
-                            ? ` +${c.matchedSkills.length - 5}`
-                            : ""}
+            {/* Candidate List - Only show when not loading */}
+            {!loadingSuggestions && suggestedCandidates.length > 0 && (
+              <div className="space-y-3">
+                {suggestedCandidates.map((c) => {
+                  const profileLink = c.candidateId
+                    ? `${profileBaseUrl}/profile/${c.candidateId}?public=1`
+                    : undefined;
+                  const mailto = c.email
+                    ? `mailto:${c.email}?subject=Mời ứng tuyển - ${
+                        jobData?.title || "Cơ hội mới"
+                      }&body=Chào ${
+                        c.name
+                      },%0D%0AChúng tôi muốn mời bạn ứng tuyển vị trí ${
+                        jobData?.title || ""
+                      }.`
+                    : undefined;
+
+                  return (
+                    <div
+                      key={c.candidateId}
+                      className="border border-blue-100 bg-white rounded-md p-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
+                    >
+                      <div className="space-y-1">
+                        <p className="font-semibold text-gray-900 flex items-center gap-2">
+                          {c.name}
+                          {c.tier && (
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
+                              Tier {c.tier}
+                            </span>
+                          )}
                         </p>
-                      )}
-                    </div>
+                        {c.email && (
+                          <p className="text-sm text-gray-600">{c.email}</p>
+                        )}
+                      </div>
 
-                    <div className="flex flex-col items-start gap-2 md:items-end">
-                      <div className="text-sm font-semibold text-blue-700">
-                        Điểm: {Math.round(c.score)}%
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setSelectedCandidate(c)}
-                          disabled={!c}
-                        >
-                          Xem hồ sơ
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            if (mailto) window.open(mailto, "_blank");
-                          }}
-                          disabled={!mailto}
-                        >
-                          Mời ứng tuyển
-                        </Button>
+                      <div className="flex flex-col items-start gap-2 md:items-end">
+                        <div className="text-sm font-semibold text-blue-700">
+                          Điểm: {Math.round(c.score)}%
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setSelectedCandidate(c)}
+                            disabled={!c}
+                          >
+                            Xem hồ sơ
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              if (!c.candidateId || !jobId) return;
+
+                              // Check if already invited
+                              if (invitedCandidates.has(c.candidateId)) {
+                                toast({
+                                  title: "Đã gửi lời mời",
+                                  description: `Bạn đã gửi lời mời đến ${c.name} rồi.`,
+                                });
+                                return;
+                              }
+
+                              // Set loading state
+                              setInvitingCandidates((prev: Set<string>) =>
+                                new Set(prev).add(c.candidateId)
+                              );
+
+                              try {
+                                const response =
+                                  await nlpService.inviteCandidate(
+                                    jobId,
+                                    c.candidateId,
+                                    `Chào ${
+                                      c.name
+                                    }, chúng tôi muốn mời bạn ứng tuyển vị trí ${
+                                      jobData?.title || "này"
+                                    }.`
+                                  );
+
+                                if (response.success) {
+                                  // Mark as invited
+                                  setInvitedCandidates((prev: Set<string>) =>
+                                    new Set(prev).add(c.candidateId)
+                                  );
+
+                                  toast({
+                                    title: "✅ Gửi lời mời thành công",
+                                    description: `Đã gửi lời mời ứng tuyển đến ${c.name}. Ứng viên sẽ nhận được thông báo qua email và trong ứng dụng.`,
+                                  });
+                                } else {
+                                  throw new Error(
+                                    response.message || "Không thể gửi lời mời"
+                                  );
+                                }
+                              } catch (error: any) {
+                                toast({
+                                  title: "❌ Gửi lời mời thất bại",
+                                  description:
+                                    error?.response?.data?.message ||
+                                    error?.message ||
+                                    "Vui lòng thử lại sau.",
+                                  variant: "destructive",
+                                });
+                              } finally {
+                                // Remove loading state
+                                setInvitingCandidates((prev: Set<string>) => {
+                                  const next = new Set(prev);
+                                  next.delete(c.candidateId);
+                                  return next;
+                                });
+                              }
+                            }}
+                            disabled={
+                              !c.candidateId ||
+                              !jobId ||
+                              invitingCandidates.has(c.candidateId) ||
+                              invitedCandidates.has(c.candidateId)
+                            }
+                          >
+                            {invitingCandidates.has(c.candidateId) ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Đang gửi...
+                              </>
+                            ) : invitedCandidates.has(c.candidateId) ? (
+                              <>
+                                <Check className="w-4 h-4 mr-2" />
+                                Đã gửi
+                              </>
+                            ) : (
+                              <>
+                                <Mail className="w-4 h-4 mr-2" />
+                                Mời ứng tuyển
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -988,54 +1186,116 @@ export default function JobDetailPage() {
         open={!!selectedCandidate}
         onOpenChange={() => setSelectedCandidate(null)}
       >
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Hồ sơ ứng viên</DialogTitle>
           </DialogHeader>
           {selectedCandidate && (
-            <div className="space-y-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-lg font-semibold text-gray-900">
-                    {selectedCandidate.name}
-                  </p>
-                  {selectedCandidate.email && (
-                    <p className="text-sm text-gray-600">
-                      {selectedCandidate.email}
-                    </p>
-                  )}
-                  {(selectedCandidate.phone || selectedCandidate.location) && (
-                    <p className="text-sm text-gray-600">
-                      {selectedCandidate.phone ? `${selectedCandidate.phone} · ` : ""}
-                      {selectedCandidate.location || ""}
-                    </p>
-                  )}
-                  {selectedCandidate.tier && (
-                    <p className="text-sm text-blue-600 mt-1">
-                      Tier: {selectedCandidate.tier}
-                    </p>
-                  )}
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-blue-700">
-                    Điểm: {Math.round(selectedCandidate.score)}%
-                  </p>
-                {selectedCandidate.semanticScore !== undefined && (
-                  <p className="text-xs text-gray-600">
-                    Semantic:{" "}
-                    {Math.round((selectedCandidate.semanticScore || 0) * 100) /
-                      100}
-                  </p>
+            <div className="space-y-6">
+              {/* Header with Avatar and Basic Info */}
+              <div className="flex items-start gap-4 pb-4 border-b">
+                {selectedCandidate.avatar && (
+                  <img
+                    src={selectedCandidate.avatar}
+                    alt={selectedCandidate.name}
+                    className="w-20 h-20 rounded-full object-cover"
+                  />
                 )}
-                {selectedCandidate.method && (
-                  <p className="text-xs text-gray-600">
-                    Method: {selectedCandidate.method}
-                  </p>
+                {!selectedCandidate.avatar && (
+                  <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center">
+                    <User className="w-10 h-10 text-blue-600" />
+                  </div>
                 )}
+                <div className="flex-1">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xl font-semibold text-gray-900">
+                        {selectedCandidate.name}
+                      </p>
+                      {selectedCandidate.email && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          {selectedCandidate.email}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-3 mt-2 text-sm text-gray-600">
+                        {selectedCandidate.phone && (
+                          <span>{selectedCandidate.phone}</span>
+                        )}
+                        {selectedCandidate.location && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-4 h-4" />
+                            {selectedCandidate.location}
+                          </span>
+                        )}
+                      </div>
+                      {/* Social Links */}
+                      <div className="flex items-center gap-3 mt-2">
+                        {selectedCandidate.linkedin && (
+                          <a
+                            href={selectedCandidate.linkedin}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            <Linkedin className="w-5 h-5" />
+                          </a>
+                        )}
+                        {selectedCandidate.github && (
+                          <a
+                            href={selectedCandidate.github}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-gray-700 hover:text-gray-900"
+                          >
+                            <Github className="w-5 h-5" />
+                          </a>
+                        )}
+                        {selectedCandidate.website && (
+                          <a
+                            href={selectedCandidate.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-gray-700 hover:text-gray-900"
+                          >
+                            <Globe className="w-5 h-5" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex items-center gap-2 mb-2">
+                        <p className="text-lg font-semibold text-blue-700">
+                          Điểm: {Math.round(selectedCandidate.score)}%
+                        </p>
+                        {selectedCandidate.tier && (
+                          <Badge variant="outline" className="ml-2">
+                            Tier {selectedCandidate.tier}
+                          </Badge>
+                        )}
+                      </div>
+                      {selectedCandidate.method && (
+                        <p className="text-xs text-gray-500">
+                          Method: {selectedCandidate.method}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {selectedCandidate.matchedSkills &&
+              {/* Bio */}
+              {selectedCandidate.bio && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                    Giới thiệu
+                  </h3>
+                  <p className="text-sm text-gray-600 whitespace-pre-wrap">
+                    {selectedCandidate.bio}
+                  </p>
+                </div>
+              )}
+              {/* TODO: Cần sửa lại, tạm ẩn */}
+              {/* {selectedCandidate.matchedSkills &&
                 selectedCandidate.matchedSkills.length > 0 && (
                   <div className="text-sm text-gray-700">
                     <p className="font-medium mb-1">Kỹ năng khớp</p>
@@ -1043,48 +1303,385 @@ export default function JobDetailPage() {
                       {selectedCandidate.matchedSkills.join(", ")}
                     </p>
                   </div>
-                )}
+                )} */}
 
-              {selectedCandidate.skills && selectedCandidate.skills.length > 0 && (
+              {/* Education Section */}
+              {selectedCandidate.education && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <GraduationCap className="w-4 h-4" />
+                    Học vấn
+                  </h3>
+                  {selectedCandidate.education.institution && (
+                    <div className="bg-gray-50 p-3 rounded-md">
+                      <p className="font-medium text-gray-900">
+                        {selectedCandidate.education.institution}
+                      </p>
+                      {selectedCandidate.education.major && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          {selectedCandidate.education.degree &&
+                            `${selectedCandidate.education.degree} - `}
+                          {selectedCandidate.education.major}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                        {selectedCandidate.education.graduationYear && (
+                          <span>
+                            Tốt nghiệp:{" "}
+                            {selectedCandidate.education.graduationYear}
+                          </span>
+                        )}
+                        {selectedCandidate.education.gpa && (
+                          <span>GPA: {selectedCandidate.education.gpa}</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {selectedCandidate.education.certifications &&
+                    selectedCandidate.education.certifications.length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-xs font-medium text-gray-600 mb-2 flex items-center gap-2">
+                          <Award className="w-4 h-4" />
+                          Chứng chỉ
+                        </p>
+                        <div className="space-y-2">
+                          {selectedCandidate.education.certifications.map(
+                            (cert: any, idx: number) => (
+                              <div
+                                key={idx}
+                                className="flex items-start gap-2 text-sm bg-gray-50 p-2 rounded"
+                              >
+                                <Award className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                                <div>
+                                  <p className="font-medium text-gray-900">
+                                    {cert.name}
+                                  </p>
+                                  {cert.issuer && (
+                                    <p className="text-xs text-gray-600">
+                                      {cert.issuer}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    )}
+                </div>
+              )}
+
+              {/* Skills Section - Use profile data if available */}
+              {selectedCandidate.raw?.profile?.skills ? (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-gray-700">
+                    Kỹ năng
+                  </h3>
+                  {selectedCandidate.raw.profile.skills.technical &&
+                    selectedCandidate.raw.profile.skills.technical.length >
+                      0 && (
+                      <div>
+                        <p className="text-xs font-medium text-gray-600 mb-2">
+                          Kỹ thuật
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedCandidate.raw.profile.skills.technical.map(
+                            (skill: any, idx: number) => (
+                              <Badge
+                                key={idx}
+                                variant="secondary"
+                                className="flex items-center gap-1"
+                              >
+                                {skill.name}
+                                {skill.level && (
+                                  <span className="text-xs opacity-70">
+                                    ({skill.level})
+                                  </span>
+                                )}
+                              </Badge>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  {selectedCandidate.raw.profile.skills.soft &&
+                    selectedCandidate.raw.profile.skills.soft.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-gray-600 mb-2">
+                          Kỹ năng mềm
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedCandidate.raw.profile.skills.soft.map(
+                            (skill: any, idx: number) => (
+                              <Badge key={idx} variant="outline">
+                                {skill.name}
+                              </Badge>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  {selectedCandidate.raw.profile.skills.languages &&
+                    selectedCandidate.raw.profile.skills.languages.length >
+                      0 && (
+                      <div>
+                        <p className="text-xs font-medium text-gray-600 mb-2">
+                          Ngôn ngữ
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedCandidate.raw.profile.skills.languages.map(
+                            (lang: any, idx: number) => (
+                              <Badge key={idx} variant="outline">
+                                {lang.name} {lang.level && `(${lang.level})`}
+                              </Badge>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    )}
+                </div>
+              ) : selectedCandidate.skills &&
+                selectedCandidate.skills.length > 0 ? (
                 <div>
                   <p className="text-sm font-medium text-gray-700 mb-2">
                     Kỹ năng
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    {selectedCandidate.skills.slice(0, 15).map((skill: string, idx: number) => (
-                      <Badge key={idx} variant="secondary">
-                        {skill}
-                      </Badge>
-                    ))}
+                    {selectedCandidate.skills
+                      .slice(0, 15)
+                      .map((skill: string, idx: number) => (
+                        <Badge key={idx} variant="secondary">
+                          {skill}
+                        </Badge>
+                      ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Experience Section - Use profile data if available */}
+              {selectedCandidate.experience ? (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <Briefcase className="w-4 h-4" />
+                    Kinh nghiệm
+                  </h3>
+                  {selectedCandidate.experience.internships &&
+                    selectedCandidate.experience.internships.length > 0 && (
+                      <div className="space-y-3">
+                        {selectedCandidate.experience.internships.map(
+                          (intern: any, idx: number) => (
+                            <Card key={idx} className="border-gray-200">
+                              <CardContent className="p-4">
+                                <div className="flex items-start justify-between mb-2">
+                                  <div>
+                                    <p className="font-medium text-gray-900">
+                                      {intern.position || "Thực tập sinh"}
+                                    </p>
+                                    {intern.company && (
+                                      <p className="text-sm text-gray-600">
+                                        {intern.company}
+                                      </p>
+                                    )}
+                                  </div>
+                                  {(intern.startDate || intern.endDate) && (
+                                    <div className="text-xs text-gray-500 text-right">
+                                      {intern.startDate &&
+                                        new Date(
+                                          intern.startDate
+                                        ).toLocaleDateString("vi-VN", {
+                                          month: "short",
+                                          year: "numeric",
+                                        })}
+                                      {intern.startDate &&
+                                        intern.endDate &&
+                                        " - "}
+                                      {intern.endDate
+                                        ? new Date(
+                                            intern.endDate
+                                          ).toLocaleDateString("vi-VN", {
+                                            month: "short",
+                                            year: "numeric",
+                                          })
+                                        : intern.startDate && "Hiện tại"}
+                                    </div>
+                                  )}
+                                </div>
+                                {intern.description && (
+                                  <p className="text-sm text-gray-600 whitespace-pre-wrap mt-2">
+                                    {intern.description}
+                                  </p>
+                                )}
+                              </CardContent>
+                            </Card>
+                          )
+                        )}
+                      </div>
+                    )}
+                  {selectedCandidate.experience.projects &&
+                    selectedCandidate.experience.projects.length > 0 && (
+                      <div className="mt-4">
+                        <p className="text-xs font-medium text-gray-600 mb-2">
+                          Dự án
+                        </p>
+                        <div className="space-y-2">
+                          {selectedCandidate.experience.projects.map(
+                            (project: any, idx: number) => (
+                              <Card key={idx} className="border-gray-200">
+                                <CardContent className="p-3">
+                                  <p className="font-medium text-gray-900">
+                                    {project.title || project.name}
+                                  </p>
+                                  {project.description && (
+                                    <p className="text-sm text-gray-600 mt-1">
+                                      {project.description}
+                                    </p>
+                                  )}
+                                  {project.technologies &&
+                                    project.technologies.length > 0 && (
+                                      <div className="flex flex-wrap gap-1 mt-2">
+                                        {project.technologies.map(
+                                          (tech: string, techIdx: number) => (
+                                            <Badge
+                                              key={techIdx}
+                                              variant="outline"
+                                              className="text-xs"
+                                            >
+                                              {tech}
+                                            </Badge>
+                                          )
+                                        )}
+                                      </div>
+                                    )}
+                                  {project.url && (
+                                    <a
+                                      href={project.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs text-blue-600 hover:underline mt-2 inline-flex items-center gap-1"
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                      Xem dự án
+                                    </a>
+                                  )}
+                                </CardContent>
+                              </Card>
+                            )
+                          )}
+                        </div>
+                      </div>
+                    )}
+                </div>
+              ) : selectedCandidate.experienceList &&
+                selectedCandidate.experienceList.length > 0 ? (
+                <div className="text-sm text-gray-700">
+                  <p className="font-medium mb-1">Kinh nghiệm</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    {selectedCandidate.experienceList.map(
+                      (exp: string, idx: number) => (
+                        <li key={idx}>{exp}</li>
+                      )
+                    )}
+                  </ul>
+                </div>
+              ) : null}
+
+              {/* Resume Section */}
+              {selectedCandidate.resume && selectedCandidate.resume.url && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-2">
+                    <FileText className="w-4 h-4" />
+                    CV/Resume
+                  </h3>
+                  <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-md">
+                    <FileText className="w-5 h-5 text-gray-600" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">
+                        {selectedCandidate.resume.filename || "Resume"}
+                      </p>
+                      {selectedCandidate.resume.updatedAt && (
+                        <p className="text-xs text-gray-500">
+                          Cập nhật:{" "}
+                          {new Date(
+                            selectedCandidate.resume.updatedAt
+                          ).toLocaleDateString("vi-VN")}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        window.open(selectedCandidate.resume.url, "_blank")
+                      }
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Tải xuống
+                    </Button>
                   </div>
                 </div>
               )}
 
-              {selectedCandidate.experienceList &&
-                selectedCandidate.experienceList.length > 0 && (
-                  <div className="text-sm text-gray-700">
-                    <p className="font-medium mb-1">Kinh nghiệm</p>
-                    <ul className="list-disc list-inside space-y-1">
-                      {selectedCandidate.experienceList.map((exp: string, idx: number) => (
-                        <li key={idx}>{exp}</li>
-                      ))}
-                    </ul>
+              {/* Preferences Section */}
+              {selectedCandidate.preferences && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold text-gray-700">
+                    Sở thích & Mong muốn
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    {selectedCandidate.preferences.locations &&
+                      selectedCandidate.preferences.locations.length > 0 && (
+                        <div className="flex items-start gap-2">
+                          <MapPin className="w-4 h-4 text-gray-500 mt-0.5" />
+                          <div>
+                            <p className="font-medium text-gray-700">
+                              Địa điểm
+                            </p>
+                            <p className="text-gray-600">
+                              {selectedCandidate.preferences.locations.join(
+                                ", "
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    {(selectedCandidate.preferences.minSalary ||
+                      selectedCandidate.preferences.maxSalary) && (
+                      <div className="flex items-start gap-2">
+                        <DollarSign className="w-4 h-4 text-gray-500 mt-0.5" />
+                        <div>
+                          <p className="font-medium text-gray-700">
+                            Mức lương mong muốn
+                          </p>
+                          <p className="text-gray-600">
+                            {selectedCandidate.preferences.minSalary &&
+                              `${selectedCandidate.preferences.minSalary.toLocaleString()} VND`}
+                            {selectedCandidate.preferences.minSalary &&
+                              selectedCandidate.preferences.maxSalary &&
+                              " - "}
+                            {selectedCandidate.preferences.maxSalary &&
+                              `${selectedCandidate.preferences.maxSalary.toLocaleString()} VND`}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedCandidate.preferences.availableFrom && (
+                      <div className="flex items-start gap-2">
+                        <Calendar className="w-4 h-4 text-gray-500 mt-0.5" />
+                        <div>
+                          <p className="font-medium text-gray-700">
+                            Có thể bắt đầu từ
+                          </p>
+                          <p className="text-gray-600">
+                            {new Date(
+                              selectedCandidate.preferences.availableFrom
+                            ).toLocaleDateString("vi-VN")}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-
-              {selectedCandidate.education &&
-                (selectedCandidate.education.degree ||
-                  selectedCandidate.education.major ||
-                  selectedCandidate.education.institution) && (
-                  <div className="text-sm text-gray-700">
-                    <p className="font-medium mb-1">Học vấn</p>
-                    <p className="text-gray-600">
-                      {[selectedCandidate.education.degree, selectedCandidate.education.major, selectedCandidate.education.institution]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
-                  </div>
-                )}
+                </div>
+              )}
 
               {selectedCandidate.summary && (
                 <div className="text-sm text-gray-700">
@@ -1097,11 +1694,13 @@ export default function JobDetailPage() {
 
               {selectedCandidate.raw?.scoreBreakdown &&
                 typeof selectedCandidate.raw.scoreBreakdown === "object" && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                  {Object.entries(
-                    (selectedCandidate.raw?.scoreBreakdown ?? {}) as Record<string, any>
-                  ).map(
-                    ([key, val]: any) => {
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    {Object.entries(
+                      (selectedCandidate.raw?.scoreBreakdown ?? {}) as Record<
+                        string,
+                        any
+                      >
+                    ).map(([key, val]: any) => {
                       const details =
                         val?.details && typeof val.details === "object"
                           ? val.details
@@ -1124,17 +1723,19 @@ export default function JobDetailPage() {
                                   const valString = Array.isArray(v)
                                     ? v.join(", ")
                                     : v && typeof v === "object"
-                                    ? Object.values(v as Record<string, any>).join(", ")
+                                    ? Object.values(
+                                        v as Record<string, any>
+                                      ).join(", ")
                                     : String(v ?? "");
                                   return (
-                                  <li key={k}>
-                                    <span className="font-medium">{k}:</span>{" "}
-                                    {Array.isArray(v)
-                                      ? v.join(", ")
-                                      : typeof v === "object" && v !== null
-                                      ? Object.values(v).join(", ")
-                                      : String(v)}
-                                  </li>
+                                    <li key={k}>
+                                      <span className="font-medium">{k}:</span>{" "}
+                                      {Array.isArray(v)
+                                        ? v.join(", ")
+                                        : typeof v === "object" && v !== null
+                                        ? Object.values(v).join(", ")
+                                        : String(v)}
+                                    </li>
                                   );
                                 })}
                               </ul>
@@ -1142,10 +1743,9 @@ export default function JobDetailPage() {
                           </CardContent>
                         </Card>
                       );
-                    }
-                  )}
-                </div>
-              )}
+                    })}
+                  </div>
+                )}
             </div>
           )}
         </DialogContent>

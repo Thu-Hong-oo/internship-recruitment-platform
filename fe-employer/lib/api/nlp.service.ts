@@ -27,12 +27,53 @@ export const nlpService = {
 
     const query = queryParams.toString();
     const token = getToken();
-    return apiClient.get(
+    const response = await apiClient.get(
       `/nlp/top-candidates/${jobId}${query ? `?${query}` : ""}`,
       token
         ? { headers: { Authorization: `Bearer ${token}` } }
         : undefined
     );
+    return response.data;
+  },
+
+  /**
+   * Invite candidate to apply for a job (Employer only)
+   */
+  async inviteCandidate(
+    jobId: string,
+    candidateId: string,
+    message?: string
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    data?: {
+      candidateEmail: string;
+      candidateName: string;
+      jobTitle: string;
+      notificationSent: boolean;
+      sentAt: string;
+    };
+    error?: string;
+  }> {
+    const token = getToken();
+    if (!token) {
+      throw new Error("Vui lòng đăng nhập lại");
+    }
+
+    const response = await apiClient.post(
+      `/nlp/top-candidates/${jobId}/invite`,
+      {
+        candidateId,
+        message,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    return response.data;
   },
 };
 

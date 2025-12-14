@@ -237,6 +237,40 @@ class NotificationService {
   }
 
   /**
+   * Notify candidate về job invitation từ employer
+   * @param {String} candidateId - Candidate user ID
+   * @param {String} employerId - Employer user ID
+   * @param {String} jobId - Job ID
+   * @param {String} jobTitle - Job title
+   * @param {String} companyName - Company name
+   * @param {String} invitationLink - Link to job application page
+   */
+  static async notifyJobInvitation(
+    candidateId,
+    employerId,
+    jobId,
+    jobTitle,
+    companyName,
+    invitationLink
+  ) {
+    return this.createAndSend({
+      recipientId: candidateId,
+      senderId: employerId,
+      type: NOTIFICATION_TYPES.JOB_INVITATION,
+      title: `Bạn được mời ứng tuyển: ${jobTitle}`,
+      message: `${companyName} đã mời bạn ứng tuyển cho vị trí "${jobTitle}". Nhấp để xem chi tiết và ứng tuyển ngay!`,
+      data: {
+        jobId,
+        candidateId,
+        companyName,
+        jobTitle,
+        invitationLink,
+      },
+      priority: NOTIFICATION_PRIORITY.MEDIUM,
+    });
+  }
+
+  /**
    * Notify system message
    * @param {String} recipientId - User ID
    * @param {String} title - Notification title
