@@ -13,14 +13,14 @@ require('dotenv').config();
 // Note: This is kept for backward compatibility, but getModel() creates its own instance
 const geminiApiKey = process.env.GEMINI_API_KEY?.trim();
 if (!geminiApiKey) {
-  console.error('❌ GEMINI_API_KEY is not set in .env file!');
-  console.error('   Hệ thống sẽ sử dụng fallback parsing (rule-based)');
+  logger.error('❌ GEMINI_API_KEY is not set in .env file!');
+  logger.error('   Hệ thống sẽ sử dụng fallback parsing (rule-based)');
 } else {
   if (!geminiApiKey.startsWith('AIzaSy')) {
-    console.error(`❌ GEMINI_API_KEY format is INVALID - must start with "AIzaSy"`);
-    console.error(`   Current key starts with: "${geminiApiKey.substring(0, 6)}"`);
+    logger.error(`❌ GEMINI_API_KEY format is INVALID - must start with "AIzaSy"`);
+    logger.error(`   Current key starts with: "${geminiApiKey.substring(0, 6)}"`);
   } else {
-    console.log(`✅ GEMINI_API_KEY loaded: ${geminiApiKey.substring(0, 10)}...${geminiApiKey.substring(geminiApiKey.length - 4)} (length: ${geminiApiKey.length})`);
+    logger.info(`✅ GEMINI_API_KEY loaded: ${geminiApiKey.substring(0, 10)}...${geminiApiKey.substring(geminiApiKey.length - 4)} (length: ${geminiApiKey.length})`);
   }
 }
 // Note: genAI instance here is not used, getModel() creates its own
@@ -66,7 +66,7 @@ class AIService {
     
     // Check if API key is available
     if (!apiKey) {
-      console.error('❌ GEMINI_API_KEY is not set. Cannot initialize Gemini model.');
+      logger.error('❌ GEMINI_API_KEY is not set. Cannot initialize Gemini model.');
       return null;
     }
     
@@ -74,17 +74,17 @@ class AIService {
     apiKey = apiKey.trim();
     
     // Debug: Log API key info (only first and last few chars for security)
-    console.log(`🔑 API Key Info: ${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)} (length: ${apiKey.length})`);
+    logger.debug(`🔑 API Key Info: ${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)} (length: ${apiKey.length})`);
     
     // Validate API key format (basic check)
     if (!apiKey.startsWith('AIzaSy')) {
-      console.error('❌ GEMINI_API_KEY format is INVALID - must start with "AIzaSy"');
-      console.error(`   Current key starts with: "${apiKey.substring(0, 6)}"`);
+      logger.error('❌ GEMINI_API_KEY format is INVALID - must start with "AIzaSy"');
+      logger.error(`   Current key starts with: "${apiKey.substring(0, 6)}"`);
       return null;
     }
     
     if (apiKey.length < 30 || apiKey.length > 50) {
-      console.warn(`⚠️ GEMINI_API_KEY length is unusual: ${apiKey.length} (expected ~39 chars)`);
+      logger.warn(`⚠️ GEMINI_API_KEY length is unusual: ${apiKey.length} (expected ~39 chars)`);
     }
     
     // If model name changed or model not cached, create new instance
@@ -102,7 +102,7 @@ class AIService {
           console.log(`✅ Using Gemini model: ${modelName} (from ${process.env.GEMINI_MODEL ? '.env' : 'default'})`);
         } catch (modelError) {
           // Nếu model không tìm thấy, thử fallback models
-          console.warn(`⚠️ Model "${modelName}" not available, trying alternatives...`);
+          logger.warn(`⚠️ Model "${modelName}" not available, trying alternatives...`);
           
           // Fallback models - thử các model có sẵn (ưu tiên tốc độ)
           const fallbackModels = ['gemini-2.0-flash-lite', 'gemini-2.0-flash', 'gemini-2.0-flash-exp', 'gemini-2.5-flash', 'gemini-1.5-flash'];
@@ -113,13 +113,13 @@ class AIService {
               this._cachedModel = genAI.getGenerativeModel({
                 model: fallbackModel
               });
-              console.log(`✅ Using fallback model: ${fallbackModel}`);
+              logger.info(`✅ Using fallback model: ${fallbackModel}`);
               modelName = fallbackModel; // Update model name
               modelFound = true;
               break;
             } catch (e) {
               // Continue to next fallback
-              console.log(`   ⚠️ Fallback model "${fallbackModel}" not available: ${e.message.substring(0, 50)}`);
+              logger.warn(`   ⚠️ Fallback model "${fallbackModel}" not available: ${e.message.substring(0, 50)}`);
             }
           }
           
@@ -130,10 +130,10 @@ class AIService {
         
         this._cachedModelName = modelName;
         this._cachedApiKey = apiKey;
-        console.log(`✅ Gemini model initialized: ${modelName}`);
+        logger.info(`✅ Gemini model initialized: ${modelName}`);
         logger.info(`Gemini model initialized: ${modelName}`);
       } catch (error) {
-        console.error(`❌ Failed to initialize Gemini model: ${error.message}`);
+        logger.error(`❌ Failed to initialize Gemini model: ${error.message}`);
         logger.warn('Failed to initialize Gemini model, using fallback methods', error.message);
         this._cachedModel = null;
         this._cachedModelName = null;
@@ -181,10 +181,10 @@ class AIService {
   async extractSkills(text) {
     try {
       // Use AI-powered skill extraction service
-      console.log('🤖 Using AI-powered skill extraction service');
+      logger.debug('🤖 Using AI-powered skill extraction service');
       return await this.extractSkillsEnhanced(text);
 
-      console.log('🤖 Using Gemini API for skill extraction');
+      logger.debug('🤖 Using Gemini API for skill extraction');
       const prompt = `
 Trích xuất TẤT CẢ kỹ năng từ CV này:
 
@@ -228,11 +228,11 @@ QUY TẮC:
         .trim();
 
       const skills = JSON.parse(responseText);
-      console.log(`✅ Extracted ${skills.length} skills with Gemini`);
+      logger.info(`✅ Extracted ${skills.length} skills with Gemini`);
 
       return skills;
     } catch (error) {
-      console.error('❌ Gemini skill extraction failed:', error.message);
+      logger.error('❌ Gemini skill extraction failed:', { error: error.message });
       return await this.extractSkillsEnhanced(text);
     }
   }
@@ -241,7 +241,7 @@ QUY TẮC:
    * Enhanced fallback skill extraction - Sử dụng AI-powered service
    */
   async extractSkillsEnhanced(text) {
-    console.log('📝 Using AI-powered skill extraction service');
+    logger.debug('📝 Using AI-powered skill extraction service');
 
     try {
       // Sử dụng AI-powered skill extraction service
@@ -253,7 +253,7 @@ QUY TẮC:
         useCache: true,
       });
 
-      console.log(`✅ Extracted ${skills.length} skills using AI service`);
+      logger.info(`✅ Extracted ${skills.length} skills using AI service`);
       return skills;
     } catch (error) {
       logger.warn('⚠️ AI skill extraction failed, using basic fallback:', error.message);
@@ -343,7 +343,7 @@ QUY TẮC:
         format = 'html',
       } = options;
 
-      console.log('🤖 Generating AI-enhanced resume...');
+      logger.debug('🤖 Generating AI-enhanced resume...');
 
       // Step 1: Analyze and enhance content with AI
       const enhancedContent = await this.enhanceResumeContent(
@@ -372,7 +372,7 @@ QUY TẮC:
         targetJob,
       };
     } catch (error) {
-      console.error('AI resume generation failed:', error);
+      logger.error('AI resume generation failed:', { error });
       throw error;
     }
   }
@@ -530,7 +530,7 @@ LƯU Ý:
 
       return enhanced;
     } catch (error) {
-      console.error('Content enhancement failed:', error);
+      logger.error('Content enhancement failed:', { error });
       // Return original content if enhancement fails
       return {
         enhancedContent: content,
@@ -981,14 +981,14 @@ LƯU Ý:
    */
   async uploadGeneratedResume(html, format = 'html') {
     try {
-      console.log(`📤 Uploading AI-generated resume with format: ${format}`);
+      logger.debug(`📤 Uploading AI-generated resume with format: ${format}`);
 
       // For HTML, use proper HTML upload
       if (format === 'html') {
         const fileName = `ai_resume_${Date.now()}.html`;
         const fileBuffer = Buffer.from(html, 'utf8');
 
-        console.log(`File size: ${fileBuffer.length} bytes`);
+        logger.debug(`File size: ${fileBuffer.length} bytes`);
 
         // Upload HTML as raw file with proper format
         const uploadOptions = {
@@ -1002,7 +1002,7 @@ LƯU Ý:
           unique_filename: true,
         };
 
-        console.log('Upload options:', uploadOptions);
+        logger.debug('Upload options:', { uploadOptions });
 
         try {
           const { uploadFile } = require('../upload/fileUploadService');
@@ -1012,7 +1012,7 @@ LƯU Ý:
             uploadOptions
           );
 
-          console.log('✅ HTML Resume uploaded successfully:', {
+          logger.info('✅ HTML Resume uploaded successfully:', {
             url: uploadResult.url,
             publicId: uploadResult.publicId,
             format: uploadResult.format,
@@ -1021,7 +1021,7 @@ LƯU Ý:
 
           return uploadResult;
         } catch (uploadError) {
-          console.log('📤 Standard upload failed, trying base64 upload...');
+          logger.warn('📤 Standard upload failed, trying base64 upload...');
           return await this.directCloudinaryUpload(html, format);
         }
       } else {
@@ -1053,8 +1053,8 @@ LƯU Ý:
         };
       }
     } catch (error) {
-      console.error('Resume upload failed:', error);
-      console.error('Error details:', {
+      logger.error('Resume upload failed:', { error });
+      logger.error('Error details:', {
         message: error.message,
         name: error.name,
         http_code: error.http_code,
@@ -1091,7 +1091,7 @@ LƯU Ý:
         format: format, // Preserve original format
       });
 
-      console.log('✅ Direct HTML upload successful:', result.secure_url);
+      logger.info('✅ Direct HTML upload successful:', { url: result.secure_url });
 
       return {
         url: result.secure_url,
@@ -1101,7 +1101,7 @@ LƯU Ý:
         type: 'ai_generated',
       };
     } catch (directError) {
-      console.error('❌ Direct upload also failed:', directError);
+      logger.error('❌ Direct upload also failed:', { error: directError });
       throw new Error(`All upload methods failed: ${directError.message}`);
     }
   }
@@ -1468,7 +1468,7 @@ LƯU Ý:
         savedToDatabase: !!resumeBuilderDoc, // NEW: Indicate if saved
       };
     } catch (error) {
-      console.error('Enhanced CV generation failed:', error);
+      logger.error('Enhanced CV generation failed:', { error });
       throw error;
     }
   }
@@ -1547,7 +1547,7 @@ LƯU Ý:
         templateGenerators[template] || templateGenerators.modern;
       return await generator.call(this, content, targetJob, customization);
     } catch (error) {
-      console.error(`Template ${template} generation failed:`, error);
+      logger.error(`Template ${template} generation failed:`, { error });
       // Fallback to modern template
       return await this.generateModernTemplate(
         content,

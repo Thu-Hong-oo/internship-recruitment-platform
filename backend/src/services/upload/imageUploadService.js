@@ -75,13 +75,14 @@ async function uploadImage(type, filePathOrBuffer, options = {}) {
  * @returns {Promise<void>}
  */
 async function deleteImage(publicId) {
+  const { logger } = require('../../utils/logger');
   try {
     if (publicId && !publicId.includes('http')) {
       await cloudinary.uploader.destroy(publicId);
-      console.log(`Deleted image: ${publicId}`);
+      logger.info(`Deleted image: ${publicId}`);
     }
   } catch (error) {
-    console.error('Error deleting image from Cloudinary:', error);
+    logger.error('Error deleting image from Cloudinary:', error);
     throw error;
   }
 }

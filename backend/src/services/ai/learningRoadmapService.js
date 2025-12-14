@@ -14,7 +14,7 @@
 const skillExtractionService = require('./skillExtractionService');
 const skillNormalizationService = require('./skillNormalizationService');
 const sentenceBertService = require('./sentenceBertService');
-const vectorStoreService = require('./vectorStoreService');
+const vectorStoreService = require('../vectorStore/vectorStoreService');
 const natural = require('natural');
 const { logger } = require('../../utils/logger');
 

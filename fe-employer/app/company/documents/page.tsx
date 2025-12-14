@@ -330,8 +330,7 @@ export default function DocumentsPage() {
         {/* Progress Overview */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-600" />
+            <CardTitle className="text-base font-semibold">
               Tiến độ hoàn thành
             </CardTitle>
           </CardHeader>

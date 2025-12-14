@@ -6,6 +6,7 @@
  */
 
 const axios = require('axios');
+const { logger } = require('../../utils/logger');
 
 class VietnameseSpellChecker {
   constructor() {
@@ -118,7 +119,7 @@ class VietnameseSpellChecker {
    * Correct Vietnamese text using dictionary + edit distance
    */
   correctText(text) {
-    console.log('🔤 Running Vietnamese spell checker...');
+    logger.debug('🔤 Running Vietnamese spell checker...');
     
     // Split into words (preserve spaces and punctuation)
     const words = text.split(/(\s+|[.,;:!?()•\-–—])/);
@@ -135,7 +136,7 @@ class VietnameseSpellChecker {
       const correction = this.findClosestMatch(word);
       
       if (correction) {
-        console.log(`   ✏️  "${word}" → "${correction}"`);
+        logger.debug(`   ✏️  "${word}" → "${correction}"`);
         correctedWords.push(correction);
       } else {
         correctedWords.push(word);
@@ -143,7 +144,7 @@ class VietnameseSpellChecker {
     }
 
     const correctedText = correctedWords.join('');
-    console.log(`✅ Spell check complete (${correctedWords.length} tokens processed)`);
+    logger.debug(`✅ Spell check complete (${correctedWords.length} tokens processed)`);
     
     return correctedText;
   }
@@ -153,7 +154,7 @@ class VietnameseSpellChecker {
    * This is more accurate than single-word correction
    */
   correctPhrases(text) {
-    console.log('🔤 Correcting Vietnamese phrases...');
+    logger.debug('🔤 Correcting Vietnamese phrases...');
     
     // Define common 2-word and 3-word phrases with their corrections
     // Each entry: [wrong_pattern, correct_text]
@@ -223,11 +224,11 @@ class VietnameseSpellChecker {
       correctedText = correctedText.replace(regex, correct);
       
       if (correctedText !== beforeCorrection) {
-        console.log(`   ✏️  Fixed: "${wrongPattern.replace(/\\\\s\*/g, ' ')}" → "${correct}"`);
+        logger.debug(`   ✏️  Fixed: "${wrongPattern.replace(/\\\\s\*/g, ' ')}" → "${correct}"`);
       }
     }
 
-    console.log('✅ Phrase correction complete');
+    logger.debug('✅ Phrase correction complete');
     return correctedText;
   }
 
@@ -236,7 +237,7 @@ class VietnameseSpellChecker {
    */
   async correct(text) {
     try {
-      console.log('🔤 Starting Vietnamese spell correction...');
+      logger.debug('🔤 Starting Vietnamese spell correction...');
       
       // Step 1: Phrase-based correction (more accurate with context)
       let corrected = this.correctPhrases(text);
@@ -244,10 +245,10 @@ class VietnameseSpellChecker {
       // Step 2: Word-based correction (fallback for unknown phrases)
       // corrected = this.correctText(corrected); // Optional - can be slow
       
-      console.log('✅ Spell correction completed');
+      logger.info('✅ Spell correction completed');
       return corrected;
     } catch (error) {
-      console.error('❌ Spell check failed:', error.message);
+      logger.error('❌ Spell check failed:', { error: error.message });
       return text; // Return original if correction fails
     }
   }

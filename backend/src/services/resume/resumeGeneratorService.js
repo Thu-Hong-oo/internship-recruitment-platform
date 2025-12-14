@@ -1,5 +1,6 @@
 const { uploadFile } = require('../upload/fileUploadService');
 const aiService = require('../ai/aiService');
+const { logger } = require('../../utils/logger');
 
 /**
  * Generate resume based on candidate profile
@@ -38,9 +39,9 @@ async function generateResume(candidateProfile, options = {}) {
         generatedResume = await generateBasicResume(resumeContent, template);
       }
     } catch (aiError) {
-      console.log(
+      logger.warn(
         'AI generation failed, using basic generation:',
-        aiError.message
+        { error: aiError.message }
       );
       generatedResume = await generateBasicResume(resumeContent, template);
     }
@@ -55,7 +56,7 @@ async function generateResume(candidateProfile, options = {}) {
       },
     };
   } catch (error) {
-    console.error('Resume generation error:', error);
+    logger.error('Resume generation error:', error);
     throw new Error(`Failed to generate resume: ${error.message}`);
   }
 }
@@ -423,7 +424,7 @@ function generateObjective(candidateProfile, targetJob) {
  */
 async function parseResume(resumeUrl) {
   try {
-    console.log('Parsing resume from URL:', resumeUrl);
+    logger.debug('Parsing resume from URL:', { resumeUrl });
 
     // Try to use AI service for parsing
     if (aiService && typeof aiService.parseResume === 'function') {
@@ -431,11 +432,11 @@ async function parseResume(resumeUrl) {
       return parseResult;
     } else {
       // Fallback: Return mock parsed data for development
-      console.warn('AI service not available, returning mock parsed data');
+      logger.warn('AI service not available, returning mock parsed data');
       return generateMockParsedData();
     }
   } catch (error) {
-    console.error('Resume parsing failed:', error.message);
+    logger.error('Resume parsing failed:', { error: error.message });
 
     // Return mock data even on error for development
     return generateMockParsedData();

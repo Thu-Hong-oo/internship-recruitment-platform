@@ -7,6 +7,7 @@
 
 const mongoose = require('mongoose');
 const CandidateProfile = require('../../models/CandidateProfile');
+const { logger } = require('../../utils/logger');
 
 class AddressMigrationService {
   /**
@@ -14,7 +15,7 @@ class AddressMigrationService {
    */
   static async fixAllCorruptedAddresses() {
     try {
-      console.log('🔧 Starting address field migration...');
+      logger.info('🔧 Starting address field migration...');
 
       // Find all profiles where address is a string (including empty strings)
       const corruptedProfiles = await CandidateProfile.find({
@@ -24,7 +25,7 @@ class AddressMigrationService {
         ],
       });
 
-      console.log(
+      logger.info(
         `📊 Found ${corruptedProfiles.length} profiles with problematic addresses`
       );
 
@@ -39,13 +40,13 @@ class AddressMigrationService {
           if (typeof addressField === 'string') {
             if (addressField === '') {
               // Empty string - set to null to avoid MongoDB error
-              console.log(
+              logger.debug(
                 `🔧 Converting empty string address to null for profile ${profile._id}`
               );
               profile.personalInfo.address = null;
             } else {
               // Non-empty string - convert to object
-              console.log(
+              logger.debug(
                 `🔧 Converting string address "${addressField}" to object for profile ${profile._id}`
               );
               profile.personalInfo.address = {
@@ -58,7 +59,7 @@ class AddressMigrationService {
             }
           } else if (!addressField) {
             // Undefined or null - set to null explicitly
-            console.log(
+            logger.debug(
               `🔧 Setting undefined address to null for profile ${profile._id}`
             );
             profile.personalInfo.address = null;
@@ -67,37 +68,37 @@ class AddressMigrationService {
           await profile.save();
           fixedCount++;
 
-          console.log(`✅ Fixed profile ${profile._id}`);
+          logger.debug(`✅ Fixed profile ${profile._id}`);
         } catch (error) {
           errorCount++;
-          console.error(
+          logger.error(
             `❌ Failed to fix profile ${profile._id}:`,
-            error.message
+            { error: error.message }
           );
 
           // Try setting to null as fallback
           try {
             profile.personalInfo.address = null;
             await profile.save();
-            console.log(
+            logger.warn(
               `🆘 Set address to null for profile ${profile._id} as fallback`
             );
           } catch (fallbackError) {
-            console.error(
+            logger.error(
               `💥 Even fallback failed for profile ${profile._id}:`,
-              fallbackError.message
+              { error: fallbackError.message }
             );
           }
         }
       }
 
-      console.log('🎉 Migration completed!');
-      console.log(`✅ Fixed: ${fixedCount} profiles`);
-      console.log(`❌ Errors: ${errorCount} profiles`);
+      logger.info('🎉 Migration completed!');
+      logger.info(`✅ Fixed: ${fixedCount} profiles`);
+      logger.info(`❌ Errors: ${errorCount} profiles`);
 
       return { fixedCount, errorCount, totalFound: corruptedProfiles.length };
     } catch (error) {
-      console.error('💥 Migration failed:', error);
+      logger.error('💥 Migration failed:', error);
       throw error;
     }
   }
@@ -132,18 +133,15 @@ class AddressMigrationService {
       const totalProblematic =
         stringAddresses + emptyStringAddresses + missingAddresses;
 
-      console.log('📊 Address Field Analysis:');
-      console.log(`Total profiles: ${totalProfiles}`);
-      console.log(
-        `Non-empty string addresses (need fixing): ${stringAddresses}`
-      );
-      console.log(
-        `Empty string addresses (need fixing): ${emptyStringAddresses}`
-      );
-      console.log(`Missing address fields (need fixing): ${missingAddresses}`);
-      console.log(`Total problematic: ${totalProblematic}`);
-      console.log(`Object addresses (correct): ${objectAddresses}`);
-      console.log(`Null addresses (correct): ${nullAddresses}`);
+      logger.info('📊 Address Field Analysis:', {
+        totalProfiles,
+        stringAddresses,
+        emptyStringAddresses,
+        missingAddresses,
+        totalProblematic,
+        objectAddresses,
+        nullAddresses,
+      });
 
       return {
         total: totalProfiles,
@@ -155,7 +153,7 @@ class AddressMigrationService {
         totalProblematic,
       };
     } catch (error) {
-      console.error('💥 Analysis failed:', error);
+      logger.error('💥 Analysis failed:', error);
       throw error;
     }
   }

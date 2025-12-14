@@ -40,6 +40,7 @@ import {
   X,
   AlertCircle,
   CalendarClock,
+  Filter,
 } from "lucide-react";
 import {
   Dialog,
@@ -341,20 +342,20 @@ export default function JobApplicationsPage() {
 
     return (
       <div className="flex items-center gap-3">
-        <Avatar className="h-10 w-10">
+        <Avatar className="h-12 w-12 border-2 border-slate-200 shadow-sm">
           <AvatarImage src={user?.avatar} alt={displayName} />
-          <AvatarFallback>
+          <AvatarFallback className="bg-linear-to-br from-primary/10 to-primary/5 text-primary font-semibold">
             {displayName.substring(0, 2).toUpperCase()}
           </AvatarFallback>
         </Avatar>
-        <div className="space-y-1">
-          <div className="font-medium flex items-center gap-1">
-            <UserRound className="h-4 w-4 text-muted-foreground" />
+        <div className="space-y-1.5">
+          <div className="font-semibold text-slate-900 flex items-center gap-1.5 group-hover:text-primary transition-colors">
+            <UserRound className="h-4 w-4 text-slate-400" />
             {displayName}
           </div>
           {user?.email && (
-            <div className="text-sm text-muted-foreground flex items-center gap-1">
-              <Mail className="h-3 w-3" />
+            <div className="text-sm text-slate-600 flex items-center gap-1.5">
+              <Mail className="h-3.5 w-3.5 text-slate-400" />
               {user.email}
             </div>
           )}
@@ -487,11 +488,10 @@ export default function JobApplicationsPage() {
             Quay lại
           </Button>
           <div>
-            <h1 className="text-2xl font-semibold mb-2 flex items-center gap-2">
-              <Users className="h-5 w-5" />
+            <h1 className="text-2xl font-semibold mb-2">
               Ứng viên của tin tuyển dụng
             </h1>
-            <p className="text-gray-600">
+            <p className="text-sm text-muted-foreground">
               Xem và quản lý tất cả ứng viên đã ứng tuyển vào tin tuyển dụng này
             </p>
           </div>
@@ -507,11 +507,14 @@ export default function JobApplicationsPage() {
         </Card>
       )}
 
-      <Card className="mb-6">
-        <CardContent className="p-4 flex flex-wrap items-center gap-4">
-          <div className="text-sm font-medium">Bộ lọc</div>
+      <Card className="mb-6 border-0 shadow-md">
+        <CardContent className="p-4 flex flex-wrap items-center gap-4 bg-linear-to-r from-slate-50 to-white">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Trạng thái:</span>
+            <Filter className="h-4 w-4 text-primary" />
+            <span className="text-sm font-semibold text-slate-700">Bộ lọc:</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-600">Trạng thái:</span>
             <Select
               value={statusFilter}
               onValueChange={(v) => {
@@ -519,7 +522,7 @@ export default function JobApplicationsPage() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[180px] border-slate-200 hover:border-primary transition-colors">
                 <SelectValue placeholder="Tất cả" />
               </SelectTrigger>
               <SelectContent>
@@ -531,8 +534,11 @@ export default function JobApplicationsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="text-sm text-muted-foreground">
-            Tổng số ứng viên: {total}
+          <div className="ml-auto flex items-center gap-2">
+            <Users className="h-4 w-4 text-slate-400" />
+            <span className="text-sm font-medium text-slate-700">
+              Tổng số ứng viên: <span className="text-primary font-bold">{total}</span>
+            </span>
           </div>
         </CardContent>
       </Card>
@@ -553,135 +559,148 @@ export default function JobApplicationsPage() {
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>
+        <Card className="overflow-hidden border-0 shadow-lg">
+          <CardHeader className="bg-linear-to-r from-slate-50 to-white border-b border-slate-200">
+            <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
               Danh sách ứng viên ({applications.length} ứng viên trên trang{" "}
               {page}/{pages})
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Ứng viên</TableHead>
-                  <TableHead>Trạng thái</TableHead>
-                  <TableHead>Thời gian</TableHead>
-                  <TableHead>Tài liệu</TableHead>
-                  <TableHead className="w-[200px]">Hành động</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {applications.map((app) => {
-                  const resume = getResume(app);
-                  return (
-                    <TableRow key={app._id}>
-                      <TableCell>{renderCandidateInfo(app)}</TableCell>
-                      <TableCell>
-                      {(() => {
-                        const upcoming = getUpcomingInterview(app);
-                        if (upcoming && app.status === "interview") {
-                          return (
-                            <Badge variant="default" className="bg-blue-100 text-blue-700">
-                              Đã lên lịch
-                            </Badge>
-                          );
-                        }
-                        if (FINAL_STATUSES.includes(app.status || "")) {
-                          return renderStatusBadge(app.status || "pending");
-                        }
-                        return (
-                          <Select
-                            value={app.status || "pending"}
-                            onValueChange={(value) => handleStatusChange(app._id, value)}
-                            disabled={updatingStatus === app._id}
-                          >
-                            <SelectTrigger className="w-[160px]">
-                              <SelectValue>
-                                {statusConfig[app.status || "pending"]?.label ||
-                                  app.status ||
-                                  "Chờ duyệt"}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              {STATUS_OPTIONS_FOR_SELECT.filter((option) => {
-                                const availableStatuses = getAvailableStatuses(
-                                  app.status || "pending"
-                                );
-                                return (
-                                  option.value === app.status ||
-                                  availableStatuses.includes(option.value)
-                                );
-                              }).map((option) => (
-                                <SelectItem key={option.value} value={option.value}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        );
-                      })()}
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm text-muted-foreground">
-                          {getUpcomingInterview(app)?.scheduledAt
-                            ? formatDateTime(getUpcomingInterview(app)!.scheduledAt!)
-                            : formatDateTime(app.createdAt)}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {resume?.url ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewCV(app._id, resume.url)}
-                            disabled={loadingCV}
-                          >
-                            <FileText className="h-4 w-4 mr-2" />
-                            {loadingCV ? "Đang tải..." : "Xem CV"}
-                          </Button>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">
-                            Không có tệp
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2 justify-end">
-                          <Dialog
-                            open={schedulingFor === app._id}
-                            onOpenChange={(open) =>
-                              setSchedulingFor(open ? app._id : null)
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-linear-to-r from-slate-50 to-slate-100/50 hover:bg-slate-100/50 border-b border-slate-200">
+                    <TableHead className="font-semibold text-slate-700 py-4 px-6">Ứng viên</TableHead>
+                    <TableHead className="font-semibold text-slate-700 py-4 px-6">Trạng thái</TableHead>
+                    <TableHead className="font-semibold text-slate-700 py-4 px-6">Thời gian</TableHead>
+                    <TableHead className="font-semibold text-slate-700 py-4 px-6">Tài liệu</TableHead>
+                    <TableHead className="font-semibold text-slate-700 py-4 px-6 text-right">Hành động</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {applications.map((app) => {
+                    const resume = getResume(app);
+                    return (
+                      <TableRow 
+                        key={app._id}
+                        className="border-b border-slate-100 hover:bg-linear-to-r hover:from-blue-50/30 hover:to-white transition-all duration-200 group"
+                      >
+                        <TableCell className="py-5 px-6">
+                          {renderCandidateInfo(app)}
+                        </TableCell>
+                        <TableCell className="py-5 px-6">
+                          {(() => {
+                            const upcoming = getUpcomingInterview(app);
+                            if (upcoming && app.status === "interview") {
+                              return (
+                                <Badge variant="default" className="bg-blue-100 text-blue-700 border-blue-200">
+                                  <CalendarClock className="h-3 w-3 mr-1" />
+                                  Đã lên lịch
+                                </Badge>
+                              );
                             }
-                          >
-                            <DialogTrigger asChild>
-                              {(() => {
-                                const upcoming = getUpcomingInterview(app);
-                                const isFinal = FINAL_STATUSES.includes(app.status || "");
-                                if (upcoming) {
+                            if (FINAL_STATUSES.includes(app.status || "")) {
+                              return renderStatusBadge(app.status || "pending");
+                            }
+                            return (
+                              <Select
+                                value={app.status || "pending"}
+                                onValueChange={(value) => handleStatusChange(app._id, value)}
+                                disabled={updatingStatus === app._id}
+                              >
+                                <SelectTrigger className="w-[160px] border-slate-200 hover:border-primary transition-colors">
+                                  <SelectValue>
+                                    {statusConfig[app.status || "pending"]?.label ||
+                                      app.status ||
+                                      "Chờ duyệt"}
+                                  </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {STATUS_OPTIONS_FOR_SELECT.filter((option) => {
+                                    const availableStatuses = getAvailableStatuses(
+                                      app.status || "pending"
+                                    );
+                                    return (
+                                      option.value === app.status ||
+                                      availableStatuses.includes(option.value)
+                                    );
+                                  }).map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                      {option.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            );
+                          })()}
+                        </TableCell>
+                        <TableCell className="py-5 px-6">
+                          <div className="flex items-center gap-2">
+                            <CalendarClock className="h-4 w-4 text-slate-400" />
+                            <span className="text-sm font-medium text-slate-700">
+                              {getUpcomingInterview(app)?.scheduledAt
+                                ? formatDateTime(getUpcomingInterview(app)!.scheduledAt!)
+                                : formatDateTime(app.createdAt)}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-5 px-6">
+                          {resume?.url ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewCV(app._id, resume.url)}
+                              disabled={loadingCV}
+                              className="hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all duration-200"
+                            >
+                              <FileText className="h-4 w-4 mr-2" />
+                              {loadingCV ? "Đang tải..." : "Xem CV"}
+                            </Button>
+                          ) : (
+                            <span className="text-sm text-slate-500 flex items-center gap-1">
+                              <FileText className="h-4 w-4 text-slate-300" />
+                              Không có tệp
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-5 px-6">
+                          <div className="flex flex-wrap gap-2 justify-end">
+                            <Dialog
+                              open={schedulingFor === app._id}
+                              onOpenChange={(open) =>
+                                setSchedulingFor(open ? app._id : null)
+                              }
+                            >
+                              <DialogTrigger asChild>
+                                {(() => {
+                                  const upcoming = getUpcomingInterview(app);
+                                  const isFinal = FINAL_STATUSES.includes(app.status || "");
+                                  if (upcoming) {
+                                    return (
+                                      <Button variant="outline" size="sm" disabled className="gap-2 bg-green-50 border-green-200 text-green-700">
+                                        <CalendarClock className="h-4 w-4" />
+                                        Đã lên lịch
+                                      </Button>
+                                    );
+                                  }
+                                  if (isFinal) {
+                                    return (
+                                      <Button variant="outline" size="sm" disabled className="gap-2 bg-slate-50 border-slate-200 text-slate-500">
+                                        <CalendarClock className="h-4 w-4" />
+                                        Đã kết thúc
+                                      </Button>
+                                    );
+                                  }
                                   return (
-                                    <Button variant="outline" size="sm" disabled className="gap-2">
+                                    <Button variant="outline" size="sm" className="gap-2 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-700 transition-all duration-200">
                                       <CalendarClock className="h-4 w-4" />
-                                      Đã lên lịch
+                                      Mời phỏng vấn
                                     </Button>
                                   );
-                                }
-                                if (isFinal) {
-                                  return (
-                                    <Button variant="outline" size="sm" disabled className="gap-2">
-                                      <CalendarClock className="h-4 w-4" />
-                                      Đã kết thúc
-                                    </Button>
-                                  );
-                                }
-                                return (
-                                  <Button variant="outline" size="sm" className="gap-2">
-                                    <CalendarClock className="h-4 w-4" />
-                                    Mời phỏng vấn
-                                  </Button>
-                                );
-                              })()}
-                            </DialogTrigger>
+                                })()}
+                              </DialogTrigger>
                             <DialogContent className="sm:max-w-lg">
                               <DialogHeader>
                                 <DialogTitle>Mời phỏng vấn</DialogTitle>
@@ -806,25 +825,27 @@ export default function JobApplicationsPage() {
                               </DialogFooter>
                             </DialogContent>
                           </Dialog>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                              router.push(
-                                `/jobs/${jobId}/applications/${app._id}`
-                              )
-                            }
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            Chi tiết
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                router.push(
+                                  `/jobs/${jobId}/applications/${app._id}`
+                                )
+                              }
+                              className="hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all duration-200"
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              Chi tiết
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
 
             {pages > 1 && (
               <div className="flex items-center justify-between mt-4">

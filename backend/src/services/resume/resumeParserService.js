@@ -1,5 +1,6 @@
 const { uploadFile } = require('../upload/fileUploadService');
 const aiService = require('../ai/aiService');
+const { logger } = require('../../utils/logger');
 
 /**
  * Parse resume using AI service
@@ -44,9 +45,9 @@ async function parseResume(fileBuffer, filename) {
         extractedData.rawText = `Resume file: ${filename} (${uploadResult.format})`;
       }
     } catch (aiError) {
-      console.log(
+      logger.warn(
         'AI parsing failed, using basic extraction:',
-        aiError.message
+        { error: aiError.message }
       );
       extractedData.summary = `Resume uploaded: ${filename}`;
     }
@@ -65,7 +66,7 @@ async function parseResume(fileBuffer, filename) {
       },
     };
   } catch (error) {
-    console.error('Resume parsing error:', error);
+    logger.error('Resume parsing error:', error);
     throw new Error(`Failed to parse resume: ${error.message}`);
   }
 }

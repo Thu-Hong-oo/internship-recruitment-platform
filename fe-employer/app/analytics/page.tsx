@@ -24,6 +24,7 @@ import {
   Clock,
   XCircle,
 } from "lucide-react";
+import EmployerShell from "@/components/layout/EmployerShell";
 
 type PeriodOption = {
   value: string;
@@ -100,9 +101,10 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+    <EmployerShell active="analytics">
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -114,7 +116,7 @@ export default function AnalyticsPage() {
           </Button>
           <div>
             <h1 className="text-2xl font-semibold mb-2">Thống kê</h1>
-            <p className="text-gray-600">
+            <p className="text-sm text-muted-foreground">
               Theo dõi hiệu suất tuyển dụng của bạn
             </p>
           </div>
@@ -133,19 +135,19 @@ export default function AnalyticsPage() {
             </SelectContent>
           </Select>
         </div>
-      </div>
+        </div>
 
-      {/* Error Message */}
-      {error && (
-        <Card className="border-red-200 bg-red-50 mb-6">
-          <CardContent className="p-4">
-            <p className="text-red-600">{error}</p>
-          </CardContent>
-        </Card>
-      )}
+        {/* Error Message */}
+        {error && (
+          <Card className="border-red-200 bg-red-50">
+            <CardContent className="p-4">
+              <p className="text-red-600">{error}</p>
+            </CardContent>
+          </Card>
+        )}
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Jobs */}
         <Card>
           <CardContent className="p-6">
@@ -219,15 +221,14 @@ export default function AnalyticsPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+        </div>
 
-      {/* Detailed Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Detailed Stats */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Jobs Breakdown */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="w-5 h-5" />
+            <CardTitle className="text-base font-semibold">
               Phân tích tin tuyển dụng
             </CardTitle>
           </CardHeader>
@@ -306,8 +307,7 @@ export default function AnalyticsPage() {
         {/* Applications Stats */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5" />
+            <CardTitle className="text-base font-semibold">
               Thống kê ứng tuyển
             </CardTitle>
           </CardHeader>
@@ -374,10 +374,10 @@ export default function AnalyticsPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
+        </div>
 
-      {/* Quick Actions */}
-      <div className="mt-6">
+        {/* Quick Actions */}
+        <div>
         <Card>
           <CardHeader>
             <CardTitle>Thao tác nhanh</CardTitle>
@@ -402,7 +402,8 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+      </div>
+    </EmployerShell>
   );
 }
 

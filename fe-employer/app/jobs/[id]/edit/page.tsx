@@ -17,7 +17,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { X, Plus, ArrowLeft } from "lucide-react";
+import {
+  X,
+  Plus,
+  ArrowLeft,
+  Briefcase,
+  MapPin,
+  DollarSign,
+  Calendar,
+  FileText,
+  Code,
+  Building2,
+  Users,
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
+} from "lucide-react";
 import { getCities, getDistricts, getWards } from "@/lib/vietnamAddress";
 import { findOptionByLabelLoose } from "@/lib/addressUtils";
 import { getJobById } from "@/lib/jobAPI";
@@ -31,6 +46,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import EmployerShell from "@/components/layout/EmployerShell";
 
 const JOB_LEVELS = [
   { value: "Intern", label: "Thực tập sinh" },
@@ -546,494 +562,644 @@ export default function EditJobPage() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-gray-600">Đang tải dữ liệu bài tuyển dụng...</p>
+      <EmployerShell active="jobs">
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center space-y-4">
+            <Loader2 className="h-12 w-12 animate-spin text-teal-600 mx-auto" />
+            <p className="text-slate-600 font-medium">Đang tải dữ liệu bài tuyển dụng...</p>
           </div>
         </div>
-      </div>
+      </EmployerShell>
     );
   }
 
   if (error && !formData.title) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="p-6 text-center">
-            <p className="text-red-600 mb-4">{error}</p>
-            <Button onClick={() => router.push("/jobs")} variant="outline">
-              Quay lại danh sách
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <EmployerShell active="jobs">
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <Card className="border-red-300 bg-red-50 shadow-md">
+            <CardContent className="p-6 text-center">
+              <AlertCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+              <p className="text-red-800 font-semibold mb-2">Có lỗi xảy ra</p>
+              <p className="text-red-600 mb-6">{error}</p>
+              <Button
+                onClick={() => router.push("/jobs")}
+                variant="outline"
+                className="hover:bg-red-50"
+              >
+                Quay lại danh sách
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </EmployerShell>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <div className="mb-6">
-        <div className="flex items-center gap-4 mb-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => router.back()}
-            className="flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Quay lại
-          </Button>
-        </div>
-        <h1 className="text-2xl font-semibold mb-2">
-          Chỉnh sửa bài tuyển dụng
-        </h1>
-        <p className="text-gray-600">Cập nhật thông tin về vị trí tuyển dụng</p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Thông tin cơ bản</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="title">Tiêu đề bài tuyển dụng *</Label>
-              <Input
-                id="title"
-                value={formData.title}
-                onChange={(e) => handleInputChange("title", e.target.value)}
-                placeholder="Ví dụ: Senior Full Stack Developer"
-                required
-              />
+    <EmployerShell active="jobs">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center gap-4 mb-6">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.back()}
+              className="flex items-center gap-2 hover:bg-slate-100 transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Quay lại
+            </Button>
+          </div>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-teal-100 rounded-lg">
+              <Briefcase className="h-6 w-6 text-teal-600" />
             </div>
-
             <div>
-              <Label htmlFor="slug">Slug (URL-friendly)</Label>
-              <Input
-                id="slug"
-                value={formData.slug}
-                onChange={(e) => {
-                  setSlugManuallyEdited(true);
-                  handleInputChange("slug", e.target.value);
-                }}
-                placeholder="Tự động tạo từ tiêu đề hoặc nhập thủ công"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Slug sẽ được tự động tạo từ tiêu đề nếu chưa chỉnh sửa
+              <h1 className="text-3xl font-bold text-slate-900">
+                Chỉnh sửa bài tuyển dụng
+              </h1>
+              <p className="text-sm text-slate-600 mt-1">
+                Cập nhật thông tin về vị trí tuyển dụng của bạn
               </p>
             </div>
+          </div>
+        </div>
 
-            <div>
-              <Label htmlFor="description">Mô tả công việc *</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) =>
-                  handleInputChange("description", e.target.value)
-                }
-                placeholder="Mô tả chi tiết về công việc, trách nhiệm..."
-                rows={4}
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="level">Cấp độ *</Label>
-                <Select
-                  value={formData.level}
-                  onValueChange={(value) => handleInputChange("level", value)}
-                  required
-                >
-                  <SelectTrigger id="level" className="w-full">
-                    <SelectValue placeholder="Chọn cấp độ" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {JOB_LEVELS.map((level) => (
-                      <SelectItem key={level.value} value={level.value}>
-                        {level.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="jobType">Loại công việc *</Label>
-                <Select
-                  value={formData.jobType}
-                  onValueChange={(value) => handleInputChange("jobType", value)}
-                  required
-                >
-                  <SelectTrigger id="jobType" className="w-full">
-                    <SelectValue placeholder="Chọn loại công việc" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {JOB_TYPES.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="workingMode">Chế độ làm việc *</Label>
-              <Select
-                value={formData.workingMode}
-                onValueChange={(value) =>
-                  handleInputChange("workingMode", value)
-                }
-                required
-              >
-                <SelectTrigger id="workingMode" className="w-full">
-                  <SelectValue placeholder="Chọn chế độ làm việc" />
-                </SelectTrigger>
-                <SelectContent>
-                  {WORKING_MODES.map((mode) => (
-                    <SelectItem key={mode.value} value={mode.value}>
-                      {mode.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="industryCode">Ngành nghề *</Label>
-                <Select
-                  value={formData.industryCode}
-                  onValueChange={(value) => {
-                    handleInputChange("industryCode", value);
-                  }}
-                  disabled={loadingIndustries}
-                  required
-                >
-                  <SelectTrigger id="industryCode" className="w-full">
-                    <SelectValue placeholder="Chọn ngành nghề" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {industries.map((industry) => (
-                      <SelectItem key={industry.code} value={industry.code}>
-                        {industry.name.vi || industry.name.en}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="subIndustryCode">Lĩnh vực con</Label>
-                <Select
-                  value={formData.subIndustryCode}
-                  onValueChange={(value) =>
-                    handleInputChange("subIndustryCode", value)
-                  }
-                  disabled={loadingIndustries || !formData.industryCode}
-                >
-                  <SelectTrigger id="subIndustryCode" className="w-full">
-                    <SelectValue placeholder="Chọn lĩnh vực con (tùy chọn)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {subIndustries.map((subIndustry) => (
-                      <SelectItem
-                        key={subIndustry.code}
-                        value={subIndustry.code}
-                      >
-                        {subIndustry.name.vi || subIndustry.name.en}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div>
-              <Label>Địa điểm làm việc *</Label>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="city" className="text-sm text-gray-600">
-                    Tỉnh/Thành phố *
-                  </Label>
-                  <Select
-                    value={selectedCity}
-                    onValueChange={setSelectedCity}
-                    disabled={loadingAddress}
-                    required
-                  >
-                    <SelectTrigger id="city" className="w-full">
-                      <SelectValue placeholder="Chọn tỉnh/thành phố" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {cities.map((city) => (
-                        <SelectItem key={city.value} value={city.value}>
-                          {city.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Thông tin cơ bản */}
+          <Card className="border-0 shadow-lg overflow-hidden">
+            <CardHeader className="bg-linear-to-r from-teal-50 to-white border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-teal-100 rounded-lg">
+                  <FileText className="h-5 w-5 text-teal-600" />
                 </div>
-
-                <div>
-                  <Label htmlFor="district" className="text-sm text-gray-600">
-                    Quận/Huyện *
-                  </Label>
-                  <Select
-                    value={selectedDistrict}
-                    onValueChange={setSelectedDistrict}
-                    disabled={loadingAddress || !selectedCity}
-                    required
-                  >
-                    <SelectTrigger id="district" className="w-full">
-                      <SelectValue placeholder="Chọn quận/huyện" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {districts.map((district) => (
-                        <SelectItem key={district.value} value={district.value}>
-                          {district.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="ward" className="text-sm text-gray-600">
-                    Phường/Xã *
-                  </Label>
-                  <Select
-                    value={selectedWard}
-                    onValueChange={setSelectedWard}
-                    disabled={loadingAddress || !selectedDistrict}
-                    required
-                  >
-                    <SelectTrigger id="ward" className="w-full">
-                      <SelectValue placeholder="Chọn phường/xã" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {wards.map((ward) => (
-                        <SelectItem key={ward.value} value={ward.value}>
-                          {ward.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <CardTitle className="text-xl font-semibold text-slate-900">
+                  Thông tin cơ bản
+                </CardTitle>
               </div>
-              {formData.location && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Địa điểm: {formData.location}
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              <div>
+                <Label htmlFor="title" className="text-sm font-semibold text-slate-700 mb-2 block">
+                  Tiêu đề bài tuyển dụng <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="title"
+                  value={formData.title}
+                  onChange={(e) => handleInputChange("title", e.target.value)}
+                  placeholder="Ví dụ: Senior Full Stack Developer"
+                  className="h-11 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
+                  required
+                />
+                <p className="text-xs text-slate-500 mt-1.5">
+                  Tiêu đề hấp dẫn sẽ thu hút nhiều ứng viên hơn
                 </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="address">
-                Địa chỉ chi tiết (Số nhà, tên đường)
-              </Label>
-              <Input
-                id="address"
-                value={
-                  typeof formData.address === "string" ? formData.address : ""
-                }
-                onChange={(e) => handleInputChange("address", e.target.value)}
-                placeholder="Ví dụ: 123 Nguyễn Huệ, Tòa nhà ABC"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <Label htmlFor="salaryMin">Lương tối thiểu *</Label>
-                <Input
-                  id="salaryMin"
-                  type="number"
-                  min="0"
-                  value={formData.salaryMin || ""}
-                  onChange={(e) =>
-                    handleInputChange(
-                      "salaryMin",
-                      e.target.value ? parseInt(e.target.value) : undefined
-                    )
-                  }
-                  placeholder="30000000"
-                  required
-                />
               </div>
 
               <div>
-                <Label htmlFor="salaryMax">Lương tối đa *</Label>
+                <Label htmlFor="slug" className="text-sm font-semibold text-slate-700 mb-2 block">
+                  Slug (URL-friendly)
+                </Label>
                 <Input
-                  id="salaryMax"
-                  type="number"
-                  min="0"
-                  value={formData.salaryMax || ""}
-                  onChange={(e) =>
-                    handleInputChange(
-                      "salaryMax",
-                      e.target.value ? parseInt(e.target.value) : undefined
-                    )
-                  }
-                  placeholder="50000000"
-                  required
+                  id="slug"
+                  value={formData.slug}
+                  onChange={(e) => {
+                    setSlugManuallyEdited(true);
+                    handleInputChange("slug", e.target.value);
+                  }}
+                  placeholder="Tự động tạo từ tiêu đề hoặc nhập thủ công"
+                  className="h-11 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
                 />
+                <p className="text-xs text-slate-500 mt-1.5">
+                  Slug sẽ được tự động tạo từ tiêu đề nếu chưa chỉnh sửa
+                </p>
               </div>
 
               <div>
-                <Label htmlFor="currency">Đơn vị tiền tệ *</Label>
+                <Label htmlFor="description" className="text-sm font-semibold text-slate-700 mb-2 block">
+                  Mô tả công việc <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) =>
+                    handleInputChange("description", e.target.value)
+                  }
+                  placeholder="Mô tả chi tiết về công việc, trách nhiệm, môi trường làm việc..."
+                  rows={5}
+                  className="focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all resize-none"
+                  required
+                />
+                <p className="text-xs text-slate-500 mt-1.5">
+                  Mô tả càng chi tiết, ứng viên càng hiểu rõ về công việc
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label htmlFor="level" className="text-sm font-semibold text-slate-700 mb-2 block">
+                    Cấp độ <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={formData.level}
+                    onValueChange={(value) => handleInputChange("level", value)}
+                    required
+                  >
+                    <SelectTrigger id="level" className="w-full h-11 focus:ring-2 focus:ring-teal-500">
+                      <SelectValue placeholder="Chọn cấp độ" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {JOB_LEVELS.map((level) => (
+                        <SelectItem key={level.value} value={level.value}>
+                          {level.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="jobType" className="text-sm font-semibold text-slate-700 mb-2 block">
+                    Loại công việc <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={formData.jobType}
+                    onValueChange={(value) => handleInputChange("jobType", value)}
+                    required
+                  >
+                    <SelectTrigger id="jobType" className="w-full h-11 focus:ring-2 focus:ring-teal-500">
+                      <SelectValue placeholder="Chọn loại công việc" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {JOB_TYPES.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="workingMode" className="text-sm font-semibold text-slate-700 mb-2 block">
+                  Chế độ làm việc <span className="text-red-500">*</span>
+                </Label>
                 <Select
-                  value={formData.currency}
+                  value={formData.workingMode}
                   onValueChange={(value) =>
-                    handleInputChange("currency", value)
+                    handleInputChange("workingMode", value)
                   }
                   required
                 >
-                  <SelectTrigger id="currency" className="w-full">
-                    <SelectValue />
+                  <SelectTrigger id="workingMode" className="w-full h-11 focus:ring-2 focus:ring-teal-500">
+                    <SelectValue placeholder="Chọn chế độ làm việc" />
                   </SelectTrigger>
                   <SelectContent>
-                    {CURRENCIES.map((currency) => (
-                      <SelectItem key={currency.value} value={currency.value}>
-                        {currency.label}
+                    {WORKING_MODES.map((mode) => (
+                      <SelectItem key={mode.value} value={mode.value}>
+                        {mode.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            </div>
 
-            <div>
-              <Label htmlFor="positions">Số lượng vị trí *</Label>
-              <Input
-                id="positions"
-                type="number"
-                min="1"
-                value={formData.positions}
-                onChange={(e) =>
-                  handleInputChange("positions", parseInt(e.target.value) || 1)
-                }
-                required
-              />
-            </div>
-          </CardContent>
-        </Card>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label htmlFor="industryCode" className="text-sm font-semibold text-slate-700 mb-2 block">
+                    Ngành nghề <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={formData.industryCode}
+                    onValueChange={(value) => {
+                      handleInputChange("industryCode", value);
+                    }}
+                    disabled={loadingIndustries}
+                    required
+                  >
+                    <SelectTrigger id="industryCode" className="w-full h-11 focus:ring-2 focus:ring-teal-500">
+                      <SelectValue placeholder="Chọn ngành nghề" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {industries.map((industry) => (
+                        <SelectItem key={industry.code} value={industry.code}>
+                          {industry.name.vi || industry.name.en}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Yêu cầu và kỹ năng</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="requirements">Yêu cầu công việc *</Label>
-              <Textarea
-                id="requirements"
-                value={formData.requirements}
-                onChange={(e) =>
-                  handleInputChange("requirements", e.target.value)
-                }
-                placeholder="Liệt kê các yêu cầu cụ thể..."
-                rows={4}
-                required
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="benefits">Quyền lợi</Label>
-              <Textarea
-                id="benefits"
-                value={formData.benefits}
-                onChange={(e) => handleInputChange("benefits", e.target.value)}
-                placeholder="Liệt kê các quyền lợi (lương tháng 13, bảo hiểm, bonus...)"
-                rows={3}
-              />
-            </div>
-
-            <div>
-              <Label>Kỹ năng yêu cầu *</Label>
-              <div className="flex gap-2 mb-2">
-                <Input
-                  value={newSkill}
-                  onChange={(e) => setNewSkill(e.target.value)}
-                  placeholder="Nhập kỹ năng và nhấn Enter"
-                  onKeyPress={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addSkill();
+                <div>
+                  <Label htmlFor="subIndustryCode" className="text-sm font-semibold text-slate-700 mb-2 block">
+                    Lĩnh vực con
+                  </Label>
+                  <Select
+                    value={formData.subIndustryCode}
+                    onValueChange={(value) =>
+                      handleInputChange("subIndustryCode", value)
                     }
-                  }}
-                />
-                <Button type="button" onClick={addSkill} size="sm">
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {formData.skills.map((skill) => (
-                  <Badge
-                    key={skill}
-                    variant="secondary"
-                    className="flex items-center gap-1"
+                    disabled={loadingIndustries || !formData.industryCode}
                   >
-                    {skill}
-                    <X
-                      className="h-3 w-3 cursor-pointer"
-                      onClick={() => removeSkill(skill)}
-                    />
-                  </Badge>
-                ))}
+                    <SelectTrigger id="subIndustryCode" className="w-full h-11 focus:ring-2 focus:ring-teal-500">
+                      <SelectValue placeholder="Chọn lĩnh vực con (tùy chọn)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subIndustries.map((subIndustry) => (
+                        <SelectItem
+                          key={subIndustry.code}
+                          value={subIndustry.code}
+                        >
+                          {subIndustry.name.vi || subIndustry.name.en}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              {formData.skills.length === 0 && (
-                <p className="text-sm text-gray-500">
-                  Chưa có kỹ năng nào được thêm
+
+              <div>
+                <Label className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-teal-600" />
+                  Địa điểm làm việc <span className="text-red-500">*</span>
+                </Label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="city" className="text-xs font-medium text-slate-600 mb-1.5 block">
+                      Tỉnh/Thành phố <span className="text-red-500">*</span>
+                    </Label>
+                    <Select
+                      value={selectedCity}
+                      onValueChange={setSelectedCity}
+                      disabled={loadingAddress}
+                      required
+                    >
+                      <SelectTrigger id="city" className="w-full h-11 focus:ring-2 focus:ring-teal-500">
+                        <SelectValue placeholder="Chọn tỉnh/thành phố" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {cities.map((city) => (
+                          <SelectItem key={city.value} value={city.value}>
+                            {city.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="district" className="text-xs font-medium text-slate-600 mb-1.5 block">
+                      Quận/Huyện <span className="text-red-500">*</span>
+                    </Label>
+                    <Select
+                      value={selectedDistrict}
+                      onValueChange={setSelectedDistrict}
+                      disabled={loadingAddress || !selectedCity}
+                      required
+                    >
+                      <SelectTrigger id="district" className="w-full h-11 focus:ring-2 focus:ring-teal-500">
+                        <SelectValue placeholder="Chọn quận/huyện" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {districts.map((district) => (
+                          <SelectItem key={district.value} value={district.value}>
+                            {district.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="ward" className="text-xs font-medium text-slate-600 mb-1.5 block">
+                      Phường/Xã <span className="text-red-500">*</span>
+                    </Label>
+                    <Select
+                      value={selectedWard}
+                      onValueChange={setSelectedWard}
+                      disabled={loadingAddress || !selectedDistrict}
+                      required
+                    >
+                      <SelectTrigger id="ward" className="w-full h-11 focus:ring-2 focus:ring-teal-500">
+                        <SelectValue placeholder="Chọn phường/xã" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {wards.map((ward) => (
+                          <SelectItem key={ward.value} value={ward.value}>
+                            {ward.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {formData.location && (
+                  <div className="mt-3 p-3 bg-teal-50 border border-teal-200 rounded-lg">
+                    <p className="text-sm text-teal-700 flex items-center gap-2">
+                      <MapPin className="h-4 w-4" />
+                      <span className="font-medium">Địa điểm:</span> {formData.location}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="address" className="text-sm font-semibold text-slate-700 mb-2 block">
+                  Địa chỉ chi tiết (Số nhà, tên đường)
+                </Label>
+                <Input
+                  id="address"
+                  value={
+                    typeof formData.address === "string" ? formData.address : ""
+                  }
+                  onChange={(e) => handleInputChange("address", e.target.value)}
+                  placeholder="Ví dụ: 123 Nguyễn Huệ, Tòa nhà ABC"
+                  className="h-11 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
+                />
+              </div>
+
+              <div>
+                <Label className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-teal-600" />
+                  Mức lương <span className="text-red-500">*</span>
+                </Label>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="salaryMin" className="text-xs font-medium text-slate-600 mb-1.5 block">
+                      Lương tối thiểu <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="salaryMin"
+                      type="number"
+                      min="0"
+                      value={formData.salaryMin || ""}
+                      onChange={(e) =>
+                        handleInputChange(
+                          "salaryMin",
+                          e.target.value ? parseInt(e.target.value) : undefined
+                        )
+                      }
+                      placeholder="30,000,000"
+                      className="h-11 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="salaryMax" className="text-xs font-medium text-slate-600 mb-1.5 block">
+                      Lương tối đa <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="salaryMax"
+                      type="number"
+                      min="0"
+                      value={formData.salaryMax || ""}
+                      onChange={(e) =>
+                        handleInputChange(
+                          "salaryMax",
+                          e.target.value ? parseInt(e.target.value) : undefined
+                        )
+                      }
+                      placeholder="50,000,000"
+                      className="h-11 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="currency" className="text-xs font-medium text-slate-600 mb-1.5 block">
+                      Đơn vị tiền tệ <span className="text-red-500">*</span>
+                    </Label>
+                    <Select
+                      value={formData.currency}
+                      onValueChange={(value) =>
+                        handleInputChange("currency", value)
+                      }
+                      required
+                    >
+                      <SelectTrigger id="currency" className="w-full h-11 focus:ring-2 focus:ring-teal-500">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CURRENCIES.map((currency) => (
+                          <SelectItem key={currency.value} value={currency.value}>
+                            {currency.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="positions" className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                  <Users className="h-4 w-4 text-teal-600" />
+                  Số lượng vị trí <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="positions"
+                  type="number"
+                  min="1"
+                  value={formData.positions}
+                  onChange={(e) =>
+                    handleInputChange("positions", parseInt(e.target.value) || 1)
+                  }
+                  className="h-11 w-32 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
+                  required
+                />
+              </div>
+          </CardContent>
+        </Card>
+
+          {/* Yêu cầu và kỹ năng */}
+          <Card className="border-0 shadow-lg overflow-hidden">
+            <CardHeader className="bg-linear-to-r from-teal-50 to-white border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-teal-100 rounded-lg">
+                  <Code className="h-5 w-5 text-teal-600" />
+                </div>
+                <CardTitle className="text-xl font-semibold text-slate-900">
+                  Yêu cầu và kỹ năng
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6 space-y-6">
+              <div>
+                <Label htmlFor="requirements" className="text-sm font-semibold text-slate-700 mb-2 block">
+                  Yêu cầu công việc <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  id="requirements"
+                  value={formData.requirements}
+                  onChange={(e) =>
+                    handleInputChange("requirements", e.target.value)
+                  }
+                  placeholder="Liệt kê các yêu cầu cụ thể về kinh nghiệm, trình độ, chứng chỉ..."
+                  rows={5}
+                  className="focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all resize-none"
+                  required
+                />
+                <p className="text-xs text-slate-500 mt-1.5">
+                  Nêu rõ các yêu cầu về kinh nghiệm, trình độ học vấn, kỹ năng cần thiết
                 </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+              </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Thời gian</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div>
-              <Label htmlFor="deadline">Hạn nộp hồ sơ *</Label>
-              <Input
-                id="deadline"
-                type="date"
-                value={formData.deadline}
-                onChange={(e) => handleInputChange("deadline", e.target.value)}
-                required
-              />
-            </div>
-          </CardContent>
-        </Card>
+              <div>
+                <Label htmlFor="benefits" className="text-sm font-semibold text-slate-700 mb-2 block">
+                  Quyền lợi
+                </Label>
+                <Textarea
+                  id="benefits"
+                  value={formData.benefits}
+                  onChange={(e) => handleInputChange("benefits", e.target.value)}
+                  placeholder="Liệt kê các quyền lợi (lương tháng 13, bảo hiểm, bonus, đào tạo...)"
+                  rows={4}
+                  className="focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all resize-none"
+                />
+                <p className="text-xs text-slate-500 mt-1.5">
+                  Quyền lợi hấp dẫn sẽ thu hút ứng viên chất lượng cao
+                </p>
+              </div>
 
-        {error && (
-          <Card className="border-red-200 bg-red-50">
-            <CardContent className="p-4">
-              <p className="text-red-600">{error}</p>
+              <div>
+                <Label className="text-sm font-semibold text-slate-700 mb-3 block">
+                  Kỹ năng yêu cầu <span className="text-red-500">*</span>
+                </Label>
+                <div className="flex gap-2 mb-3">
+                  <Input
+                    value={newSkill}
+                    onChange={(e) => setNewSkill(e.target.value)}
+                    placeholder="Nhập kỹ năng và nhấn Enter hoặc click +"
+                    onKeyPress={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addSkill();
+                      }
+                    }}
+                    className="h-11 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
+                  />
+                  <Button
+                    type="button"
+                    onClick={addSkill}
+                    size="default"
+                    className="h-11 px-4 bg-teal-600 hover:bg-teal-700 text-white transition-all"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Thêm
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2 min-h-10 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                  {formData.skills.length > 0 ? (
+                    formData.skills.map((skill) => (
+                      <Badge
+                        key={skill}
+                        variant="secondary"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-100 text-teal-700 border-teal-200 hover:bg-teal-200 transition-colors"
+                      >
+                        <span className="font-medium">{skill}</span>
+                        <X
+                          className="h-3.5 w-3.5 cursor-pointer hover:text-red-600 transition-colors"
+                          onClick={() => removeSkill(skill)}
+                        />
+                      </Badge>
+                    ))
+                  ) : (
+                    <p className="text-sm text-slate-500 flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4" />
+                      Chưa có kỹ năng nào được thêm
+                    </p>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 mt-2">
+                  Thêm các kỹ năng cần thiết cho vị trí này (ví dụ: React, Node.js, Python...)
+                </p>
+              </div>
             </CardContent>
           </Card>
-        )}
 
-        <div className="flex gap-4">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => router.back()}
-            disabled={saving}
-          >
-            Hủy
-          </Button>
-          <Button type="submit" disabled={saving}>
-            {saving ? "Đang lưu..." : "Lưu thay đổi"}
-          </Button>
-        </div>
-      </form>
+          {/* Thời gian */}
+          <Card className="border-0 shadow-lg overflow-hidden">
+            <CardHeader className="bg-linear-to-r from-teal-50 to-white border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-teal-100 rounded-lg">
+                  <Calendar className="h-5 w-5 text-teal-600" />
+                </div>
+                <CardTitle className="text-xl font-semibold text-slate-900">
+                  Thời gian
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div>
+                <Label htmlFor="deadline" className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-teal-600" />
+                  Hạn nộp hồ sơ <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="deadline"
+                  type="date"
+                  value={formData.deadline}
+                  onChange={(e) => handleInputChange("deadline", e.target.value)}
+                  className="h-11 w-full max-w-xs focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
+                  required
+                />
+                <p className="text-xs text-slate-500 mt-1.5">
+                  Chọn ngày hết hạn nhận hồ sơ ứng tuyển
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Error Message */}
+          {error && (
+            <Card className="border-red-300 bg-red-50 shadow-md">
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-red-800 font-medium">Có lỗi xảy ra</p>
+                    <p className="text-red-600 text-sm mt-1">{error}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex items-center justify-between gap-4 pt-4 border-t border-slate-200">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.back()}
+              disabled={saving}
+              className="px-6 h-11 hover:bg-slate-50 transition-all"
+            >
+              Hủy
+            </Button>
+            <Button
+              type="submit"
+              disabled={saving}
+              className="px-8 h-11 bg-teal-600 hover:bg-teal-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Đang lưu...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Lưu thay đổi
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
+      </div>
 
       {/* Moderation Result Dialog */}
       <AlertDialog
@@ -1146,6 +1312,6 @@ export default function EditJobPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </EmployerShell>
   );
 }

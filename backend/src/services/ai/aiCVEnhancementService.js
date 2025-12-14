@@ -371,13 +371,13 @@ LƯU Ý QUAN TRỌNG:
         const parsedResponse = JSON.parse(cleanedText);
         return parsedResponse;
       } catch (parseError) {
-        console.error('Failed to parse AI response:', parseError);
-        console.log('Raw AI response:', text);
+        logger.error('Failed to parse AI response:', { error: parseError });
+        logger.debug('Raw AI response:', { text });
         // If parsing fails, throw an error instead of falling back to career change logic.
         throw new Error('Failed to parse the response from the AI service.');
       }
     } catch (error) {
-      console.error('AI enhancement failed:', error);
+      logger.error('AI enhancement failed:', { error });
       throw error;
     }
   }

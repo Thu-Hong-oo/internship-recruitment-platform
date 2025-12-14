@@ -4,13 +4,16 @@ const { logger } = require('../../utils/logger');
 
 /**
  * Vector Store Service using ChromaDB
- * Manages embeddings and semantic search for learning resources
- * 
- * @description Provides credible, verifiable learning resources for thesis
- * @author Thu-Hong-oo
- * @date 2025-12-01
- * 
- * UPDATED 2025-12-04: Replaced Gemini embeddings with HuggingFace (free, no quota limits)
+ * Manages embeddings and semantic search for curated learning resources
+ *
+ * Improvements (2025-12-14):
+ * - Retry + backoff for HF embeddings
+ * - Early credibility filtering in Chroma query
+ * - Better popularity normalization
+ * - Code refactoring & warmup support
+ * - Improved scoring weights
+ *
+ * @author Thu-Hong-oo (updated by Grok assistance)
  */
 class VectorStoreService {
   constructor() {
@@ -18,63 +21,60 @@ class VectorStoreService {
     this.collection = null;
     this.collectionName = 'learning_resources';
     
-    // HuggingFace embeddings (FREE, no quota limits!)
     this.embeddings = new HuggingFaceInferenceEmbeddings({
-      apiKey: process.env.HUGGING_FACE_API_KEY || 'hf_default', // Free tier available
-      model: 'sentence-transformers/all-mpnet-base-v2', // Most popular stable model (768-dim)
+      apiKey: process.env.HUGGING_FACE_API_KEY || 'hf_default',
+      model: 'sentence-transformers/all-mpnet-base-v2',
     });
-    
+
     this.initialized = false;
+  }
+
+  /**
+   * Build text used for embedding from resource fields
+   */
+  _buildEmbeddingText(resource) {
+    return `${resource.title || ''} ${resource.description || ''} ${resource.skill || ''} ${resource.type || ''}`.trim();
   }
 
   /**
    * Initialize ChromaDB client and collection
    */
   async initialize() {
-    try {
-      if (this.initialized) {
-        return true;
-      }
+    if (this.initialized) return true;
 
-      // Initialize ChromaDB client
-      // ChromaDB connection logic:
-      // 1. If CHROMA_URL is set → use it (external ChromaDB server)
-      // 2. If CHROMA_URL is not set → use embedded server on port 8001 (for App Runner)
-      // 3. For localhost → default to http://localhost:8000 (requires docker-compose)
+    try {
+      // Determine ChromaDB URL based on environment
       let chromaUrl;
       if (process.env.CHROMADB_URL || process.env.CHROMA_URL) {
         chromaUrl = process.env.CHROMADB_URL || process.env.CHROMA_URL;
-        logger.info(`Using ChromaDB URL from env: ${chromaUrl}`);
-      } else if (process.env.NODE_ENV === 'production' || 
-                 process.env.AWS_EXECUTION_ENV || 
-                 process.env.AWS_LAMBDA_FUNCTION_NAME ||
-                 process.env._?.includes('apprunner')) {
-        // Production/App Runner: use embedded server (runs in same container)
+        logger.info(`Using external ChromaDB: ${chromaUrl}`);
+      } else if (
+        process.env.NODE_ENV === 'production' ||
+        process.env.AWS_EXECUTION_ENV ||
+        process.env.AWS_LAMBDA_FUNCTION_NAME ||
+        process.env._?.includes('apprunner')
+      ) {
         chromaUrl = 'http://localhost:8001';
-        logger.info('Using ChromaDB embedded server on port 8001 (production mode)');
+        logger.info('Using embedded ChromaDB on port 8001 (production)');
       } else {
-        // Local development: default to docker-compose ChromaDB
         chromaUrl = 'http://localhost:8000';
-        logger.info('Using ChromaDB on port 8000 (local development)');
+        logger.info('Using local ChromaDB on port 8000 (development)');
       }
-      this.client = new ChromaClient({ path: chromaUrl });
 
+      this.client = new ChromaClient({ path: chromaUrl });
       logger.info('🔗 Connecting to ChromaDB...');
 
       // Get or create collection
       try {
-        this.collection = await this.client.getCollection({
-          name: this.collectionName,
-        });
-        logger.info(`✅ Connected to existing collection: ${this.collectionName}`);
-      } catch (error) {
-        // Collection doesn't exist, create it
+        this.collection = await this.client.getCollection({ name: this.collectionName });
+        logger.info(`✅ Loaded existing collection: ${this.collectionName}`);
+      } catch {
         this.collection = await this.client.createCollection({
           name: this.collectionName,
           metadata: {
             description: 'Curated learning resources from YouTube, GitHub, Roadmap.sh',
             createdAt: new Date().toISOString(),
-            version: '1.0',
+            version: '2.0',
           },
         });
         logger.info(`✅ Created new collection: ${this.collectionName}`);
@@ -90,36 +90,47 @@ class VectorStoreService {
   }
 
   /**
-   * Generate embedding vector using HuggingFace (FREE, no quota limits!)
-   * @param {string} text - Text to embed
-   * @returns {Promise<number[]>} Embedding vector
+   * Generate embedding with retry and exponential backoff
    */
-  async generateEmbedding(text) {
-    try {
-      // Use HuggingFace sentence-transformers (100% free, no billing)
-      const embedding = await this.embeddings.embedQuery(text);
-      return embedding;
-    } catch (error) {
-      logger.error('❌ HuggingFace embedding generation failed:', error);
-      throw error;
+  async generateEmbedding(text, maxRetries = 4) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        return await this.embeddings.embedQuery(text);
+      } catch (error) {
+        const isRateLimit = error.message?.includes('429') || error.status === 429;
+        if (attempt === maxRetries - 1 || !isRateLimit) {
+          logger.error('❌ Embedding generation failed permanently:', error.message);
+          throw error;
+        }
+        const delay = 1000 * 2 ** attempt; // 1s, 2s, 4s, 8s
+        logger.warn(`⚠️ Rate limited, retrying in ${delay / 1000}s... (attempt ${attempt + 1})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
     }
   }
 
   /**
-   * Add a learning resource to vector database
-   * @param {Object} resource - Learning resource with metadata
+   * Warm up embedding model (call on app startup to reduce cold start latency)
+   */
+  async warmup() {
+    try {
+      await this.generateEmbedding('warmup query for learning resources');
+      logger.info('✅ Embedding model warmed up');
+    } catch (error) {
+      logger.warn('⚠️ Warmup failed (non-critical):', error.message);
+    }
+  }
+
+  /**
+   * Add single resource
    */
   async addResource(resource) {
     try {
-      if (!this.initialized) {
-        await this.initialize();
-      }
+      if (!this.initialized) await this.initialize();
 
-      // Generate embedding for resource description
-      const embeddingText = `${resource.title} ${resource.description} ${resource.skill} ${resource.type}`;
+      const embeddingText = this._buildEmbeddingText(resource);
       const embedding = await this.generateEmbedding(embeddingText);
 
-      // Add to collection
       await this.collection.add({
         ids: [resource.id],
         embeddings: [embedding],
@@ -140,32 +151,30 @@ class VectorStoreService {
         documents: [embeddingText],
       });
 
-      logger.info(`✅ Added resource to vector DB: ${resource.title}`);
+      logger.info(`✅ Added resource: ${resource.title}`);
       return true;
     } catch (error) {
-      logger.error(`❌ Failed to add resource: ${resource.title}`, error);
+      logger.error(`❌ Failed to add resource "${resource.title}":`, error.message);
       return false;
     }
   }
 
   /**
-   * Batch add multiple resources
-   * @param {Array<Object>} resources - Array of learning resources
+   * Batch add resources
    */
   async addResourcesBatch(resources) {
+    if (resources.length === 0) return true;
+
     try {
-      if (!this.initialized) {
-        await this.initialize();
-      }
+      if (!this.initialized) await this.initialize();
 
       const ids = [];
       const embeddings = [];
       const metadatas = [];
       const documents = [];
 
-      // Process all resources
       for (const resource of resources) {
-        const embeddingText = `${resource.title} ${resource.description} ${resource.skill} ${resource.type}`;
+        const embeddingText = this._buildEmbeddingText(resource);
         const embedding = await this.generateEmbedding(embeddingText);
 
         ids.push(resource.id);
@@ -187,32 +196,58 @@ class VectorStoreService {
         documents.push(embeddingText);
       }
 
-      // Batch insert
-      await this.collection.add({
-        ids,
-        embeddings,
-        metadatas,
-        documents,
-      });
-
-      logger.info(`✅ Batch added ${resources.length} resources to vector DB`);
+      await this.collection.add({ ids, embeddings, metadatas, documents });
+      logger.info(`✅ Batch added ${resources.length} resources`);
       return true;
     } catch (error) {
-      logger.error('❌ Batch add failed:', error);
+      logger.error('❌ Batch add failed:', error.message);
       return false;
     }
   }
 
   /**
-   * Search for relevant learning resources using semantic search
-   * @param {string} query - Search query (e.g., "Learn React for frontend development")
-   * @param {Object} options - Search options
-   * @returns {Promise<Array>} Relevant resources with similarity scores
+   * Semantic search with filters and improved scoring
+   * Supports multiple call signatures for backward compatibility:
+   * 1. searchResources(queryString, options) - query is string
+   * 2. searchResources(queryParams, filters, limit) - queryParams is object (legacy)
    */
-  async searchResources(query, options = {}) {
+  async searchResources(queryOrParams, optionsOrFilters = {}, limit = null) {
     try {
-      if (!this.initialized) {
-        await this.initialize();
+      if (!this.initialized) await this.initialize();
+
+      // Handle legacy signature: searchResources(queryParams, filters, limit)
+      let query, options;
+      if (typeof queryOrParams === 'object' && queryOrParams !== null && !Array.isArray(queryOrParams)) {
+        // Legacy signature: queryParams is object
+        const queryParams = queryOrParams;
+        const filters = optionsOrFilters;
+        const queryLimit = limit || 10;
+        
+        // Build query string from queryParams
+        const parts = [];
+        if (queryParams.skill) parts.push(queryParams.skill);
+        if (queryParams.difficulty) parts.push(`${queryParams.difficulty} level`);
+        if (queryParams.learningStage) parts.push(queryParams.learningStage);
+        if (queryParams.objectives && Array.isArray(queryParams.objectives)) {
+          parts.push(...queryParams.objectives);
+        }
+        query = parts.join(' ') || 'learning resources';
+        
+        // Convert filters to options format
+        options = {
+          topK: queryLimit,
+          skill: queryParams.skill || filters.skill || null,
+          difficulty: queryParams.difficulty || filters.level || null,
+          type: filters.type || null,
+          minCredibility: filters.minRating ? filters.minRating / 5.0 : 0.6,
+        };
+      } else {
+        // New signature: query is string
+        query = typeof queryOrParams === 'string' ? queryOrParams : String(queryOrParams);
+        options = optionsOrFilters || {};
+        if (limit) {
+          options.topK = limit;
+        }
       }
 
       const {
@@ -223,164 +258,157 @@ class VectorStoreService {
         minCredibility = 0.6,
       } = options;
 
-      // Generate query embedding
       const queryEmbedding = await this.generateEmbedding(query);
 
-      // Build where filter with proper ChromaDB operators
-      const whereConditions = [];
+      // Build where filter including credibility early
+      const whereConditions = [{ credibility: { $gte: minCredibility } }];
       if (skill) whereConditions.push({ skill: { $eq: skill } });
       if (difficulty) whereConditions.push({ difficulty: { $eq: difficulty } });
       if (type) whereConditions.push({ type: { $eq: type } });
 
-      // Combine conditions with $and operator if multiple filters
-      const whereFilter = whereConditions.length === 0 ? undefined :
-                         whereConditions.length === 1 ? whereConditions[0] :
-                         { $and: whereConditions };
+      const where = whereConditions.length === 1
+        ? whereConditions[0]
+        : { $and: whereConditions };
 
-      // Query collection
       const results = await this.collection.query({
         queryEmbeddings: [queryEmbedding],
-        nResults: topK * 2, // Get more results for filtering
-        where: whereFilter,
+        nResults: topK * 3, // Extra buffer in case of scoring
+        where,
       });
 
-      // Format and filter results
       const resources = [];
-      if (results.ids && results.ids[0]) {
+      if (results.ids?.[0]) {
         for (let i = 0; i < results.ids[0].length; i++) {
           const metadata = results.metadatas[0][i];
           const distance = results.distances[0][i];
-          
-          // Convert distance to similarity score (closer to 1 is better)
           const similarity = 1 / (1 + distance);
-          
-          // Filter by credibility
-          if (metadata.credibility >= minCredibility) {
-            resources.push({
-              id: results.ids[0][i],
-              title: metadata.title,
-              description: metadata.description,
-              url: metadata.url,
-              type: metadata.type,
-              skill: metadata.skill,
-              difficulty: metadata.difficulty,
-              duration: metadata.duration,
-              source: metadata.source,
-              credibility: metadata.credibility,
-              rating: metadata.rating,
-              popularity: metadata.popularity,
-              similarity: similarity,
-              lastVerified: metadata.lastVerified,
-            });
-          }
+
+          // Normalize popularity (log scale, cap at reasonable max)
+          const normalizedPopularity = metadata.popularity
+            ? Math.min(1, Math.log10(Math.max(metadata.popularity, 1000)) / 6)
+            : 0;
+
+          const score = 
+            similarity * 0.6 + 
+            metadata.credibility * 0.3 + 
+            normalizedPopularity * 0.1;
+
+          resources.push({
+            id: results.ids[0][i],
+            title: metadata.title,
+            description: metadata.description,
+            url: metadata.url,
+            type: metadata.type,
+            skill: metadata.skill,
+            difficulty: metadata.difficulty,
+            duration: metadata.duration,
+            source: metadata.source,
+            credibility: metadata.credibility,
+            rating: metadata.rating,
+            popularity: metadata.popularity,
+            similarity: parseFloat(similarity.toFixed(4)),
+            score: parseFloat(score.toFixed(4)),
+            lastVerified: metadata.lastVerified,
+          });
         }
       }
 
-      // Sort by combined score (similarity + credibility + popularity)
-      resources.sort((a, b) => {
-        const scoreA = a.similarity * 0.5 + a.credibility * 0.3 + (a.popularity / 100000) * 0.2;
-        const scoreB = b.similarity * 0.5 + b.credibility * 0.3 + (b.popularity / 100000) * 0.2;
-        return scoreB - scoreA;
-      });
+      // Sort by final score and limit
+      resources.sort((a, b) => b.score - a.score);
+      logger.info(`✅ Found ${resources.length} resources → returning top ${topK} for query: "${query}"`);
 
-      logger.info(`✅ Found ${resources.length} relevant resources for: "${query}"`);
       return resources.slice(0, topK);
     } catch (error) {
-      logger.error('❌ Vector search failed:', error);
+      logger.error('❌ Vector search failed:', error.message);
       return [];
     }
   }
 
   /**
-   * Update resource metadata (e.g., refresh credibility scores)
-   * @param {string} resourceId - Resource ID
-   * @param {Object} updates - Fields to update
+   * Update resource metadata
    */
   async updateResource(resourceId, updates) {
     try {
-      if (!this.initialized) {
-        await this.initialize();
-      }
+      if (!this.initialized) await this.initialize();
 
       await this.collection.update({
         ids: [resourceId],
-        metadatas: [{
-          ...updates,
-          lastVerified: new Date().toISOString(),
-        }],
+        metadatas: [{ ...updates, lastVerified: new Date().toISOString() }],
       });
 
       logger.info(`✅ Updated resource: ${resourceId}`);
       return true;
     } catch (error) {
-      logger.error(`❌ Failed to update resource: ${resourceId}`, error);
+      logger.error(`❌ Update failed for ${resourceId}:`, error.message);
       return false;
     }
   }
 
   /**
-   * Delete resource from vector database
-   * @param {string} resourceId - Resource ID
+   * Delete resource
    */
   async deleteResource(resourceId) {
     try {
-      if (!this.initialized) {
-        await this.initialize();
-      }
-
-      await this.collection.delete({
-        ids: [resourceId],
-      });
-
+      if (!this.initialized) await this.initialize();
+      await this.collection.delete({ ids: [resourceId] });
       logger.info(`✅ Deleted resource: ${resourceId}`);
       return true;
     } catch (error) {
-      logger.error(`❌ Failed to delete resource: ${resourceId}`, error);
+      logger.error(`❌ Delete failed for ${resourceId}:`, error.message);
       return false;
     }
   }
 
   /**
-   * Get collection statistics
+   * Get collection stats
    */
   async getStats() {
     try {
-      if (!this.initialized) {
-        await this.initialize();
-      }
-
+      if (!this.initialized) await this.initialize();
       const count = await this.collection.count();
-
       return {
         totalResources: count,
         collectionName: this.collectionName,
         initialized: this.initialized,
       };
     } catch (error) {
-      logger.error('❌ Failed to get stats:', error);
+      logger.error('❌ Failed to get stats:', error.message);
       return null;
     }
   }
 
   /**
-   * Clear all resources (use with caution!)
+   * Clear entire collection (dangerous - use carefully)
    */
   async clearCollection() {
     try {
-      if (!this.initialized) {
-        await this.initialize();
-      }
-
+      if (!this.initialized) await this.initialize();
       await this.client.deleteCollection({ name: this.collectionName });
-      logger.warn(`⚠️ Cleared collection: ${this.collectionName}`);
-
-      // Recreate collection
-      await this.initialize();
+      logger.warn(`⚠️ Collection ${this.collectionName} cleared`);
+      this.initialized = false;
+      await this.initialize(); // Recreate
       return true;
     } catch (error) {
-      logger.error('❌ Failed to clear collection:', error);
+      logger.error('❌ Clear collection failed:', error.message);
       return false;
     }
+  }
+
+  /**
+   * Check if service is available
+   * @returns {boolean} True if service is initialized and ready
+   */
+  isAvailable() {
+    return this.initialized && this.client !== null && this.collection !== null;
+  }
+
+  /**
+   * Alias for addResourcesBatch for compatibility
+   * @param {Array<Object>} resources - Array of learning resources
+   * @returns {Promise<boolean>} Success status
+   */
+  async addResources(resources) {
+    return this.addResourcesBatch(resources);
   }
 }
 

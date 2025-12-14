@@ -15,7 +15,7 @@
  */
 
 const { logger } = require('../../utils/logger');
-const vectorStoreService = require('../ai/vectorStoreService');
+const vectorStoreService = require('../vectorStore/vectorStoreService');
 const resourceHealthCheckService = require('./resourceHealthCheckService');
 const realResourceUrlService = require('./realResourceUrlService');
 const curatedResourcesDatabase = require('./curatedResourcesDatabase');
@@ -30,59 +30,19 @@ const industryMappingService = require('./industryMappingService');
 const resourceFilterService = require('./resourceFilterService');
 const personalizationService = require('./personalizationService');
 const { getCacheService } = require('../cache/cacheService');
+const RESOURCE_CONSTANTS = require('./resourceConstants');
 
 class ResourceRecommendationService {
   constructor() {
-    // Level progression map
-    this.levelOrder = ['none', 'beginner', 'intermediate', 'advanced', 'expert'];
-    
-    // Phase characteristics
-    this.phaseCharacteristics = {
-      1: {
-        // Foundation Phase
-        focus: 'fundamentals',
-        preferredTypes: ['documentation', 'video', 'course'],
-        difficultyRange: ['beginner', 'intermediate'],
-        maxDuration: '20 hours',
-        priority: 'understanding',
-      },
-      2: {
-        // Intermediate Phase
-        focus: 'practice',
-        preferredTypes: ['course', 'video', 'project'],
-        difficultyRange: ['intermediate', 'advanced'],
-        maxDuration: '40 hours',
-        priority: 'application',
-      },
-      3: {
-        // Advanced Phase
-        focus: 'mastery',
-        preferredTypes: ['course', 'article', 'project'],
-        difficultyRange: ['advanced', 'expert'],
-        maxDuration: '60 hours',
-        priority: 'creation',
-      },
-      4: {
-        // Specialization Phase
-        focus: 'specialization',
-        preferredTypes: ['course', 'article', 'documentation'],
-        difficultyRange: ['advanced', 'expert'],
-        maxDuration: '80 hours',
-        priority: 'expertise',
-      },
-    };
-
-    // Credibility weights
-    this.credibilityWeights = {
-      providerReputation: 0.40,
-      userRating: 0.30,
-      resourceType: 0.20,
-      certificateOffered: 0.10,
-    };
+    // Use constants from centralized config
+    this.levelOrder = RESOURCE_CONSTANTS.LEVEL_ORDER;
+    this.phaseCharacteristics = RESOURCE_CONSTANTS.PHASE_CHARACTERISTICS;
+    this.credibilityWeights = RESOURCE_CONSTANTS.CREDIBILITY_WEIGHTS;
+    this.thresholds = RESOURCE_CONSTANTS.THRESHOLDS;
 
     // Cache service (Redis) for API responses
     this.cacheService = typeof getCacheService === 'function' ? getCacheService() : null;
-    this.apiCacheTTLSeconds = 60 * 60 * 6; // 6 hours
+    this.apiCacheTTLSeconds = RESOURCE_CONSTANTS.CACHE.API_CACHE_TTL_SECONDS;
   }
 
   /**
@@ -172,7 +132,7 @@ class ResourceRecommendationService {
             {
               level: appropriateDifficulty,
               type: preferredTypes.length > 0 ? preferredTypes[0] : undefined,
-              minRating: 4.0, // Only recommend high-quality resources
+              minRating: this.thresholds.MIN_RATING_FOR_RAG,
             },
             10 // Get more results for diversification
           );
@@ -210,7 +170,7 @@ class ResourceRecommendationService {
       // 6. Use intelligent recommendations if not enough from RAG
       // PRIORITY CHANGE: IntelligentResourceService provides curated, verified resources
       // This should come BEFORE APIs (which return search URLs as last resort)
-      if (resources.length < 5) {
+      if (resources.length < this.thresholds.MIN_RESOURCES_FOR_INTELLIGENT) {
         try {
           const intelligentResources = await this._generateIntelligentRecommendations({
             skill: canonicalSkill,
@@ -238,7 +198,7 @@ class ResourceRecommendationService {
 
       // 7. Fetch from APIs only if still not enough resources (LAST RESORT)
       // APIs provide search URLs, not direct resources, so use only when needed
-      if (resources.length < 3) {
+      if (resources.length < this.thresholds.MIN_RESOURCES_FOR_API_FALLBACK) {
         try {
           // Enhance search query with industry context AND skill-specific enhancements
           let enhancedSkill = industry 
@@ -347,7 +307,7 @@ class ResourceRecommendationService {
       // 11. Filter by minimum credibility
       const credibleResources = resourceFilterService.filterByCredibility(
         phaseAlignedResources,
-        0.6 // Minimum credibility score
+        this.thresholds.MIN_CREDIBILITY_SCORE
       );
 
       // 11.5. Filter by role relevance (NEW) - Remove resources not relevant to target role
@@ -405,8 +365,12 @@ class ResourceRecommendationService {
       }
 
       // 10. Limit và diversify với MMR (Maximal Marginal Relevance)
-      // Lambda = 0.7: 70% relevance, 30% diversity
-      const finalResources = this._diversifyAndLimit(validResources, preferredTypes, 5, 0.7);
+      const finalResources = this._diversifyAndLimit(
+        validResources, 
+        preferredTypes, 
+        this.thresholds.DEFAULT_RESOURCE_LIMIT, 
+        this.thresholds.MMR_LAMBDA
+      );
       
       // 11. CRITICAL: Ensure ALL resources have required 'type' field (Mongoose validation)
       // This is the final safety net before returning to prevent validation errors
@@ -414,19 +378,20 @@ class ResourceRecommendationService {
         if (!resource.type) {
           // Infer type from URL or use default
           if (resource.url) {
-            if (resource.url.includes('youtube.com') || resource.url.includes('vimeo.com')) {
+            const url = resource.url.toLowerCase();
+            if (RESOURCE_CONSTANTS.TYPE_INFERENCE.VIDEO.some(pattern => url.includes(pattern))) {
               resource.type = 'video';
-            } else if (resource.url.includes('udemy.com') || resource.url.includes('coursera.org') || resource.url.includes('edx.org')) {
+            } else if (RESOURCE_CONSTANTS.TYPE_INFERENCE.COURSE.some(pattern => url.includes(pattern))) {
               resource.type = 'course';
-            } else if (resource.url.includes('github.com') || resource.url.includes('gitlab.com')) {
+            } else if (RESOURCE_CONSTANTS.TYPE_INFERENCE.PROJECT.some(pattern => url.includes(pattern))) {
               resource.type = 'project';
-            } else if (resource.url.includes('docs.') || resource.url.includes('documentation') || resource.url.includes('/docs/')) {
+            } else if (RESOURCE_CONSTANTS.TYPE_INFERENCE.DOCUMENTATION.some(pattern => url.includes(pattern))) {
               resource.type = 'documentation';
             } else {
-              resource.type = 'article'; // Default fallback
+              resource.type = RESOURCE_CONSTANTS.TYPE_INFERENCE.DEFAULT;
             }
           } else {
-            resource.type = 'article'; // Ultimate fallback
+            resource.type = RESOURCE_CONSTANTS.TYPE_INFERENCE.DEFAULT;
           }
           logger.warn('Resource missing type field, inferred as:', {
             title: resource.title,
@@ -1174,13 +1139,7 @@ class ResourceRecommendationService {
 
   // Helper methods
   _getPhaseTitle(phaseNumber) {
-    const titles = {
-      1: 'Fundamentals',
-      2: 'Intermediate',
-      3: 'Advanced',
-      4: 'Mastery',
-    };
-    return titles[phaseNumber] || 'Complete';
+    return RESOURCE_CONSTANTS.PHASE_TITLES[phaseNumber] || `Phase ${phaseNumber}`;
   }
 
   _sanitizeSkillQuery(rawSkill = '') {
@@ -1721,5 +1680,15 @@ class ResourceRecommendationService {
   }
 }
 
-module.exports = new ResourceRecommendationService();
+// Export singleton instance (for backward compatibility)
+const resourceRecommendationService = new ResourceRecommendationService();
+
+// Export factory function for testing
+function getResourceRecommendationService() {
+  return resourceRecommendationService;
+}
+
+module.exports = resourceRecommendationService;
+module.exports.getResourceRecommendationService = getResourceRecommendationService;
+module.exports.ResourceRecommendationService = ResourceRecommendationService;
 
