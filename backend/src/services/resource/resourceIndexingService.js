@@ -9,7 +9,7 @@
  * - Updating existing resources
  */
 
-const vectorStoreService = require('../ai/vectorStoreService');
+const vectorStoreService = require('../vectorStore/vectorStoreService');
 const { logger } = require('../../utils/logger');
 
 class ResourceIndexingService {

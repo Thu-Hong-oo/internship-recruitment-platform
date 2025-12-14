@@ -432,10 +432,7 @@ export default function ProfilePage() {
         {/* Avatar Upload Section */}
         <Card className="mb-6 border border-slate-200/80 shadow-lg shadow-slate-200/60">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <div className="rounded-full bg-primary/10 p-2">
-                <Camera className="w-4 h-4 text-primary" />
-              </div>
+            <CardTitle className="text-base font-semibold">
               Ảnh đại diện
             </CardTitle>
             <p className="text-sm text-slate-500">
@@ -520,10 +517,7 @@ export default function ProfilePage() {
             {/* Contact Information */}
             <Card className="h-full border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <div className="rounded-full bg-primary/10 p-2">
-                    <User className="w-4 h-4 text-primary" />
-                  </div>
+                <CardTitle className="text-base font-semibold">
                   Thông tin liên hệ
                 </CardTitle>
                 <p className="text-sm text-slate-500">
@@ -615,10 +609,7 @@ export default function ProfilePage() {
             {/* Position Information */}
             <Card className="h-full border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <div className="rounded-full bg-primary/10 p-2">
-                    <Building className="w-4 h-4 text-primary" />
-                  </div>
+                <CardTitle className="text-base font-semibold">
                   Vị trí công việc
                 </CardTitle>
                 <p className="text-sm text-slate-500">

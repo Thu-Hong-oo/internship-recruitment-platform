@@ -316,7 +316,7 @@ class UnifiedUploadService {
         }
       }
 
-      console.log(
+      logger.debug(
         `🗑️ Deleting file with resource_type: ${actualResourceType}, publicId: ${publicId}`
       );
 
@@ -513,7 +513,7 @@ class UnifiedUploadService {
         ...options,
       };
 
-      console.log('🔐 Generating signed URL with options:', {
+      logger.debug('🔐 Generating signed URL with options:', {
         publicId,
         ...finalOptions,
       });

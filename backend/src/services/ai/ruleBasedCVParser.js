@@ -339,10 +339,10 @@ class RuleBasedCVParser {
     try {
       text = await vietnameseSpellChecker.correct(text);
     } catch (error) {
-      console.warn('⚠️  Spell checker failed, using original text:', error.message);
+      logger.warn('⚠️  Spell checker failed, using original text:', { error: error.message });
     }
     
-    console.log(`🧹 Text cleaned (length: ${text.length})`);
+    logger.debug(`🧹 Text cleaned (length: ${text.length})`);
     return text;
   }
 
@@ -351,19 +351,18 @@ class RuleBasedCVParser {
    */
   async parseCV(fileBuffer, mimeType) {
     try {
-      console.log('📝 Starting rule-based CV parsing (no AI required)');
+      logger.debug('📝 Starting rule-based CV parsing (no AI required)');
       
       // Step 1: Extract text from file
       const text = await this.extractTextFromCV(fileBuffer, mimeType);
       
       if (!text || text.length < 50) {
-        console.error('❌ Insufficient text extracted from CV');
-        console.error(`   Text length: ${text?.length || 0}`);
+        logger.error('❌ Insufficient text extracted from CV', { textLength: text?.length || 0 });
         throw new Error('Insufficient text extracted from CV');
       }
 
-      console.log(`✅ Text extracted: ${text.length} characters`);
-      console.log(`📄 Text preview (first 500 chars): ${text.substring(0, 500)}`);
+      logger.debug(`✅ Text extracted: ${text.length} characters`);
+      logger.debug(`📄 Text preview (first 500 chars): ${text.substring(0, 500)}`);
 
       // Step 2: Extract information using rules
       const personalInfo = this.extractPersonalInfo(text);
@@ -374,13 +373,14 @@ class RuleBasedCVParser {
       const awards = this.extractAwards(text);
       
       // Log extracted info for debugging
-      console.log('📊 Extracted information:');
-      console.log(`   Name: ${personalInfo.fullName || 'Not found'}`);
-      console.log(`   Email: ${personalInfo.email || 'Not found'}`);
-      console.log(`   Phone: ${personalInfo.phone || 'Not found'}`);
-      console.log(`   Education: ${education.institution || 'Not found'}`);
-      console.log(`   Experience count: ${experience.length}`);
-      console.log(`   Skills count: ${skills.length}`);
+      logger.debug('📊 Extracted information:', {
+        name: personalInfo.fullName || 'Not found',
+        email: personalInfo.email || 'Not found',
+        phone: personalInfo.phone || 'Not found',
+        education: education.institution || 'Not found',
+        experienceCount: experience.length,
+        skillsCount: skills.length,
+      });
       
       const result = {
         extractedData: {
@@ -403,7 +403,7 @@ class RuleBasedCVParser {
       // Flatten skills for compatibility
       result.skills = result.extractedData.skills.map(s => s.name || s);
 
-      console.log('✅ Rule-based parsing complete');
+      logger.info('✅ Rule-based parsing complete');
       return result;
     } catch (error) {
       logger.error('Rule-based CV parsing error:', error);

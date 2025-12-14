@@ -37,6 +37,19 @@ import {
   X,
   ExternalLink,
   CalendarClock,
+  Search,
+  Filter,
+  Download,
+  CheckSquare,
+  Square,
+  MoreVertical,
+  Briefcase,
+  TrendingUp,
+  Users,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  ArrowUpDown,
 } from "lucide-react";
 import {
   Dialog,
@@ -50,6 +63,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import EmployerShell from "@/components/layout/EmployerShell";
+import { getMyJobs } from "@/lib/jobAPI";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type Application = {
   _id: string;
@@ -147,6 +169,22 @@ export default function EmployerApplicationsPage() {
   });
   const [filters, setFilters] = useState({
     status: "all",
+    jobId: "all",
+    search: "",
+    sortBy: "createdAt",
+    sortOrder: "desc" as "asc" | "desc",
+  });
+  const [selectedApplications, setSelectedApplications] = useState<string[]>([]);
+  const [allJobs, setAllJobs] = useState<Array<{ _id: string; title: string }>>([]);
+  const [stats, setStats] = useState({
+    total: 0,
+    pending: 0,
+    reviewing: 0,
+    shortlisted: 0,
+    interview: 0,
+    offer: 0,
+    accepted: 0,
+    rejected: 0,
   });
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -165,7 +203,7 @@ export default function EmployerApplicationsPage() {
 
   const loadApplications = async (
     page = pageMeta.page,
-    status = filters.status
+    currentFilters = filters
   ) => {
     try {
       setLoading(true);
@@ -182,11 +220,75 @@ export default function EmployerApplicationsPage() {
       const result = await getEmployerApplications(token, {
         page,
         limit: pageMeta.limit,
-        status: status === "all" ? undefined : status,
+        status: currentFilters.status === "all" ? undefined : currentFilters.status,
+        jobId: currentFilters.jobId === "all" ? undefined : currentFilters.jobId,
       });
 
       if (result.success && result.data) {
-        setApplications(result.data.data || []);
+        let filteredData = result.data.data || [];
+        
+        // Client-side search filter
+        if (currentFilters.search) {
+          const searchLower = currentFilters.search.toLowerCase();
+          filteredData = filteredData.filter((app: Application) => {
+            const name = app.candidateId?.userId?.fullName || app.candidateId?.userId?.displayFullName || "";
+            const email = app.candidateId?.userId?.email || "";
+            const jobTitle = app.jobId?.title || "";
+            return (
+              name.toLowerCase().includes(searchLower) ||
+              email.toLowerCase().includes(searchLower) ||
+              jobTitle.toLowerCase().includes(searchLower)
+            );
+          });
+        }
+
+        // Client-side sort
+        filteredData.sort((a: Application, b: Application) => {
+          let aValue: any;
+          let bValue: any;
+          
+          switch (currentFilters.sortBy) {
+            case "name":
+              aValue = a.candidateId?.userId?.fullName || a.candidateId?.userId?.displayFullName || "";
+              bValue = b.candidateId?.userId?.fullName || b.candidateId?.userId?.displayFullName || "";
+              break;
+            case "job":
+              aValue = a.jobId?.title || "";
+              bValue = b.jobId?.title || "";
+              break;
+            case "status":
+              aValue = a.status || "";
+              bValue = b.status || "";
+              break;
+            case "createdAt":
+            default:
+              aValue = new Date(a.createdAt).getTime();
+              bValue = new Date(b.createdAt).getTime();
+              break;
+          }
+          
+          if (currentFilters.sortOrder === "asc") {
+            return aValue > bValue ? 1 : aValue < bValue ? -1 : 0;
+          } else {
+            return aValue < bValue ? 1 : aValue > bValue ? -1 : 0;
+          }
+        });
+
+        setApplications(filteredData);
+        
+        // Calculate stats
+        const allData = result.data.data || [];
+        setStats({
+          total: allData.length,
+          pending: allData.filter((a: Application) => a.status === "pending").length,
+          reviewing: allData.filter((a: Application) => a.status === "reviewing").length,
+          shortlisted: allData.filter((a: Application) => a.status === "shortlisted").length,
+          interview: allData.filter((a: Application) => a.status === "interview").length,
+          offer: allData.filter((a: Application) => a.status === "offer").length,
+          accepted: allData.filter((a: Application) => a.status === "accepted").length,
+          rejected: allData.filter((a: Application) => a.status === "rejected").length,
+        });
+        
         setPageMeta({
           page: result.data.pagination?.page || page,
           limit: result.data.pagination?.limit || pageMeta.limit,
@@ -206,21 +308,101 @@ export default function EmployerApplicationsPage() {
     }
   };
 
+  // Load jobs for filter
   useEffect(() => {
-    loadApplications(1, filters.status);
+    const loadJobs = async () => {
+      try {
+        const token =
+          localStorage.getItem("token") || sessionStorage.getItem("token");
+        if (!token) return;
+        
+        const result = await getMyJobs(token, { limit: 100 });
+        if (result.success && result.data) {
+          setAllJobs(
+            result.data.map((job: any) => ({
+              _id: job._id,
+              title: job.title,
+            }))
+          );
+        }
+      } catch (e) {
+        // silent fail
+      }
+    };
+    loadJobs();
+  }, []);
+
+  useEffect(() => {
+    loadApplications(1, filters);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleFilterStatusChange = (value: string) => {
-    const newFilters = { ...filters, status: value };
+  const handleFilterChange = (key: string, value: string) => {
+    const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
-    loadApplications(1, value);
+    loadApplications(1, newFilters);
+  };
+
+  const handleSearchChange = (value: string) => {
+    const newFilters = { ...filters, search: value };
+    setFilters(newFilters);
+    // Debounce search - reload after user stops typing
+    const timeoutId = setTimeout(() => {
+      loadApplications(1, newFilters);
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedApplications(applications.map((app) => app._id));
+    } else {
+      setSelectedApplications([]);
+    }
+  };
+
+  const handleSelectApplication = (applicationId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedApplications([...selectedApplications, applicationId]);
+    } else {
+      setSelectedApplications(selectedApplications.filter((id) => id !== applicationId));
+    }
+  };
+
+  const handleBulkStatusChange = async (newStatus: string) => {
+    if (selectedApplications.length === 0) return;
+    
+    try {
+      const token =
+        localStorage.getItem("token") || sessionStorage.getItem("token");
+      if (!token) return;
+
+      const promises = selectedApplications.map((id) =>
+        updateApplicationStatus(id, newStatus, token)
+      );
+      
+      await Promise.all(promises);
+      
+      toast({
+        title: "Thành công",
+        description: `Đã cập nhật trạng thái cho ${selectedApplications.length} ứng viên`,
+      });
+      
+      setSelectedApplications([]);
+      loadApplications(pageMeta.page, filters);
+    } catch (err: any) {
+      toast({
+        title: "Lỗi",
+        description: err?.message || "Không thể cập nhật trạng thái",
+        variant: "destructive",
+      });
+    }
   };
 
   const handlePageChange = (direction: "prev" | "next") => {
     const newPage =
       direction === "next" ? pageMeta.page + 1 : pageMeta.page - 1;
-    loadApplications(newPage, filters.status);
+    loadApplications(newPage, filters);
   };
 
   const formatDateTime = (dateString: string) => {
@@ -298,7 +480,7 @@ export default function EmployerApplicationsPage() {
           description: "Đã cập nhật trạng thái ứng viên",
         });
         // Refresh data after successful update
-        await loadApplications(pageMeta.page, filters.status);
+        await loadApplications(pageMeta.page, filters);
       } else {
         const errorMsg = res.error || "Không thể cập nhật trạng thái";
         setError(errorMsg);
@@ -392,7 +574,7 @@ export default function EmployerApplicationsPage() {
         note: "",
         metadata: "",
       });
-      loadApplications(pageMeta.page, filters.status);
+      loadApplications(pageMeta.page, filters);
     } else {
       toast({
         title: "Lỗi",
@@ -417,20 +599,20 @@ export default function EmployerApplicationsPage() {
 
     return (
       <div className="flex items-center gap-3">
-        <Avatar className="h-10 w-10">
+        <Avatar className="h-12 w-12 border-2 border-slate-200 shadow-sm">
           <AvatarImage src={user?.avatar} alt={displayName} />
-          <AvatarFallback>
+          <AvatarFallback className="bg-linear-to-br from-primary/10 to-primary/5 text-primary font-semibold">
             {displayName.substring(0, 2).toUpperCase()}
           </AvatarFallback>
         </Avatar>
-        <div className="space-y-1">
-          <div className="font-medium flex items-center gap-1">
-            <UserRound className="h-4 w-4 text-muted-foreground" />
+        <div className="space-y-1.5">
+          <div className="font-semibold text-slate-900 flex items-center gap-1.5 group-hover:text-primary transition-colors">
+            <UserRound className="h-4 w-4 text-slate-400" />
             {displayName}
           </div>
           {user?.email && (
-            <div className="text-sm text-muted-foreground flex items-center gap-1">
-              <Mail className="h-3 w-3" />
+            <div className="text-sm text-slate-600 flex items-center gap-1.5">
+              <Mail className="h-3.5 w-3.5 text-slate-400" />
               {user.email}
             </div>
           )}
@@ -455,15 +637,6 @@ export default function EmployerApplicationsPage() {
   return (
     <EmployerShell active="applications">
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold mb-2">Ứng viên ứng tuyển</h1>
-            <p className="text-gray-600">
-              Theo dõi tất cả ứng viên đã ứng tuyển vào các tin tuyển dụng của bạn
-            </p>
-          </div>
-        </div>
-
         {error && (
           <Card className="border-red-200 bg-red-50">
             <CardContent className="p-4 flex items-center gap-2 text-red-700">
@@ -473,27 +646,173 @@ export default function EmployerApplicationsPage() {
           </Card>
         )}
 
-        <Card>
-          <CardContent className="p-4 flex flex-wrap items-center gap-4">
-            <div className="text-sm font-medium">Bộ lọc</div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Trạng thái:</span>
-              <Select value={filters.status} onValueChange={handleFilterStatusChange}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Tất cả" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tất cả</SelectItem>
-                  <SelectItem value="pending">Chờ duyệt</SelectItem>
-                  <SelectItem value="reviewing">Đang xem xét</SelectItem>
-                  <SelectItem value="shortlisted">Vòng tiếp theo</SelectItem>
-                  <SelectItem value="interview">Đã phỏng vấn</SelectItem>
-                  <SelectItem value="offer">Đã đề xuất</SelectItem>
-                  <SelectItem value="accepted">Đã tuyển</SelectItem>
-                  <SelectItem value="rejected">Từ chối</SelectItem>
-                </SelectContent>
-              </Select>
+        {/* Statistics Cards
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card className="border-0 shadow-md bg-linear-to-r from-blue-50 to-blue-100/50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-600">Tổng ứng viên</p>
+                  <p className="text-2xl font-bold text-slate-900 mt-1">{stats.total}</p>
+                </div>
+                <Users className="h-8 w-8 text-blue-600" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-md bg-linear-to-r from-amber-50 to-amber-100/50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-600">Chờ xử lý</p>
+                  <p className="text-2xl font-bold text-slate-900 mt-1">{stats.pending + stats.reviewing}</p>
+                </div>
+                <Clock className="h-8 w-8 text-amber-600" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-md bg-linear-to-r from-green-50 to-green-100/50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-600">Đã tuyển</p>
+                  <p className="text-2xl font-bold text-slate-900 mt-1">{stats.accepted}</p>
+                </div>
+                <CheckCircle2 className="h-8 w-8 text-green-600" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-md bg-linear-to-r from-red-50 to-red-100/50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-600">Từ chối</p>
+                  <p className="text-2xl font-bold text-slate-900 mt-1">{stats.rejected}</p>
+                </div>
+                <XCircle className="h-8 w-8 text-red-600" />
+              </div>
+            </CardContent>
+          </Card>
+        </div> */}
+
+        {/* Search and Filters */}
+        <Card className="border-0 shadow-md">
+          <CardContent className="p-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              {/* Search */}
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input
+                    placeholder="Tìm kiếm theo tên, email, công việc..."
+                    value={filters.search}
+                    onChange={(e) => {
+                      setFilters({ ...filters, search: e.target.value });
+                      const timeoutId = setTimeout(() => {
+                        loadApplications(1, { ...filters, search: e.target.value });
+                      }, 500);
+                      return () => clearTimeout(timeoutId);
+                    }}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-wrap gap-3 items-center">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-semibold text-slate-700">Bộ lọc:</span>
+                </div>
+                
+                <Select value={filters.status} onValueChange={(v) => handleFilterChange("status", v)}>
+                  <SelectTrigger className="w-[160px] border-slate-200">
+                    <SelectValue placeholder="Trạng thái" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                    <SelectItem value="pending">Chờ duyệt</SelectItem>
+                    <SelectItem value="reviewing">Đang xem xét</SelectItem>
+                    <SelectItem value="shortlisted">Vòng tiếp theo</SelectItem>
+                    <SelectItem value="interview">Đã phỏng vấn</SelectItem>
+                    <SelectItem value="offer">Đã đề xuất</SelectItem>
+                    <SelectItem value="accepted">Đã tuyển</SelectItem>
+                    <SelectItem value="rejected">Từ chối</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={filters.jobId} onValueChange={(v) => handleFilterChange("jobId", v)}>
+                  <SelectTrigger className="w-[200px] border-slate-200">
+                    <SelectValue placeholder="Công việc" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tất cả công việc</SelectItem>
+                    {allJobs.map((job) => (
+                      <SelectItem key={job._id} value={job._id}>
+                        {job.title.length > 40 ? `${job.title.substring(0, 40)}...` : job.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={`${filters.sortBy}-${filters.sortOrder}`} onValueChange={(v) => {
+                  const [sortBy, sortOrder] = v.split("-");
+                  handleFilterChange("sortBy", sortBy);
+                  handleFilterChange("sortOrder", sortOrder as "asc" | "desc");
+                }}>
+                  <SelectTrigger className="w-[180px] border-slate-200">
+                    <SelectValue placeholder="Sắp xếp" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="createdAt-desc">Mới nhất</SelectItem>
+                    <SelectItem value="createdAt-asc">Cũ nhất</SelectItem>
+                    <SelectItem value="name-asc">Tên A-Z</SelectItem>
+                    <SelectItem value="name-desc">Tên Z-A</SelectItem>
+                    <SelectItem value="job-asc">Công việc A-Z</SelectItem>
+                    <SelectItem value="job-desc">Công việc Z-A</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+
+            {/* Bulk Actions */}
+            {selectedApplications.length > 0 && (
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+                <span className="text-sm font-medium text-blue-900">
+                  Đã chọn {selectedApplications.length} ứng viên
+                </span>
+                <div className="flex gap-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        Thay đổi trạng thái
+                        <ArrowUpDown className="h-4 w-4 ml-2" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onClick={() => handleBulkStatusChange("reviewing")}>
+                        Đang xem xét
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleBulkStatusChange("shortlisted")}>
+                        Vòng tiếp theo
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleBulkStatusChange("interview")}>
+                        Đã phỏng vấn
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleBulkStatusChange("rejected")}>
+                        Từ chối
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedApplications([])}
+                  >
+                    Bỏ chọn
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -515,108 +834,141 @@ export default function EmployerApplicationsPage() {
             </CardContent>
           </Card>
         ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                Danh sách ứng viên ({applications.length} ứng viên trên trang {pageMeta.page}/
-                {pageMeta.totalPages})
-              </CardTitle>
+          <Card className="overflow-hidden border-0 shadow-lg">
+            <CardHeader className="bg-linear-to-r from-slate-50 to-white border-b border-slate-200">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" />
+                  Danh sách ứng viên ({applications.length} ứng viên trên trang {pageMeta.page}/
+                  {pageMeta.totalPages})
+                </CardTitle>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Download className="h-4 w-4" />
+                  Xuất Excel
+                </Button>
+              </div>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ứng viên</TableHead>
-                    <TableHead>Công việc</TableHead>
-                    <TableHead>Trạng thái</TableHead>
-                    <TableHead>Thời gian</TableHead>
-                    <TableHead>Tài liệu</TableHead>
-                    <TableHead className="w-[200px]">Hành động</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {applications.map((application) => (
-                    <TableRow key={application._id}>
-                      <TableCell>{renderCandidateInfo(application)}</TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="font-medium">{application.jobId?.title || "Tin đã bị xóa"}</div>
-                          {application.jobId?._id && (
-                            <Button
-                              variant="link"
-                              className="px-0 h-auto text-sm"
-                              onClick={() => router.push(`/jobs/${application.jobId?._id}`)}
-                            >
-                              <Eye className="h-3 w-3 mr-1" />
-                              Xem tin
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {(() => {
-                          const upcoming = getUpcomingInterview(application);
-                          if (upcoming && application.status === "interview") {
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-linear-to-r from-slate-50 to-slate-100/50 hover:bg-slate-100/50 border-b border-slate-200">
+                      <TableHead className="w-[50px]">
+                        <Checkbox
+                          checked={selectedApplications.length === applications.length && applications.length > 0}
+                          onCheckedChange={handleSelectAll}
+                        />
+                      </TableHead>
+                      <TableHead className="font-semibold text-slate-700 py-4 px-6">Ứng viên</TableHead>
+                      <TableHead className="font-semibold text-slate-700 py-4 px-6">Công việc</TableHead>
+                      <TableHead className="font-semibold text-slate-700 py-4 px-6">Trạng thái</TableHead>
+                      <TableHead className="font-semibold text-slate-700 py-4 px-6">Thời gian</TableHead>
+                      <TableHead className="font-semibold text-slate-700 py-4 px-6">Tài liệu</TableHead>
+                      <TableHead className="font-semibold text-slate-700 py-4 px-6 text-right">Hành động</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {applications.map((application) => (
+                      <TableRow 
+                        key={application._id}
+                        className="border-b border-slate-100 hover:bg-linear-to-r hover:from-blue-50/30 hover:to-white transition-all duration-200 group"
+                      >
+                        <TableCell className="py-5 px-6">
+                          <Checkbox
+                            checked={selectedApplications.includes(application._id)}
+                            onCheckedChange={(checked) => handleSelectApplication(application._id, checked as boolean)}
+                          />
+                        </TableCell>
+                        <TableCell className="py-5 px-6">{renderCandidateInfo(application)}</TableCell>
+                        <TableCell className="py-5 px-6">
+                          <div className="space-y-2">
+                            <div className="font-semibold text-slate-900 group-hover:text-primary transition-colors">
+                              {application.jobId?.title || "Tin đã bị xóa"}
+                            </div>
+                            {application.jobId?._id && (
+                              <Button
+                                variant="link"
+                                className="px-0 h-auto text-sm text-blue-600 hover:text-blue-700"
+                                onClick={() => router.push(`/jobs/${application.jobId?._id}`)}
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
+                                Xem tin
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-5 px-6">
+                          {(() => {
+                            const upcoming = getUpcomingInterview(application);
+                            if (upcoming && application.status === "interview") {
+                              return (
+                                <Badge variant="default" className="bg-blue-100 text-blue-700 border-blue-200">
+                                  <CalendarClock className="h-3 w-3 mr-1" />
+                                  Đã lên lịch
+                                </Badge>
+                              );
+                            }
+                            if (FINAL_STATUSES.includes(application.status || "")) {
+                              return renderStatusBadge(application.status || "pending");
+                            }
                             return (
-                              <Badge variant="default" className="bg-blue-100 text-blue-700">
-                                Đã lên lịch
-                              </Badge>
+                              <Select
+                                value={application.status || "pending"}
+                                onValueChange={(value) => handleStatusChange(application._id, value)}
+                                disabled={updatingStatus === application._id}
+                              >
+                                <SelectTrigger className="w-[160px] border-slate-200 hover:border-primary transition-colors">
+                                  <SelectValue>
+                                    {statusConfig[application.status || "pending"]?.label ||
+                                      application.status ||
+                                      "Chờ duyệt"}
+                                  </SelectValue>
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {STATUS_OPTIONS_FOR_SELECT.filter((option) => {
+                                    const availableStatuses = getAvailableStatuses(application.status || "pending");
+                                    return option.value === application.status || availableStatuses.includes(option.value);
+                                  }).map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                      {option.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             );
-                          }
-                          if (FINAL_STATUSES.includes(application.status || "")) {
-                            return renderStatusBadge(application.status || "pending");
-                          }
-                          return (
-                            <Select
-                              value={application.status || "pending"}
-                              onValueChange={(value) => handleStatusChange(application._id, value)}
-                              disabled={updatingStatus === application._id}
+                          })()}
+                        </TableCell>
+                        <TableCell className="py-5 px-6">
+                          <div className="flex items-center gap-2">
+                            <CalendarClock className="h-4 w-4 text-slate-400" />
+                            <span className="text-sm font-medium text-slate-700">
+                              {getUpcomingInterview(application)?.scheduledAt
+                                ? formatDateTime(getUpcomingInterview(application)!.scheduledAt!)
+                                : formatDateTime(application.createdAt)}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-5 px-6">
+                          {application.resume?.url ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleViewCV(application)}
+                              disabled={loadingCV}
+                              className="hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all duration-200"
                             >
-                              <SelectTrigger className="w-[160px]">
-                                <SelectValue>
-                                  {statusConfig[application.status || "pending"]?.label ||
-                                    application.status ||
-                                    "Chờ duyệt"}
-                                </SelectValue>
-                              </SelectTrigger>
-                              <SelectContent>
-                                {STATUS_OPTIONS_FOR_SELECT.filter((option) => {
-                                  const availableStatuses = getAvailableStatuses(application.status || "pending");
-                                  return option.value === application.status || availableStatuses.includes(option.value);
-                                }).map((option) => (
-                                  <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          );
-                        })()}
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm text-muted-foreground">
-                          {getUpcomingInterview(application)?.scheduledAt
-                            ? formatDateTime(getUpcomingInterview(application)!.scheduledAt!)
-                            : formatDateTime(application.createdAt)}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {application.resume?.url ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleViewCV(application)}
-                            disabled={loadingCV}
-                          >
-                            <FileText className="h-4 w-4 mr-2" />
-                            {loadingCV ? "Đang tải..." : "Xem CV"}
-                          </Button>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">Không có tệp</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-2 justify-end">
+                              <FileText className="h-4 w-4 mr-2" />
+                              {loadingCV ? "Đang tải..." : "Xem CV"}
+                            </Button>
+                          ) : (
+                            <span className="text-sm text-slate-500 flex items-center gap-1">
+                              <FileText className="h-4 w-4 text-slate-300" />
+                              Không có tệp
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-5 px-6">
+                          <div className="flex flex-wrap gap-2 justify-end">
                           <Dialog
                             open={schedulingFor === application._id}
                             onOpenChange={(open) => setSchedulingFor(open ? application._id : null)}
@@ -769,20 +1121,23 @@ export default function EmployerApplicationsPage() {
                               </DialogFooter>
                             </DialogContent>
                           </Dialog>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => router.push(`/jobs/${application.jobId?._id ?? ""}/applications`)}
-                            disabled={!application.jobId?._id}
-                          >
-                            Chi tiết
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => router.push(`/jobs/${application.jobId?._id ?? ""}/applications`)}
+                              disabled={!application.jobId?._id}
+                              className="hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all duration-200"
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              Chi tiết
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
 
               <div className="flex items-center justify-between mt-4">
                 <div className="text-sm text-muted-foreground">
@@ -810,10 +1165,9 @@ export default function EmployerApplicationsPage() {
             </CardContent>
           </Card>
         )}
-      </div>
 
-      {/* CV Preview Modal */}
-      {showPreview && previewUrl && (
+        {/* CV Preview Modal */}
+        {showPreview && previewUrl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="relative flex h-full max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-white/30 bg-white/90 shadow-[0_40px_90px_rgba(15,45,95,0.18)] backdrop-blur-2xl">
             <div className="flex items-center justify-between border-b border-white/40 bg-white/70 px-6 py-4 backdrop-blur-lg">
@@ -862,7 +1216,8 @@ export default function EmployerApplicationsPage() {
             </div>
           </div>
         </div>
-      )}
+        )}
+      </div>
     </EmployerShell>
   );
 }

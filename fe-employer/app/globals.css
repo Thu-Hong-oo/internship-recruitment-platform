@@ -124,3 +124,101 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* DayPicker styles for dashboard - teal theme */
+.rdp-button_previous,
+.rdp-button_next {
+  color: #14b8a6 !important;
+}
+
+.rdp-button_previous:hover,
+.rdp-button_next:hover {
+  color: #0d9488 !important;
+  background-color: #ccfbf1 !important;
+}
+
+.rdp-button_previous:focus,
+.rdp-button_next:focus {
+  color: #14b8a6 !important;
+}
+
+/* Target SVG chevron icons inside buttons */
+.rdp-button_previous svg,
+.rdp-button_next svg,
+.rdp-button_previous svg polygon,
+.rdp-button_next svg polygon,
+.rdp-button_previous svg path,
+.rdp-button_next svg path {
+  fill: #14b8a6 !important;
+  stroke: #14b8a6 !important;
+}
+
+.rdp-button_previous:hover svg,
+.rdp-button_next:hover svg,
+.rdp-button_previous:hover svg polygon,
+.rdp-button_next:hover svg polygon,
+.rdp-button_previous:hover svg path,
+.rdp-button_next:hover svg path {
+  fill: #0d9488 !important;
+  stroke: #0d9488 !important;
+}
+
+.rdp-day_selected {
+  background-color: #14b8a6 !important;
+  color: #ffffff !important;
+}
+
+.rdp-day_selected:hover {
+  background-color: #0d9488 !important;
+}
+
+/* Override all day button colors */
+.rdp-day_button {
+  color: #0f172a !important;
+}
+
+.rdp-day_button:hover {
+  background-color: #ccfbf1 !important;
+  color: #0d9488 !important;
+}
+
+.rdp-day_button:focus {
+  background-color: #ccfbf1 !important;
+  color: #0d9488 !important;
+}
+
+/* Today button */
+.rdp-day_today .rdp-day_button {
+  border: 2px solid #14b8a6 !important;
+  color: #14b8a6 !important;
+  font-weight: bold !important;
+}
+
+.rdp-day_today.rdp-day_selected .rdp-day_button {
+  background-color: #14b8a6 !important;
+  color: #ffffff !important;
+  border-color: #14b8a6 !important;
+}
+
+/* Selected day button */
+.rdp-day_selected .rdp-day_button {
+  background-color: #14b8a6 !important;
+  color: #ffffff !important;
+}
+
+.rdp-day_selected .rdp-day_button:hover {
+  background-color: #0d9488 !important;
+  color: #ffffff !important;
+}
+
+/* Has interview modifier */
+.rdp-day_hasInterview .rdp-day_button {
+  background-color: #ccfbf1 !important;
+  color: #0d9488 !important;
+  font-weight: bold !important;
+}
+
+.rdp-day_hasInterview .rdp-day_button:hover {
+  background-color: #99f6e4 !important;
+  color: #0f766e !important;
+}

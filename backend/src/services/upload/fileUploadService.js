@@ -1,4 +1,5 @@
 const { cloudinary } = require('../../utils/cloudinary');
+const { logger } = require('../../utils/logger');
 
 /**
  * Upload any file (image, video, document, audio, etc.) to Cloudinary
@@ -54,8 +55,8 @@ async function uploadFile(type, filePathOrBuffer, options = {}) {
   const config = { ...configByType[type], ...options };
 
   // Debug logging
-  console.log(`📤 FileUploadService: Uploading ${type} file`);
-  console.log('Config:', JSON.stringify(config, null, 2));
+  logger.debug(`📤 FileUploadService: Uploading ${type} file`);
+  logger.debug('Config:', { config });
 
   // Giới hạn kích thước file mặc định theo loại
   const defaultMaxSizeByType = {
@@ -88,16 +89,16 @@ async function uploadFile(type, filePathOrBuffer, options = {}) {
 
   let result;
   if (Buffer.isBuffer(filePathOrBuffer)) {
-    console.log('📤 Uploading from buffer...');
+    logger.debug('📤 Uploading from buffer...');
     result = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         config,
         (err, res) => {
           if (err) {
-            console.error('❌ Upload stream error:', err);
+            logger.error('❌ Upload stream error:', err);
             return reject(err);
           }
-          console.log('✅ Upload stream success:', {
+          logger.info('✅ Upload stream success:', {
             public_id: res.public_id,
             url: res.secure_url,
             format: res.format,
@@ -109,7 +110,7 @@ async function uploadFile(type, filePathOrBuffer, options = {}) {
       uploadStream.end(filePathOrBuffer);
     });
   } else {
-    console.log('📤 Uploading from file path...');
+    logger.debug('📤 Uploading from file path...');
     result = await cloudinary.uploader.upload(filePathOrBuffer, config);
   }
 
@@ -136,10 +137,10 @@ async function deleteFile(publicId, resourceType = 'auto') {
       await cloudinary.uploader.destroy(publicId, {
         resource_type: resourceType,
       });
-      console.log(`Deleted file: ${publicId}`);
+      logger.info(`Deleted file: ${publicId}`);
     }
   } catch (error) {
-    console.error('Error deleting file from Cloudinary:', error);
+    logger.error('Error deleting file from Cloudinary:', error);
     throw error;
   }
 }

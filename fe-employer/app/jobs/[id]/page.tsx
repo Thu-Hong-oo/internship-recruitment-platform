@@ -12,6 +12,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -37,6 +45,10 @@ import {
   Clock,
   Building,
   Users,
+  Filter,
+  Search,
+  Star,
+  TrendingUp,
 } from "lucide-react";
 import { getCities, getDistricts, getWards } from "@/lib/vietnamAddress";
 import { findOptionByLabelLoose } from "@/lib/addressUtils";
@@ -134,6 +146,9 @@ export default function JobDetailPage() {
   const [selectedWard, setSelectedWard] = useState<string>("");
   const [loadingAddress, setLoadingAddress] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [filterScore, setFilterScore] = useState<number>(0);
+  const [filterTier, setFilterTier] = useState<string>("all");
+  const [filterSkill, setFilterSkill] = useState<string>("");
 
   // Load job data on mount
   useEffect(() => {
@@ -829,7 +844,7 @@ export default function JobDetailPage() {
             </Button>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold text-gray-900">
+                <h1 className="text-2xl font-semibold text-slate-800">
                   {jobData.title}
                 </h1>
                 {jobData?.status && getStatusBadge(jobData.status)}
@@ -889,97 +904,266 @@ export default function JobDetailPage() {
 
       {/* Suggested Candidates */}
       {showSuggestions && (
-        <Card className="border-blue-100 bg-blue-50 mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span className="inline-flex h-2 w-2 rounded-full bg-blue-500"></span>
-              Ứng viên gợi ý cho bài tuyển dụng
-            </CardTitle>
+        <Card className="mb-6 overflow-hidden border-0 shadow-lg bg-gradient-to-br from-white via-blue-50/30 to-white">
+          <CardHeader className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent border-b border-primary/10 pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl font-bold text-slate-900">
+                    Ứng viên gợi ý
+                  </CardTitle>
+                  <p className="text-sm text-slate-600 mt-0.5">
+                    Danh sách ứng viên phù hợp với bài tuyển dụng
+                  </p>
+                </div>
+              </div>
+              <Badge variant="secondary" className="text-sm font-medium px-3 py-1">
+                {suggestedCandidates.length} ứng viên
+              </Badge>
+            </div>
           </CardHeader>
-          <CardContent>
+
+          {/* Sticky Filter Bar */}
+          <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm border-b border-slate-200 shadow-sm">
+            <CardContent className="p-4">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-2 text-slate-700">
+                  <Filter className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-semibold">Bộ lọc:</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="filter-score" className="text-sm text-slate-600 whitespace-nowrap">
+                    Điểm tối thiểu:
+                  </Label>
+                  <Input
+                    id="filter-score"
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={filterScore}
+                    onChange={(e) => setFilterScore(Number(e.target.value))}
+                    className="w-24 h-9"
+                    placeholder="0"
+                  />
+                  <span className="text-xs text-slate-500">%</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="filter-tier" className="text-sm text-slate-600 whitespace-nowrap">
+                    Tier:
+                  </Label>
+                  <Select value={filterTier} onValueChange={setFilterTier}>
+                    <SelectTrigger id="filter-tier" className="w-32 h-9">
+                      <SelectValue placeholder="Tất cả" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tất cả</SelectItem>
+                      <SelectItem value="1">Tier 1</SelectItem>
+                      <SelectItem value="2">Tier 2</SelectItem>
+                      <SelectItem value="3">Tier 3</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      type="text"
+                      placeholder="Tìm theo kỹ năng..."
+                      value={filterSkill}
+                      onChange={(e) => setFilterSkill(e.target.value)}
+                      className="pl-9 h-9"
+                    />
+                  </div>
+                </div>
+
+                {(filterScore > 0 || filterTier !== "all" || filterSkill) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setFilterScore(0);
+                      setFilterTier("all");
+                      setFilterSkill("");
+                    }}
+                    className="h-9 text-xs"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Xóa bộ lọc
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </div>
+
+          <CardContent className="p-0">
             {loadingSuggestions && (
-              <p className="text-sm text-gray-600">
-                Đang tải gợi ý ứng viên...
-              </p>
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-10 w-10 border-3 border-primary border-t-transparent mx-auto mb-4"></div>
+                  <p className="text-sm text-slate-600">Đang tải gợi ý ứng viên...</p>
+                </div>
+              </div>
             )}
             {suggestionError && suggestedCandidates.length === 0 && (
-              <p className="text-sm text-red-600">{suggestionError}</p>
+              <div className="p-8 text-center">
+                <p className="text-sm text-red-600">{suggestionError}</p>
+              </div>
             )}
             {!loadingSuggestions &&
               !suggestionError &&
               suggestedCandidates.length === 0 && (
-                <p className="text-sm text-gray-600">Chưa có gợi ý phù hợp.</p>
+                <div className="p-8 text-center">
+                  <p className="text-sm text-slate-600">Chưa có gợi ý phù hợp.</p>
+                </div>
               )}
-            <div className="space-y-3">
-              {suggestedCandidates.map((c) => {
-                const profileLink = c.candidateId
-                  ? `${profileBaseUrl}/profile/${c.candidateId}?public=1`
-                  : undefined;
-                const mailto = c.email
-                  ? `mailto:${c.email}?subject=Mời ứng tuyển - ${
-                      jobData?.title || "Cơ hội mới"
-                    }&body=Chào ${
-                      c.name
-                    },%0D%0AChúng tôi muốn mời bạn ứng tuyển vị trí ${
-                      jobData?.title || ""
-                    }.`
-                  : undefined;
 
-                return (
-                  <div
-                    key={c.candidateId}
-                    className="border border-blue-100 bg-white rounded-md p-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
-                  >
-                    <div className="space-y-1">
-                      <p className="font-semibold text-gray-900 flex items-center gap-2">
-                        {c.name}
-                        {c.tier && (
-                          <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">
-                            Tier {c.tier}
-                          </span>
-                        )}
-                      </p>
-                      {c.email && (
-                        <p className="text-sm text-gray-600">{c.email}</p>
-                      )}
-                      {c.matchedSkills && c.matchedSkills.length > 0 && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          Kỹ năng khớp: {c.matchedSkills.slice(0, 5).join(", ")}
-                          {c.matchedSkills.length > 5
-                            ? ` +${c.matchedSkills.length - 5}`
-                            : ""}
-                        </p>
-                      )}
-                    </div>
+            {!loadingSuggestions && suggestedCandidates.length > 0 && (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-slate-50/50">
+                    <TableRow className="hover:bg-slate-50/50 border-b border-slate-200">
+                      <TableHead className="font-semibold text-slate-700 w-[30%]">Ứng viên</TableHead>
+                      <TableHead className="font-semibold text-slate-700 w-[25%]">Kỹ năng khớp</TableHead>
+                      <TableHead className="font-semibold text-slate-700 w-[15%] text-center">Điểm số</TableHead>
+                      <TableHead className="font-semibold text-slate-700 w-[15%] text-center">Tier</TableHead>
+                      <TableHead className="font-semibold text-slate-700 w-[15%] text-right">Thao tác</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {suggestedCandidates
+                      .filter((c) => {
+                        if (filterScore > 0 && Math.round(c.score) < filterScore) return false;
+                        if (filterTier !== "all" && c.tier !== filterTier) return false;
+                        if (filterSkill && c.matchedSkills) {
+                          const skillLower = filterSkill.toLowerCase();
+                          return !c.matchedSkills.some((s) =>
+                            s.toLowerCase().includes(skillLower)
+                          );
+                        }
+                        return true;
+                      })
+                      .map((c, index) => {
+                        const profileLink = c.candidateId
+                          ? `${profileBaseUrl}/profile/${c.candidateId}?public=1`
+                          : undefined;
+                        const mailto = c.email
+                          ? `mailto:${c.email}?subject=Mời ứng tuyển - ${
+                              jobData?.title || "Cơ hội mới"
+                            }&body=Chào ${
+                              c.name
+                            },%0D%0AChúng tôi muốn mời bạn ứng tuyển vị trí ${
+                              jobData?.title || ""
+                            }.`
+                          : undefined;
 
-                    <div className="flex flex-col items-start gap-2 md:items-end">
-                      <div className="text-sm font-semibold text-blue-700">
-                        Điểm: {Math.round(c.score)}%
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setSelectedCandidate(c)}
-                          disabled={!c}
-                        >
-                          Xem hồ sơ
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            if (mailto) window.open(mailto, "_blank");
-                          }}
-                          disabled={!mailto}
-                        >
-                          Mời ứng tuyển
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                        const scoreColor =
+                          c.score >= 80
+                            ? "text-emerald-600 bg-emerald-50"
+                            : c.score >= 60
+                            ? "text-blue-600 bg-blue-50"
+                            : c.score >= 40
+                            ? "text-amber-600 bg-amber-50"
+                            : "text-slate-600 bg-slate-50";
+
+                        return (
+                          <TableRow
+                            key={c.candidateId}
+                            className="hover:bg-slate-50/50 transition-colors border-b border-slate-100"
+                          >
+                            <TableCell>
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-semibold text-slate-900">
+                                    {c.name}
+                                  </p>
+                                </div>
+                                {c.email && (
+                                  <p className="text-sm text-slate-600">{c.email}</p>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {c.matchedSkills && c.matchedSkills.length > 0 ? (
+                                  <>
+                                    {c.matchedSkills.slice(0, 3).map((skill, idx) => (
+                                      <Badge
+                                        key={idx}
+                                        variant="secondary"
+                                        className="text-xs bg-primary/10 text-primary border-primary/20"
+                                      >
+                                        {skill}
+                                      </Badge>
+                                    ))}
+                                    {c.matchedSkills.length > 3 && (
+                                      <Badge
+                                        variant="secondary"
+                                        className="text-xs bg-slate-100 text-slate-600"
+                                      >
+                                        +{c.matchedSkills.length - 3}
+                                      </Badge>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span className="text-xs text-slate-400">Không có</span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <div
+                                className={`inline-flex items-center justify-center px-3 py-1.5 rounded-full font-bold text-sm ${scoreColor}`}
+                              >
+                                <Star className="h-3 w-3 mr-1 fill-current" />
+                                {Math.round(c.score)}%
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {c.tier ? (
+                                <Badge
+                                  variant="outline"
+                                  className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/30 text-primary font-semibold"
+                                >
+                                  Tier {c.tier}
+                                </Badge>
+                              ) : (
+                                <span className="text-xs text-slate-400">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setSelectedCandidate(c)}
+                                  className="h-8 text-xs"
+                                >
+                                  Xem
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    if (mailto) window.open(mailto, "_blank");
+                                  }}
+                                  disabled={!mailto}
+                                  className="h-8 text-xs bg-primary hover:bg-primary/90"
+                                >
+                                  Mời
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

@@ -1,5 +1,7 @@
 "use client";
 
+import type React from "react";
+
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -25,13 +27,12 @@ import {
 } from "lucide-react";
 import { getToken } from "@/lib/userStorage";
 import { useVietnamAddress } from "@/hooks/useVietnamAddress";
-import { AddressOption, findOptionByLabelLoose } from "@/lib/addressUtils";
 import {
   getCompanyInfo,
   updateCompanyInfo,
   uploadCompanyLogo,
   uploadCompanyCoverImage,
-  CompanyFormData,
+  type CompanyFormData,
 } from "@/lib/companyAPI";
 import { useVerificationContext } from "@/contexts/VerificationContext";
 import { industryService, type Industry } from "@/lib/industryAPI";
@@ -44,6 +45,7 @@ import {
   isPlaceholderRegistrationNumber,
   isPlaceholderTaxId,
 } from "@/lib/placeholderUtils";
+import EmployerShell from "@/components/layout/EmployerShell";
 
 export default function CompanyPage() {
   const router = useRouter();
@@ -460,55 +462,45 @@ export default function CompanyPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-6xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => router.back()}
-                className="flex items-center gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" /> Quay lại
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold text-slate-800">
-                  Cập nhật thông tin công ty
-                </h1>
-                <p className="text-slate-600">
-                  Thông tin công ty và người đại diện
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => router.push("/company/documents")}
-                className="flex items-center gap-2"
-              >
-                <FileText className="w-4 h-4" /> Tài liệu công ty
-              </Button>
-              {!isEditing && (
-                <Button
-                  type="button"
-                  onClick={() => setIsEditing(true)}
-                  className="bg-primary text-white hover:brightness-110 shadow-sm px-4"
-                >
-                  <Edit3 className="w-4 h-4 mr-2" /> Chỉnh sửa
-                </Button>
-              )}
-            </div>
-          </div>
+    <EmployerShell active="company">
+      <div className="space-y-6">
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.push("/company/documents")}
+          >
+            <FileText className="w-4 h-4 mr-2" /> Tài liệu
+          </Button>
+          {!isEditing && (
+            <Button type="button" onClick={() => setIsEditing(true)}>
+              <Edit3 className="w-4 h-4 mr-2" /> Chỉnh sửa
+            </Button>
+          )}
         </div>
-      </div>
+        {/* Success/Error Messages */}
+        {error && (
+          <Alert className="mb-6 border-red-200 bg-red-50">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertTitle className="text-red-800">Lỗi</AlertTitle>
+            <AlertDescription className="text-red-700">
+              {error}
+            </AlertDescription>
+          </Alert>
+        )}
+        {success && (
+          <Alert className="mb-6 border-green-200 bg-green-50">
+            <AlertCircle className="h-4 w-4 text-green-600" />
+            <AlertTitle className="text-green-800">Thành công</AlertTitle>
+            <AlertDescription className="text-green-700">
+              {success}
+            </AlertDescription>
+          </Alert>
+        )}
 
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        {/* Placeholder Data Alert */}
+        {/* Placeholder Alert */}
         {isPlaceholder && !isEditing && (
-          <Alert className="mb-6 border-amber-200 bg-amber-50">
+          <Alert className="border-amber-200 bg-amber-50">
             <AlertCircle className="h-4 w-4 text-amber-600" />
             <AlertTitle className="text-amber-800">
               Dữ liệu mẫu được hiển thị
@@ -521,34 +513,45 @@ export default function CompanyPage() {
           </Alert>
         )}
 
+        {/* View Mode */}
         {!isEditing && (
           <div className="space-y-6">
-            {/* View Mode - Company visuals */}
+            {/* Company Images Card */}
             <Card>
               <CardHeader>
                 <CardTitle>Hình ảnh công ty</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label>Logo</Label>
-                    <div className="mt-2">
+              <CardContent className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Logo */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold text-slate-700">
+                      Logo công ty
+                    </Label>
+                    <div className="space-y-3">
                       {companyView?.logo ||
                       companyView?.company?.logo?.url ||
                       companyView?.company?.logo ? (
-                        <img
-                          src={
-                            companyView.logo ||
-                            companyView?.company?.logo?.url ||
-                            (companyView?.company?.logo as any)
-                          }
-                          alt="Logo"
-                          className="h-16 w-16 rounded object-cover border"
-                        />
+                        <div className="relative group">
+                          <div className="w-24 h-24 rounded-xl border-2 border-slate-200 overflow-hidden bg-white shadow-sm group-hover:shadow-md transition-shadow">
+                            <img
+                              src={
+                                companyView.logo ||
+                                companyView?.company?.logo?.url ||
+                                (companyView?.company?.logo as any) ||
+                                "/placeholder.svg"
+                              }
+                              alt="Logo"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        </div>
                       ) : (
-                        <div className="text-slate-500">Chưa có logo</div>
+                        <div className="w-24 h-24 rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center bg-slate-50">
+                          <Building2 className="w-8 h-8 text-slate-400" />
+                        </div>
                       )}
-                      <div className="mt-2">
+                      <div>
                         <input
                           ref={logoInputRef}
                           type="file"
@@ -566,32 +569,42 @@ export default function CompanyPage() {
                           size="sm"
                           onClick={() => logoInputRef.current?.click()}
                           disabled={uploadingLogo}
-                          className="mt-1"
                         >
                           {uploadingLogo ? "Đang tải..." : "Thay đổi logo"}
                         </Button>
                       </div>
                     </div>
                   </div>
-                  <div>
-                    <Label>Ảnh bìa</Label>
-                    <div className="mt-2">
+
+                  {/* Cover Image */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold text-slate-700">
+                      Ảnh bìa
+                    </Label>
+                    <div className="space-y-3">
                       {companyView?.coverImage ||
                       companyView?.company?.coverImage?.url ||
                       companyView?.company?.coverImage ? (
-                        <img
-                          src={
-                            companyView.coverImage ||
-                            companyView?.company?.coverImage?.url ||
-                            (companyView?.company?.coverImage as any)
-                          }
-                          alt="Cover"
-                          className="h-28 w-full max-w-md rounded object-cover border"
-                        />
+                        <div className="relative group">
+                          <div className="w-full h-32 rounded-xl border-2 border-slate-200 overflow-hidden bg-white shadow-sm group-hover:shadow-md transition-shadow">
+                            <img
+                              src={
+                                companyView.coverImage ||
+                                companyView?.company?.coverImage?.url ||
+                                (companyView?.company?.coverImage as any) ||
+                                "/placeholder.svg"
+                              }
+                              alt="Cover"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        </div>
                       ) : (
-                        <div className="text-slate-500">Chưa có ảnh bìa</div>
+                        <div className="w-full h-32 rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center bg-slate-50">
+                          <FileText className="w-8 h-8 text-slate-400" />
+                        </div>
                       )}
-                      <div className="mt-2">
+                      <div>
                         <input
                           ref={coverInputRef}
                           type="file"
@@ -609,7 +622,6 @@ export default function CompanyPage() {
                           size="sm"
                           onClick={() => coverInputRef.current?.click()}
                           disabled={uploadingCover}
-                          className="mt-1"
                         >
                           {uploadingCover ? "Đang tải..." : "Thay đổi ảnh bìa"}
                         </Button>
@@ -620,136 +632,341 @@ export default function CompanyPage() {
               </CardContent>
             </Card>
 
-            <div className="grid gap-6 md:grid-cols-2">
+            {/* Company Info & Address Grid */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              {/* Company Info */}
               <Card>
                 <CardHeader>
                   <CardTitle>Thông tin công ty</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2 text-slate-900">
-                  <div>
-                    <span className="text-slate-500">Tên:</span>{" "}
-                    {isPlaceholderText(formData.company.name)
-                      ? "Chưa cập nhật"
-                      : formData.company.name || "Chưa cập nhật"}
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Ngành:</span>{" "}
-                    {isPlaceholder
-                      ? "Chưa cập nhật"
-                      : industries.find(
-                          (i) => i.code === formData.company.industry
-                        )?.name?.vi ||
-                        industries.find(
-                          (i) => i.code === formData.company.industry
-                        )?.name?.en ||
-                        formData.company.industry ||
-                        "Chưa cập nhật"}
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Quy mô:</span>{" "}
-                    {isPlaceholder
-                      ? "Chưa cập nhật"
-                      : sizeOptions.find(
-                          (o) => o.value === formData.company.size
-                        )?.label ||
-                        formData.company.size ||
-                        "Chưa cập nhật"}
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Email:</span>{" "}
-                    {isPlaceholderEmail(formData.company.email)
-                      ? "Chưa cập nhật"
-                      : formData.company.email || "Chưa cập nhật"}
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Website:</span>{" "}
-                    {formData.company.website || "Chưa cập nhật"}
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Năm thành lập:</span>{" "}
-                    {formData.company.foundedYear || "Chưa cập nhật"}
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Số nhân sự:</span>{" "}
-                    {formData.company.employeesCount || "Chưa cập nhật"}
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Mô tả:</span>
-                    <div className="mt-1 whitespace-pre-line">
-                      {formData.company.description || "Chưa cập nhật"}
+                <CardContent className="p-6">
+                  <dl className="space-y-4">
+                    <div className="flex flex-col">
+                      <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                        Tên công ty
+                      </dt>
+                      <dd className="text-base font-semibold text-slate-900">
+                        {isPlaceholderText(formData.company.name)
+                          ? "Chưa cập nhật"
+                          : formData.company.name || "Chưa cập nhật"}
+                      </dd>
                     </div>
-                  </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col">
+                        <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                          Ngành nghề
+                        </dt>
+                        <dd className="text-sm text-slate-900">
+                          {isPlaceholder
+                            ? "Chưa cập nhật"
+                            : industries.find(
+                                (i) => i.code === formData.company.industry
+                              )?.name?.vi ||
+                              industries.find(
+                                (i) => i.code === formData.company.industry
+                              )?.name?.en ||
+                              formData.company.industry ||
+                              "Chưa cập nhật"}
+                        </dd>
+                      </div>
+                      <div className="flex flex-col">
+                        <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                          Quy mô
+                        </dt>
+                        <dd className="text-sm text-slate-900">
+                          {isPlaceholder
+                            ? "Chưa cập nhật"
+                            : sizeOptions.find(
+                                (o) => o.value === formData.company.size
+                              )?.label ||
+                              formData.company.size ||
+                              "Chưa cập nhật"}
+                        </dd>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col">
+                        <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                          Năm thành lập
+                        </dt>
+                        <dd className="text-sm text-slate-900">
+                          {formData.company.foundedYear || "Chưa cập nhật"}
+                        </dd>
+                      </div>
+                      <div className="flex flex-col">
+                        <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                          Số nhân sự
+                        </dt>
+                        <dd className="text-sm text-slate-900">
+                          {formData.company.employeesCount || "Chưa cập nhật"}
+                        </dd>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col">
+                      <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                        Email
+                      </dt>
+                      <dd className="text-sm text-primary">
+                        {isPlaceholderEmail(formData.company.email)
+                          ? "Chưa cập nhật"
+                          : formData.company.email || "Chưa cập nhật"}
+                      </dd>
+                    </div>
+
+                    <div className="flex flex-col">
+                      <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                        Website
+                      </dt>
+                      <dd className="text-sm text-primary">
+                        {formData.company.website || "Chưa cập nhật"}
+                      </dd>
+                    </div>
+
+                    {formData.company.description && (
+                      <div className="flex flex-col pt-2 border-t">
+                        <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
+                          Mô tả
+                        </dt>
+                        <dd className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">
+                          {formData.company.description}
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
                 </CardContent>
               </Card>
+
+              {/* Address */}
               <Card>
                 <CardHeader>
                   <CardTitle>Địa chỉ văn phòng</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-2 text-slate-900">
-                  <div>
-                    <span className="text-slate-500">Địa chỉ:</span>{" "}
-                    {isPlaceholderText(formData.businessInfo.address.street)
-                      ? "Chưa cập nhật"
-                      : formData.businessInfo.address.street || "Chưa cập nhật"}
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Phường/Xã:</span>{" "}
-                    {isPlaceholderText(formData.businessInfo.address.ward)
-                      ? "Chưa cập nhật"
-                      : formData.businessInfo.address.ward || "Chưa cập nhật"}
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Quận/Huyện:</span>{" "}
-                    {isPlaceholderText(formData.businessInfo.address.district)
-                      ? "Chưa cập nhật"
-                      : formData.businessInfo.address.district ||
-                        "Chưa cập nhật"}
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Tỉnh/Thành phố:</span>{" "}
-                    {isPlaceholderText(formData.businessInfo.address.city)
-                      ? "Chưa cập nhật"
-                      : formData.businessInfo.address.city || "Chưa cập nhật"}
-                  </div>
-                  <div>
-                    <span className="text-slate-500">Quốc gia:</span>{" "}
-                    {formData.businessInfo.address.country || "Chưa cập nhật"}
-                  </div>
+                <CardContent className="p-6">
+                  <dl className="space-y-4">
+                    <div className="flex flex-col">
+                      <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                        Địa chỉ
+                      </dt>
+                      <dd className="text-sm text-slate-900">
+                        {isPlaceholderText(formData.businessInfo.address.street)
+                          ? "Chưa cập nhật"
+                          : formData.businessInfo.address.street ||
+                            "Chưa cập nhật"}
+                      </dd>
+                    </div>
+                    <div className="flex flex-col">
+                      <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                        Phường/Xã
+                      </dt>
+                      <dd className="text-sm text-slate-900">
+                        {isPlaceholderText(formData.businessInfo.address.ward)
+                          ? "Chưa cập nhật"
+                          : formData.businessInfo.address.ward ||
+                            "Chưa cập nhật"}
+                      </dd>
+                    </div>
+                    <div className="flex flex-col">
+                      <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                        Quận/Huyện
+                      </dt>
+                      <dd className="text-sm text-slate-900">
+                        {isPlaceholderText(
+                          formData.businessInfo.address.district
+                        )
+                          ? "Chưa cập nhật"
+                          : formData.businessInfo.address.district ||
+                            "Chưa cập nhật"}
+                      </dd>
+                    </div>
+                    <div className="flex flex-col">
+                      <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                        Tỉnh/Thành phố
+                      </dt>
+                      <dd className="text-sm text-slate-900">
+                        {isPlaceholderText(formData.businessInfo.address.city)
+                          ? "Chưa cập nhật"
+                          : formData.businessInfo.address.city ||
+                            "Chưa cập nhật"}
+                      </dd>
+                    </div>
+                    <div className="flex flex-col">
+                      <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                        Quốc gia
+                      </dt>
+                      <dd className="text-sm text-slate-900">
+                        {formData.businessInfo.address.country ||
+                          "Chưa cập nhật"}
+                      </dd>
+                    </div>
+                  </dl>
                 </CardContent>
               </Card>
             </div>
 
+            {/* Business Info & Legal Rep Grid */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              {/* Business Info */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Thông tin pháp lý</CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <dl className="space-y-4">
+                    <div className="flex flex-col">
+                      <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                        Số ĐKKD
+                      </dt>
+                      <dd className="text-sm font-medium text-slate-900">
+                        {isPlaceholderRegistrationNumber(
+                          formData.businessInfo.registrationNumber
+                        )
+                          ? "Chưa cập nhật"
+                          : formData.businessInfo.registrationNumber ||
+                            "Chưa cập nhật"}
+                      </dd>
+                    </div>
+                    <div className="flex flex-col">
+                      <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                        Mã số thuế
+                      </dt>
+                      <dd className="text-sm font-medium text-slate-900">
+                        {isPlaceholderTaxId(formData.businessInfo.taxId)
+                          ? "Chưa cập nhật"
+                          : formData.businessInfo.taxId || "Chưa cập nhật"}
+                      </dd>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col">
+                        <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                          Ngày cấp
+                        </dt>
+                        <dd className="text-sm text-slate-900">
+                          {formData.businessInfo.issueDate
+                            ? new Date(
+                                formData.businessInfo.issueDate
+                              ).toLocaleDateString("vi-VN")
+                            : "Chưa cập nhật"}
+                        </dd>
+                      </div>
+                      <div className="flex flex-col">
+                        <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                          Nơi cấp
+                        </dt>
+                        <dd className="text-sm text-slate-900">
+                          {isPlaceholderText(formData.businessInfo.issuePlace)
+                            ? "Chưa cập nhật"
+                            : formData.businessInfo.issuePlace ||
+                              "Chưa cập nhật"}
+                        </dd>
+                      </div>
+                    </div>
+                  </dl>
+                </CardContent>
+              </Card>
+
+              {/* Legal Representative */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Người đại diện pháp luật</CardTitle>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <dl className="space-y-4">
+                    <div className="flex flex-col">
+                      <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                        Họ và tên
+                      </dt>
+                      <dd className="text-base font-semibold text-slate-900">
+                        {isPlaceholderText(
+                          formData.legalRepresentative.fullName
+                        )
+                          ? "Chưa cập nhật"
+                          : formData.legalRepresentative.fullName ||
+                            "Chưa cập nhật"}
+                      </dd>
+                    </div>
+                    <div className="flex flex-col">
+                      <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                        Chức vụ
+                      </dt>
+                      <dd className="text-sm text-slate-900">
+                        {isPlaceholderText(
+                          formData.legalRepresentative.position
+                        )
+                          ? "Chưa cập nhật"
+                          : formData.legalRepresentative.position ||
+                            "Chưa cập nhật"}
+                      </dd>
+                    </div>
+                    <div className="flex flex-col">
+                      <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                        Số điện thoại
+                      </dt>
+                      <dd className="text-sm text-slate-900">
+                        {isPlaceholderPhone(formData.legalRepresentative.phone)
+                          ? "Chưa cập nhật"
+                          : formData.legalRepresentative.phone ||
+                            "Chưa cập nhật"}
+                      </dd>
+                    </div>
+                    <div className="flex flex-col">
+                      <dt className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">
+                        Email
+                      </dt>
+                      <dd className="text-sm text-primary">
+                        {isPlaceholderEmail(formData.legalRepresentative.email)
+                          ? "Chưa cập nhật"
+                          : formData.legalRepresentative.email ||
+                            "Chưa cập nhật"}
+                      </dd>
+                    </div>
+                  </dl>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         )}
-        {isEditing ? (
+
+        {/* Edit Mode */}
+        {isEditing && (
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Company Info */}
+            {/* Company Info Card */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-primary" /> Thông tin công
-                  ty
-                </CardTitle>
+                <CardTitle>Thông tin công ty</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="company.name">Tên công ty *</Label>
+              <CardContent className="p-6 space-y-5">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="company.name"
+                      className="text-sm font-medium text-slate-700"
+                    >
+                      Tên công ty <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="company.name"
                       value={formData.company.name}
                       onChange={(e) => setField("company.name", e.target.value)}
                       required
+                      className="focus:border-primary focus:ring-primary"
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="company.industry">Ngành *</Label>
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="company.industry"
+                      className="text-sm font-medium text-slate-700"
+                    >
+                      Ngành nghề <span className="text-red-500">*</span>
+                    </Label>
                     <Select
                       value={formData.company.industry}
                       onValueChange={(v) => setField("company.industry", v)}
                       disabled={loadingIndustries}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="focus:border-primary focus:ring-primary">
                         <SelectValue
                           placeholder={
                             loadingIndustries ? "Đang tải..." : "Chọn ngành"
@@ -769,14 +986,19 @@ export default function CompanyPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="company.size">Quy mô *</Label>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="company.size"
+                      className="text-sm font-medium text-slate-700"
+                    >
+                      Quy mô <span className="text-red-500">*</span>
+                    </Label>
                     <Select
                       value={formData.company.size}
                       onValueChange={(v) => setField("company.size", v)}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="focus:border-primary focus:ring-primary">
                         <SelectValue placeholder="Chọn quy mô" />
                       </SelectTrigger>
                       <SelectContent>
@@ -788,8 +1010,13 @@ export default function CompanyPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div>
-                    <Label htmlFor="company.foundedYear">Năm thành lập</Label>
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="company.foundedYear"
+                      className="text-sm font-medium text-slate-700"
+                    >
+                      Năm thành lập
+                    </Label>
                     <Input
                       id="company.foundedYear"
                       type="number"
@@ -802,13 +1029,19 @@ export default function CompanyPage() {
                           e.target.value ? Number(e.target.value) : ""
                         )
                       }
+                      className="focus:border-primary focus:ring-primary"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="company.email">Email công ty *</Label>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="company.email"
+                      className="text-sm font-medium text-slate-700"
+                    >
+                      Email công ty <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="company.email"
                       type="email"
@@ -817,28 +1050,38 @@ export default function CompanyPage() {
                         setField("company.email", e.target.value)
                       }
                       required
+                      className="focus:border-primary focus:ring-primary"
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="company.website">Website</Label>
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="company.website"
+                      className="text-sm font-medium text-slate-700"
+                    >
+                      Website
+                    </Label>
                     <Input
                       id="company.website"
-                      // Chuyển thành type="text" để cho phép nhập các dạng như bluewaveagency.vn, example.com, v.v.
                       type="text"
-                      placeholder="https://example.com, example.com"
+                      placeholder="https://example.com"
                       value={formData.company.website}
-                      onChange={(e) => setField("company.website", e.target.value)}
+                      onChange={(e) =>
+                        setField("company.website", e.target.value)
+                      }
                       pattern="^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(\/.*)?$"
+                      className="focus:border-primary focus:ring-primary"
                     />
-                    <p className="text-xs text-slate-500 mt-1">
-                      Bạn có thể nhập dạng https://example.com, example.com hoặc bluewaveagency.vn - hệ thống sẽ tự động thêm https:// nếu bạn chưa nhập.
-                    </p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="company.employeesCount">Số nhân sự</Label>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="company.employeesCount"
+                      className="text-sm font-medium text-slate-700"
+                    >
+                      Số nhân sự
+                    </Label>
                     <Input
                       id="company.employeesCount"
                       type="number"
@@ -850,33 +1093,44 @@ export default function CompanyPage() {
                           e.target.value ? Number(e.target.value) : ""
                         )
                       }
+                      className="focus:border-primary focus:ring-primary"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="company.description">Mô tả</Label>
+                <div className="space-y-2">
+                  <Label
+                    htmlFor="company.description"
+                    className="text-sm font-medium text-slate-700"
+                  >
+                    Mô tả công ty
+                  </Label>
                   <Textarea
                     id="company.description"
                     value={formData.company.description}
                     onChange={(e) =>
                       setField("company.description", e.target.value)
                     }
+                    rows={4}
+                    className="border-slate-300 focus:border-blue-500 focus:ring-blue-500 resize-none"
                   />
                 </div>
               </CardContent>
             </Card>
 
-            {/* Business Info */}
+            {/* Business Info Card */}
             <Card>
               <CardHeader>
                 <CardTitle>Thông tin pháp lý</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="businessInfo.registrationNumber">
-                      Số ĐKKD *
+              <CardContent className="p-6 space-y-5">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="businessInfo.registrationNumber"
+                      className="text-sm font-medium text-slate-700"
+                    >
+                      Số ĐKKD <span className="text-red-500">*</span>
                     </Label>
                     <Input
                       id="businessInfo.registrationNumber"
@@ -888,10 +1142,16 @@ export default function CompanyPage() {
                         )
                       }
                       required
+                      className="focus:border-primary focus:ring-primary"
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="businessInfo.taxId">Mã số thuế *</Label>
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="businessInfo.taxId"
+                      className="text-sm font-medium text-slate-700"
+                    >
+                      Mã số thuế <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="businessInfo.taxId"
                       value={formData.businessInfo.taxId}
@@ -899,12 +1159,18 @@ export default function CompanyPage() {
                         setField("businessInfo.taxId", e.target.value)
                       }
                       required
+                      className="focus:border-primary focus:ring-primary"
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="businessInfo.issueDate">Ngày cấp *</Label>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="businessInfo.issueDate"
+                      className="text-sm font-medium text-slate-700"
+                    >
+                      Ngày cấp <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="businessInfo.issueDate"
                       type="date"
@@ -913,10 +1179,16 @@ export default function CompanyPage() {
                         setField("businessInfo.issueDate", e.target.value)
                       }
                       required
+                      className="focus:border-primary focus:ring-primary"
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="businessInfo.issuePlace">Nơi cấp *</Label>
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="businessInfo.issuePlace"
+                      className="text-sm font-medium text-slate-700"
+                    >
+                      Nơi cấp <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="businessInfo.issuePlace"
                       value={formData.businessInfo.issuePlace}
@@ -924,99 +1196,92 @@ export default function CompanyPage() {
                         setField("businessInfo.issuePlace", e.target.value)
                       }
                       required
+                      className="focus:border-primary focus:ring-primary"
                     />
                   </div>
                 </div>
 
-                {/* Address */}
-                <div>
-                  <Label>Địa chỉ</Label>
-                  <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="md:col-span-2">
-                      <Input
-                        placeholder="Số nhà, tên đường"
-                        value={formData.businessInfo.address.street}
-                        onChange={(e) =>
-                          setField(
-                            "businessInfo.address.street",
-                            e.target.value
-                          )
-                        }
-                      />
-                    </div>
-                    <div className="flex flex-col md:flex-row gap-4 md:gap-6 md:justify-between justify-between">
-                      <div className="flex-1">
-                        <Select
-                          value={selectedCityKey}
-                          onValueChange={(v) => setSelectedCityKey(v)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Tỉnh/Thành phố" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {cities.map((c) => (
-                              <SelectItem key={c.value} value={c.value}>
-                                {c.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex-1">
-                        <Select
-                          value={selectedDistrictCode}
-                          onValueChange={(v) => setSelectedDistrictCode(v)}
-                          disabled={!selectedCityKey}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Quận/Huyện" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {districts.map((d) => (
-                              <SelectItem key={d.value} value={d.value}>
-                                {d.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex-1">
-                        <Select
-                          value={selectedWardCode}
-                          onValueChange={(v) => setSelectedWardCode(v)}
-                          disabled={!selectedDistrictCode}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Phường/Xã" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {wards.map((w) => (
-                              <SelectItem key={w.value} value={w.value}>
-                                {w.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                {/* Address Section */}
+                <div className="space-y-3 pt-4 border-t">
+                  <Label className="text-sm font-semibold text-slate-700">
+                    Địa chỉ văn phòng
+                  </Label>
+                  <div className="space-y-4">
+                    <Input
+                      placeholder="Số nhà, tên đường"
+                      value={formData.businessInfo.address.street}
+                      onChange={(e) =>
+                        setField("businessInfo.address.street", e.target.value)
+                      }
+                      className="focus:border-primary focus:ring-primary"
+                    />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Select
+                        value={selectedCityKey}
+                        onValueChange={(v) => setSelectedCityKey(v)}
+                      >
+                        <SelectTrigger className="focus:border-primary focus:ring-primary">
+                          <SelectValue placeholder="Tỉnh/Thành phố" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {cities.map((c) => (
+                            <SelectItem key={c.value} value={c.value}>
+                              {c.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={selectedDistrictCode}
+                        onValueChange={(v) => setSelectedDistrictCode(v)}
+                        disabled={!selectedCityKey}
+                      >
+                        <SelectTrigger className="focus:border-primary focus:ring-primary">
+                          <SelectValue placeholder="Quận/Huyện" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {districts.map((d) => (
+                            <SelectItem key={d.value} value={d.value}>
+                              {d.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={selectedWardCode}
+                        onValueChange={(v) => setSelectedWardCode(v)}
+                        disabled={!selectedDistrictCode}
+                      >
+                        <SelectTrigger className="focus:border-primary focus:ring-primary">
+                          <SelectValue placeholder="Phường/Xã" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {wards.map((w) => (
+                            <SelectItem key={w.value} value={w.value}>
+                              {w.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Legal Representative */}
+            {/* Legal Representative Card */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <UserCircle2 className="w-5 h-5 text-primary" /> Người đại
-                  diện pháp luật
-                </CardTitle>
+                <CardTitle>Người đại diện pháp luật</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="legalRepresentative.fullName">
-                      Họ và tên *
+              <CardContent className="p-6 space-y-5">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="legalRepresentative.fullName"
+                      className="text-sm font-medium text-slate-700"
+                    >
+                      Họ và tên <span className="text-red-500">*</span>
                     </Label>
                     <Input
                       id="legalRepresentative.fullName"
@@ -1025,11 +1290,15 @@ export default function CompanyPage() {
                         setField("legalRepresentative.fullName", e.target.value)
                       }
                       required
+                      className="focus:border-primary focus:ring-primary"
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="legalRepresentative.position">
-                      Chức vụ *
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="legalRepresentative.position"
+                      className="text-sm font-medium text-slate-700"
+                    >
+                      Chức vụ <span className="text-red-500">*</span>
                     </Label>
                     <Input
                       id="legalRepresentative.position"
@@ -1038,13 +1307,17 @@ export default function CompanyPage() {
                         setField("legalRepresentative.position", e.target.value)
                       }
                       required
+                      className="focus:border-primary focus:ring-primary"
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="legalRepresentative.phone">
-                      Số điện thoại *
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="legalRepresentative.phone"
+                      className="text-sm font-medium text-slate-700"
+                    >
+                      Số điện thoại <span className="text-red-500">*</span>
                     </Label>
                     <Input
                       id="legalRepresentative.phone"
@@ -1053,10 +1326,16 @@ export default function CompanyPage() {
                         setField("legalRepresentative.phone", e.target.value)
                       }
                       required
+                      className="focus:border-primary focus:ring-primary"
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="legalRepresentative.email">Email *</Label>
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="legalRepresentative.email"
+                      className="text-sm font-medium text-slate-700"
+                    >
+                      Email <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       id="legalRepresentative.email"
                       type="email"
@@ -1065,170 +1344,31 @@ export default function CompanyPage() {
                         setField("legalRepresentative.email", e.target.value)
                       }
                       required
+                      className="focus:border-primary focus:ring-primary"
                     />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="text-red-800 whitespace-pre-line">
-                  {typeof error === "string" ? error : JSON.stringify(error)}
-                </div>
-              </div>
-            )}
-
-            {success && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <p className="text-green-800">{success}</p>
-              </div>
-            )}
-
-            <div className="flex justify-end gap-4">
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-3 pt-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setIsEditing(false)}
+                disabled={loading}
               >
                 Hủy
               </Button>
-              <Button
-                type="submit"
-                disabled={loading}
-                className="flex items-center gap-2"
-              >
-                <Save className="w-4 h-4" />{" "}
-                {loading ? "Đang lưu..." : "Lưu thông tin"}
+              <Button type="submit" disabled={loading}>
+                <Save className="w-4 h-4 mr-2" />
+                {loading ? "Đang lưu..." : "Lưu thay đổi"}
               </Button>
             </div>
           </form>
-        ) : (
-          <div className="space-y-6">
-            {/* View Mode - Business Info */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Thông tin pháp lý</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label>Số ĐKKD</Label>
-                    <div className="mt-1 text-slate-900">
-                      {isPlaceholder ||
-                      isPlaceholderRegistrationNumber(
-                        formData.businessInfo.registrationNumber
-                      )
-                        ? "Chưa cập nhật"
-                        : formData.businessInfo.registrationNumber ||
-                          "Chưa cập nhật"}
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Mã số thuế</Label>
-                    <div className="mt-1 text-slate-900">
-                      {isPlaceholder ||
-                      isPlaceholderTaxId(formData.businessInfo.taxId)
-                        ? "Chưa cập nhật"
-                        : formData.businessInfo.taxId || "Chưa cập nhật"}
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label>Ngày cấp</Label>
-                    <div className="mt-1 text-slate-900">
-                      {!formData.businessInfo.issueDate || isPlaceholder
-                        ? "Chưa cập nhật"
-                        : formData.businessInfo.issueDate}
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Nơi cấp</Label>
-                    <div className="mt-1 text-slate-900">
-                      {isPlaceholderText(formData.businessInfo.issuePlace)
-                        ? "Chưa cập nhật"
-                        : formData.businessInfo.issuePlace || "Chưa cập nhật"}
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <Label>Địa chỉ</Label>
-                  <div className="mt-1 text-slate-900">
-                    {(() => {
-                      const addressParts = [
-                        formData.businessInfo.address.street,
-                        formData.businessInfo.address.ward,
-                        formData.businessInfo.address.district,
-                        formData.businessInfo.address.city,
-                        formData.businessInfo.address.country,
-                      ];
-                      const hasPlaceholder = addressParts.some(
-                        (part) => part && isPlaceholderText(part)
-                      );
-                      if (hasPlaceholder) return "Chưa cập nhật";
-                      return (
-                        addressParts.filter(Boolean).join(", ") ||
-                        "Chưa cập nhật"
-                      );
-                    })()}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* View Mode - Legal Representative */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <UserCircle2 className="w-5 h-5 text-primary" /> Người đại
-                  diện pháp luật
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label>Họ và tên</Label>
-                    <div className="mt-1 text-slate-900">
-                      {isPlaceholderText(formData.legalRepresentative.fullName)
-                        ? "Chưa cập nhật"
-                        : formData.legalRepresentative.fullName ||
-                          "Chưa cập nhật"}
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Chức vụ</Label>
-                    <div className="mt-1 text-slate-900">
-                      {isPlaceholderText(formData.legalRepresentative.position)
-                        ? "Chưa cập nhật"
-                        : formData.legalRepresentative.position ||
-                          "Chưa cập nhật"}
-                    </div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label>Số điện thoại</Label>
-                    <div className="mt-1 text-slate-900">
-                      {isPlaceholderPhone(formData.legalRepresentative.phone)
-                        ? "Chưa cập nhật"
-                        : formData.legalRepresentative.phone || "Chưa cập nhật"}
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Email</Label>
-                    <div className="mt-1 text-slate-900">
-                      {isPlaceholderEmail(formData.legalRepresentative.email)
-                        ? "Chưa cập nhật"
-                        : formData.legalRepresentative.email || "Chưa cập nhật"}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         )}
       </div>
-    </div>
+    </EmployerShell>
   );
 }
